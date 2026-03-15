@@ -1,0 +1,21 @@
+{
+  "id": "TestiID",
+  "name": "TEST BETA BADGE",
+  "email": "email@testbetabadge.com",
+  "url": "https://testbetabadge.org/",
+  "description": "This is a test badge for Test Beta Badge.",
+  "image": "[REDACTED_IMAGE]",
+  "tier": "pro",
+  "paid_until": 1923516000,
+  "aliases": 3,
+  "issuing_limit": 4885,
+  "country": "FI",
+  "type": "other",
+  "reply_to": "reply_to@testbetabadge.com",
+  "billing_email": "billing_email@testbetabadge.com",
+  "vat_id": "",
+  "searchable": true,
+  "verified": false,
+  "ctime": 1729086820,
+  "mtime": 1752228687
+}

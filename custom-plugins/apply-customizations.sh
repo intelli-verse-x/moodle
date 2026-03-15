@@ -1,42 +1,47 @@
 #!/bin/bash
 echo "[custom-init] Applying persistent customizations..."
 
-# 1. Install/upgrade customcert plugin (mod_customcert v5.0.2)
-CUSTOMCERT_SRC=/var/moodledata/custom-plugins/mod/customcert
-CUSTOMCERT_DST=/var/www/html/mod/customcert
-if [ -d "$CUSTOMCERT_SRC" ]; then
-    INSTALLED_VER=""
-    if [ -f "$CUSTOMCERT_DST/version.php" ]; then
-        INSTALLED_VER=$(grep -oP "release\s*=\s*\"\K[^\"]*" "$CUSTOMCERT_DST/version.php" 2>/dev/null)
+install_plugin() {
+    local SRC="$1"
+    local DST="$2"
+    local LABEL="$3"
+
+    if [ ! -d "$SRC" ]; then
+        return
     fi
-    SOURCE_VER=$(grep -oP "release\s*=\s*\"\K[^\"]*" "$CUSTOMCERT_SRC/version.php" 2>/dev/null)
+
+    INSTALLED_VER=""
+    SOURCE_VER=""
+    if [ -f "$DST/version.php" ]; then
+        INSTALLED_VER=$(grep -oP "version\s*=\s*\K[0-9]+" "$DST/version.php" 2>/dev/null | head -1)
+    fi
+    SOURCE_VER=$(grep -oP "version\s*=\s*\K[0-9]+" "$SRC/version.php" 2>/dev/null | head -1)
 
     if [ "$INSTALLED_VER" != "$SOURCE_VER" ]; then
-        echo "[custom-init] Upgrading customcert: ${INSTALLED_VER:-not installed} -> $SOURCE_VER"
-        rm -rf "$CUSTOMCERT_DST"
-        cp -a "$CUSTOMCERT_SRC" "$CUSTOMCERT_DST"
-        chown -R www-data:www-data "$CUSTOMCERT_DST" 2>/dev/null || true
-        echo "[custom-init] customcert $SOURCE_VER installed"
+        echo "[custom-init] Installing/upgrading $LABEL: ${INSTALLED_VER:-not installed} -> $SOURCE_VER"
+        rm -rf "$DST"
+        cp -a "$SRC" "$DST"
+        chown -R www-data:www-data "$DST" 2>/dev/null || true
+        echo "[custom-init] $LABEL installed"
     else
-        echo "[custom-init] customcert $INSTALLED_VER already up to date"
+        echo "[custom-init] $LABEL already up to date ($INSTALLED_VER)"
     fi
-fi
+}
 
-# 2. Install/upgrade verify_certs block (block_verify_certs)
-VERIFYCERTS_SRC=/var/moodledata/custom-plugins/blocks/verify_certs
-VERIFYCERTS_DST=/var/www/html/blocks/verify_certs
-if [ -d "$VERIFYCERTS_SRC" ]; then
-    if [ ! -f "$VERIFYCERTS_DST/version.php" ]; then
-        echo "[custom-init] Installing verify_certs block..."
-        cp -a "$VERIFYCERTS_SRC" "$VERIFYCERTS_DST"
-        chown -R www-data:www-data "$VERIFYCERTS_DST" 2>/dev/null || true
-        echo "[custom-init] verify_certs installed"
-    else
-        echo "[custom-init] verify_certs already present"
-    fi
-fi
+# Activity modules
+install_plugin /var/moodledata/custom-plugins/mod/customcert /var/www/html/mod/customcert "mod_customcert"
+install_plugin /var/moodledata/custom-plugins/mod/linkedincert /var/www/html/mod/linkedincert "mod_linkedincert"
 
-# 3. Apply email confirmation skip patch
+# Blocks
+install_plugin /var/moodledata/custom-plugins/blocks/verify_certs /var/www/html/blocks/verify_certs "block_verify_certs"
+
+# Enrollment
+install_plugin /var/moodledata/custom-plugins/enrol/apply /var/www/html/enrol/apply "enrol_apply"
+
+# Local plugins
+install_plugin /var/moodledata/custom-plugins/local/obf /var/www/html/local/obf "local_obf"
+
+# Apply email confirmation skip patch
 AUTH_FILE=/var/www/html/auth/email/auth.php
 if [ -f "$AUTH_FILE" ]; then
     if ! grep -q "CUSTOM_SKIP_EMAIL_CONFIRM" "$AUTH_FILE"; then

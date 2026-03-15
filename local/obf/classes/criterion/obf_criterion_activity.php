@@ -1,0 +1,445 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Activity completion critrion.
+ *
+ * @package    local_obf
+ * @copyright  2013-2020, Open Badge Factory Oy
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+namespace classes\criterion;
+
+use completion_info;
+use html_writer;
+use MoodleQuickForm;
+use Set;
+use stdClass;
+
+defined('MOODLE_INTERNAL') || die();
+
+require_once(__DIR__ . '/obf_criterion_item.php');
+require_once(__DIR__ . '/obf_criterion.php');
+require_once(__DIR__ . '/obf_criterion_course.php');
+require_once(__DIR__ . '/../badge.php');
+
+/**
+ * Class representing a activity criterion.
+ *
+ * @copyright  2013-2020, Open Badge Factory Oy
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class obf_criterion_activity extends obf_criterion_course {
+    /**
+     * @var $criteriatype Set to self::CRITERIA_TYPE_ACTIVITY
+     */
+    protected $criteriatype = obf_criterion_item::CRITERIA_TYPE_ACTIVITY;
+    /**
+     * @var string $requiredparam
+     * @see obf_criterion_course::save_params
+     */
+    protected $requiredparam = 'module';
+    /**
+     * @var string[] $optionalparams Optional params to be saved.
+     * @see obf_criterion_course::save_params
+     */
+    protected $optionalparams = array('completedby', 'clientaliasid');
+
+    /**
+     * Get the instance of this class by id.
+     *
+     * @param int $id The id of the activity criterion
+     * @param int $method
+     * @return obf_criterion_activity
+     */
+    public static function get_instance($id, $method = null) {
+        global $DB;
+
+        $record = $DB->get_record('local_obf_criterion_courses', array('id' => $id));
+        $obj = new self();
+
+        return $obj->populate_from_record($record);
+    }
+
+    /**
+     * Initializes this object with values from $record
+     *
+     * @param stdClass $record The record from Moodle's database
+     * @return \obf_criterion_activity
+     */
+    public function populate_from_record(\stdClass $record) {
+        $this->set_id($record->id)->set_criterionid($record->obf_criterion_id);
+        $this->set_courseid($record->courseid)->set_completedby($record->completed_by);
+        $this->set_criteriatype($record->criteria_type);
+        // TODO:  Populate params?
+        return $this;
+    }
+
+    /**
+     * Saves this activity criterion to database. If it exists already, the
+     * existing record will be updated.
+     *
+     * @return mixed Returns this object if everything went ok, false otherwise.
+     */
+    public function save() {
+        global $DB;
+
+        $obj = new stdClass();
+        $obj->obf_criterion_id = $this->criterionid;
+        $obj->courseid = $this->courseid;
+        $obj->completed_by = $this->has_completion_date() ? $this->completedby : null;
+        $obj->criteria_type = $this->get_criteriatype();
+
+        // Updating existing record.
+        if ($this->id > 0) {
+            $obj->id = $this->id;
+            $DB->update_record('local_obf_criterion_courses', $obj);
+        } else { // Inserting a new record.
+            $id = $DB->insert_record('local_obf_criterion_courses', $obj);
+
+            if (!$id) {
+                return false;
+            }
+
+            $this->set_id($id);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Check that activities are all available, deleted item has empty name
+     */
+    public function is_valid() {
+        $params = $this->get_params();
+        $modids = self::get_module_instanceids_from_params($params);
+        $texts = array();
+        foreach ($modids as $modid) {
+            if (empty($this->get_activityname($modid))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Returns the name of the activity this criterion is related to.
+     *
+     * @param int $cminstance Course module instance id
+     * @return string The full name of the activity.
+     */
+    public function get_activityname($cminstance) {
+        global $DB;
+
+        $activityname = '';
+        $cmrecord = $DB->get_record('course_modules', array('id' => $cminstance));
+        if ($cmrecord) {
+            $modulename = $DB->get_field('modules', 'name',
+                array('id' => $cmrecord->module));
+            $activityname = $DB->get_field($modulename, 'name', array('id' => $cmrecord->instance));
+        }
+        return $activityname;
+    }
+
+    /**
+     * Get name.
+     *
+     * @return string
+     */
+    public function get_name() {
+        $params = $this->get_params();
+        $name = '';
+        foreach ($params as $param) {
+            if (array_key_exists('module', $param)) {
+                $cminstance = $param['module'];
+                $name .= (empty($name) ? '' : ', ') . $this->get_activityname($cminstance);
+            }
+        }
+        return $name;
+    }
+
+    /**
+     * Get course activities.
+     *
+     * @param int $courseid
+     * @return stdClass[] Activities
+     */
+    public static function get_course_activities($courseid) {
+        global $DB;
+
+        $activities = array();
+        $sql = "SELECT * FROM {course_modules} WHERE course = $courseid AND completion > 0";
+        $cmrecords = $DB->get_records_sql($sql);
+        foreach ($cmrecords as $cmrecord) {
+            $modulename = $DB->get_field('modules', 'name', array('id' => $cmrecord->module));
+            $modulename_localised = get_string('modulename', 'mod_' . $modulename);
+            $section = $DB->get_record_sql('SELECT * FROM {course_sections} WHERE id = ?', array('id' => $cmrecord->section));
+
+            $activities[$cmrecord->id]['sectionid'] = $section->id;
+
+            if (empty($section->name)) {
+                $activities[$cmrecord->id]['sectionname'] = get_string('section', 'core') . ' ' . $section->section;
+            } else {
+                $activities[$cmrecord->id]['sectionname'] = $section->name;
+            }
+
+            try {
+                $imageicon = html_writer::empty_tag('img',
+                    ['src' => get_fast_modinfo($courseid)->get_cm($cmrecord->id)->get_icon_url(),
+                    'class' => 'activityicon', 'alt' => '', 'role' => 'presentation', 'aria-hidden' => 'true']);
+            } catch (\moodle_exception $e) {
+                $imageicon = '';
+            }
+
+            $activities[$cmrecord->id]['name'] =
+                $imageicon . ' ' .
+                '<span class="modulename">'
+                . $modulename_localised .
+                ' - ' . $DB->get_field($modulename, 'name', array('id' => $cmrecord->instance));
+        }
+
+        return $activities;
+    }
+
+    /**
+     * Returns this criterion as text, including the name of the activity.
+     *
+     * @return string
+     */
+    public function get_text() {
+        $html = html_writer::tag('strong', $this->get_name());
+
+        if ($this->has_completion_date()) {
+            $html .= ' ' . get_string('completedbycriterion', 'local_obf',
+                    userdate($this->completedby,
+                        get_string('dateformatdate', 'local_obf')));
+        }
+
+        return $html;
+    }
+
+    /**
+     * Get an array of activity names.
+     *
+     * @return array html encoded activity descriptions.
+     */
+    public function get_text_array(): array {
+        $params = $this->get_params();
+        $modids = self::get_module_instanceids_from_params($params);
+        $texts = array();
+        foreach ($modids as $modid) {
+            $name = $this->get_activityname($modid);
+            if (empty($name)) {
+                $name = '???';
+            }
+            $html = html_writer::tag('strong', $name);
+            if (array_key_exists('completedby', $params[$modid])) {
+                $html .= ' ' . get_string('completedbycriterion', 'local_obf',
+                        userdate($params[$modid]['completedby'],
+                            get_string('dateformatdate', 'local_obf')));
+            }
+            $texts[] = $html;
+        }
+        return $texts;
+    }
+
+    /**
+     * Returns this criterion as text without the activity name.
+     *
+     * @return string
+     */
+    public function get_text_for_single_activity() {
+        $html = get_string('toearnthisbadge', 'local_obf');
+
+        if ($this->has_completion_date()) {
+            $html .= ' ' . get_string('completedbycriterion', 'local_obf',
+                    userdate($this->completedby,
+                        get_string('dateformatdate', 'local_obf')));
+        }
+
+        $html .= '.';
+
+        return $html;
+    }
+
+    /**
+     * Prints criteria activity settings for criteria forms.
+     *
+     * @param MoodleQuickForm& $mform
+     * @param mixed& $obj
+     */
+    public function get_options(&$mform, &$obj) {
+        global $OUTPUT;
+
+        $modules = self::get_course_activities($this->get_courseid());
+        $params = $this->get_params();
+
+        $this->get_form_activities($mform, $modules, $params, $obj);
+    }
+
+    /**
+     * Prints required config fields for criteria forms.
+     *
+     * @param MoodleQuickForm& $mform
+     * @param mixed& $obj
+     */
+    public function get_form_config(&$mform, &$obj) {
+        global $OUTPUT;
+        $mform->addElement('hidden', 'criteriatype', obf_criterion_item::CRITERIA_TYPE_ACTIVITY);
+        $mform->setType('criteriatype', PARAM_INT);
+
+        $mform->createElement('hidden', 'picktype', 'no');
+        $mform->setType('picktype', PARAM_TEXT);
+    }
+
+    /**
+     * Activities do not support multiple courses.
+     *
+     * @return boolean false
+     */
+    public function criteria_supports_multiple_courses() {
+        return false;
+    }
+
+    /**
+     * Reviews criteria for single user.
+     *
+     * @param stdClass $user
+     * @param obf_criterion $criterion The main criterion.
+     * @param obf_criterion_item[] $otheritems Other items related to main criterion.
+     * @param array& $extra Extra options passed to review method.
+     * @return boolean If the course criterion is completed by the user.
+     */
+    protected function review_for_user($user, $criterion = null, $otheritems = null, &$extra = null) {
+        global $CFG, $DB;
+        require_once($CFG->dirroot . '/grade/querylib.php');
+        require_once($CFG->libdir . '/gradelib.php');
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $requireall = $criterion->get_completion_method() == obf_criterion::CRITERIA_COMPLETION_ALL;
+
+        $userid = $user->id;
+        $courseid = $this->get_courseid();
+        $course = $criterion->get_course($courseid);
+        $completioninfo = new completion_info($course);
+
+        $params = $this->get_params();
+        $modules = array_keys(array_filter($params, function($v) {
+            return array_key_exists('module', $v) ? true : false;
+        }));
+        $completedmodulecount = 0;
+
+        foreach ($modules as $modid) {
+            $cm = $DB->get_record('course_modules', array('id' => $modid));
+            $completiondata = $completioninfo->get_data($cm, false, $userid);
+
+            $modulecomplete = in_array($completiondata->completionstate, array(COMPLETION_COMPLETE, COMPLETION_COMPLETE_PASS));
+            $datepassed = false;
+            $completedby = array_key_exists('completedby', $params[$modid]) ? $params[$modid][completedby] : null;
+            // Check completion date.
+            if (!is_null($completedby)) {
+                if ($completioninfo->timemodified <= $completedby) {
+                    $datepassed = true;
+                }
+            } else {
+                $datepassed = true;
+            }
+
+            if ($modulecomplete && $datepassed) {
+                $completedmodulecount += 1;
+            } else if ($requireall) {
+                return false;
+            }
+
+        }
+        if ($completedmodulecount < 1) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Print activities to form.
+     *
+     * @param MoodleQuickForm& $mform
+     * @param array $modules modules so the database is not accessed too much
+     * @param array $params
+     */
+    private function get_form_activities(&$mform, $modules, $params, $obj = null) {
+        $mform->addElement('html', html_writer::tag('h2', get_string('selectactivity', 'local_obf')));
+
+        $existing = array();
+        foreach ($params as $param) {
+            if (array_key_exists('module', $param)) {
+                $existing[] = $param['module'];
+            }
+        }
+
+        $groupedmodules = array();
+        foreach ($modules as $key => $mod) {
+            $sectionid = $mod['sectionid'];
+            $sectionname = $mod['sectionname'];
+            $modulename = $mod['name'];
+
+            if (!isset($groupedmodules[$sectionid])) {
+                $groupedmodules[$sectionid] = array(
+                    'header' => 'section_' . $sectionid,
+                    'sectionname' => $sectionname,
+                    'modules' => array(),
+                );
+            }
+
+            $groupedmodules[$sectionid]['modules'][$key] = $modulename;
+        }
+
+        foreach ($groupedmodules as $sectionid => $groupdata) {
+            $mform->addElement('html',
+                html_writer::tag('div', $groupdata['sectionname'], array('class' => 'col-md-9 offset-md-3 section-text'))
+            );
+
+            foreach ($groupdata['modules'] as $moduleid => $modulename) {
+                $mform->addElement('advcheckbox', 'module_' . $moduleid,
+                    $modulename, null, array('group' => $sectionid), array(0, $moduleid));
+            }
+        }
+
+        foreach ($existing as $modid) {
+            $mform->setDefault('module_' . $modid, $modid);
+        }
+
+        /** Select issuer section */
+        $this->add_issuer_selector_section($mform, $obj);
+    }
+
+
+    /**
+     * Get module instance ids this activity criterion item is asscociated to.
+     *
+     * @param array $params
+     * @return array ids of activity instances
+     */
+    private static function get_module_instanceids_from_params($params) {
+        $ids = array();
+        foreach ($params as $param) {
+            if (array_key_exists('module', $param)) {
+                $ids[] = $param['module'];
+            }
+        }
+        return $ids;
+    }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "TestiID",
+  "category": ["Testi"],
+  "image": "[REDACTED_IMAGE]",
+  "primary_language": "",
+  "content": [
+    {
+      "language": "",
+      "name": "The badge that no one has!",
+      "description": "It's a badge for nobody!",
+      "criteria": "It's without criteria",
+      "tag": [],
+      "alignment": [],
+      "achievement_type": "",
+      "credits_available": 0.0,
+      "field_of_study": "",
+      "human_code": "",
+      "specialization": ""
+    }
+  ],
+  "creator": null,
+  "intent": "",
+  "client_alias_id": [],
+  "email_message": null,
+  "expires": 0,
+  "draft": false,
+  "ctime": 1746005542,
+  "mtime": 1751984153
+}

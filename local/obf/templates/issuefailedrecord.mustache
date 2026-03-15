@@ -1,0 +1,141 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template local_obf/issuefailedrecord
+
+    The issuefailedrecord template is used to render a table of badges with
+    various information like recipients, timestamp, name, etc.
+
+    Context variables required for this template: connectionfailed, records.
+
+    Other context variables: id, recipients, timestamp, badgename, badgeinformation,
+    emailbutton, badgeid, body, linktext, courseslinks, deleteurl etc.
+
+    Example context (json):
+    {
+        "connectionfailed": false,
+        "records": [
+            {
+                "id": 1,
+                "recipients": ["John Doe", "Jane Doe"],
+                "timestamp": "2023-06-15 15:30",
+                "badgename": "Great Achiever",
+                // more data...
+            },
+            // More records...
+        ]
+    }
+}}
+
+{{#connectionfailed}}
+    <div class="alert alert-warning" role="alert">
+        <h4 class="alert-heading">{{#str}}error, core{{/str}}</h4>
+        {{#str}}unavailableserver, local_obf{{/str}}
+    </div>
+{{/connectionfailed}}
+
+<div class="alert alert-info mt-3" role="alert">
+    <h4 class="alert-heading">{{#str}}badgependinginformation, local_obf{{/str}}</h4>
+    <p>
+        {{#str}}badgependinginformationmessage, local_obf{{/str}}
+    </p>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+        <tr>
+            <th>{{#str}}tableheaderid, local_obf{{/str}}</th>
+            <th>{{#str}}tableheaderrecipients, local_obf{{/str}}</th>
+            <th>{{#str}}tableheaderdate, local_obf{{/str}}</th>
+            <th>{{#str}}badgenameorid, local_obf{{/str}}</th>
+            <th>{{#str}}tableheaderinfo, local_obf{{/str}}</th>
+            <th>{{#str}}tableheadercourse, local_obf{{/str}}</th>
+            <th>{{#str}}tableheaderstatus, local_obf{{/str}}</th>
+            <th>{{#str}}tableheaderaction, local_obf{{/str}}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{#records}}
+            <tr>
+                <td>{{id}}</td>
+                <td>
+                    {{#recipients}}
+                        {{.}}
+                    {{/recipients}}
+                </td>
+                <td>{{timestamp}}</td>
+                <td>
+                    {{badgename}}
+                    {{^badgeinformation}}
+                        <a href="#" data-toggle="tooltip" data-placement="right" title="{{#str}}unavailableinfo, local_obf{{/str}}">
+                            <i class="icon fa fa-question-circle text-info fa-fw"></i>
+                        </a>
+                    {{/badgeinformation}}
+                </td>
+                <td>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-toggle="modal" data-target="#emailModal-{{id}}">
+                        {{#str}}emailbutton, local_obf{{/str}}
+                    </button>
+                    <div class="modal fade" id="emailModal-{{id}}" tabindex="-1" role="dialog" aria-labelledby="emailModalLabel-{{id}}" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="emailModalLabel-{{id}}">{{email.subject}}</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <p><strong>{{#str}}emailbadgeid, local_obf{{/str}}</strong> {{email.badgeid}}</p>
+                                    <p><strong>{{#str}}emailbody, local_obf{{/str}}</strong> {{email.body}}</p>
+                                    <p><strong>{{#str}}emailfooter, local_obf{{/str}}</strong> {{email.footer}}</p>
+                                    <p><strong>{{#str}}emaillinktext, local_obf{{/str}}</strong> {{email.linktext}}</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <ul class="list-unstyled">
+                        {{#courseslinks}}
+                            <li><a href="{{link}}" class="text-decoration-none link-primary fw-bold fs-5">{{name}}</a></li>
+                        {{/courseslinks}}
+                    </ul>
+                </td>
+                <td>
+                    <span class="badge bg-{{status}} status-{{status}} p-1">{{status}}</span>
+                </td>
+                <td>
+                    <a href="{{deleteurl}}" class="btn btn-danger">
+                        {{#str}}deletelink, local_obf{{/str}}
+                    </a>
+                </td>
+            </tr>
+        {{/records}}
+        {{^records}}
+            <!-- Displayed when records is empty -->
+            <tr>
+                <td class="text-center" colspan="8">{{#str}}norecordsfound, local_obf{{/str}}</td>
+            </tr>
+        {{/records}}
+        </tbody>
+    </table>
+</div>
