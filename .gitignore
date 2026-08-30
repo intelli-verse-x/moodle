@@ -61,4 +61,4 @@ jsconfig.json
 UPGRADING-CURRENT.md
 .phpunit.cache
 tsconfig.aliases.json
-config.bat
+# INC-2026-08-29: config.bat (the carrier script) must NOT be ignored - it has to stay visible to `git status`.
