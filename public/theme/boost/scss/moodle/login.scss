@@ -66,6 +66,15 @@ $login-input-bg: $gray-100 !default;
     margin: auto 0;
 }
 
+#loginlogo {
+    margin-top: -16px;
+
+    #logoimage {
+        height: 80px;
+        width: auto;
+    }
+}
+
 .login-container {
     .login-form {
         .form-control {
