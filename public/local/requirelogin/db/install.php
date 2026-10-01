@@ -30,4 +30,5 @@ defined('MOODLE_INTERNAL') || die();
 function xmldb_local_requirelogin_install(): void {
     \local_requirelogin\policy::persist();
     \local_requirelogin\courselist::restrict();
+    \local_requirelogin\logo::install();
 }
