@@ -39,5 +39,9 @@ function xmldb_local_requirelogin_upgrade($oldversion) {
         \local_requirelogin\courselist::restrict();
         upgrade_plugin_savepoint(true, 2026092601, 'local', 'requirelogin');
     }
+    if ($oldversion < 2026092602) {
+        \local_requirelogin\logo::install();
+        upgrade_plugin_savepoint(true, 2026092602, 'local', 'requirelogin');
+    }
     return true;
 }
