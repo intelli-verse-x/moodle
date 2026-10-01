@@ -1,0 +1,9 @@
+.git
+.github
+**/.git
+node_modules
+npm-shrinkwrap.json
+.phpunit*
+/vendor
+*.md
+.upgradenotes

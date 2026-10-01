@@ -1,0 +1,128 @@
+# Deploy intelli-verse-x/moodle → ECR toba-moodle → toba-prod/moodle (learn.toba-tech.ai).
+# OIDC role github-actions-moodle-deploy. Public ECR login avoids the anonymous 500GB cap.
+name: Build & Deploy to EKS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "803881282303"
+  DEPLOY_ROLE_ARN: arn:aws:iam::803881282303:role/github-actions-moodle-deploy
+  ECR_REGISTRY: 803881282303.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: toba-moodle
+  EKS_CLUSTER_NAME: ai-cart-auto-cluster
+  K8S_NAMESPACE: toba-prod
+  K8S_DEPLOYMENT: moodle
+  K8S_CONTAINER: moodle
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          role-session-name: moodle-deploy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Login to Amazon ECR Public
+        uses: aws-actions/amazon-ecr-login@v2
+        env:
+          AWS_REGION: us-east-1
+          AWS_DEFAULT_REGION: us-east-1
+        with:
+          registry-type: public
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+          kubectl get deployment "$K8S_DEPLOYMENT" -n "$K8S_NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+
+      - name: Compute image tag
+        run: |
+          COMMIT_HASH=$(echo "$GITHUB_SHA" | cut -c 1-7)
+          IMAGE_VERSION="gha${GITHUB_RUN_NUMBER}-${COMMIT_HASH}"
+          echo "IMAGE_VERSION=$IMAGE_VERSION" >> "$GITHUB_ENV"
+          echo "REPOSITORY_URI=${ECR_REGISTRY}/${ECR_REPOSITORY}" >> "$GITHUB_ENV"
+
+      - name: Dump Moodle database before image change
+        run: |
+          set -euo pipefail
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          kubectl -n "$K8S_NAMESPACE" exec deploy/mariadb -- sh -c \
+            'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines moodle | gzip' \
+            > "/tmp/moodle-${STAMP}.sql.gz"
+          ls -lh "/tmp/moodle-${STAMP}.sql.gz"
+          kubectl -n "$K8S_NAMESPACE" cp "/tmp/moodle-${STAMP}.sql.gz" \
+            "deploy/mariadb:/tmp/moodle-pre-gha-${STAMP}.sql.gz"
+          echo "DB dump kept on runner and mariadb pod /tmp/moodle-pre-gha-${STAMP}.sql.gz"
+
+      - name: Build and push amd64 image
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            -f Dockerfile \
+            -t "${REPOSITORY_URI}:${IMAGE_VERSION}" \
+            --push \
+            .
+
+      - name: Deploy digest-pinned image
+        run: |
+          set -euo pipefail
+          IMAGE_DIGEST=$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_VERSION" \
+            --query 'imageDetails[0].imageDigest' --output text)
+          PREVIOUS_IMAGE=$(kubectl get deployment "$K8S_DEPLOYMENT" -n "$K8S_NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "PREVIOUS_IMAGE=$PREVIOUS_IMAGE"
+          echo "IMAGE_DIGEST=$IMAGE_DIGEST"
+          kubectl set image deployment/"$K8S_DEPLOYMENT" \
+            "$K8S_CONTAINER"="${REPOSITORY_URI}@${IMAGE_DIGEST}" \
+            -n "$K8S_NAMESPACE"
+          kubectl annotate deployment/"$K8S_DEPLOYMENT" -n "$K8S_NAMESPACE" --overwrite \
+            kubernetes.io/change-cause="deploy-eks gha${GITHUB_RUN_NUMBER}: ${IMAGE_VERSION}"
+          if ! kubectl rollout status deployment/"$K8S_DEPLOYMENT" -n "$K8S_NAMESPACE" --timeout=12m; then
+            echo "Rollout failed — restoring $PREVIOUS_IMAGE"
+            kubectl set image deployment/"$K8S_DEPLOYMENT" \
+              "$K8S_CONTAINER=$PREVIOUS_IMAGE" -n "$K8S_NAMESPACE"
+            kubectl rollout status deployment/"$K8S_DEPLOYMENT" -n "$K8S_NAMESPACE" --timeout=12m || true
+            exit 1
+          fi
+
+      - name: Moodle CLI upgrade (non-interactive)
+        run: |
+          set -euo pipefail
+          kubectl -n "$K8S_NAMESPACE" exec deploy/"$K8S_DEPLOYMENT" -- \
+            php admin/cli/upgrade.php --non-interactive --allow-unstable --agree-license
+
+      - name: Site check
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /tmp/moodle-home.html -w '%{http_code}' --max-time 30 https://learn.toba-tech.ai/)
+          echo "HTTP $code"
+          test "$code" = "200" || test "$code" = "303" || test "$code" = "302"
