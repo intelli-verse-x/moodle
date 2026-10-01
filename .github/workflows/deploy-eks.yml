@@ -122,7 +122,7 @@ jobs:
         run: |
           set -euo pipefail
           kubectl -n "$K8S_NAMESPACE" exec deploy/"$K8S_DEPLOYMENT" -- \
-            php admin/cli/upgrade.php --non-interactive --allow-unstable --agree-license
+            runuser -u www-data -- php admin/cli/upgrade.php --non-interactive --allow-unstable
 
       - name: Site check
         run: |
