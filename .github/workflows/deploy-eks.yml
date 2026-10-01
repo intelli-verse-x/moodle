@@ -75,9 +75,13 @@ jobs:
             'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines moodle | gzip' \
             > "/tmp/moodle-${STAMP}.sql.gz"
           ls -lh "/tmp/moodle-${STAMP}.sql.gz"
-          kubectl -n "$K8S_NAMESPACE" cp "/tmp/moodle-${STAMP}.sql.gz" \
-            "deploy/mariadb:/tmp/moodle-pre-gha-${STAMP}.sql.gz"
-          echo "DB dump kept on runner and mariadb pod /tmp/moodle-pre-gha-${STAMP}.sql.gz"
+          # kubectl cp SRC dest/pod:path treats "dest" as a namespace. Pipe into the
+          # deployment instead (same resource exec already used for mysqldump).
+          kubectl -n "$K8S_NAMESPACE" exec -i deploy/mariadb -- \
+            sh -c "cat > /tmp/moodle-pre-gha-${STAMP}.sql.gz" \
+            < "/tmp/moodle-${STAMP}.sql.gz"
+          echo "DBDUMP=/tmp/moodle-${STAMP}.sql.gz" >> "$GITHUB_ENV"
+          echo "DB dump kept on runner and mariadb /tmp/moodle-pre-gha-${STAMP}.sql.gz"
 
       - name: Build and push amd64 image
         run: |
