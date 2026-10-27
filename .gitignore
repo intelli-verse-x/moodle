@@ -61,3 +61,6 @@ jsconfig.json
 UPGRADING-CURRENT.md
 .phpunit.cache
 tsconfig.aliases.json
+
+# Local personal notes (not part of Moodle / ToBa deploy).
+/personal-resources/
