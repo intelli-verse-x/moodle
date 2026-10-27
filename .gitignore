@@ -62,5 +62,5 @@ UPGRADING-CURRENT.md
 .phpunit.cache
 tsconfig.aliases.json
 
-# Local personal notes (not part of Moodle / ToBa deploy).
+# Local personal notes / tooling (not part of Moodle / ToBa deploy).
 /personal-resources/

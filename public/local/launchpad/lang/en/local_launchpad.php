@@ -24,7 +24,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$string['pluginname'] = 'LaunchPad structure tools';
-$string['privacy:metadata'] = 'The LaunchPad structure plugin does not store personal data.';
+$string['pluginname'] = 'ToBa Learn LaunchPad';
+$string['privacy:metadata'] = 'The LaunchPad plugin does not store personal data beyond normal Moodle account and enrolment records.';
+$string['pagetitle'] = 'ToBa Learn · LaunchPad Fellowship';
+$string['mentorformurl'] = 'Become a mentor · Google Form URL';
+$string['mentorformurl_desc'] = 'Public Google Form link for mentor applications. Applicants are redirected here from the landing page. After they submit, your team contacts them for the next steps.';
 $string['emptystate_no_course'] = 'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.';
-

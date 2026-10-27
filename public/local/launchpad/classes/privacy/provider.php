@@ -16,6 +16,8 @@
 
 namespace local_launchpad\privacy;
 
+defined('MOODLE_INTERNAL') || die();
+
 /**
  * Privacy provider (null provider).
  *
@@ -25,6 +27,8 @@ namespace local_launchpad\privacy;
  */
 class provider implements \core_privacy\local\metadata\null_provider {
     /**
+     * Language string explaining why no data is stored.
+     *
      * @return string
      */
     public static function get_reason(): string {
