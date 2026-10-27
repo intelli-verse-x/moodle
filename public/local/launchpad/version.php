@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-$plugin->version   = 2026102601;
+$plugin->version   = 2026102700;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.1.2';
+$plugin->release   = '0.1.3';

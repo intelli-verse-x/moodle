@@ -12,6 +12,7 @@ Repository-backed tools to create the **LaunchPad** Moodle category/course skele
 - Four phase sections on each **track** course: Foundations → Guided project → Industry simulation → Demo day and certification
 - Hidden placeholder activities (Page / Quiz / Assign only — **no video stubs**)
 - Ensures a **manual** enrolment instance (create/enable if needed). Other enabled enrolment methods are **reported and left unchanged**
+- On **My / My courses**, fellows with no `lp-*` enrolment see an honest empty-state notice (no invented contacts or self-enrol instructions)
 
 Does **not** delete legacy categories (e.g. an older Orientation category). Does **not** invent curriculum body text, mentors, grades, or certificates. Out of scope vs MVP §8: portals, commerce, hiring, mentor marketplace.
 

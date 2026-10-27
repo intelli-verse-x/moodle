@@ -26,3 +26,5 @@ defined('MOODLE_INTERNAL') || die();
 
 $string['pluginname'] = 'LaunchPad structure tools';
 $string['privacy:metadata'] = 'The LaunchPad structure plugin does not store personal data.';
+$string['emptystate_no_course'] = 'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.';
+
