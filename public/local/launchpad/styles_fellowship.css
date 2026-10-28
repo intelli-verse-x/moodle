@@ -809,7 +809,46 @@ body.local-launchpad-fellowship {
 }
 .lp-chip.is-on { background: var(--lp-blue); color: #fff; }
 .lp-chip.ok { background: #E3F5E8; color: #1E7A3B; }
+.lp-chip.warn { background: #FFF4D6; color: #8A5A00; }
 .lp-chip.line { background: none; border-color: var(--lp-line); color: var(--lp-muted); }
+
+.lp-feedback-card.is-attention {
+  border-color: #F5DFAE;
+  box-shadow: 0 0 0 3px rgba(255, 191, 51, .12);
+}
+.lp-feedback-grade {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.lp-feedback-grade b {
+  font-family: var(--lp-head);
+  font-size: 28px;
+  color: var(--lp-navy);
+}
+.lp-quote {
+  margin: 8px 0 14px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--lp-blue);
+  background: var(--lp-blue-softer);
+  border-radius: 0 14px 14px 0;
+  font-size: 15.5px;
+  color: var(--lp-ink);
+}
+.lp-feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+.lp-feedback-section {
+  margin: 8px 0 0;
+  font-family: var(--lp-head);
+  font-size: 18px;
+  font-weight: 700;
+}
 
 .lp-phase {
   background: var(--lp-surface);
@@ -895,6 +934,20 @@ body.local-launchpad-fellowship {
   align-items: center;
   gap: 10px;
   box-shadow: var(--lp-shadow);
+}
+.lp-empty-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.lp-empty-av {
+  height: 170px;
+  width: auto;
+  display: block;
+  margin: 0 auto 4px;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 20px rgba(13, 36, 97, .18));
 }
 .lp-empty-mark {
   width: 56px;

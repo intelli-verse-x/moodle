@@ -916,6 +916,255 @@ final class fellowship_dashboard {
     }
 
     /**
+     * Assignment feedback cards for the Fellowship Feedback tab (Moodle assign + gradebook).
+     *
+     * Statuses: not_submitted | pending | reviewed | changes
+     * "changes" = graded and attempt reopened for resubmit, or latest submission is reopened/draft after a grade.
+     *
+     * @param list<\stdClass> $courses
+     * @return array{
+     *   items: list<array>,
+     *   has_items: bool,
+     *   has_assigns: bool,
+     *   attention_count: int,
+     *   has_attention: bool
+     * }
+     */
+    public static function list_assignment_feedback(int $userid, array $courses): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $items = [];
+        $attention = 0;
+        $assigncount = 0;
+
+        foreach ($courses as $course) {
+            $modinfo = get_fast_modinfo($course, $userid);
+            foreach ($modinfo->get_cms() as $cm) {
+                if ($cm->modname !== 'assign' || !$cm->uservisible || $cm->deletioninprogress) {
+                    continue;
+                }
+                $assigncount++;
+                $instanceid = (int) $cm->instance;
+                $name = $cm->get_formatted_name();
+                $url = (new \moodle_url('/mod/assign/view.php', ['id' => $cm->id]))->out(false);
+
+                $latest = $DB->get_record('assign_submission', [
+                    'assignment' => $instanceid,
+                    'userid' => $userid,
+                    'latest' => 1,
+                ]);
+                $submittedcount = (int) $DB->count_records('assign_submission', [
+                    'assignment' => $instanceid,
+                    'userid' => $userid,
+                    'status' => 'submitted',
+                ]);
+
+                $agrades = $DB->get_records_select(
+                    'assign_grades',
+                    'assignment = :assignment AND userid = :userid AND grade >= 0',
+                    ['assignment' => $instanceid, 'userid' => $userid],
+                    'attemptnumber DESC, timemodified DESC',
+                    '*',
+                    0,
+                    1
+                );
+                $agrade = $agrades ? reset($agrades) : false;
+
+                $commenttext = '';
+                $gradedat = 0;
+                $gradepct = null;
+                $gradestr = '';
+                $hasgrade = false;
+
+                if ($agrade) {
+                    $gradedat = (int) ($agrade->timemodified ?: 0);
+                    // Moodle uses -1 for "no grade" on assign_grades.
+                    if ($agrade->grade !== null && (float) $agrade->grade >= 0) {
+                        $hasgrade = true;
+                        $assignmax = $DB->get_field('assign', 'grade', ['id' => $instanceid]);
+                        if ($assignmax !== false && (float) $assignmax > 0) {
+                            $gradepct = (((float) $agrade->grade) / ((float) $assignmax)) * 100;
+                            $gradestr = format_float($gradepct, 0) . '%';
+                        } else {
+                            $gradestr = format_float((float) $agrade->grade, 2);
+                        }
+                    }
+                    $fc = $DB->get_record('assignfeedback_comments', [
+                        'assignment' => $instanceid,
+                        'grade' => (int) $agrade->id,
+                    ]);
+                    if ($fc && trim((string) $fc->commenttext) !== '') {
+                        $hasgrade = true; // Comment released counts as feedback even if mark pending.
+                        $commenttext = format_text(
+                            $fc->commenttext,
+                            (int) $fc->commentformat,
+                            ['context' => \context_module::instance($cm->id), 'para' => false]
+                        );
+                    }
+                }
+
+                $gradeinfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
+                $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
+                $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
+                if ($gg && $gg->grade !== null && $grademax > 0) {
+                    $hasgrade = true;
+                    $gradepct = (((float) $gg->grade) / $grademax) * 100;
+                    $gradestr = format_float($gradepct, 0) . '%';
+                    if (!empty($gg->dategraded)) {
+                        $gradedat = max($gradedat, (int) $gg->dategraded);
+                    }
+                    if ($commenttext === '' && !empty($gg->feedback)) {
+                        $commenttext = format_text(
+                            $gg->feedback,
+                            (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
+                            ['context' => \context_module::instance($cm->id), 'para' => false]
+                        );
+                    }
+                }
+
+                $substatus = $latest ? (string) $latest->status : '';
+                $attempt = $latest ? ((int) $latest->attemptnumber + 1) : 0;
+                $submittedat = 0;
+                if ($latest && ($substatus === 'submitted' || $substatus === 'reopened')) {
+                    $submittedat = (int) ($latest->timemodified ?: $latest->timecreated);
+                } else if ($submittedcount > 0) {
+                    $lastsub = $DB->get_records('assign_submission', [
+                        'assignment' => $instanceid,
+                        'userid' => $userid,
+                        'status' => 'submitted',
+                    ], 'timemodified DESC', '*', 0, 1);
+                    if ($lastsub) {
+                        $s = reset($lastsub);
+                        $submittedat = (int) ($s->timemodified ?: $s->timecreated);
+                        if ($attempt <= 0) {
+                            $attempt = (int) $s->attemptnumber + 1;
+                        }
+                    }
+                }
+
+                // Classify.
+                $status = 'not_submitted';
+                $chip = 'line';
+                $needsattention = false;
+                if ($hasgrade && ($substatus === 'reopened' || $substatus === 'draft' || $substatus === 'new')) {
+                    $status = 'changes';
+                    $chip = 'warn';
+                    $needsattention = true;
+                } else if ($hasgrade) {
+                    $status = 'reviewed';
+                    $chip = ($gradepct !== null && $gradepct < 70) ? 'warn' : 'ok';
+                    if ($gradepct !== null && $gradepct < 70) {
+                        $needsattention = true;
+                    }
+                } else if ($substatus === 'submitted' || $submittedcount > 0) {
+                    $status = 'pending';
+                    $chip = '';
+                } else {
+                    $status = 'not_submitted';
+                    $chip = 'line';
+                }
+
+                if ($needsattention) {
+                    $attention++;
+                }
+
+                $statuslabel = match ($status) {
+                    'pending' => get_string('fellowship_feedback_status_pending', 'local_launchpad'),
+                    'reviewed' => get_string('fellowship_feedback_status_reviewed', 'local_launchpad'),
+                    'changes' => get_string('fellowship_feedback_status_changes', 'local_launchpad'),
+                    default => get_string('fellowship_feedback_status_none', 'local_launchpad'),
+                };
+
+                $summary = match ($status) {
+                    'pending' => get_string('fellowship_feedback_summary_pending', 'local_launchpad'),
+                    'reviewed' => get_string('fellowship_feedback_summary_reviewed', 'local_launchpad'),
+                    'changes' => get_string('fellowship_feedback_summary_changes', 'local_launchpad'),
+                    default => get_string('fellowship_feedback_summary_none', 'local_launchpad'),
+                };
+
+                $items[] = [
+                    'cmid' => (int) $cm->id,
+                    'name' => $name,
+                    'course_name' => format_string($course->fullname),
+                    'course_idnumber' => s($course->idnumber),
+                    'url' => $url,
+                    'status' => $status,
+                    'status_label' => $statuslabel,
+                    'chip' => $chip,
+                    'summary' => $summary,
+                    'has_grade' => $hasgrade && $gradestr !== '',
+                    'grade_display' => $gradestr,
+                    'has_comment' => $commenttext !== '',
+                    'comment_html' => $commenttext,
+                    'has_attempt' => $attempt > 0,
+                    'attempt' => $attempt,
+                    'submitted_at' => $submittedat ? userdate($submittedat, get_string('strftimedatetimeshort', 'langconfig')) : '',
+                    'graded_at' => $gradedat ? userdate($gradedat, get_string('strftimedatetimeshort', 'langconfig')) : '',
+                    'needs_attention' => $needsattention,
+                    'cta_label' => match ($status) {
+                        'not_submitted' => get_string('fellowship_feedback_cta_open', 'local_launchpad'),
+                        'pending' => get_string('fellowship_feedback_cta_view', 'local_launchpad'),
+                        'changes' => get_string('fellowship_feedback_cta_revise', 'local_launchpad'),
+                        default => get_string('fellowship_feedback_cta_view', 'local_launchpad'),
+                    },
+                ];
+            }
+        }
+
+        $released = [];
+        $pending = [];
+        $notsubmitted = [];
+        foreach ($items as $item) {
+            if ($item['status'] === 'reviewed' || $item['status'] === 'changes') {
+                $released[] = $item;
+            } else if ($item['status'] === 'pending') {
+                $pending[] = $item;
+            } else {
+                $notsubmitted[] = $item;
+            }
+        }
+
+        // HTML-style empty: no *released* mentor feedback yet.
+        $hasreleased = $released !== [];
+        $emptyctaurl = '';
+        $emptyctalabel = get_string('fellowship_feedback_cta_open', 'local_launchpad');
+        $emptybody = get_string('fellowship_feedback_empty_submit', 'local_launchpad');
+        if ($pending !== []) {
+            $emptybody = get_string('fellowship_feedback_empty_waiting', 'local_launchpad');
+            $emptyctaurl = $pending[0]['url'];
+            $emptyctalabel = get_string('fellowship_feedback_cta_receipt', 'local_launchpad');
+        } else if ($notsubmitted !== []) {
+            $emptybody = get_string('fellowship_feedback_empty_submit', 'local_launchpad');
+            $emptyctaurl = $notsubmitted[0]['url'];
+            $emptyctalabel = get_string('fellowship_feedback_cta_open', 'local_launchpad');
+        } else if ($items !== []) {
+            $emptyctaurl = $items[0]['url'];
+        }
+
+        return [
+            'items' => $items,
+            'released_items' => $released,
+            'pending_items' => $pending,
+            'open_items' => array_values(array_merge($pending, $notsubmitted)),
+            'has_released' => $hasreleased,
+            'has_open_items' => ($pending !== [] || $notsubmitted !== []),
+            'has_items' => $items !== [],
+            'has_assigns' => $assigncount > 0,
+            'attention_count' => $attention,
+            'has_attention' => $attention > 0,
+            // Banner only — cards below still update from Moodle (not a static forever page).
+            'show_empty_released' => $assigncount > 0 && !$hasreleased,
+            'empty_title' => get_string('fellowship_feedback_empty_title', 'local_launchpad'),
+            'empty_body' => $emptybody,
+            'empty_cta_url' => $emptyctaurl,
+            'empty_cta_label' => $emptyctalabel,
+            'has_empty_cta' => $emptyctaurl !== '',
+        ];
+    }
+
+    /**
      * Whether the user may open the Fellowship shell.
      */
     public static function can_access(int $userid): bool {

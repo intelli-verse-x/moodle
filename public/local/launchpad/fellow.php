@@ -109,6 +109,18 @@ $nav = [
         ],
     ],
     [
+        'group' => get_string('fellowship_nav_record', 'local_launchpad'),
+        'items' => [
+            [
+                'label' => get_string('fellowship_nav_feedback', 'local_launchpad'),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'feedback']))->out(false),
+                'current' => $view === 'feedback',
+                'key' => 'feedback',
+                'icon_svg' => $icon('<path d="M5 5h14v10H9l-4 4V5z"/>'),
+            ],
+        ],
+    ],
+    [
         'group' => get_string('fellowship_nav_you', 'local_launchpad'),
         'items' => [
             [
@@ -264,6 +276,12 @@ switch ($view) {
         $content = '';
         break;
 
+    case 'feedback':
+        $pagetitle = get_string('fellowship_nav_feedback', 'local_launchpad');
+        // Content filled after list_assignment_feedback() (shared with nav badge).
+        $content = '';
+        break;
+
     case 'help':
         $pagetitle = get_string('fellowship_nav_help', 'local_launchpad');
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_help', [
@@ -367,13 +385,36 @@ if ($view === 'achievements') {
     ]));
 }
 
-// Mark current nav + Achievements earned/total badge (HTML-style "2/9").
+$feedbackdata = fellowship_dashboard::list_assignment_feedback($userid, $courses);
+$feedbackattention = (int) ($feedbackdata['attention_count'] ?? 0);
+if ($view === 'feedback') {
+    $content = $OUTPUT->render_from_template('local_launchpad/fellowship_feedback', array_merge($feedbackdata, [
+        'has_courses' => $courses !== [],
+        'empty_message' => get_string('fellowship_no_courses', 'local_launchpad'),
+        'track_url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
+        'empty_avatar_url' => $pluginbase . '/assets/img/prof.webp',
+        'has_crumbs' => true,
+        'crumbs' => [
+            $crumbhome,
+            [
+                'label' => get_string('fellowship_nav_feedback', 'local_launchpad'),
+                'url' => '',
+            ],
+        ],
+    ]));
+}
+
+// Mark current nav + Achievements earned/total + Feedback attention.
 foreach ($nav as &$group) {
     foreach ($group['items'] as &$item) {
         $item['current'] = ($item['key'] === $view);
         if (($item['key'] ?? '') === 'achievements') {
             $item['has_badge'] = true;
             $item['badge'] = $badgesearned . '/' . $badgestotal;
+        }
+        if (($item['key'] ?? '') === 'feedback' && $feedbackattention > 0) {
+            $item['has_badge'] = true;
+            $item['badge'] = (string) $feedbackattention;
         }
     }
 }
@@ -396,6 +437,7 @@ $orbittips = [
     'track' => get_string('fellowship_orbit_tip_track', 'local_launchpad'),
     'progress' => get_string('fellowship_orbit_tip_progress', 'local_launchpad'),
     'achievements' => get_string('fellowship_orbit_tip_achievements', 'local_launchpad'),
+    'feedback' => get_string('fellowship_orbit_tip_feedback', 'local_launchpad'),
     'help' => get_string('fellowship_orbit_tip_help', 'local_launchpad'),
 ];
 $orbittip = $orbittips[$view] ?? $orbittips['home'];
