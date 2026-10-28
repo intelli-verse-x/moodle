@@ -513,6 +513,16 @@ body.local-launchpad-fellowship {
   stroke: #fff;
   stroke-width: 4px;
 }
+.lp-jn .sb {
+  font-family: var(--lp-body);
+  font-size: 12px;
+  font-weight: 500;
+  fill: var(--lp-muted);
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+}
+.lp-journey:not(.compact) .lp-journey-in { min-width: 640px; }
 .lp-jn.cur .ring {
   stroke: var(--lp-blue);
   animation: lp-pulsering 2s ease-in-out infinite;
@@ -811,6 +821,181 @@ body.local-launchpad-fellowship {
 .lp-chip.ok { background: #E3F5E8; color: #1E7A3B; }
 .lp-chip.warn { background: #FFF4D6; color: #8A5A00; }
 .lp-chip.line { background: none; border-color: var(--lp-line); color: var(--lp-muted); }
+
+.lp-phase-list { margin-top: 4px; }
+.lp-phase-item {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  background: #fff;
+  min-width: 0;
+}
+.lp-phase-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--lp-blue-soft);
+  color: var(--lp-blue);
+  display: grid;
+  place-items: center;
+  font-family: var(--lp-head);
+  font-weight: 700;
+  font-size: 14px;
+  flex: none;
+}
+.lp-phase-ico.dim {
+  background: #EEF1F6;
+  color: #9AA3B5;
+}
+.lp-phase-bd {
+  flex: 1;
+  min-width: 0;
+}
+.lp-phase-bd b {
+  display: block;
+  font-family: var(--lp-head);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--lp-ink);
+}
+.lp-phase-bd small {
+  display: block;
+  color: var(--lp-muted);
+  font-size: 13.5px;
+  margin-top: 2px;
+}
+.lp-phase-score {
+  font-family: var(--lp-head);
+  font-weight: 700;
+  font-size: 15px;
+  flex: none;
+  min-width: 3.5rem;
+  text-align: right;
+}
+.lp-note {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.lp-completion-hero {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lp-completion-gates {
+  margin: 0;
+  font-family: var(--lp-head);
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.15;
+}
+.lp-ring {
+  position: relative;
+  flex: none;
+}
+.lp-ring svg { display: block; width: 100%; height: 100%; }
+.lp-ring-arc {
+  transition: stroke-dashoffset 1s cubic-bezier(.2, .8, .2, 1);
+}
+.lp-ring-v {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-family: var(--lp-head);
+  pointer-events: none;
+}
+.lp-ring-v b {
+  font-size: 26px;
+  display: block;
+  line-height: 1;
+  color: var(--lp-navy);
+}
+.lp-ring-v span {
+  font-family: var(--lp-body);
+  font-size: 11px;
+  color: var(--lp-blue);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.lp-todo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14.5px;
+}
+.lp-chk {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1.5px solid var(--lp-line);
+  flex: none;
+  background: #fff;
+}
+.lp-cert {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 26px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #F6F8FC, #E5EDFA);
+  border: 2px dashed #CBD5E6;
+}
+.lp-cert span { font-size: 34px; line-height: 1; }
+.lp-cert b {
+  font-family: var(--lp-head);
+  font-size: 16px;
+}
+.lp-cert small { color: var(--lp-muted); font-size: 13px; }
+/* HTML x-mascot + bubble — full figure beside speech, not a cropped circle. */
+.lp-mascot {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+}
+.lp-mascot > img {
+  height: 90px;
+  width: auto;
+  flex: none;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px rgba(13, 36, 97, .16));
+}
+.lp-bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 10px;
+  background: var(--lp-blue-softer);
+  border: 1px solid var(--lp-blue-soft);
+  border-radius: 18px;
+  padding: 16px 18px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--lp-ink);
+}
+.lp-bubble::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: 26px;
+  width: 16px;
+  height: 16px;
+  background: var(--lp-blue-softer);
+  border-left: 1px solid var(--lp-blue-soft);
+  border-bottom: 1px solid var(--lp-blue-soft);
+  transform: rotate(45deg);
+}
+.lp-bubble p { margin: 0; }
 
 .lp-feedback-card.is-attention {
   border-color: #F5DFAE;

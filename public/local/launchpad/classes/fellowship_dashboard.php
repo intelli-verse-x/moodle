@@ -209,24 +209,46 @@ final class fellowship_dashboard {
     }
 
     /**
-     * Compact home "Your journey" — same four gates / path as the HTML portal.
+     * Programme phase weights (HTML PHW[]) — share of result per gate.
+     *
+     * @return array<int, int> sectionnum => weight percent
+     */
+    public static function phase_weights(): array {
+        return [
+            1 => 20,
+            2 => 25,
+            3 => 20,
+            4 => 35,
+        ];
+    }
+
+    /**
+     * "Your journey" — same four gates / path as the HTML portal.
      *
      * Always renders Foundations → Guided project → Simulation → Demo day
      * (programme spine). Moodle section completion only drives status/progress;
      * empty later sections are still shown (locked), not dropped.
      *
      * @param array $outline Return value of {@see course_outline()}
+     * @param bool $compact Home card uses compact; Phase progress uses full height + sublabels
+     * @param array<int, string>|null $phasestatus Optional sectionnum => status label for sublabels
      * @return array{
      *   has_gates: bool,
+     *   compact: bool,
+     *   show_sublabels: bool,
      *   gates: list<array>,
      *   path_d: string,
      *   dash_offset: string,
      *   view_h: int,
+     *   ring_r: int,
+     *   core_r: int,
+     *   mark_y: int,
+     *   label_y: int,
      *   bot_left: string,
      *   bot_top: string
      * }
      */
-    public static function journey_from_outline(array $outline): array {
+    public static function journey_from_outline(array $outline, bool $compact = true, ?array $phasestatus = null): array {
         // Short labels match HTML PHS[]; full names match blueprint / HTML PH[].
         $spine = [
             1 => ['short' => 'Foundations', 'name' => 'Foundations'],
@@ -239,6 +261,7 @@ final class fellowship_dashboard {
                 $spine[$num]['name'] = $fullname;
             }
         }
+        $weights = self::phase_weights();
 
         $bysection = [];
         foreach ($outline['sections'] ?? [] as $section) {
@@ -290,6 +313,8 @@ final class fellowship_dashboard {
                 $mark = (string) ($i + 1);
                 $foundcurrent = true;
             }
+            $statustext = $phasestatus[$num] ?? ($isdone ? 'Met' : ($iscurrent ? 'In progress' : 'Not released'));
+            $weight = (int) ($weights[$num] ?? 0);
             $gates[] = [
                 'name' => $meta['name'],
                 'short' => $meta['short'],
@@ -301,12 +326,19 @@ final class fellowship_dashboard {
                 'mark' => $mark,
                 'cx' => 0,
                 'cy' => 0,
+                'show_sublabel' => !$compact,
+                'sublabel' => $weight . '% · ' . $statustext,
+                // Duplicated on each gate so Mustache nest context can read sizes.
+                'ring_r' => $compact ? 24 : 30,
+                'core_r' => $compact ? 17 : 22,
+                'mark_y' => $compact ? 6 : 7,
+                'label_y' => $compact ? 44 : 54,
             ];
             $i++;
         }
 
-        // Exact compact path from ToBa-Learn-LaunchPad.html journey(true).
-        $viewh = 150;
+        // Path geometry from ToBa-Learn-LaunchPad.html journey(compact).
+        $viewh = $compact ? 150 : 210;
         $pts = [
             [90.0, $viewh * 0.62],
             [360.0, $viewh * 0.30],
@@ -355,19 +387,278 @@ final class fellowship_dashboard {
         }
         $dashoffset = number_format(1.0 - $pathprogress, 3, '.', '');
 
-        // Bot sits on the first gate (same as HTML compact journey).
+        // Bot sits on the first gate (HTML: offset 62 compact / 78 full).
+        $botlift = $compact ? 62 : 78;
         $botleft = round(($pts[0][0] / 1000) * 100, 2) . '%';
-        $bottop = round((($pts[0][1] - 62) / $viewh) * 100, 2) . '%';
+        $bottop = round((($pts[0][1] - $botlift) / $viewh) * 100, 2) . '%';
 
         return [
             'has_gates' => true,
+            'compact' => $compact,
+            'show_sublabels' => !$compact,
             'gates' => $gates,
             'path_d' => $pathd,
             'dash_offset' => $dashoffset,
             'view_h' => $viewh,
+            'ring_r' => $compact ? 24 : 30,
+            'core_r' => $compact ? 17 : 22,
+            'mark_y' => $compact ? 6 : 7,
+            'label_y' => $compact ? 44 : 54,
             'bot_left' => $botleft,
             'bot_top' => $bottop,
         ];
+    }
+
+    /**
+     * Phase progress tab: journey + per-gate weight/score/status from Moodle assigns.
+     *
+     * Pass at 70/100 on a released assign grade in that section (HTML rule). Empty
+     * later sections stay "Not released". Never invents marks.
+     *
+     * @param list<\stdClass> $courses
+     * @param \stdClass|null $selected Preferred lp-* course
+     * @return array
+     */
+    public static function phase_progress_for_user(int $userid, array $courses, ?\stdClass $selected = null): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $course = $selected;
+        if ($course === null && $courses !== []) {
+            $course = $courses[0];
+        }
+
+        $weights = self::phase_weights();
+        $hints = [
+            1 => get_string('fellowship_phase_hint_foundations', 'local_launchpad'),
+            2 => get_string('fellowship_phase_hint_submission', 'local_launchpad'),
+            3 => get_string('fellowship_phase_hint_submission', 'local_launchpad'),
+            4 => get_string('fellowship_phase_hint_capstone', 'local_launchpad'),
+        ];
+        $names = blueprint::phase_sections();
+        $shorts = [
+            1 => 'Foundations',
+            2 => 'Guided project',
+            3 => 'Simulation',
+            4 => 'Demo day',
+        ];
+
+        $outline = [
+            'sections' => [],
+            'completion_enabled' => false,
+            'completed' => 0,
+            'trackable' => 0,
+            'percent' => null,
+            'next' => null,
+        ];
+        $modinfo = null;
+        if ($course !== null) {
+            $outline = self::course_outline($course, $userid);
+            $modinfo = get_fast_modinfo($course, $userid);
+        }
+
+        $bysection = [];
+        foreach ($outline['sections'] ?? [] as $section) {
+            $num = (int) ($section['sectionnum'] ?? 0);
+            if ($num > 0) {
+                $bysection[$num] = $section;
+            }
+        }
+
+        $phases = [];
+        $statusmap = [];
+        foreach ($names as $num => $fullname) {
+            $weight = (int) ($weights[$num] ?? 0);
+            $section = $bysection[$num] ?? null;
+            $activities = $section['activities'] ?? [];
+            $visiblecount = count($activities);
+
+            $status = 'Not released';
+            $chip = 'line';
+            $score = null;
+            $scored = false;
+            $ico = (string) $num;
+            $icodim = true;
+
+            if ($visiblecount > 0 && $course !== null && $modinfo !== null) {
+                $icodim = false;
+                $bestpct = null;
+                $hasgrade = false;
+                $submitted = false;
+                $revising = false;
+
+                foreach ($activities as $activity) {
+                    $cmid = (int) ($activity['cmid'] ?? 0);
+                    if ($cmid <= 0 || !isset($modinfo->cms[$cmid])) {
+                        continue;
+                    }
+                    $cm = $modinfo->cms[$cmid];
+                    if ($cm->modname !== 'assign' || !$cm->uservisible || $cm->deletioninprogress) {
+                        continue;
+                    }
+                    $instanceid = (int) $cm->instance;
+
+                    $latest = $DB->get_record('assign_submission', [
+                        'assignment' => $instanceid,
+                        'userid' => $userid,
+                        'latest' => 1,
+                    ], '*', IGNORE_MISSING);
+                    if ($latest && $latest->status === 'submitted') {
+                        $submitted = true;
+                    } else if ($latest && in_array($latest->status, ['draft', 'reopened', 'new'], true)) {
+                        $subcount = (int) $DB->count_records('assign_submission', [
+                            'assignment' => $instanceid,
+                            'userid' => $userid,
+                            'status' => 'submitted',
+                        ]);
+                        if ($subcount > 0) {
+                            $revising = true;
+                        }
+                    }
+
+                    $gradeinfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
+                    $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
+                    $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
+                    if ($gg && $gg->grade !== null && $grademax > 0) {
+                        $hasgrade = true;
+                        $pct = (((float) $gg->grade) / $grademax) * 100;
+                        if ($bestpct === null || $pct > $bestpct) {
+                            $bestpct = $pct;
+                        }
+                    }
+                }
+
+                if ($hasgrade && $bestpct !== null) {
+                    $score = (int) round($bestpct);
+                    $scored = true;
+                    if ($bestpct >= 70) {
+                        $status = 'Met';
+                        $chip = 'ok';
+                        $ico = '✓';
+                    } else {
+                        $status = 'Not yet met';
+                        $chip = 'warn';
+                    }
+                } else if ($submitted) {
+                    $status = 'Review pending';
+                    $chip = '';
+                } else if ($revising) {
+                    $status = 'Revising';
+                    $chip = 'line';
+                } else {
+                    $status = 'In progress';
+                    $chip = 'line';
+                }
+            }
+
+            $statusmap[$num] = $status;
+            $phases[] = [
+                'sectionnum' => $num,
+                'name' => $fullname,
+                'short' => $shorts[$num] ?? $fullname,
+                'weight' => $weight,
+                'weight_label' => $weight . '%',
+                'hint' => $hints[$num] ?? '',
+                'status' => $status,
+                'chip' => $chip,
+                'has_chip_class' => $chip !== '',
+                'score' => $score,
+                'has_score' => $scored,
+                'score_display' => $scored ? ($score . '/100') : '—',
+                'ico' => $ico,
+                'ico_dim' => $icodim,
+                'is_met' => $status === 'Met',
+                'is_not_released' => $status === 'Not released',
+            ];
+        }
+
+        $journey = self::journey_from_outline($outline, false, $statusmap);
+
+        return [
+            'has_course' => $course !== null,
+            'course_name' => $course ? format_string($course->fullname) : '',
+            'course_idnumber' => $course ? s($course->idnumber) : '',
+            'phases' => $phases,
+            'has_phases' => $phases !== [],
+            'journey' => $journey,
+        ];
+    }
+
+    /**
+     * Completion tab: gates passed + requirements table + locked certificate.
+     *
+     * Reuses {@see phase_progress_for_user()} status. Weighted result only when
+     * every phase has a released score. Certificate stays locked (tool not live).
+     *
+     * @param list<\stdClass> $courses
+     * @param \stdClass|null $selected
+     * @return array
+     */
+    public static function completion_for_user(int $userid, array $courses, ?\stdClass $selected = null): array {
+        $base = self::phase_progress_for_user($userid, $courses, $selected);
+        $phases = $base['phases'] ?? [];
+        $met = 0;
+        $outstanding = [];
+        $allscored = $phases !== [];
+        $weightsum = 0.0;
+
+        foreach ($phases as $phase) {
+            if (!empty($phase['is_met'])) {
+                $met++;
+            } else {
+                $outstanding[] = [
+                    'label' => $phase['name'] . ': ' . \core_text::strtolower($phase['status']),
+                ];
+            }
+            if (empty($phase['has_score'])) {
+                $allscored = false;
+            } else {
+                $weightsum += ((float) $phase['score']) * ((int) $phase['weight']) / 100.0;
+            }
+        }
+
+        $allmet = $phases !== [] && $met === count($phases);
+        $gates = max(1, count($phases));
+        $ringpct = (int) round(($met / $gates) * 100);
+
+        // SVG ring geometry (size 120, matching HTML completion ring).
+        $size = 120;
+        $radius = ($size / 2) - 10;
+        $circ = 2 * M_PI * $radius;
+        $dashoffset = $circ * (1 - ($ringpct / 100));
+
+        return array_merge($base, [
+            'gates_met' => $met,
+            'gates_total' => count($phases),
+            'gates_label' => get_string('fellowship_completion_gates', 'local_launchpad', [
+                'met' => $met,
+                'total' => count($phases),
+            ]),
+            'all_met' => $allmet,
+            'status_chip' => $allmet ? 'ok' : 'line',
+            'status_label' => $allmet
+                ? get_string('fellowship_completion_met', 'local_launchpad')
+                : get_string('fellowship_completion_outstanding', 'local_launchpad'),
+            'ring_pct' => $ringpct,
+            'ring_size' => $size,
+            'ring_radius' => round($radius, 2),
+            'ring_cx' => $size / 2,
+            'ring_cy' => $size / 2,
+            'ring_circ' => round($circ, 2),
+            'ring_dashoffset' => number_format($dashoffset, 2, '.', ''),
+            'has_outstanding' => $outstanding !== [],
+            'outstanding' => $outstanding,
+            'has_weighted' => $allscored,
+            'weighted_display' => $allscored ? (string) (int) round($weightsum) : '—',
+            'weighted_chip' => $allscored ? ($weightsum >= 70 ? 'ok' : 'warn') : 'line',
+            'weighted_status' => $allscored
+                ? ($weightsum >= 70
+                    ? get_string('fellowship_completion_weighted_ok', 'local_launchpad')
+                    : get_string('fellowship_completion_weighted_low', 'local_launchpad'))
+                : get_string('fellowship_completion_weighted_pending', 'local_launchpad'),
+            'certificate_locked' => true,
+        ]);
     }
 
     /**

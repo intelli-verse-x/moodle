@@ -56,23 +56,24 @@
         }
     });
 
-    // Animate journey path fill (respect reduced motion).
+    // Animate journey path + completion ring (respect reduced motion).
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    shell.querySelectorAll('.lp-journey-progress').forEach(function (path) {
-        var to = path.getAttribute('data-to');
+    function animateDash(el) {
+        var to = el.getAttribute('data-to');
         if (to === null || to === '') {
             return;
         }
         if (reduce) {
-            path.style.strokeDashoffset = to;
+            el.style.strokeDashoffset = to;
             return;
         }
         requestAnimationFrame(function () {
             requestAnimationFrame(function () {
-                path.style.strokeDashoffset = to;
+                el.style.strokeDashoffset = to;
             });
         });
-    });
+    }
+    shell.querySelectorAll('.lp-journey-progress, .lp-ring-arc').forEach(animateDash);
 
     // Dot Dot orbit (bottom-right companion).
     var orbit = document.getElementById('lp-orbit');

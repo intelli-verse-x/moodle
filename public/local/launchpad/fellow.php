@@ -118,6 +118,20 @@ $nav = [
                 'key' => 'feedback',
                 'icon_svg' => $icon('<path d="M5 5h14v10H9l-4 4V5z"/>'),
             ],
+            [
+                'label' => get_string('fellowship_nav_phases', 'local_launchpad'),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false),
+                'current' => $view === 'phases',
+                'key' => 'phases',
+                'icon_svg' => $icon('<path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15h3v4H7z"/><path d="M12 10h3v9h-3z"/><path d="M17 7h3v12h-3z"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_nav_completion', 'local_launchpad'),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'completion']))->out(false),
+                'current' => $view === 'completion',
+                'key' => 'completion',
+                'icon_svg' => $icon('<path d="M4 5h16v14H4z"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M15 16l2 2 4-4"/>'),
+            ],
         ],
     ],
     [
@@ -282,6 +296,41 @@ switch ($view) {
         $content = '';
         break;
 
+    case 'phases':
+        $pagetitle = get_string('fellowship_nav_phases', 'local_launchpad');
+        $phasedata = fellowship_dashboard::phase_progress_for_user($userid, $courses, $selected);
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_phases', array_merge($phasedata, [
+            'bot_url' => $pluginbase . '/assets/img/bot.webp',
+            'empty_message' => get_string('fellowship_no_courses', 'local_launchpad'),
+            'has_crumbs' => true,
+            'crumbs' => [
+                $crumbhome,
+                [
+                    'label' => get_string('fellowship_nav_phases', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
+        ]));
+        break;
+
+    case 'completion':
+        $pagetitle = get_string('fellowship_nav_completion', 'local_launchpad');
+        $completiondata = fellowship_dashboard::completion_for_user($userid, $courses, $selected);
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_completion', array_merge($completiondata, [
+            'prof_url' => $pluginbase . '/assets/img/prof.webp',
+            'cert_message' => get_string('fellowship_completion_cert_body', 'local_launchpad'),
+            'empty_message' => get_string('fellowship_no_courses', 'local_launchpad'),
+            'has_crumbs' => true,
+            'crumbs' => [
+                $crumbhome,
+                [
+                    'label' => get_string('fellowship_nav_completion', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
+        ]));
+        break;
+
     case 'help':
         $pagetitle = get_string('fellowship_nav_help', 'local_launchpad');
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_help', [
@@ -438,6 +487,8 @@ $orbittips = [
     'progress' => get_string('fellowship_orbit_tip_progress', 'local_launchpad'),
     'achievements' => get_string('fellowship_orbit_tip_achievements', 'local_launchpad'),
     'feedback' => get_string('fellowship_orbit_tip_feedback', 'local_launchpad'),
+    'phases' => get_string('fellowship_orbit_tip_phases', 'local_launchpad'),
+    'completion' => get_string('fellowship_orbit_tip_completion', 'local_launchpad'),
     'help' => get_string('fellowship_orbit_tip_help', 'local_launchpad'),
 ];
 $orbittip = $orbittips[$view] ?? $orbittips['home'];
