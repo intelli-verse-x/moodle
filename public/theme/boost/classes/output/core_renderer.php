@@ -261,21 +261,42 @@ class core_renderer extends \core_renderer {
      * @return string
      */
     public function render_login(\core_auth\output\login $form) {
-        global $CFG, $SITE;
+        global $CFG;
 
         $context = $form->export_for_template($this);
-        $url = $this->get_logo_url();
-        if ($url) {
-            $url = $url->out(false);
+        // Prefer the ToBa Learn brand mark shipped with LaunchPad.
+        $tobalogo = $CFG->dirroot . '/local/launchpad/assets/img/logo.webp';
+        if (is_readable($tobalogo)) {
+            $context->logourl = $CFG->wwwroot . '/local/launchpad/assets/img/logo.webp';
+        } else {
+            $url = $this->get_logo_url();
+            $context->logourl = $url ? $url->out(false) : false;
         }
-        $context->logourl = $url;
-        $context->sitename = format_string(
-            $SITE->fullname,
-            true,
-            ['context' => context_course::instance(SITEID), 'escape' => false]
-        );
+        $context->sitename = 'ToBa Learn';
         $context->hasauthinstructions = !empty($CFG->auth_instructions);
 
         return $this->render_from_template('core/loginform', $context);
+    }
+
+    /**
+     * Render the login signup form with the ToBa Learn brand mark.
+     *
+     * @param \moodleform $form Signup form.
+     * @return string
+     */
+    public function render_login_signup_form($form) {
+        global $CFG;
+
+        $context = $form->export_for_template($this);
+        $tobalogo = $CFG->dirroot . '/local/launchpad/assets/img/logo.webp';
+        if (is_readable($tobalogo)) {
+            $context['logourl'] = $CFG->wwwroot . '/local/launchpad/assets/img/logo.webp';
+        } else {
+            $url = $this->get_logo_url();
+            $context['logourl'] = $url ? $url->out(false) : false;
+        }
+        $context['sitename'] = 'ToBa Learn';
+
+        return $this->render_from_template('core/signup_form_layout', $context);
     }
 }
