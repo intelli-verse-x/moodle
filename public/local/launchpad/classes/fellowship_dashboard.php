@@ -209,6 +209,713 @@ final class fellowship_dashboard {
     }
 
     /**
+     * Compact home "Your journey" — same four gates / path as the HTML portal.
+     *
+     * Always renders Foundations → Guided project → Simulation → Demo day
+     * (programme spine). Moodle section completion only drives status/progress;
+     * empty later sections are still shown (locked), not dropped.
+     *
+     * @param array $outline Return value of {@see course_outline()}
+     * @return array{
+     *   has_gates: bool,
+     *   gates: list<array>,
+     *   path_d: string,
+     *   dash_offset: string,
+     *   view_h: int,
+     *   bot_left: string,
+     *   bot_top: string
+     * }
+     */
+    public static function journey_from_outline(array $outline): array {
+        // Short labels match HTML PHS[]; full names match blueprint / HTML PH[].
+        $spine = [
+            1 => ['short' => 'Foundations', 'name' => 'Foundations'],
+            2 => ['short' => 'Guided project', 'name' => 'Guided project'],
+            3 => ['short' => 'Simulation', 'name' => 'Industry simulation'],
+            4 => ['short' => 'Demo day', 'name' => 'Demo day and certification'],
+        ];
+        foreach (blueprint::phase_sections() as $num => $fullname) {
+            if (isset($spine[$num])) {
+                $spine[$num]['name'] = $fullname;
+            }
+        }
+
+        $bysection = [];
+        foreach ($outline['sections'] ?? [] as $section) {
+            $num = (int) ($section['sectionnum'] ?? 0);
+            if ($num > 0) {
+                $bysection[$num] = $section;
+            }
+        }
+
+        $phasedone = [];
+        foreach ($spine as $num => $meta) {
+            $section = $bysection[$num] ?? null;
+            $tracked = 0;
+            $done = 0;
+            if ($section !== null) {
+                foreach ($section['activities'] ?? [] as $activity) {
+                    if (!empty($activity['tracked'])) {
+                        $tracked++;
+                        if (!empty($activity['complete'])) {
+                            $done++;
+                        }
+                    }
+                }
+            }
+            $phasedone[$num] = ($tracked > 0 && $done >= $tracked);
+        }
+
+        // HTML home journey: gate 0 is done|cur; later gates stay lock until earlier work is met.
+        // We advance "current" when prior phases are complete (still show all four).
+        $gates = [];
+        $foundcurrent = false;
+        $i = 0;
+        foreach ($spine as $num => $meta) {
+            $isdone = !empty($phasedone[$num]);
+            $status = 'lock';
+            $isdoneflag = false;
+            $iscurrent = false;
+            $islock = true;
+            $mark = '🔒';
+            if ($isdone) {
+                $status = 'done';
+                $isdoneflag = true;
+                $islock = false;
+                $mark = '✓';
+            } else if (!$foundcurrent) {
+                $status = 'cur';
+                $iscurrent = true;
+                $islock = false;
+                $mark = (string) ($i + 1);
+                $foundcurrent = true;
+            }
+            $gates[] = [
+                'name' => $meta['name'],
+                'short' => $meta['short'],
+                'sectionnum' => $num,
+                'status' => $status,
+                'is_done' => $isdoneflag,
+                'is_current' => $iscurrent,
+                'is_lock' => $islock,
+                'mark' => $mark,
+                'cx' => 0,
+                'cy' => 0,
+            ];
+            $i++;
+        }
+
+        // Exact compact path from ToBa-Learn-LaunchPad.html journey(true).
+        $viewh = 150;
+        $pts = [
+            [90.0, $viewh * 0.62],
+            [360.0, $viewh * 0.30],
+            [640.0, $viewh * 0.66],
+            [910.0, $viewh * 0.32],
+        ];
+        $pathd = sprintf(
+            'M%s,%s C230,%s 240,%s %s,%s S520,%s %s,%s S800,%s %s,%s',
+            $pts[0][0],
+            $pts[0][1],
+            $viewh * 0.05,
+            $viewh * 0.85,
+            $pts[1][0],
+            $pts[1][1],
+            $viewh * 0.98,
+            $pts[2][0],
+            $pts[2][1],
+            $viewh * 0.02,
+            $pts[3][0],
+            $pts[3][1]
+        );
+        foreach ($gates as $idx => &$gate) {
+            $gate['cx'] = (int) round($pts[$idx][0]);
+            $gate['cy'] = (int) round($pts[$idx][1]);
+        }
+        unset($gate);
+
+        // HTML: foundations Met → 0.36; else scale activity progress within first ~30% of path.
+        $foundationsmet = !empty($phasedone[1]);
+        $completed = (int) ($outline['completed'] ?? 0);
+        $trackable = (int) ($outline['trackable'] ?? 0);
+        if ($foundationsmet) {
+            $pathprogress = 0.36;
+            // Nudge further when later phases complete.
+            $extradone = 0;
+            foreach ([2, 3, 4] as $n) {
+                if (!empty($phasedone[$n])) {
+                    $extradone++;
+                }
+            }
+            $pathprogress = min(1.0, 0.36 + ($extradone * 0.21));
+        } else if ($trackable > 0) {
+            $pathprogress = min(0.30, ($completed / $trackable) * 0.30);
+        } else {
+            $pathprogress = 0.0;
+        }
+        $dashoffset = number_format(1.0 - $pathprogress, 3, '.', '');
+
+        // Bot sits on the first gate (same as HTML compact journey).
+        $botleft = round(($pts[0][0] / 1000) * 100, 2) . '%';
+        $bottop = round((($pts[0][1] - 62) / $viewh) * 100, 2) . '%';
+
+        return [
+            'has_gates' => true,
+            'gates' => $gates,
+            'path_d' => $pathd,
+            'dash_offset' => $dashoffset,
+            'view_h' => $viewh,
+            'bot_left' => $botleft,
+            'bot_top' => $bottop,
+        ];
+    }
+
+    /**
+     * Live XP total from Moodle activity records (same rules as Achievements log).
+     *
+     * @param list<\stdClass> $courses
+     */
+    public static function provisional_xp_total(array $courses, int $userid): int {
+        $live = self::live_achievements($userid, $courses);
+        return (int) $live['xp_total'];
+    }
+
+    /**
+     * Level ladder from the HTML Fellow portal (thresholds + colours).
+     *
+     * @return list<array{name: string, xp: int, color: string}>
+     */
+    public static function achievement_levels(): array {
+        return [
+            ['name' => 'Explorer', 'xp' => 0, 'color' => '#8FB3FF'],
+            ['name' => 'Builder', 'xp' => 200, 'color' => '#5B8DF6'],
+            ['name' => 'Practitioner', 'xp' => 450, 'color' => '#1A61F2'],
+            ['name' => 'Specialist', 'xp' => 800, 'color' => '#0F4FD6'],
+            ['name' => 'Fellow', 'xp' => 1200, 'color' => '#0D2461'],
+        ];
+    }
+
+    /**
+     * Index into {@see achievement_levels()} for the given XP.
+     */
+    public static function level_index_for_xp(int $xp): int {
+        $levels = self::achievement_levels();
+        $index = 0;
+        foreach ($levels as $i => $level) {
+            if ($xp >= (int) $level['xp']) {
+                $index = $i;
+            }
+        }
+        return $index;
+    }
+
+    /**
+     * Achievements template context from live Moodle progress for this fellow.
+     *
+     * @param list<\stdClass> $courses
+     * @return array
+     */
+    public static function achievements_for_user(int $userid, array $courses): array {
+        $live = self::live_achievements($userid, $courses);
+        return self::achievements_context_from_live($live);
+    }
+
+    /**
+     * @deprecated Use {@see achievements_for_user()}; kept for callers that only have XP.
+     */
+    public static function achievements_context(int $xp): array {
+        return self::achievements_context_from_live([
+            'xp_total' => $xp,
+            'xp_log' => [],
+            'badges' => self::badge_catalogue_empty(),
+            'badges_earned' => 0,
+        ]);
+    }
+
+    /**
+     * Build Achievements view context from a {@see live_achievements()} result.
+     *
+     * @param array $live
+     * @return array
+     */
+    public static function achievements_context_from_live(array $live): array {
+        $xp = (int) ($live['xp_total'] ?? 0);
+        $levels = self::achievement_levels();
+        $li = self::level_index_for_xp($xp);
+        $ladder = [];
+        foreach ($levels as $i => $level) {
+            $ispast = $i < $li;
+            $isnow = $i === $li;
+            $ladder[] = [
+                'name' => $level['name'],
+                'xp' => $level['xp'],
+                'index' => $i + 1,
+                'mark' => $ispast ? '✓' : (string) ($i + 1),
+                'is_past' => $ispast,
+                'is_now' => $isnow,
+                'css' => $ispast ? 'past' : ($isnow ? 'now' : ''),
+                // Past = green done; current keeps level colour; locked = grey.
+                'badge_color' => $ispast ? '#2E9E4F' : ($isnow ? $level['color'] : '#D6DEEC'),
+            ];
+        }
+
+        $current = $levels[$li];
+        $next = $levels[$li + 1] ?? null;
+        $tonext = null;
+        $pcttonext = 100;
+        if ($next !== null) {
+            $span = max(1, (int) $next['xp'] - (int) $current['xp']);
+            $into = max(0, $xp - (int) $current['xp']);
+            $tonext = max(0, (int) $next['xp'] - $xp);
+            $pcttonext = (int) min(100, round(($into / $span) * 100));
+            // Exactly at a level threshold → 0% into the next band looks "broken"; show a floor fill.
+            if ($pcttonext === 0 && $xp >= (int) $current['xp']) {
+                $pcttonext = 6;
+            }
+        }
+
+        $badges = $live['badges'] ?? self::badge_catalogue_empty();
+        $xplog = $live['xp_log'] ?? [];
+
+        $xprules = [
+            ['label' => 'Finish a lesson', 'xp' => 50],
+            ['label' => 'Submit a quiz attempt', 'xp' => 40],
+            ['label' => 'Each correct answer', 'xp' => 10],
+            ['label' => 'Submit an assignment', 'xp' => 120],
+            ['label' => 'Resubmit after feedback', 'xp' => 80],
+            ['label' => 'Pass a gate', 'xp' => 200],
+            ['label' => 'Save a portfolio case study', 'xp' => 60],
+        ];
+
+        return [
+            'xp_total' => $xp,
+            'level_name' => $current['name'],
+            'level_index' => $li + 1,
+            'level_color' => $current['color'],
+            'has_next_level' => $next !== null,
+            'next_level_name' => $next['name'] ?? '',
+            'xp_to_next' => $tonext,
+            'pct_to_next' => $pcttonext,
+            'ladder' => $ladder,
+            'badges' => $badges,
+            'badges_earned' => (int) ($live['badges_earned'] ?? 0),
+            'badges_total' => count($badges),
+            'has_xp_log' => $xplog !== [],
+            'xp_log' => $xplog,
+            'xp_rules' => $xprules,
+        ];
+    }
+
+    /**
+     * Derive XP log + badge state from Moodle completion, quiz grades, and assign submissions.
+     *
+     * No local unlock tables — recomputed from Moodle records each request.
+     *
+     * @param list<\stdClass> $courses
+     * @return array{xp_total: int, xp_log: list<array>, badges: list<array>, badges_earned: int}
+     */
+    public static function live_achievements(int $userid, array $courses): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->libdir . '/completionlib.php');
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $xplog = [];
+        $pagesdone = 0;
+        $pagesdones1 = 0;
+        $pagestotals1 = 0;
+        $pagecompletebyname = [];
+        $quizperfect = false;
+        $quizperfectat = 0;
+        $assignsubmitted = false;
+        $assignsubmittedat = 0;
+        $assignresubmit = false;
+        $assignresubmitat = 0;
+        $foundationscomplete = false;
+        $foundationsgateat = 0;
+        $foundationsgradeok = false;
+
+        foreach ($courses as $course) {
+            $modinfo = get_fast_modinfo($course, $userid);
+            $completion = new \completion_info($course);
+            $completionenabled = $completion->is_enabled();
+
+            $s1tracked = 0;
+            $s1done = 0;
+
+            foreach ($modinfo->get_cms() as $cm) {
+                if (!$cm->uservisible || $cm->deletioninprogress || $cm->modname === 'label') {
+                    continue;
+                }
+
+                $sectionnum = 0;
+                try {
+                    $sectionnum = (int) $cm->get_section_info()->section;
+                } catch (\Throwable $e) {
+                    $sectionnum = 0;
+                }
+
+                $name = $cm->get_formatted_name();
+                $namelower = \core_text::strtolower($name);
+                $iscomplete = false;
+                $completedtime = 0;
+                if ($completionenabled && $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE) {
+                    $data = $completion->get_data($cm, false, $userid);
+                    $state = (int) $data->completionstate;
+                    $iscomplete = ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS);
+                    $completedtime = (int) ($data->timemodified ?? 0);
+                }
+
+                if ($cm->modname === 'page' || $cm->modname === 'resource' || $cm->modname === 'url') {
+                    if ($sectionnum === 1) {
+                        $pagestotals1++;
+                        if ($iscomplete) {
+                            $pagesdones1++;
+                        }
+                    }
+                    if ($iscomplete) {
+                        $pagesdone++;
+                        $pagecompletebyname[] = $namelower;
+                        $xplog[] = self::xp_log_entry(
+                            $completedtime,
+                            get_string('fellowship_xp_log_lesson', 'local_launchpad', $name),
+                            50,
+                            'page-' . $cm->id
+                        );
+                    }
+                }
+
+                if ($sectionnum === 1 && $completionenabled && $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE) {
+                    $s1tracked++;
+                    if ($iscomplete) {
+                        $s1done++;
+                        $foundationsgateat = max($foundationsgateat, $completedtime);
+                    }
+                }
+
+                if ($cm->modname === 'quiz') {
+                    $attempts = $DB->get_records('quiz_attempts', [
+                        'userid' => $userid,
+                        'quiz' => (int) $cm->instance,
+                        'state' => 'finished',
+                    ], 'attempt DESC', '*', 0, 1);
+                    $attempt = $attempts ? reset($attempts) : false;
+                    if ($attempt) {
+                        $at = (int) ($attempt->timefinish ?: $attempt->timestart);
+                        $xplog[] = self::xp_log_entry(
+                            $at,
+                            get_string('fellowship_xp_log_quiz', 'local_launchpad', $name),
+                            40,
+                            'quiz-' . $cm->id
+                        );
+                        $quiz = $DB->get_record('quiz', ['id' => (int) $cm->instance], 'id,sumgrades,grade');
+                        $fraction = null;
+                        if ($quiz && (float) $quiz->sumgrades > 0 && $attempt->sumgrades !== null) {
+                            $fraction = ((float) $attempt->sumgrades) / ((float) $quiz->sumgrades);
+                        } else {
+                            $grades = grade_get_grades($course->id, 'mod', 'quiz', (int) $cm->instance, $userid);
+                            $gg = $grades->items[0]->grades[$userid] ?? null;
+                            if ($gg && $gg->grade !== null && !empty($grades->items[0]->grademax)) {
+                                $fraction = ((float) $gg->grade) / ((float) $grades->items[0]->grademax);
+                            }
+                        }
+                        if ($fraction !== null && $fraction >= 0.999) {
+                            $quizperfect = true;
+                            $quizperfectat = max($quizperfectat, $at);
+                            // HTML: +10 per correct (Foundations check = 4). Award 40 when perfect.
+                            $xplog[] = self::xp_log_entry(
+                                $at,
+                                get_string('fellowship_xp_log_quiz_perfect', 'local_launchpad', $name),
+                                40,
+                                'quiz-perfect-' . $cm->id
+                            );
+                        } else if ($fraction !== null && $fraction > 0) {
+                            $correctxp = (int) round($fraction * 4) * 10;
+                            if ($correctxp > 0) {
+                                $xplog[] = self::xp_log_entry(
+                                    $at,
+                                    get_string('fellowship_xp_log_quiz_correct', 'local_launchpad', $name),
+                                    $correctxp,
+                                    'quiz-correct-' . $cm->id
+                                );
+                            }
+                        }
+                    }
+                }
+
+                if ($cm->modname === 'assign') {
+                    $allsubs = $DB->get_records('assign_submission', [
+                        'assignment' => (int) $cm->instance,
+                        'userid' => $userid,
+                        'status' => 'submitted',
+                    ], 'attemptnumber ASC');
+                    if ($allsubs) {
+                        $first = true;
+                        foreach ($allsubs as $sub) {
+                            $at = (int) ($sub->timemodified ?: $sub->timecreated);
+                            if ($first) {
+                                $assignsubmitted = true;
+                                $assignsubmittedat = max($assignsubmittedat, $at);
+                                $xplog[] = self::xp_log_entry(
+                                    $at,
+                                    get_string('fellowship_xp_log_assign', 'local_launchpad', $name),
+                                    120,
+                                    'assign-' . $cm->id
+                                );
+                                $first = false;
+                            } else {
+                                $assignresubmit = true;
+                                $assignresubmitat = max($assignresubmitat, $at);
+                                $xplog[] = self::xp_log_entry(
+                                    $at,
+                                    get_string('fellowship_xp_log_resubmit', 'local_launchpad', $name),
+                                    80,
+                                    'assign-re-' . $cm->id . '-' . $sub->attemptnumber
+                                );
+                            }
+                        }
+                    }
+
+                    $grades = grade_get_grades($course->id, 'mod', 'assign', (int) $cm->instance, $userid);
+                    $gg = $grades->items[0]->grades[$userid] ?? null;
+                    if ($gg && $gg->grade !== null && !empty($grades->items[0]->grademax)) {
+                        $pct = (((float) $gg->grade) / ((float) $grades->items[0]->grademax)) * 100;
+                        if ($sectionnum === 1 && $pct >= 70) {
+                            $foundationsgradeok = true;
+                            $foundationsgateat = max($foundationsgateat, (int) ($gg->dategraded ?: time()));
+                        }
+                    }
+                }
+            }
+
+            if ($s1tracked > 0 && $s1done >= $s1tracked) {
+                $foundationscomplete = true;
+            }
+        }
+
+        $gatecleared = $foundationscomplete || $foundationsgradeok;
+        if ($gatecleared) {
+            $xplog[] = self::xp_log_entry(
+                $foundationsgateat ?: time(),
+                get_string('fellowship_xp_log_gate', 'local_launchpad'),
+                200,
+                'gate-foundations'
+            );
+        }
+
+        // Newest first for the history table.
+        usort($xplog, static function (array $a, array $b): int {
+            return ($b['ts'] <=> $a['ts']) ?: strcmp($a['key'], $b['key']);
+        });
+        // Dedupe by key (gate / activities).
+        $seen = [];
+        $deduped = [];
+        foreach ($xplog as $row) {
+            if (isset($seen[$row['key']])) {
+                continue;
+            }
+            $seen[$row['key']] = true;
+            $deduped[] = $row;
+        }
+        $xplog = $deduped;
+
+        $xptotal = 0;
+        foreach ($xplog as $row) {
+            $xptotal += (int) $row['xp'];
+        }
+
+        $evidence = false;
+        $evidenceat = 0;
+        foreach ($pagecompletebyname as $n) {
+            if (str_contains($n, 'evidence') || str_contains($n, 'assumption')) {
+                $evidence = true;
+            }
+        }
+        if (!$evidence && $pagesdone >= 2) {
+            $evidence = true;
+        }
+
+        $alllessons = ($pagestotals1 > 0 && $pagesdones1 >= $pagestotals1)
+            || ($pagestotals1 === 0 && $pagesdone >= 3);
+
+        $profiledone = false;
+        $profileat = 0;
+        $user = ($USER && (int) $USER->id === $userid) ? $USER : \core_user::get_user($userid);
+        if ($user) {
+            $headline = trim(strip_tags((string) ($user->description ?? '')));
+            $city = trim((string) ($user->city ?? ''));
+            if ($headline !== '' || $city !== '') {
+                $profiledone = true;
+                $profileat = (int) ($user->timemodified ?? time());
+            }
+        }
+
+        $badgedefs = [
+            'first' => [
+                'name' => 'First step',
+                'icon' => '🌱',
+                'how' => 'Finish your first lesson',
+                'earned' => $pagesdone >= 1,
+                'at' => $pagesdone >= 1 ? self::first_log_ts($xplog, 'page-') : 0,
+            ],
+            'evidence' => [
+                'name' => 'Evidence hunter',
+                'icon' => '🔍',
+                'how' => 'Finish Lesson 2: Evidence versus assumptions',
+                'earned' => $evidence,
+                'at' => $evidence ? self::first_log_ts($xplog, 'page-') : 0,
+            ],
+            'allLessons' => [
+                'name' => 'Foundations reader',
+                'icon' => '📚',
+                'how' => 'Finish all Foundations lessons in your track',
+                'earned' => $alllessons,
+                'at' => $alllessons ? self::first_log_ts($xplog, 'page-') : 0,
+            ],
+            'ace' => [
+                'name' => 'Quiz ace',
+                'icon' => '🎯',
+                'how' => 'Score full marks on the Foundations check',
+                'earned' => $quizperfect,
+                'at' => $quizperfectat,
+            ],
+            'handin' => [
+                'name' => 'Hand-in hero',
+                'icon' => '📨',
+                'how' => 'Submit your first assignment',
+                'earned' => $assignsubmitted,
+                'at' => $assignsubmittedat,
+            ],
+            'loop' => [
+                'name' => 'Feedback loop',
+                'icon' => '🔄',
+                'how' => 'Resubmit after your mentor requests changes',
+                'earned' => $assignresubmit,
+                'at' => $assignresubmitat,
+            ],
+            'gate' => [
+                'name' => 'Gate one cleared',
+                'icon' => '🏁',
+                'how' => 'Pass Foundations (completion or grade ≥ 70)',
+                'earned' => $gatecleared,
+                'at' => $foundationsgateat,
+            ],
+            'portfolio' => [
+                'name' => 'Portfolio starter',
+                'icon' => '🗂️',
+                'how' => 'Save your first portfolio case study',
+                'earned' => false,
+                'at' => 0,
+            ],
+            'profile' => [
+                'name' => 'Introduced',
+                'icon' => '👋',
+                'how' => 'Add a city or description on your Moodle profile',
+                'earned' => $profiledone,
+                'at' => $profileat,
+            ],
+        ];
+
+        $badges = [];
+        $earnedcount = 0;
+        foreach ($badgedefs as $id => $def) {
+            $earned = !empty($def['earned']);
+            if ($earned) {
+                $earnedcount++;
+            }
+            $at = (int) ($def['at'] ?? 0);
+            $badges[] = [
+                'id' => $id,
+                'name' => $def['name'],
+                'icon' => $def['icon'],
+                'how' => $def['how'],
+                'earned' => $earned,
+                'display_icon' => $earned ? $def['icon'] : '🔒',
+                'detail' => $earned
+                    ? get_string('fellowship_badge_earned_on', 'local_launchpad', $at ? userdate($at, get_string('strftimedate', 'langconfig')) : get_string('fellowship_badge_earned_recent', 'local_launchpad'))
+                    : $def['how'],
+                'css' => $earned ? 'on' : '',
+            ];
+        }
+
+        return [
+            'xp_total' => $xptotal,
+            'xp_log' => array_map(static function (array $row): array {
+                return [
+                    'at' => $row['at'],
+                    'title' => $row['title'],
+                    'xp' => $row['xp'],
+                ];
+            }, $xplog),
+            'badges' => $badges,
+            'badges_earned' => $earnedcount,
+        ];
+    }
+
+    /**
+     * @return list<array>
+     */
+    private static function badge_catalogue_empty(): array {
+        $live = [
+            'badges' => [],
+            'badges_earned' => 0,
+        ];
+        // Reuse definitions with nothing earned via a zero-user path is heavy; inline locked catalogue.
+        foreach ([
+            ['first', 'First step', '🌱', 'Finish your first lesson'],
+            ['evidence', 'Evidence hunter', '🔍', 'Finish Lesson 2: Evidence versus assumptions'],
+            ['allLessons', 'Foundations reader', '📚', 'Finish all Foundations lessons in your track'],
+            ['ace', 'Quiz ace', '🎯', 'Score full marks on the Foundations check'],
+            ['handin', 'Hand-in hero', '📨', 'Submit your first assignment'],
+            ['loop', 'Feedback loop', '🔄', 'Resubmit after your mentor requests changes'],
+            ['gate', 'Gate one cleared', '🏁', 'Pass Foundations (completion or grade ≥ 70)'],
+            ['portfolio', 'Portfolio starter', '🗂️', 'Save your first portfolio case study'],
+            ['profile', 'Introduced', '👋', 'Add a city or description on your Moodle profile'],
+        ] as $row) {
+            $live['badges'][] = [
+                'id' => $row[0],
+                'name' => $row[1],
+                'icon' => $row[2],
+                'how' => $row[3],
+                'earned' => false,
+                'display_icon' => '🔒',
+                'detail' => $row[3],
+                'css' => '',
+            ];
+        }
+        return $live['badges'];
+    }
+
+    /**
+     * @return array{ts: int, at: string, title: string, xp: int, key: string}
+     */
+    private static function xp_log_entry(int $ts, string $title, int $xp, string $key): array {
+        if ($ts <= 0) {
+            $ts = time();
+        }
+        return [
+            'ts' => $ts,
+            'at' => userdate($ts, get_string('strftimedatetimeshort', 'langconfig')),
+            'title' => $title,
+            'xp' => $xp,
+            'key' => $key,
+        ];
+    }
+
+    /**
+     * @param list<array{key: string, ts: int}> $xplog
+     */
+    private static function first_log_ts(array $xplog, string $prefix): int {
+        $best = 0;
+        foreach ($xplog as $row) {
+            if (str_starts_with((string) $row['key'], $prefix)) {
+                $best = max($best, (int) $row['ts']);
+            }
+        }
+        return $best;
+    }
+
+    /**
      * Whether the user may open the Fellowship shell.
      */
     public static function can_access(int $userid): bool {

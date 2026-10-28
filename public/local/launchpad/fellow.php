@@ -59,13 +59,20 @@ $PAGE->set_heading(get_string('fellowship_area_heading', 'local_launchpad'));
 
 $pluginbase = $CFG->wwwroot . '/local/launchpad';
 $cssurl = $pluginbase . '/styles_fellowship.css';
+$jsurl = $pluginbase . '/fellowship.js';
 $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
-$publicurl = $CFG->wwwroot . '/';
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
+$progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false);
+$notificationsurl = (new moodle_url('/message/index.php'))->out(false);
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
+
+$icon = static function (string $paths): string {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+        . $paths . '</svg>';
+};
 
 $nav = [
     [
@@ -76,18 +83,28 @@ $nav = [
                 'url' => $homeurl,
                 'current' => $view === 'home',
                 'key' => 'home',
+                'icon_svg' => $icon('<path d="M3 11.5L12 4l9 7.5"/><path d="M6 10.5V20h12v-9.5"/>'),
             ],
             [
                 'label' => get_string('fellowship_nav_track', 'local_launchpad'),
                 'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
                 'current' => $view === 'track',
                 'key' => 'track',
+                'icon_svg' => $icon('<path d="M4 6h16M4 12h10M4 18h13"/><circle cx="18" cy="12" r="2"/><circle cx="19" cy="18" r="2"/>'),
             ],
             [
                 'label' => get_string('fellowship_nav_progress', 'local_launchpad'),
                 'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false),
                 'current' => $view === 'progress',
                 'key' => 'progress',
+                'icon_svg' => $icon('<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15v-4"/><path d="M12 15V8"/><path d="M16 15v-6"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_nav_achievements', 'local_launchpad'),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false),
+                'current' => $view === 'achievements',
+                'key' => 'achievements',
+                'icon_svg' => $icon('<path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 01-10 0V4z"/><path d="M7 8H4a2 2 0 000 4c2 0 3-1 3-2"/><path d="M17 8h3a2 2 0 010 4c-2 0-3-1-3-2"/>'),
             ],
         ],
     ],
@@ -99,16 +116,16 @@ $nav = [
                 'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'help']))->out(false),
                 'current' => $view === 'help',
                 'key' => 'help',
-            ],
-            [
-                'label' => get_string('fellowship_nav_account', 'local_launchpad'),
-                'url' => $profileurl,
-                'current' => false,
-                'key' => 'account',
-                'external' => true,
+                'icon_svg' => $icon('<circle cx="12" cy="12" r="9"/><path d="M12 16v-1"/><path d="M12 13a2.5 2.5 0 10-1-4.8"/>'),
             ],
         ],
     ],
+];
+$achievementsurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false);
+
+$crumbhome = [
+    'label' => get_string('fellowship_nav_home', 'local_launchpad'),
+    'url' => $homeurl,
 ];
 
 $selected = null;
@@ -190,6 +207,14 @@ switch ($view) {
                 'progress_label' => $progresslabel,
                 'courses' => $coursecards,
                 'multi_course' => count($coursecards) > 1,
+                'has_crumbs' => true,
+                'crumbs' => [
+                    $crumbhome,
+                    [
+                        'label' => get_string('fellowship_nav_track', 'local_launchpad'),
+                        'url' => '',
+                    ],
+                ],
             ]);
         }
         break;
@@ -222,12 +247,34 @@ switch ($view) {
             'courses' => $progresscards,
             'has_courses' => $progresscards !== [],
             'empty_message' => get_string('fellowship_no_courses', 'local_launchpad'),
+            'has_crumbs' => true,
+            'crumbs' => [
+                $crumbhome,
+                [
+                    'label' => get_string('fellowship_nav_progress', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
         ]);
+        break;
+
+    case 'achievements':
+        $pagetitle = get_string('fellowship_nav_achievements', 'local_launchpad');
+        // Content filled after live_achievements() so we compute Moodle XP/badges once.
+        $content = '';
         break;
 
     case 'help':
         $pagetitle = get_string('fellowship_nav_help', 'local_launchpad');
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_help', [
+            'has_crumbs' => true,
+            'crumbs' => [
+                $crumbhome,
+                [
+                    'label' => get_string('fellowship_nav_help', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
             'faqs' => [
                 [
                     'q' => get_string('fellowship_faq_internship_q', 'local_launchpad'),
@@ -253,7 +300,27 @@ switch ($view) {
     default:
         $view = 'home';
         $pagetitle = get_string('fellowship_nav_home', 'local_launchpad');
-        $next = $outline['next'] ?? null;
+        $homeoutline = $outline;
+        if ($homeoutline === null && $courses !== []) {
+            $homecourse = $selected ?? $courses[0];
+            $homeoutline = fellowship_dashboard::course_outline($homecourse, $userid);
+            if ($selected === null) {
+                $selected = $homecourse;
+                $courseid = (int) $homecourse->id;
+            }
+        }
+        if ($homeoutline === null) {
+            $homeoutline = [
+                'sections' => [],
+                'completion_enabled' => false,
+                'completed' => 0,
+                'trackable' => 0,
+                'percent' => null,
+                'next' => null,
+            ];
+        }
+        $next = $homeoutline['next'] ?? null;
+        $journey = fellowship_dashboard::journey_from_outline($homeoutline);
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_home', [
             'firstname' => $firstname,
             'welcome_heading' => get_string('fellowship_welcome_named', 'local_launchpad', $firstname),
@@ -264,11 +331,13 @@ switch ($view) {
             'next' => $next,
             'has_next' => $next !== null,
             'selected_course_name' => $selected ? format_string($selected->fullname) : '',
-            'completion_enabled' => $outline['completion_enabled'] ?? false,
-            'completed' => $outline['completed'] ?? 0,
-            'trackable' => $outline['trackable'] ?? 0,
-            'percent' => $outline['percent'] ?? null,
-            'has_percent' => isset($outline['percent']) && $outline['percent'] !== null,
+            'completion_enabled' => $homeoutline['completion_enabled'] ?? false,
+            'completed' => $homeoutline['completed'] ?? 0,
+            'trackable' => $homeoutline['trackable'] ?? 0,
+            'percent' => $homeoutline['percent'] ?? null,
+            'has_percent' => isset($homeoutline['percent']) && $homeoutline['percent'] !== null,
+            'journey' => $journey,
+            'bot_url' => $pluginbase . '/assets/img/bot.webp',
             'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
                 'view' => 'track',
                 'id' => $courseid > 0 ? $courseid : null,
@@ -278,13 +347,58 @@ switch ($view) {
         break;
 }
 
-// Mark current nav from actual view after switch normalisation.
+// Live XP + badges once per request (nav chip, topbar XP, Achievements view).
+$live = fellowship_dashboard::live_achievements($userid, $courses);
+$xptotal = (int) $live['xp_total'];
+$badgesearned = (int) $live['badges_earned'];
+$badgestotal = count($live['badges'] ?? []);
+
+if ($view === 'achievements') {
+    $ach = fellowship_dashboard::achievements_context_from_live($live);
+    $content = $OUTPUT->render_from_template('local_launchpad/fellowship_achievements', array_merge($ach, [
+        'has_crumbs' => true,
+        'crumbs' => [
+            $crumbhome,
+            [
+                'label' => get_string('fellowship_nav_achievements', 'local_launchpad'),
+                'url' => '',
+            ],
+        ],
+    ]));
+}
+
+// Mark current nav + Achievements earned/total badge (HTML-style "2/9").
 foreach ($nav as &$group) {
     foreach ($group['items'] as &$item) {
         $item['current'] = ($item['key'] === $view);
+        if (($item['key'] ?? '') === 'achievements') {
+            $item['has_badge'] = true;
+            $item['badge'] = $badgesearned . '/' . $badgestotal;
+        }
     }
 }
 unset($group, $item);
+
+$unread = 0;
+if (class_exists('\message_popup\api')) {
+    try {
+        $unread = (int) \message_popup\api::count_unread_popup_notifications($userid);
+    } catch (\Throwable $e) {
+        $unread = 0;
+    }
+}
+$notificationslabel = $unread > 0
+    ? get_string('fellowship_notifications_unread', 'local_launchpad', $unread)
+    : get_string('fellowship_notifications', 'local_launchpad');
+
+$orbittips = [
+    'home' => get_string('fellowship_orbit_tip_home', 'local_launchpad'),
+    'track' => get_string('fellowship_orbit_tip_track', 'local_launchpad'),
+    'progress' => get_string('fellowship_orbit_tip_progress', 'local_launchpad'),
+    'achievements' => get_string('fellowship_orbit_tip_achievements', 'local_launchpad'),
+    'help' => get_string('fellowship_orbit_tip_help', 'local_launchpad'),
+];
+$orbittip = $orbittips[$view] ?? $orbittips['home'];
 
 $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', [
     'data_region' => fellowship_dashboard::DATA_REGION,
@@ -295,10 +409,18 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', [
     'content' => $content,
     'pagetitle' => $pagetitle,
     'home_url' => $homeurl,
-    'public_url' => $publicurl,
     'logout_url' => $logouturl,
     'profile_url' => $profileurl,
+    'progress_url' => $progressurl,
+    'achievements_url' => $achievementsurl,
+    'notifications_url' => $notificationsurl,
+    'notifications_label' => $notificationslabel,
+    'unread_notifications' => $unread,
+    'has_unread_notifications' => $unread > 0,
+    'xp_total' => $xptotal,
     'initials' => fellowship_dashboard::initials($USER),
+    'bot_url' => $pluginbase . '/assets/img/bot.webp',
+    'orbit_tip' => $orbittip,
 ]);
 
 header('Content-Type: text/html; charset=utf-8');
@@ -310,10 +432,11 @@ echo '<meta name="viewport" content="width=device-width, initial-scale=1">' . "\
 echo '<title>' . s(get_string('fellowship_area_title', 'local_launchpad')) . '</title>' . "\n";
 echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
-echo '<link href="https://fonts.googleapis.com/css2?family=Gantari:wght@400;500;600;700&family=Prosto+One&display=swap" rel="stylesheet">' . "\n";
+echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
 echo '</head>' . "\n";
 echo '<body class="local-launchpad-fellowship">' . "\n";
 echo $shell;
+echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
 echo '</body>' . "\n";
 echo '</html>';

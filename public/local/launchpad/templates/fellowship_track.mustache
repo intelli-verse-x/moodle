@@ -1,6 +1,15 @@
 {{!
     @template local_launchpad/fellowship_track
 }}
+{{#has_crumbs}}
+  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
+    {{#crumbs}}
+      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
+      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
+    {{/crumbs}}
+  </nav>
+{{/has_crumbs}}
+
 {{#multi_course}}
   <div class="lp-course-switch" role="navigation" aria-label="{{#str}} fellowship_your_courses, local_launchpad {{/str}}">
     {{#courses}}
@@ -9,7 +18,7 @@
   </div>
 {{/multi_course}}
 
-<div class="lp-card-head lp-track-head">
+<div class="lp-track-head">
   <div>
     <span class="lp-eyebrow">{{course_idnumber}}</span>
     <h2>{{{course_name}}}</h2>
@@ -18,7 +27,7 @@
 </div>
 
 {{#has_percent}}
-  <div class="lp-progress-block lp-card">
+  <div class="lp-progress-block lp-card lift">
     <div class="lp-progress-meta">
       <b>{{percent}}%</b>
       <span class="lp-muted">{{progress_label}}</span>
@@ -28,33 +37,45 @@
 {{/has_percent}}
 
 {{^has_sections}}
-  <p class="lp-muted">{{#str}} fellowship_no_activities, local_launchpad {{/str}}</p>
+  <div class="lp-empty" role="status">
+    <div class="lp-empty-mark" aria-hidden="true">·</div>
+    <h2>{{#str}} fellowship_no_activities, local_launchpad {{/str}}</h2>
+  </div>
 {{/has_sections}}
 
-{{#sections}}
-  <section class="lp-phase">
-    <h3>{{{name}}}</h3>
-    <ul class="lp-act-list">
-      {{#activities}}
-        <li class="lp-act{{#complete}} is-done{{/complete}}">
-          <span class="lp-chk{{#complete}} on{{/complete}}" aria-hidden="true">{{#complete}}✓{{/complete}}</span>
-          <span class="lp-act-k lp-mod-{{icon_class}}">{{modname_display}}</span>
-          <a class="lp-act-t" href="{{url}}">{{{name}}}</a>
-          {{#tracked}}
-            {{#complete}}
-              <span class="lp-chip ok">{{#str}} fellowship_complete, local_launchpad {{/str}}</span>
-            {{/complete}}
-            {{^complete}}
-              <span class="lp-chip">{{#str}} fellowship_incomplete, local_launchpad {{/str}}</span>
-            {{/complete}}
-          {{/tracked}}
-          {{^tracked}}
-            <span class="lp-chip line">{{#str}} fellowship_not_tracked, local_launchpad {{/str}}</span>
-          {{/tracked}}
-        </li>
-      {{/activities}}
-    </ul>
-  </section>
-{{/sections}}
+{{#has_sections}}
+  <div class="lp-phases">
+    {{#sections}}
+      <section class="lp-phase">
+        <div class="lp-phase-head">
+          <span class="lp-phase-num" aria-hidden="true"></span>
+          <h3>{{{name}}}</h3>
+        </div>
+        <ul class="lp-act-list">
+          {{#activities}}
+            <li class="lp-act{{#complete}} is-done{{/complete}}">
+              <span class="lp-chk{{#complete}} on{{/complete}}" aria-hidden="true">{{#complete}}✓{{/complete}}</span>
+              <div class="lp-act-meta">
+                <span class="lp-act-k">{{modname_display}}</span>
+                <a class="lp-act-t" href="{{url}}">{{{name}}}</a>
+              </div>
+              {{#tracked}}
+                {{#complete}}
+                  <span class="lp-chip ok">{{#str}} fellowship_complete, local_launchpad {{/str}}</span>
+                {{/complete}}
+                {{^complete}}
+                  <span class="lp-chip">{{#str}} fellowship_incomplete, local_launchpad {{/str}}</span>
+                {{/complete}}
+              {{/tracked}}
+              {{^tracked}}
+                <span class="lp-chip line">{{#str}} fellowship_not_tracked, local_launchpad {{/str}}</span>
+              {{/tracked}}
+            </li>
+          {{/activities}}
+        </ul>
+      </section>
+    {{/sections}}
+  </div>
+{{/has_sections}}
 
-<p class="lp-xs lp-muted">{{#str}} fellowship_native_activities_note, local_launchpad {{/str}}</p>
+<p class="lp-note">{{#str}} fellowship_native_activities_note, local_launchpad {{/str}}</p>
