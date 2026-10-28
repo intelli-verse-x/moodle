@@ -16,6 +16,7 @@ Repository-backed tools to create the **LaunchPad** Moodle category/course skele
 - Read-only **account persona** classifier (`classes/account_persona.php`): Fellowship / Mentor / Admin / Employee from enrolments, admin checks, and cohort `lp-employee`. Does **not** authorize actions by itself.
 - Staff **account provisioning** (`classes/account_provision.php` + `cli/provision_account.php`): create manual users, enrol fellows (student on `lp-*`), assign mentors (teacher/editingteacher on `lp-*` only), grant employees (cohort `lp-employee`). Refuses Admin grants. Does **not** change signup/auth settings by itself.
 - Public **landing page** (Dipesh): `classes/page.php` + templates/assets; frontpage for guests via `public/index.php`.
+- **Persona homes** (interim): Employee → `/local/launchpad/employee.php`; Mentor → `/local/launchpad/mentor.php` (assigned `lp-*` links). Post-login and `/my/` redirect when wantsurl is default home. Fellowship empty-state is not shown to Emp/Mentor.
 - Local-only **email signup** helper: `cli/enable_local_signup.php` (fail-closed to local targets).
 
 Does **not** delete legacy categories (e.g. an older Orientation category). Does **not** invent curriculum body text, mentors, grades, or certificates. Out of scope vs MVP §8: commerce, hiring, mentor marketplace. **Employee** access is cohort `lp-employee` + `/local/launchpad/employee.php` stub (no curriculum invented).
@@ -69,4 +70,5 @@ Authoritative: `personal-resources/ToBa_Learn_MVP.pdf` (MVP 1 structure). Local 
 | `tests/account_persona_test.php` | Yes (phpunit DB / `phpu_` prefix) | Persona classifier: fellow, mentor, admin, multi, request ignored, employee unresolved, read-only |
 | `tests/account_provision_policy_test.php` | No | Grant policy: admin/employee rejected; lp-* + mentor roles |
 | `tests/account_provision_test.php` | Yes (phpunit DB) | Staff create/enrol/mentor; forbidden actor; invalid course/role; auth snapshot unchanged |
+| `tests/persona_home_test.php` | No | Default-home override vs deep wantsurl; path constants |
 | Full setup apply / enrol / access | Yes | Manual / local scripts under `personal-resources/` (not PHPUnit) |
