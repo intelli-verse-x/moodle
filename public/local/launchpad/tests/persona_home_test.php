@@ -66,5 +66,6 @@ final class persona_home_test extends \basic_testcase {
     public function test_path_constants(): void {
         $this->assertSame('/local/launchpad/mentor.php', persona_home::MENTOR_PATH);
         $this->assertSame('/local/launchpad/employee.php', persona_home::EMPLOYEE_PATH);
+        $this->assertSame('/local/launchpad/fellow.php', persona_home::FELLOW_PATH);
     }
 }

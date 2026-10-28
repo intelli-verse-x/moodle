@@ -1,0 +1,69 @@
+{{!
+    @template local_launchpad/fellowship_home
+}}
+{{^has_courses}}
+  <div class="lp-empty" role="status">
+    <h2>{{welcome_heading}}</h2>
+    <p>{{empty_message}}</p>
+  </div>
+{{/has_courses}}
+{{#has_courses}}
+  <div class="lp-hero">
+    <span class="lp-eyebrow">{{#str}} fellowship_role_label, local_launchpad {{/str}}</span>
+    <h2>{{welcome_back}}</h2>
+    {{#has_next}}
+      <div class="lp-quest">
+        <div>
+          <span class="lp-eyebrow">{{#str}} fellowship_next_activity, local_launchpad {{/str}}</span>
+          <p class="lp-quest-title">{{{next.name}}}</p>
+          <p class="lp-muted">{{next.modname_display}}{{#selected_course_name}} · {{{selected_course_name}}}{{/selected_course_name}}</p>
+        </div>
+        <a class="lp-btn lp-btn-primary" href="{{next.url}}">{{#str}} fellowship_open_activity, local_launchpad {{/str}}</a>
+      </div>
+    {{/has_next}}
+    {{^has_next}}
+      {{#has_percent}}
+        <p class="lp-muted">{{#str}} fellowship_all_tracked_done, local_launchpad {{/str}}</p>
+      {{/has_percent}}
+    {{/has_next}}
+  </div>
+
+  <div class="lp-grid-2">
+    <section class="lp-card">
+      <div class="lp-card-head">
+        <h3>{{#str}} fellowship_your_courses, local_launchpad {{/str}}</h3>
+        <a class="lp-link" href="{{track_url}}">{{#str}} fellowship_nav_track, local_launchpad {{/str}} →</a>
+      </div>
+      <ul class="lp-course-list">
+        {{#courses}}
+          <li>
+            <a href="{{url}}">
+              <b>{{{fullname}}}</b>
+              <span class="lp-muted">{{idnumber}}</span>
+            </a>
+            <a class="lp-link-sm" href="{{moodle_url}}">{{#str}} fellowship_open_moodle_course, local_launchpad {{/str}}</a>
+          </li>
+        {{/courses}}
+      </ul>
+    </section>
+    <section class="lp-card">
+      <div class="lp-card-head">
+        <h3>{{#str}} fellowship_nav_progress, local_launchpad {{/str}}</h3>
+        <a class="lp-link" href="{{progress_url}}">{{#str}} fellowship_view_progress, local_launchpad {{/str}} →</a>
+      </div>
+      {{#has_percent}}
+        <div class="lp-progress-block">
+          <div class="lp-progress-meta">
+            <b>{{percent}}%</b>
+            <span class="lp-muted">{{completed}} / {{trackable}}</span>
+          </div>
+          <div class="lp-bar" aria-hidden="true"><i style="width:{{percent}}%"></i></div>
+          <p class="lp-xs lp-muted">{{#str}} fellowship_progress_from_completion, local_launchpad {{/str}}</p>
+        </div>
+      {{/has_percent}}
+      {{^has_percent}}
+        <p class="lp-muted">{{#str}} fellowship_progress_not_tracked, local_launchpad {{/str}}</p>
+      {{/has_percent}}
+    </section>
+  </div>
+{{/has_courses}}

@@ -17,9 +17,9 @@
 namespace local_launchpad;
 
 /**
- * Persona post-login / My home routing (interim shells until HTML portals land).
+ * Persona post-login / My home routing.
  *
- * Priority: Admin (no override) → Mentor → Employee-only → Fellowship default (/my/).
+ * Priority: Admin (no override) → Mentor → Fellowship → Employee-only → Moodle /my/.
  * Deep wantsurl targets are never rewritten.
  *
  * @package    local_launchpad
@@ -39,10 +39,16 @@ final class persona_home {
     public const EMPLOYEE_PATH = '/local/launchpad/employee.php';
 
     /**
+     * Moodle path for the Fellowship dashboard shell.
+     */
+    public const FELLOW_PATH = '/local/launchpad/fellow.php';
+
+    /**
      * Persona home URL for this user, or null to keep Moodle default (/my/).
      *
      * Site admins always return null (no forced persona redirect).
-     * Mentors → mentor stub. Employees without Fellowship → employee stub.
+     * Mentors → mentor stub. Fellows → Fellowship shell.
+     * Employees without Fellowship → employee stub.
      *
      * @param int $userid
      * @return \moodle_url|null
@@ -57,7 +63,10 @@ final class persona_home {
         if (account_persona::is_mentor($userid)) {
             return new \moodle_url(self::MENTOR_PATH);
         }
-        if (account_persona::is_employee($userid) && !account_persona::is_fellowship($userid)) {
+        if (account_persona::is_fellowship($userid)) {
+            return new \moodle_url(self::FELLOW_PATH);
+        }
+        if (account_persona::is_employee($userid)) {
             return new \moodle_url(self::EMPLOYEE_PATH);
         }
         return null;

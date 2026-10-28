@@ -1,0 +1,33 @@
+{{!
+    @template local_launchpad/fellowship_progress
+}}
+{{^has_courses}}
+  <div class="lp-empty" role="status"><p>{{empty_message}}</p></div>
+{{/has_courses}}
+{{#has_courses}}
+  <p class="lp-muted">{{#str}} fellowship_progress_intro, local_launchpad {{/str}}</p>
+  <div class="lp-stack">
+    {{#courses}}
+      <section class="lp-card">
+        <div class="lp-card-head">
+          <div>
+            <h3>{{{fullname}}}</h3>
+            <span class="lp-muted">{{idnumber}}</span>
+          </div>
+          <a class="lp-link" href="{{url}}">{{#str}} fellowship_nav_track, local_launchpad {{/str}} →</a>
+        </div>
+        {{#has_percent}}
+          <div class="lp-progress-block">
+            <div class="lp-progress-meta">
+              <b>{{percent}}%</b>
+              <span class="lp-muted">{{completed}} / {{trackable}}</span>
+            </div>
+            <div class="lp-bar" aria-hidden="true"><i style="width:{{percent}}%"></i></div>
+          </div>
+        {{/has_percent}}
+        <p class="lp-sm">{{honest_note}}</p>
+        <a class="lp-link-sm" href="{{moodle_url}}">{{#str}} fellowship_open_moodle_course, local_launchpad {{/str}}</a>
+      </section>
+    {{/courses}}
+  </div>
+{{/has_courses}}

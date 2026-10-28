@@ -1,0 +1,35 @@
+{{!
+    @template local_launchpad/fellowship_shell
+
+    Fellowship authenticated shell (side nav + main). No XP / gamification.
+}}
+<div class="lp-shell" data-region="{{data_region}}">
+  <nav class="lp-side" aria-label="{{#str}} fellowship_nav_aria, local_launchpad {{/str}}">
+    <a class="lp-logo" href="{{home_url}}"><span class="lp-logo-mark" aria-hidden="true"></span>ToBa Learn</a>
+    <div class="lp-role">{{role_label}}</div>
+    {{#nav_groups}}
+      <div class="lp-nl">{{group}}</div>
+      {{#items}}
+        <a class="lp-nav{{#current}} is-current{{/current}}" href="{{url}}"{{#current}} aria-current="page"{{/current}}>{{label}}</a>
+      {{/items}}
+    {{/nav_groups}}
+    <div class="lp-me">
+      <div class="lp-av" aria-hidden="true">{{initials}}</div>
+      <div class="lp-me-text">
+        <b>{{{displayname}}}</b>
+        <span>{{role_label}}</span>
+      </div>
+    </div>
+    <a class="lp-nav" href="{{public_url}}">{{#str}} fellowship_nav_public, local_launchpad {{/str}}</a>
+    <a class="lp-nav" href="{{logout_url}}">{{#str}} fellowship_nav_signout, local_launchpad {{/str}}</a>
+  </nav>
+  <div class="lp-main-wrap">
+    <header class="lp-topbar">
+      <h1 class="lp-page-title">{{pagetitle}}</h1>
+      <a class="lp-profile-link" href="{{profile_url}}">{{#str}} fellowship_nav_account, local_launchpad {{/str}}</a>
+    </header>
+    <main class="lp-main" id="lp-main">
+      <div class="lp-inner">{{{content}}}</div>
+    </main>
+  </div>
+</div>

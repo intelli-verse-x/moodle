@@ -1,0 +1,12 @@
+{{!
+    @template local_launchpad/fellowship_help
+}}
+<p class="lp-muted">{{#str}} fellowship_help_intro, local_launchpad {{/str}}</p>
+<div class="lp-stack">
+  {{#faqs}}
+    <details class="lp-faq">
+      <summary>{{q}}</summary>
+      <p class="lp-muted">{{a}}</p>
+    </details>
+  {{/faqs}}
+</div>
