@@ -58,11 +58,11 @@ class page {
         $SESSION->wantsurl = $dashurl;
 
         // Mentor application Google Form (Site admin → Plugins → ToBa Learn LaunchPad).
+        // Always expose the Apply CTA (Dipesh landing): empty setting → placeholder URL
+        // until a real form is configured; form alone never creates a Moodle mentor account.
         $mentorformurl = trim((string) get_config('local_launchpad', 'mentorformurl'));
-        $mentorformconfigured = ($mentorformurl !== ''
-            && !str_contains($mentorformurl, 'REPLACE_WITH_YOUR_FORM'));
-        if (!$mentorformconfigured) {
-            $mentorformurl = '';
+        if ($mentorformurl === '') {
+            $mentorformurl = 'https://docs.google.com/forms/d/e/1FAIpQLSf_REPLACE_WITH_YOUR_FORM/viewform';
         }
 
         $body = $OUTPUT->render_from_template('local_launchpad/body', [
@@ -70,7 +70,6 @@ class page {
             'loginurl' => $loginurl,
             'employeeurl' => $employeeurl,
             'mentorformurl' => $mentorformurl,
-            'mentorformconfigured' => $mentorformconfigured,
         ]);
 
         $cssurl = $pluginbase . '/styles.css';
