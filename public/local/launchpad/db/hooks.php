@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $callbacks = [
     [
-        'hook' => \core\hook\after_config::class,
-        'callback' => [\local_launchpad\hook_callbacks::class, 'after_config'],
+        'hook' => \core\hook\output\before_standard_top_of_body_html_generation::class,
+        'callback' => [\local_launchpad\hook_callbacks::class, 'before_standard_top_of_body_html_generation'],
     ],
 ];

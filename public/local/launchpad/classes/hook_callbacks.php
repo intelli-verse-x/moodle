@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace local_launchpad;
+
+use core\hook\output\before_standard_top_of_body_html_generation;
+
 /**
  * Hook callbacks for local_launchpad.
  *
@@ -21,30 +25,18 @@
  * @copyright  2026 IntelliVerse-X
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+final class hook_callbacks {
 
-namespace local_launchpad;
-
-use core\hook\after_config;
-
-defined('MOODLE_INTERNAL') || die();
-
-/**
- * Enable Fellowship email self-registration when unset.
- *
- * @copyright  2026 IntelliVerse-X
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-class hook_callbacks {
     /**
-     * After config load: turn on auth_email self-registration if empty.
+     * Inject LaunchPad empty-state banner (cleared below fixed navbar).
      *
-     * @param after_config $hook
+     * @param before_standard_top_of_body_html_generation $hook
      */
-    public static function after_config(after_config $hook): void {
-        if (during_initial_install()) {
-            return;
+    public static function before_standard_top_of_body_html_generation(
+        before_standard_top_of_body_html_generation $hook,
+    ): void {
+        if (empty_state::should_show()) {
+            $hook->add_html(empty_state::notice_html());
         }
-        // Enable Email self-registration when signup is not usable yet.
-        registration::ensure_email_self_registration(true);
     }
 }

@@ -109,8 +109,8 @@
           <span class="muted portal-note">Opens your dashboard. Employer enrolment controls what you see.</span>
           {{/loggedin}}
           {{^loggedin}}
-          <a class="btn primary" href="{{{loginurl}}}?portal=employer" data-moodle-login>Sign in to Employer <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon></a>
-          <span class="muted portal-note">Opens Moodle. Your employer enrolment loads this portal.</span>
+          <a class="btn primary" href="{{{employeeurl}}}">Sign in to Employer <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon></a>
+          <span class="muted portal-note">Opens Moodle login, then the employee area. Access is assigned by your programme admin — no public employee signup.</span>
           {{/loggedin}}
         </div>
       </div>
@@ -532,9 +532,14 @@
           {{/mentorsteps}}
         </ol>
         <div class="become-info-foot">
+          {{#mentorformconfigured}}
           <a class="btn primary" href="{{{mentorformurl}}}" target="_blank" rel="noopener noreferrer">
             {{mentorctalabel}} <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon>
           </a>
+          {{/mentorformconfigured}}
+          {{^mentorformconfigured}}
+          <span class="muted portal-note">Mentor application link not configured yet. Site admins set it under Site administration → Plugins → ToBa Learn LaunchPad.</span>
+          {{/mentorformconfigured}}
         </div>
       </article>
     </div>

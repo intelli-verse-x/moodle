@@ -92,3 +92,11 @@ $string['footertermsurl'] = 'Terms of use URL';
 $string['footertermsurl_desc'] = 'Optional public URL. Leave blank to hide the Terms link.';
 $string['footercontacturl'] = 'Contact / support page URL';
 $string['footercontacturl_desc'] = 'Optional public URL (support form or contact page). Leave blank to hide.';
+
+/* Employee area (#13 provisioning). */
+$string['emptystate_no_course'] = 'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.';
+$string['employee_area_title'] = 'Employee learning';
+$string['employee_area_heading'] = 'Employee area';
+$string['employee_area_body'] = 'Your employee access is active. Programme content will appear here when your organisation assigns it. This area does not enrol you in the Fellowship or grant mentor or admin rights.';
+$string['employee_access_denied'] = 'You do not have employee access. Ask your programme administrator if you expected to see this page.';
+$string['employee_cohort_name'] = 'ToBa Learn Employees';

@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * ToBa Learn LaunchPad public landing page.
+ * Version metadata for local_launchpad (structure CLI, personas, provisioning, landing).
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-$plugin->version   = 2026102814;
+$plugin->version   = 2026102820;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.0';
+$plugin->release   = '1.1';

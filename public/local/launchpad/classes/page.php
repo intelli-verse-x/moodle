@@ -52,6 +52,8 @@ class page {
         $assets = $pluginbase . '/assets/img';
         $loginurl = (new \moodle_url('/login/index.php'))->out(false);
         $portalurl = (new \moodle_url('/my/'))->out(false);
+        // Employee CTA goes to the gated area; require_login() sends guests to Moodle login.
+        $employeeurl = (new \moodle_url('/local/launchpad/employee.php'))->out(false);
         // Always offer Fellowship register entry; register.php enables email signup.
         $signupurl = registration::fellowship_signup_url();
         $cansignup = true;
@@ -71,6 +73,7 @@ class page {
             'assets' => $assets,
             'loginurl' => $loginurl,
             'portalurl' => $portalurl,
+            'employeeurl' => $employeeurl,
             'signupurl' => $signupurl,
             'cansignup' => $cansignup,
             'loggedin' => $loggedin,
@@ -80,8 +83,8 @@ class page {
             'strsignupclosednote' => get_string('signupclosednote', 'local_launchpad'),
         ], $mentor, $footer));
 
-        $cssurl = $pluginbase . '/styles.css?v=202610281830';
-        $jsurl = $pluginbase . '/landing.js?v=202610281830';
+        $cssurl = $pluginbase . '/styles.css?v=202610282000';
+        $jsurl = $pluginbase . '/landing.js?v=202610282000';
         $title = s(get_string('pagetitle', 'local_launchpad'));
 
         // Standalone document — no Boost header/footer.
@@ -146,8 +149,10 @@ class page {
         ];
 
         $mentorformurl = trim((string) get_config('local_launchpad', 'mentorformurl'));
-        if ($mentorformurl === '') {
-            $mentorformurl = 'https://docs.google.com/forms/d/e/1FAIpQLSf_REPLACE_WITH_YOUR_FORM/viewform';
+        $mentorformconfigured = ($mentorformurl !== ''
+            && !str_contains($mentorformurl, 'REPLACE_WITH_YOUR_FORM'));
+        if (!$mentorformconfigured) {
+            $mentorformurl = '';
         }
 
         return [
@@ -160,6 +165,7 @@ class page {
             'mentorctalabel' => self::config_text('mentorctalabel', $defaults['mentorctalabel']),
             'mentormedialab' => self::config_text('mentormedialab', $defaults['mentormedialab']),
             'mentorformurl' => $mentorformurl,
+            'mentorformconfigured' => $mentorformconfigured,
             'mentorsteps' => $steps,
         ];
     }

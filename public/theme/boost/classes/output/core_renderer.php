@@ -299,4 +299,31 @@ class core_renderer extends \core_renderer {
 
         return $this->render_from_template('core/signup_form_layout', $context);
     }
+
+    /**
+     * Prefer the ToBa Learn mark from LaunchPad for the navbar (dashboard included).
+     *
+     * @param int|null $maxwidth Unused; kept for signature compatibility.
+     * @param int|null $maxheight Unused; kept for signature compatibility.
+     * @return moodle_url|false
+     */
+    public function get_compact_logo_url($maxwidth = 300, $maxheight = 300) {
+        global $CFG;
+
+        $tobalogo = $CFG->dirroot . '/local/launchpad/assets/img/logo.webp';
+        if (is_readable($tobalogo)) {
+            return new moodle_url('/local/launchpad/assets/img/logo.webp');
+        }
+
+        return parent::get_compact_logo_url($maxwidth, $maxheight);
+    }
+
+    /**
+     * Show the navbar logo whenever the ToBa Learn mark (or a site compact logo) is available.
+     *
+     * @return bool
+     */
+    public function should_display_navbar_logo() {
+        return !empty($this->get_compact_logo_url());
+    }
 }
