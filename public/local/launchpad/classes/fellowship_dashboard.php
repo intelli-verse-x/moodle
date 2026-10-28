@@ -582,7 +582,142 @@ final class fellowship_dashboard {
             'phases' => $phases,
             'has_phases' => $phases !== [],
             'journey' => $journey,
+            'outline' => $outline,
         ];
+    }
+
+    /**
+     * My track page context — HTML layout with live Moodle sections/activities.
+     *
+     * Full journey + phase accordions + Capstone / meta / How completion works.
+     * Capstone + device/tools copy is programme-honest (not demo track fiction).
+     * Mentor names come from course teachers when enrolled.
+     *
+     * @param \stdClass $course
+     * @return array
+     */
+    public static function track_for_user(int $userid, \stdClass $course): array {
+        $progress = self::phase_progress_for_user($userid, [$course], $course);
+        $outline = $progress['outline'] ?? self::course_outline($course, $userid);
+        $bysection = [];
+        foreach ($outline['sections'] ?? [] as $section) {
+            $num = (int) ($section['sectionnum'] ?? 0);
+            if ($num > 0) {
+                $bysection[$num] = $section;
+            }
+        }
+
+        $blurbs = [
+            1 => get_string('fellowship_track_blurb_1', 'local_launchpad'),
+            2 => get_string('fellowship_track_blurb_2', 'local_launchpad'),
+            3 => get_string('fellowship_track_blurb_3', 'local_launchpad'),
+            4 => get_string('fellowship_track_blurb_4', 'local_launchpad'),
+        ];
+
+        $trackphases = [];
+        $firstopen = true;
+        foreach ($progress['phases'] ?? [] as $phase) {
+            $num = (int) $phase['sectionnum'];
+            $section = $bysection[$num] ?? null;
+            $activities = $section['activities'] ?? [];
+            $released = $activities !== [];
+            $isopen = $released && $firstopen;
+            if ($released) {
+                $firstopen = false;
+            }
+            $trackphases[] = array_merge($phase, [
+                'blurb' => $blurbs[$num] ?? '',
+                'released' => $released,
+                'is_open' => $isopen,
+                'activities' => $activities,
+                'has_activities' => $activities !== [],
+                'locked_note' => get_string('fellowship_track_phase_locked', 'local_launchpad', $phase['weight']),
+            ]);
+        }
+
+        $weights = [];
+        $maxw = max(1, max(self::phase_weights()));
+        foreach (self::phase_weights() as $num => $weight) {
+            $weights[] = [
+                'name' => blueprint::phase_sections()[$num] ?? ('Phase ' . $num),
+                'weight' => $weight,
+                'weight_label' => $weight . '%',
+                'bar_pct' => (int) round(($weight / $maxw) * 100),
+            ];
+        }
+
+        $summary = trim(format_string($course->summary ?? ''));
+        $hasrealsummary = $summary !== '' && stripos($summary, 'placeholder') === false;
+
+        $mentors = self::course_mentor_names($course);
+        $mentorlabel = $mentors !== []
+            ? implode(', ', $mentors)
+            : get_string('fellowship_track_mentor_tba', 'local_launchpad');
+
+        return [
+            'course_name' => format_string($course->fullname),
+            'course_idnumber' => s($course->idnumber),
+            'course_lead' => $hasrealsummary
+                ? $summary
+                : get_string('fellowship_track_lead_default', 'local_launchpad'),
+            'journey' => $progress['journey'],
+            'track_phases' => $trackphases,
+            'has_track_phases' => $trackphases !== [],
+            'capstone_body' => get_string('fellowship_track_capstone_body', 'local_launchpad'),
+            'prerequisite' => get_string('fellowship_track_prerequisite', 'local_launchpad'),
+            'device' => get_string('fellowship_track_device', 'local_launchpad'),
+            'tools' => get_string('fellowship_track_tools', 'local_launchpad'),
+            'mentor' => $mentorlabel,
+            'weight_rows' => $weights,
+            'completion_enabled' => !empty($outline['completion_enabled']),
+            'completed' => (int) ($outline['completed'] ?? 0),
+            'trackable' => (int) ($outline['trackable'] ?? 0),
+            'percent' => $outline['percent'] ?? null,
+            'has_percent' => isset($outline['percent']) && $outline['percent'] !== null,
+        ];
+    }
+
+    /**
+     * Display names of teachers / editing teachers on a course (Mentors card).
+     *
+     * @return list<string>
+     */
+    public static function course_mentor_names(\stdClass $course): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $context = \context_course::instance((int) $course->id);
+        $roleids = $DB->get_fieldset_select(
+            'role',
+            'id',
+            'shortname IN (?, ?)',
+            ['editingteacher', 'teacher']
+        );
+        if ($roleids === []) {
+            return [];
+        }
+
+        list($insql, $params) = $DB->get_in_or_equal($roleids, SQL_PARAMS_NAMED);
+        $params['ctx'] = $context->id;
+        $params['active'] = ENROL_USER_ACTIVE;
+        $params['enabled'] = ENROL_INSTANCE_ENABLED;
+
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename
+                  FROM {role_assignments} ra
+                  JOIN {user} u ON u.id = ra.userid AND u.deleted = 0
+                  JOIN {user_enrolments} ue ON ue.userid = u.id AND ue.status = :active
+                  JOIN {enrol} e ON e.id = ue.enrolid AND e.courseid = :courseid AND e.status = :enabled
+                 WHERE ra.contextid = :ctx AND ra.roleid {$insql}
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $params['courseid'] = (int) $course->id;
+
+        $names = [];
+        foreach ($DB->get_records_sql($sql, $params) as $user) {
+            $names[] = fullname($user);
+        }
+        return array_values($names);
     }
 
     /**

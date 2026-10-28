@@ -9,15 +9,16 @@
   <nav class="lp-side" id="lp-side" aria-label="{{#str}} fellowship_nav_aria, local_launchpad {{/str}}">
     <a class="lp-logo" href="{{home_url}}"><span class="lp-logo-mark" aria-hidden="true"></span>ToBa Learn</a>
     <div class="lp-role">{{role_label}}</div>
-    <div class="lp-xp-card" title="{{#str}} fellowship_xp_title, local_launchpad {{/str}}">
-      <div class="lp-xp-row">
-        <span class="lp-xp-badge" aria-hidden="true">★</span>
-        <div class="lp-xp-text">
-          <b>{{#str}} fellowship_xp_total_label, local_launchpad {{/str}}</b>
-          <span><strong>{{xp_total}}</strong> XP</span>
+    <a class="lp-lvcard" href="{{achievements_url}}" title="{{#str}} fellowship_xp_title, local_launchpad {{/str}}">
+      <div class="lp-lvcard-row">
+        <span class="lp-lvbadge" style="background:{{level_color}}" aria-hidden="true">{{level_index}}</span>
+        <div class="lp-lvcard-text">
+          <b>{{level_name}}</b>
+          <span>{{xp_total}} XP{{#has_next_level}} · {{xp_to_next}} {{#str}} fellowship_xp_to_level, local_launchpad {{/str}} {{next_level_name}}{{/has_next_level}}{{^has_next_level}} · {{#str}} fellowship_level_top, local_launchpad {{/str}}{{/has_next_level}}</span>
         </div>
       </div>
-    </div>
+      <div class="lp-side-xpbar" aria-hidden="true"><i style="width:{{pct_to_next}}%"></i></div>
+    </a>
     {{#nav_groups}}
       <div class="lp-nl">{{group}}</div>
       {{#items}}

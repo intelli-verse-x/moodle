@@ -117,40 +117,77 @@ body.local-launchpad-fellowship {
   color: #8FA6DA;
 }
 
-.lp-xp-card {
-  margin: 0 4px 12px;
+/* HTML x-lvcard — live level + XP toward next (links to Achievements). */
+.lp-lvcard {
+  display: block;
+  margin: 0 4px 6px;
   padding: 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, .08);
-  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .07);
+  text-decoration: none;
+  color: #fff;
+  transition: background .2s;
 }
-.lp-xp-row {
+.lp-lvcard:hover { background: rgba(255, 255, 255, .12); }
+.lp-lvcard-row {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.lp-xp-badge {
+.lp-lvcard .lp-lvbadge {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: var(--lp-blue);
   color: #fff;
   display: grid;
   place-items: center;
+  font-family: var(--lp-head);
   font-size: 14px;
+  font-weight: 700;
   flex: none;
 }
-.lp-xp-text { min-width: 0; }
-.lp-xp-text b {
+.lp-lvcard-text { min-width: 0; }
+.lp-lvcard-text b {
   display: block;
+  font-size: 14px;
+  font-weight: 700;
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
 }
-.lp-xp-text span {
+.lp-lvcard-text span {
   display: block;
-  font-size: 12.5px;
-  color: #9CC0FF;
+  font-size: 12px;
+  color: #9FB3E0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lp-side-xpbar {
+  height: 7px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .14);
+  overflow: hidden;
+  margin-top: 10px;
+}
+.lp-side-xpbar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #5B8DF6, #9CC0FF);
+  transition: width 1s cubic-bezier(.2, .8, .2, 1);
+  position: relative;
+  overflow: hidden;
+}
+.lp-side-xpbar i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .5), transparent);
+  transform: translateX(-100%);
+  animation: lp-shine 2.4s 1s infinite;
+}
+@keyframes lp-shine {
+  0% { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(100%); }
 }
 .lp-xp-text strong { color: #fff; font-weight: 700; }
 
@@ -1035,6 +1072,68 @@ body.local-launchpad-fellowship {
   font-weight: 700;
 }
 
+.lp-track-grid { align-items: start; }
+.lp-phase-acc {
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+}
+.lp-phase-acc + .lp-phase-acc { margin-top: 0; }
+.lp-phase-acc summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  cursor: pointer;
+}
+.lp-phase-acc summary::-webkit-details-marker { display: none; }
+.lp-phase-n {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--lp-blue);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: var(--lp-head);
+  font-weight: 700;
+  flex: none;
+}
+.lp-phase-acc.is-off .lp-phase-n {
+  background: #EEF1F6;
+  color: #9AA3B5;
+}
+.lp-phase-sum {
+  flex: 1;
+  min-width: 0;
+}
+.lp-phase-sum h3 {
+  margin: 0 0 2px;
+  font-family: var(--lp-head);
+  font-size: 17px;
+  font-weight: 700;
+}
+.lp-phase-body {
+  padding: 0 20px 18px 70px;
+}
+.lp-phase-acc.is-off .lp-phase-body {
+  padding-left: 20px;
+}
+.lp-kv {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px 16px;
+  font-size: 14.5px;
+  margin: 0;
+}
+.lp-kv dt { color: var(--lp-muted); }
+.lp-kv dd { margin: 0; color: var(--lp-ink); }
+.lp-weight-row { display: flex; flex-direction: column; gap: 4px; }
+.lp-bar-thin { height: 6px; }
+
+/* Legacy numbered phase blocks (unused on track; keep for safety). */
 .lp-phase {
   background: var(--lp-surface);
   border: 1px solid var(--lp-line);
@@ -1239,9 +1338,12 @@ body.local-launchpad-fellowship {
     z-index: 30;
   }
   .lp-shell.is-nav-open .lp-scrim { display: block; }
-  .lp-role, .lp-me, .lp-xp-card { display: flex; }
-  .lp-xp-card { display: block; }
+  .lp-role, .lp-me { display: flex; }
+  .lp-lvcard { display: block; }
   .lp-grid-2 { grid-template-columns: 1fr; }
+  .lp-kv { grid-template-columns: 1fr; }
+  .lp-kv dt { margin-top: 6px; }
+  .lp-phase-body { padding-left: 20px; }
   .lp-main { padding: 16px 16px 80px; }
   .lp-hero { padding: 24px 20px; border-radius: 22px; }
   .lp-page-title { font-size: 24px; }

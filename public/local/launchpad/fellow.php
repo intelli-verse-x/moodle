@@ -211,26 +211,10 @@ switch ($view) {
                 'message' => get_string('fellowship_no_courses', 'local_launchpad'),
             ]);
         } else {
-            $progresslabel = '';
-            if ($outline['percent'] !== null) {
-                $progresslabel = get_string('fellowship_progress_summary', 'local_launchpad', [
-                    'done' => $outline['completed'],
-                    'total' => $outline['trackable'],
-                    'percent' => $outline['percent'],
-                ]);
-            }
-            $content = $OUTPUT->render_from_template('local_launchpad/fellowship_track', [
-                'course_name' => format_string($selected->fullname),
-                'course_idnumber' => s($selected->idnumber),
+            $trackdata = fellowship_dashboard::track_for_user($userid, $selected);
+            $content = $OUTPUT->render_from_template('local_launchpad/fellowship_track', array_merge($trackdata, [
                 'moodle_course_url' => (new moodle_url('/course/view.php', ['id' => $selected->id]))->out(false),
-                'sections' => $outline['sections'],
-                'has_sections' => $outline['sections'] !== [],
-                'completion_enabled' => $outline['completion_enabled'],
-                'completed' => $outline['completed'],
-                'trackable' => $outline['trackable'],
-                'percent' => $outline['percent'],
-                'has_percent' => $outline['percent'] !== null,
-                'progress_label' => $progresslabel,
+                'bot_url' => $pluginbase . '/assets/img/bot.webp',
                 'courses' => $coursecards,
                 'multi_course' => count($coursecards) > 1,
                 'has_crumbs' => true,
@@ -241,7 +225,7 @@ switch ($view) {
                         'url' => '',
                     ],
                 ],
-            ]);
+            ]));
         }
         break;
 
@@ -414,14 +398,14 @@ switch ($view) {
         break;
 }
 
-// Live XP + badges once per request (nav chip, topbar XP, Achievements view).
+// Live XP + badges once per request (sidebar level card, topbar XP, Achievements).
 $live = fellowship_dashboard::live_achievements($userid, $courses);
-$xptotal = (int) $live['xp_total'];
-$badgesearned = (int) $live['badges_earned'];
-$badgestotal = count($live['badges'] ?? []);
+$ach = fellowship_dashboard::achievements_context_from_live($live);
+$xptotal = (int) $ach['xp_total'];
+$badgesearned = (int) $ach['badges_earned'];
+$badgestotal = (int) $ach['badges_total'];
 
 if ($view === 'achievements') {
-    $ach = fellowship_dashboard::achievements_context_from_live($live);
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_achievements', array_merge($ach, [
         'has_crumbs' => true,
         'crumbs' => [
@@ -511,6 +495,13 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', [
     'unread_notifications' => $unread,
     'has_unread_notifications' => $unread > 0,
     'xp_total' => $xptotal,
+    'level_name' => $ach['level_name'],
+    'level_index' => $ach['level_index'],
+    'level_color' => $ach['level_color'],
+    'has_next_level' => $ach['has_next_level'],
+    'next_level_name' => $ach['next_level_name'],
+    'xp_to_next' => $ach['xp_to_next'],
+    'pct_to_next' => $ach['pct_to_next'],
     'initials' => fellowship_dashboard::initials($USER),
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,

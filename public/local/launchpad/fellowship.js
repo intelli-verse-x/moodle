@@ -75,6 +75,19 @@
     }
     shell.querySelectorAll('.lp-journey-progress, .lp-ring-arc').forEach(animateDash);
 
+    // Sidebar XP bar + track weight bars (same pattern as HTML x-xpbar / x-bar).
+    if (!reduce) {
+        shell.querySelectorAll('.lp-side-xpbar i, .lp-weight-row .lp-bar i').forEach(function (bar) {
+            var w = bar.style.width;
+            bar.style.width = '0';
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    bar.style.width = w;
+                });
+            });
+        });
+    }
+
     // Dot Dot orbit (bottom-right companion).
     var orbit = document.getElementById('lp-orbit');
     var orbitHide = document.querySelector('[data-lp-orbit-hide]');
