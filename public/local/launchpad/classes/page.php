@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -95,7 +95,7 @@ class page {
         $jsurl = $pluginbase . '/landing.js?v=202610282000';
         $title = s(get_string('pagetitle', 'local_launchpad'));
 
-        // Standalone document ΓÇö no Boost header/footer.
+        // Standalone document — no Boost header/footer.
         header('Content-Type: text/html; charset=utf-8');
         echo '<!doctype html>' . "\n";
         echo '<html lang="en">' . "\n";
@@ -122,7 +122,7 @@ class page {
     /**
      * Become-a-mentor section copy from plugin settings (with safe defaults).
      *
-     * Managed under Site administration ΓåÆ Plugins ΓåÆ ToBa Learn LaunchPad.
+     * Managed under Site administration → Plugins → ToBa Learn LaunchPad.
      *
      * @return array<string, mixed> Mustache context keys for the mentor section.
      */
@@ -130,7 +130,7 @@ class page {
         $defaults = [
             'mentoreyebrow' => 'Join the review team',
             'mentortitle' => 'Want to be a mentor?',
-            'mentorintro' => 'Apply on the form, we review fit, then we contact you for onboarding ΓÇö same 70/100 bar for employer and fellowship cohorts.',
+            'mentorintro' => 'Apply on the form, we review fit, then we contact you for onboarding — same 70/100 bar for employer and fellowship cohorts.',
             'mentorchip' => 'Application',
             'mentorcardtitle' => 'How mentoring works here',
             'mentorcardbody' => 'Mentors score evidence against published rubrics, write change notes learners can apply, and hold the same 70/100 bar for employer and fellowship cohorts.',
@@ -156,11 +156,14 @@ class page {
             ],
         ];
 
+        // Always expose the Apply CTA (pre-merge Dipesh landing): empty setting →
+        // placeholder URL until a real form is configured. Form alone never creates
+        // a Moodle mentor account.
         $mentorformurl = trim((string) get_config('local_launchpad', 'mentorformurl'));
         $mentorformconfigured = ($mentorformurl !== ''
             && !str_contains($mentorformurl, 'REPLACE_WITH_YOUR_FORM'));
-        if (!$mentorformconfigured) {
-            $mentorformurl = '';
+        if ($mentorformurl === '') {
+            $mentorformurl = 'https://docs.google.com/forms/d/e/1FAIpQLSf_REPLACE_WITH_YOUR_FORM/viewform';
         }
 
         return [
@@ -181,14 +184,14 @@ class page {
     /**
      * Footer copy and optional links from plugin settings (with safe defaults).
      *
-     * Managed under Site administration ΓåÆ Plugins ΓåÆ ToBa Learn LaunchPad.
+     * Managed under Site administration → Plugins → ToBa Learn LaunchPad.
      *
      * @return array<string, mixed> Mustache context keys for the landing footer.
      */
     private static function footer_context(): array {
         $defaults = [
             'footerbrand' => 'Employer and fellowship portals on one Moodle account. Assigned courses, mentor review, and proof of work.',
-            'footercompany' => 'ToBa Tech Solutions ┬╖ ToBa Learn',
+            'footercompany' => 'ToBa Tech Solutions · ToBa Learn',
             'footerlegal' => 'Structured learning for employers and fellows not a paid internship.',
             'footerctanote' => 'Your enrolment decides which portal opens.',
         ];

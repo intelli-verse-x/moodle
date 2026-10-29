@@ -532,14 +532,10 @@
           {{/mentorsteps}}
         </ol>
         <div class="become-info-foot">
-          {{#mentorformconfigured}}
           <a class="btn primary" href="{{{mentorformurl}}}" target="_blank" rel="noopener noreferrer">
             {{mentorctalabel}} <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon>
           </a>
-          {{/mentorformconfigured}}
-          {{^mentorformconfigured}}
-          <span class="muted portal-note">Mentor application link not configured yet. Site admins set it under Site administration → Plugins → ToBa Learn LaunchPad.</span>
-          {{/mentorformconfigured}}
+          <span class="muted portal-note">Opens a Google Form in a new tab. After you submit, we contact you — no Moodle account is created from the form alone.</span>
         </div>
       </article>
     </div>
