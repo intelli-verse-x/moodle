@@ -64,9 +64,9 @@ class observer {
     }
 
     /**
-     * After login: point default home wantsurl at persona home when applicable.
+     * After login: honour login portal tab, then persona default home if still unset.
      *
-     * From Fellowship UI / persona homes (PR #15).
+     * From Fellowship UI / persona homes (PR #15) + login portal gate wiring.
      *
      * @param \core\event\user_loggedin $event
      */
@@ -75,6 +75,8 @@ class observer {
         if ($userid <= 0) {
             return;
         }
+        // Login form portal field (employer/fellowship) must win over /my/ defaults.
+        login_portal::maybe_pin_wantsurl_from_request();
         persona_home::maybe_set_wantsurl($userid);
     }
 }
