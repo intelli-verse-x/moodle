@@ -25,7 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-$plugin->version   = 2026102818;
+// Above main 1.1 (2026102820); portal CTAs restored to gated pages after #14 merge.
+$plugin->version   = 2026102906;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.1.25';
+$plugin->release   = '1.2-dev';

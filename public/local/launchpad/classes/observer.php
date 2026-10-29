@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace local_launchpad;
-
 /**
  * Event observers for local_launchpad.
  *
@@ -23,10 +21,52 @@ namespace local_launchpad;
  * @copyright  2026 IntelliVerse-X
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-final class observer {
+
+namespace local_launchpad;
+
+defined('MOODLE_INTERNAL') || die();
+
+/**
+ * LaunchPad observers: Fellowship signup tagging + persona home routing.
+ *
+ * @copyright  2026 IntelliVerse-X
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class observer {
+
+    /**
+     * After auth_email creates the user, store toba_portal preference.
+     *
+     * From Landing-Page+Login-Screen (#14).
+     *
+     * @param \core\event\user_created $event
+     */
+    public static function user_created(\core\event\user_created $event): void {
+        global $CFG, $DB, $SESSION;
+
+        if (empty($SESSION->{registration::SESSION_PORTAL})) {
+            return;
+        }
+
+        $userid = (int) $event->objectid;
+        $user = $DB->get_record('user', ['id' => $userid], 'id,auth,confirmed');
+        if (!$user) {
+            return;
+        }
+
+        $registerauth = !empty($CFG->registerauth) ? $CFG->registerauth : 'email';
+        // Only tag unconfirmed self-registration accounts from the Fellowship signup flow.
+        if ($user->auth !== $registerauth || (int) $user->confirmed !== 0) {
+            return;
+        }
+
+        registration::apply_portal_preference($userid);
+    }
 
     /**
      * After login: point default home wantsurl at persona home when applicable.
+     *
+     * From Fellowship UI / persona homes (PR #15).
      *
      * @param \core\event\user_loggedin $event
      */
