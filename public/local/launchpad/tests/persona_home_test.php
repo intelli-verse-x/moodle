@@ -29,25 +29,28 @@ final class persona_home_test extends \basic_testcase {
 
     public function test_should_override_default_home_paths(): void {
         global $CFG;
-        $CFG->wwwroot = 'http://localhost:8080';
+
+        // Use PHPUnit's wwwroot — do not assign $CFG->wwwroot (Moodle forbids it).
+        $www = rtrim((string) $CFG->wwwroot, '/');
 
         $this->assertTrue(persona_home::should_override_default_home(null));
         $this->assertTrue(persona_home::should_override_default_home(''));
-        $this->assertTrue(persona_home::should_override_default_home('http://localhost:8080/'));
-        $this->assertTrue(persona_home::should_override_default_home('http://localhost:8080'));
-        $this->assertTrue(persona_home::should_override_default_home('http://localhost:8080/my/'));
-        $this->assertTrue(persona_home::should_override_default_home('http://localhost:8080/my'));
+        $this->assertTrue(persona_home::should_override_default_home($www . '/'));
+        $this->assertTrue(persona_home::should_override_default_home($www));
+        $this->assertTrue(persona_home::should_override_default_home($www . '/my/'));
+        $this->assertTrue(persona_home::should_override_default_home($www . '/my'));
         $this->assertTrue(persona_home::should_override_default_home('/my/'));
         $this->assertTrue(persona_home::should_override_default_home('/my/courses.php'));
-        $this->assertTrue(persona_home::should_override_default_home('http://localhost:8080/my/courses.php'));
+        $this->assertTrue(persona_home::should_override_default_home($www . '/my/courses.php'));
     }
 
     public function test_should_not_override_deep_wantsurl(): void {
         global $CFG;
-        $CFG->wwwroot = 'http://localhost:8080';
+
+        $www = rtrim((string) $CFG->wwwroot, '/');
 
         $this->assertFalse(persona_home::should_override_default_home(
-            'http://localhost:8080/course/view.php?id=3'
+            $www . '/course/view.php?id=3'
         ));
         $this->assertFalse(persona_home::should_override_default_home('/local/launchpad/employee.php'));
         $this->assertFalse(persona_home::should_override_default_home('/mod/assign/view.php?id=15'));
