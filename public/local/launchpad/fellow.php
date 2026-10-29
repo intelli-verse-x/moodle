@@ -351,59 +351,61 @@ switch ($view) {
     default:
         $view = 'home';
         $pagetitle = get_string('fellowship_nav_home', 'local_launchpad');
-        $homeoutline = $outline;
-        if ($homeoutline === null && $courses !== []) {
-            $homecourse = $selected ?? $courses[0];
-            $homeoutline = fellowship_dashboard::course_outline($homecourse, $userid);
-            if ($selected === null) {
-                $selected = $homecourse;
-                $courseid = (int) $homecourse->id;
-            }
-        }
-        if ($homeoutline === null) {
-            $homeoutline = [
-                'sections' => [],
-                'completion_enabled' => false,
-                'completed' => 0,
-                'trackable' => 0,
-                'percent' => null,
-                'next' => null,
-            ];
-        }
-        $next = $homeoutline['next'] ?? null;
-        $journey = fellowship_dashboard::journey_from_outline($homeoutline);
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_home', [
-            'firstname' => $firstname,
-            'welcome_heading' => get_string('fellowship_welcome_named', 'local_launchpad', $firstname),
-            'welcome_back' => get_string('fellowship_welcome_back', 'local_launchpad', $firstname),
-            'courses' => $coursecards,
-            'has_courses' => $coursecards !== [],
-            'empty_message' => get_string('fellowship_no_courses', 'local_launchpad'),
-            'next' => $next,
-            'has_next' => $next !== null,
-            'selected_course_name' => $selected ? format_string($selected->fullname) : '',
-            'completion_enabled' => $homeoutline['completion_enabled'] ?? false,
-            'completed' => $homeoutline['completed'] ?? 0,
-            'trackable' => $homeoutline['trackable'] ?? 0,
-            'percent' => $homeoutline['percent'] ?? null,
-            'has_percent' => isset($homeoutline['percent']) && $homeoutline['percent'] !== null,
-            'journey' => $journey,
-            'bot_url' => $pluginbase . '/assets/img/bot.webp',
-            'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
-                'view' => 'track',
-                'id' => $courseid > 0 ? $courseid : null,
-            ])))->out(false),
-            'progress_url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false),
-        ]);
+        // Content filled after live_achievements() (hero ring + recent badges).
+        $content = '';
         break;
 }
 
-// Live XP + badges once per request (sidebar level card, topbar XP, Achievements).
+// Live XP + badges once per request (sidebar, topbar, Achievements, Home).
 $live = fellowship_dashboard::live_achievements($userid, $courses);
 $ach = fellowship_dashboard::achievements_context_from_live($live);
 $xptotal = (int) $ach['xp_total'];
 $badgesearned = (int) $ach['badges_earned'];
 $badgestotal = (int) $ach['badges_total'];
+
+if ($view === 'home') {
+    $homeoutline = $outline;
+    if ($homeoutline === null && $courses !== []) {
+        $homecourse = $selected ?? $courses[0];
+        $homeoutline = fellowship_dashboard::course_outline($homecourse, $userid);
+        if ($selected === null) {
+            $selected = $homecourse;
+            $courseid = (int) $homecourse->id;
+        }
+    }
+    if ($homeoutline === null) {
+        $homeoutline = [
+            'sections' => [],
+            'completion_enabled' => false,
+            'completed' => 0,
+            'trackable' => 0,
+            'percent' => null,
+            'next' => null,
+        ];
+    }
+    $next = $homeoutline['next'] ?? null;
+    $journey = fellowship_dashboard::journey_from_outline($homeoutline);
+    $homesummary = fellowship_dashboard::home_summary($homeoutline, $journey, $live);
+    $content = $OUTPUT->render_from_template('local_launchpad/fellowship_home', array_merge([
+        'firstname' => $firstname,
+        'welcome_heading' => get_string('fellowship_welcome_named', 'local_launchpad', $firstname),
+        'welcome_back' => get_string('fellowship_welcome_back', 'local_launchpad', $firstname),
+        'courses' => $coursecards,
+        'has_courses' => $coursecards !== [],
+        'empty_message' => get_string('fellowship_no_courses', 'local_launchpad'),
+        'next' => $next,
+        'has_next' => $next !== null,
+        'selected_course_name' => $selected ? format_string($selected->fullname) : '',
+        'completion_enabled' => $homeoutline['completion_enabled'] ?? false,
+        'journey' => $journey,
+        'bot_url' => $pluginbase . '/assets/img/bot.webp',
+        'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'track',
+            'id' => $courseid > 0 ? $courseid : null,
+        ])))->out(false),
+        'progress_url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false),
+    ], $homesummary));
+}
 
 if ($view === 'achievements') {
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_achievements', array_merge($ach, [

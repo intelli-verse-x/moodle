@@ -1256,6 +1256,7 @@ final class fellowship_dashboard {
                 'icon' => $def['icon'],
                 'how' => $def['how'],
                 'earned' => $earned,
+                'at' => $at,
                 'display_icon' => $earned ? $def['icon'] : '🔒',
                 'detail' => $earned
                     ? get_string('fellowship_badge_earned_on', 'local_launchpad', $at ? userdate($at, get_string('strftimedate', 'langconfig')) : get_string('fellowship_badge_earned_recent', 'local_launchpad'))
@@ -1275,6 +1276,89 @@ final class fellowship_dashboard {
             }, $xplog),
             'badges' => $badges,
             'badges_earned' => $earnedcount,
+        ];
+    }
+
+    /**
+     * Home hero ring, KPI strip, and recent badges (newest earned first).
+     *
+     * @param array $outline From {@see course_outline()}
+     * @param array $journey From {@see journey_from_outline()}
+     * @param array $live From {@see live_achievements()}
+     * @param int $limit Max recent badges to show
+     * @return array Mustache extras for fellowship_home
+     */
+    public static function home_summary(array $outline, array $journey, array $live, int $limit = 4): array {
+        $percent = $outline['percent'] ?? null;
+        $completed = (int) ($outline['completed'] ?? 0);
+        $trackable = (int) ($outline['trackable'] ?? 0);
+        $haspercent = $percent !== null;
+
+        $currentgate = get_string('fellowship_gate_none', 'local_launchpad');
+        $currentshort = $currentgate;
+        foreach ($journey['gates'] ?? [] as $gate) {
+            if (!empty($gate['is_current'])) {
+                $currentgate = (string) ($gate['name'] ?? $currentgate);
+                $currentshort = (string) ($gate['short'] ?? $currentgate);
+                break;
+            }
+            if (!empty($gate['is_done'])) {
+                // Fall through — if all done, last done name is fine as label.
+                $currentgate = (string) ($gate['name'] ?? $currentgate);
+                $currentshort = (string) ($gate['short'] ?? $currentgate);
+            }
+        }
+        $alldone = $haspercent && $trackable > 0 && $completed >= $trackable;
+        if ($alldone) {
+            $currentshort = get_string('fellowship_gate_complete', 'local_launchpad');
+            $currentgate = $currentshort;
+        }
+
+        $ringpct = $haspercent ? (int) $percent : 0;
+        $size = 112;
+        $radius = ($size / 2) - 10;
+        $circ = 2 * M_PI * $radius;
+        $dashoffset = $circ * (1 - ($ringpct / 100));
+
+        $badges = $live['badges'] ?? [];
+        $earned = [];
+        foreach ($badges as $badge) {
+            if (empty($badge['earned'])) {
+                continue;
+            }
+            $earned[] = $badge;
+        }
+        usort($earned, static function (array $a, array $b): int {
+            $at = ((int) ($b['at'] ?? 0)) <=> ((int) ($a['at'] ?? 0));
+            if ($at !== 0) {
+                return $at;
+            }
+            return strcmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+        });
+        $recent = array_slice($earned, 0, max(1, $limit));
+
+        $badgesearned = (int) ($live['badges_earned'] ?? count($earned));
+        $badgestotal = count($badges);
+
+        return [
+            'has_percent' => $haspercent,
+            'percent' => $haspercent ? (int) $percent : null,
+            'completed' => $completed,
+            'trackable' => $trackable,
+            'ring_pct' => $ringpct,
+            'ring_label' => $currentshort,
+            'ring_size' => $size,
+            'ring_radius' => round($radius, 2),
+            'ring_cx' => $size / 2,
+            'ring_cy' => $size / 2,
+            'ring_circ' => round($circ, 2),
+            'ring_dashoffset' => number_format($dashoffset, 2, '.', ''),
+            'stat_badges_value' => $badgesearned . '/' . $badgestotal,
+            'stat_required_value' => $haspercent ? ($completed . '/' . $trackable) : '—',
+            'stat_gate_value' => $currentgate,
+            'recent_badges' => $recent,
+            'has_recent_badges' => $recent !== [],
+            'achievements_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false),
         ];
     }
 

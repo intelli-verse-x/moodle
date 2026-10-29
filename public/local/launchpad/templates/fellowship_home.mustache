@@ -10,24 +10,40 @@
 {{/has_courses}}
 {{#has_courses}}
   <div class="lp-hero">
-    <span class="lp-eyebrow">{{#str}} fellowship_role_label, local_launchpad {{/str}}</span>
-    <h2>{{welcome_back}}</h2>
-    <p class="lp-hero-lead">{{#str}} fellowship_home_lead, local_launchpad {{/str}}</p>
-    {{#has_next}}
-      <div class="lp-quest">
-        <div>
-          <span class="lp-eyebrow">{{#str}} fellowship_next_activity, local_launchpad {{/str}}</span>
-          <p class="lp-quest-title">{{{next.name}}}</p>
-          <p class="lp-muted">{{next.modname_display}}{{#selected_course_name}} · {{{selected_course_name}}}{{/selected_course_name}}</p>
-        </div>
-        <a class="lp-btn lp-btn-primary" href="{{next.url}}">{{#str}} fellowship_open_activity, local_launchpad {{/str}}</a>
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{#str}} fellowship_role_label, local_launchpad {{/str}}</span>
+        <h2>{{welcome_back}}</h2>
+        <p class="lp-hero-lead">{{#str}} fellowship_home_lead, local_launchpad {{/str}}</p>
+        {{#has_next}}
+          <div class="lp-quest">
+            <div>
+              <span class="lp-eyebrow">{{#str}} fellowship_next_activity, local_launchpad {{/str}}</span>
+              <p class="lp-quest-title">{{{next.name}}}</p>
+              <p class="lp-muted">{{next.modname_display}}{{#selected_course_name}} · {{{selected_course_name}}}{{/selected_course_name}}</p>
+            </div>
+            <a class="lp-btn lp-btn-primary" href="{{next.url}}">{{#str}} fellowship_open_activity, local_launchpad {{/str}}</a>
+          </div>
+        {{/has_next}}
+        {{^has_next}}
+          {{#has_percent}}
+            <p class="lp-muted">{{#str}} fellowship_all_tracked_done, local_launchpad {{/str}}</p>
+          {{/has_percent}}
+        {{/has_next}}
       </div>
-    {{/has_next}}
-    {{^has_next}}
       {{#has_percent}}
-        <p class="lp-muted">{{#str}} fellowship_all_tracked_done, local_launchpad {{/str}}</p>
+        <div class="lp-ring lp-hero-ring" style="width:{{ring_size}}px;height:{{ring_size}}px" role="img" aria-label="{{ring_pct}}% · {{ring_label}}">
+          <svg viewBox="0 0 {{ring_size}} {{ring_size}}" aria-hidden="true">
+            <circle class="lp-hero-ring-track" cx="{{ring_cx}}" cy="{{ring_cy}}" r="{{ring_radius}}" fill="none" stroke-width="10"/>
+            <circle class="lp-ring-arc lp-hero-ring-arc" cx="{{ring_cx}}" cy="{{ring_cy}}" r="{{ring_radius}}" fill="none" stroke-width="10" stroke-linecap="round" stroke-dasharray="{{ring_circ}}" stroke-dashoffset="{{ring_circ}}" data-to="{{ring_dashoffset}}" transform="rotate(-90 {{ring_cx}} {{ring_cy}})"/>
+          </svg>
+          <div class="lp-ring-v">
+            <b>{{ring_pct}}%</b>
+            <span>{{ring_label}}</span>
+          </div>
+        </div>
       {{/has_percent}}
-    {{/has_next}}
+    </div>
   </div>
 
   {{#journey.has_gates}}
@@ -40,7 +56,43 @@
     </section>
   {{/journey.has_gates}}
 
+  <div class="lp-stats" role="list">
+    <div class="lp-stat" role="listitem">
+      <b>{{stat_badges_value}}</b>
+      <span>{{#str}} fellowship_stat_badges, local_launchpad {{/str}}</span>
+    </div>
+    <div class="lp-stat" role="listitem">
+      <b>{{stat_required_value}}</b>
+      <span>{{#str}} fellowship_stat_required, local_launchpad {{/str}}</span>
+    </div>
+    <div class="lp-stat" role="listitem">
+      <b class="lp-stat-gate">{{stat_gate_value}}</b>
+      <span>{{#str}} fellowship_stat_gate, local_launchpad {{/str}}</span>
+    </div>
+  </div>
+
   <div class="lp-grid-2">
+    <section class="lp-card lift">
+      <div class="lp-card-head">
+        <h3>{{#str}} fellowship_recent_badges, local_launchpad {{/str}}</h3>
+        <a class="lp-link" href="{{achievements_url}}">{{#str}} fellowship_nav_achievements, local_launchpad {{/str}} →</a>
+      </div>
+      {{#has_recent_badges}}
+        <div class="lp-recent-badges">
+          {{#recent_badges}}
+            <div class="lp-bdg on lp-bdg-recent">
+              <span class="lp-bi" aria-hidden="true">{{display_icon}}</span>
+              <b>{{name}}</b>
+              <small>{{detail}}</small>
+            </div>
+          {{/recent_badges}}
+        </div>
+      {{/has_recent_badges}}
+      {{^has_recent_badges}}
+        <p class="lp-muted">{{#str}} fellowship_recent_badges_empty, local_launchpad {{/str}}</p>
+        <p class="lp-xs lp-muted">{{#str}} fellowship_recent_badges_empty_hint, local_launchpad {{/str}}</p>
+      {{/has_recent_badges}}
+    </section>
     <section class="lp-card lift">
       <div class="lp-card-head">
         <h3>{{#str}} fellowship_your_courses, local_launchpad {{/str}}</h3>
@@ -57,25 +109,6 @@
           </li>
         {{/courses}}
       </ul>
-    </section>
-    <section class="lp-card lift">
-      <div class="lp-card-head">
-        <h3>{{#str}} fellowship_nav_progress, local_launchpad {{/str}}</h3>
-        <a class="lp-link" href="{{progress_url}}">{{#str}} fellowship_view_progress, local_launchpad {{/str}} →</a>
-      </div>
-      {{#has_percent}}
-        <div class="lp-progress-block">
-          <div class="lp-progress-meta">
-            <b>{{percent}}%</b>
-            <span class="lp-muted">{{completed}} / {{trackable}}</span>
-          </div>
-          <div class="lp-bar" aria-hidden="true"><i style="width:{{percent}}%"></i></div>
-          <p class="lp-xs lp-muted">{{#str}} fellowship_progress_from_completion, local_launchpad {{/str}}</p>
-        </div>
-      {{/has_percent}}
-      {{^has_percent}}
-        <p class="lp-muted">{{#str}} fellowship_progress_not_tracked, local_launchpad {{/str}}</p>
-      {{/has_percent}}
     </section>
   </div>
 {{/has_courses}}
