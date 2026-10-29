@@ -1292,29 +1292,57 @@ final class fellowship_dashboard {
         $percent = $outline['percent'] ?? null;
         $completed = (int) ($outline['completed'] ?? 0);
         $trackable = (int) ($outline['trackable'] ?? 0);
-        $haspercent = $percent !== null;
+        $hascoursepercent = $percent !== null;
 
         $currentgate = get_string('fellowship_gate_none', 'local_launchpad');
         $currentshort = $currentgate;
+        $currentsection = 0;
         foreach ($journey['gates'] ?? [] as $gate) {
             if (!empty($gate['is_current'])) {
                 $currentgate = (string) ($gate['name'] ?? $currentgate);
                 $currentshort = (string) ($gate['short'] ?? $currentgate);
+                $currentsection = (int) ($gate['sectionnum'] ?? 0);
                 break;
             }
             if (!empty($gate['is_done'])) {
-                // Fall through — if all done, last done name is fine as label.
                 $currentgate = (string) ($gate['name'] ?? $currentgate);
                 $currentshort = (string) ($gate['short'] ?? $currentgate);
+                $currentsection = (int) ($gate['sectionnum'] ?? 0);
             }
         }
-        $alldone = $haspercent && $trackable > 0 && $completed >= $trackable;
+
+        // Prefer course-wide activity completion %. If nothing is trackable yet,
+        // fall back to the current gate section (still 0 when that section has
+        // no completion criteria). Always show the hero ring when enrolled.
+        $ringpct = $hascoursepercent ? (int) $percent : 0;
+        $gatecompleted = 0;
+        $gatetrackable = 0;
+        if (!$hascoursepercent && $currentsection > 0) {
+            foreach ($outline['sections'] ?? [] as $section) {
+                if ((int) ($section['sectionnum'] ?? 0) !== $currentsection) {
+                    continue;
+                }
+                foreach ($section['activities'] ?? [] as $activity) {
+                    if (empty($activity['tracked'])) {
+                        continue;
+                    }
+                    $gatetrackable++;
+                    if (!empty($activity['complete'])) {
+                        $gatecompleted++;
+                    }
+                }
+            }
+            if ($gatetrackable > 0) {
+                $ringpct = (int) round(($gatecompleted / $gatetrackable) * 100);
+            }
+        }
+
+        $alldone = $hascoursepercent && $trackable > 0 && $completed >= $trackable;
         if ($alldone) {
             $currentshort = get_string('fellowship_gate_complete', 'local_launchpad');
             $currentgate = $currentshort;
         }
 
-        $ringpct = $haspercent ? (int) $percent : 0;
         $size = 112;
         $radius = ($size / 2) - 10;
         $circ = 2 * M_PI * $radius;
@@ -1340,9 +1368,18 @@ final class fellowship_dashboard {
         $badgesearned = (int) ($live['badges_earned'] ?? count($earned));
         $badgestotal = count($badges);
 
+        $requiredvalue = '—';
+        if ($hascoursepercent) {
+            $requiredvalue = $completed . '/' . $trackable;
+        } else if ($gatetrackable > 0) {
+            $requiredvalue = $gatecompleted . '/' . $gatetrackable;
+        }
+
         return [
-            'has_percent' => $haspercent,
-            'percent' => $haspercent ? (int) $percent : null,
+            // Always render the hero ring for enrolled fellows (0% is honest).
+            'show_hero_ring' => true,
+            'has_percent' => $hascoursepercent,
+            'percent' => $hascoursepercent ? (int) $percent : null,
             'completed' => $completed,
             'trackable' => $trackable,
             'ring_pct' => $ringpct,
@@ -1354,7 +1391,7 @@ final class fellowship_dashboard {
             'ring_circ' => round($circ, 2),
             'ring_dashoffset' => number_format($dashoffset, 2, '.', ''),
             'stat_badges_value' => $badgesearned . '/' . $badgestotal,
-            'stat_required_value' => $haspercent ? ($completed . '/' . $trackable) : '—',
+            'stat_required_value' => $requiredvalue,
             'stat_gate_value' => $currentgate,
             'recent_badges' => $recent,
             'has_recent_badges' => $recent !== [],

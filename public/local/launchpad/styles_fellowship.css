@@ -442,6 +442,10 @@ body.local-launchpad-fellowship {
   gap: 16px;
   min-width: 0;
 }
+.lp-hero-ring {
+  flex: none;
+  margin-left: auto;
+}
 .lp-hero-ring .lp-hero-ring-track { stroke: rgba(255, 255, 255, .22); }
 .lp-hero-ring .lp-hero-ring-arc { stroke: #fff; }
 .lp-hero-ring .lp-ring-v b { color: #fff; }

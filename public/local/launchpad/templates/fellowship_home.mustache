@@ -31,7 +31,7 @@
           {{/has_percent}}
         {{/has_next}}
       </div>
-      {{#has_percent}}
+      {{#show_hero_ring}}
         <div class="lp-ring lp-hero-ring" style="width:{{ring_size}}px;height:{{ring_size}}px" role="img" aria-label="{{ring_pct}}% · {{ring_label}}">
           <svg viewBox="0 0 {{ring_size}} {{ring_size}}" aria-hidden="true">
             <circle class="lp-hero-ring-track" cx="{{ring_cx}}" cy="{{ring_cy}}" r="{{ring_radius}}" fill="none" stroke-width="10"/>
@@ -42,7 +42,7 @@
             <span>{{ring_label}}</span>
           </div>
         </div>
-      {{/has_percent}}
+      {{/show_hero_ring}}
     </div>
   </div>
 

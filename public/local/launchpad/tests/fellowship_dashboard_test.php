@@ -105,6 +105,7 @@ final class fellowship_dashboard_test extends \basic_testcase {
         ];
 
         $summary = fellowship_dashboard::home_summary($outline, $journey, $live, 4);
+        $this->assertTrue($summary['show_hero_ring']);
         $this->assertTrue($summary['has_percent']);
         $this->assertSame(20, $summary['ring_pct']);
         $this->assertSame('Foundations', $summary['ring_label']);
@@ -117,13 +118,22 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $this->assertSame('older', $summary['recent_badges'][1]['id']);
     }
 
-    public function test_home_summary_empty_recent_badges(): void {
+    public function test_home_summary_shows_ring_when_completion_untracked(): void {
         $summary = fellowship_dashboard::home_summary(
-            ['percent' => null, 'completed' => 0, 'trackable' => 0],
-            ['gates' => []],
+            ['percent' => null, 'completed' => 0, 'trackable' => 0, 'sections' => []],
+            ['gates' => [[
+                'name' => 'Foundations',
+                'short' => 'Foundations',
+                'sectionnum' => 1,
+                'is_current' => true,
+                'is_done' => false,
+            ]]],
             ['badges_earned' => 0, 'badges' => []],
         );
+        $this->assertTrue($summary['show_hero_ring']);
         $this->assertFalse($summary['has_percent']);
+        $this->assertSame(0, $summary['ring_pct']);
+        $this->assertSame('Foundations', $summary['ring_label']);
         $this->assertFalse($summary['has_recent_badges']);
         $this->assertSame('—', $summary['stat_required_value']);
     }

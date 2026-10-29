@@ -58,8 +58,9 @@ $PAGE->set_title(get_string('fellowship_area_title', 'local_launchpad'));
 $PAGE->set_heading(get_string('fellowship_area_heading', 'local_launchpad'));
 
 $pluginbase = $CFG->wwwroot . '/local/launchpad';
-$cssurl = $pluginbase . '/styles_fellowship.css';
-$jsurl = $pluginbase . '/fellowship.js';
+$assetv = (string) (get_config('local_launchpad', 'version') ?: '1');
+$cssurl = $pluginbase . '/styles_fellowship.css?v=' . rawurlencode($assetv);
+$jsurl = $pluginbase . '/fellowship.js?v=' . rawurlencode($assetv);
 $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
