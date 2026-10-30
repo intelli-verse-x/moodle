@@ -59,4 +59,11 @@ final class mentor_dashboard_test extends \basic_testcase {
         $this->assertSame([], $out['items']);
         $this->assertSame(0, $out['fellow_count']);
     }
+
+    public function test_review_url_contains_view_and_ids(): void {
+        $url = mentor_dashboard::review_url(15, 3);
+        $this->assertStringContainsString('view=review', $url);
+        $this->assertStringContainsString('id=15', $url);
+        $this->assertStringContainsString('userid=3', $url);
+    }
 }

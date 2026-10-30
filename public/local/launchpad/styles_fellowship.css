@@ -1624,3 +1624,115 @@ body.local-launchpad-mentor .lp-xp-chip { display: none; }
   gap: 10px;
   justify-content: flex-end;
 }
+
+/* Mentor review room */
+.lp-review-banner {
+  background: #E3F5E8;
+  color: #1E7A3B;
+  border: 1px solid #B7E0C2;
+  border-radius: var(--lp-r-sm);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.lp-review-banner-err {
+  background: #FFF4D6;
+  color: #8A5A00;
+  border-color: #F0D48A;
+}
+.lp-review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .lp-review-grid { grid-template-columns: 1fr; }
+}
+.lp-review-evidence h3,
+.lp-review-form-card h3 {
+  margin: 0 0 8px;
+  font-family: var(--lp-head);
+  font-size: 18px;
+}
+.lp-review-files {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lp-review-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--lp-line);
+}
+.lp-review-file:first-child { border-top: 0; padding-top: 0; }
+.lp-review-ext {
+  flex: 0 0 auto;
+  min-width: 44px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--lp-blue-soft);
+  color: var(--lp-blue);
+  font-size: 11px;
+  font-weight: 700;
+}
+.lp-review-paper {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: var(--lp-r-sm);
+  background: var(--lp-blue-softer);
+  border: 1px solid var(--lp-line);
+}
+.lp-review-label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  margin: 14px 0 6px;
+}
+.lp-review-score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lp-review-input,
+.lp-review-textarea {
+  width: 100%;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--lp-ink);
+  background: #fff;
+}
+.lp-review-input { max-width: 120px; }
+.lp-review-textarea { resize: vertical; min-height: 120px; }
+.lp-review-outcome {
+  border: 0;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.lp-review-outcome legend {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.lp-review-radio {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px 0;
+  font-size: 14.5px;
+}
+.lp-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}

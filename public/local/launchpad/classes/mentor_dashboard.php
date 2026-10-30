@@ -100,20 +100,40 @@ final class mentor_dashboard {
                         $submittedat = (int) ($latest->timemodified ?: $latest->timecreated);
                     }
 
+                    // Prefer grade for latest attempt; if latest is only reopened/draft, use prior mark.
+                    // Fresh submitted attempt with no grade stays waiting (do not inherit old marks).
                     $hasgrade = false;
                     $gradepct = null;
                     $gradestr = '';
                     $gradedat = 0;
-                    $agrades = $DB->get_records_select(
-                        'assign_grades',
-                        'assignment = :assignment AND userid = :userid AND grade >= 0',
-                        ['assignment' => $instanceid, 'userid' => $studentid],
-                        'attemptnumber DESC, timemodified DESC',
-                        '*',
-                        0,
-                        1
-                    );
-                    $agrade = $agrades ? reset($agrades) : false;
+                    $attemptnumber = $latest ? (int) $latest->attemptnumber : -1;
+                    $agrade = false;
+                    if ($attemptnumber >= 0) {
+                        $agrade = $DB->get_record('assign_grades', [
+                            'assignment' => $instanceid,
+                            'userid' => $studentid,
+                            'attemptnumber' => $attemptnumber,
+                        ]);
+                        if (!($agrade && $agrade->grade !== null && (float) $agrade->grade >= 0)) {
+                            $agrade = false;
+                        }
+                    }
+                    if (!$agrade && $latest && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
+                        $prior = $DB->get_records_select(
+                            'assign_grades',
+                            'assignment = :assignment AND userid = :userid AND grade >= 0 AND attemptnumber < :attempt',
+                            [
+                                'assignment' => $instanceid,
+                                'userid' => $studentid,
+                                'attempt' => max(0, $attemptnumber),
+                            ],
+                            'attemptnumber DESC, timemodified DESC',
+                            '*',
+                            0,
+                            1
+                        );
+                        $agrade = $prior ? reset($prior) : false;
+                    }
                     if ($agrade && $agrade->grade !== null && (float) $agrade->grade >= 0) {
                         $hasgrade = true;
                         $gradedat = (int) ($agrade->timemodified ?: 0);
@@ -147,11 +167,7 @@ final class mentor_dashboard {
                         default => get_string('mentor_status_open', 'local_launchpad'),
                     };
 
-                    $gradeurl = (new \moodle_url('/mod/assign/view.php', [
-                        'id' => $cm->id,
-                        'action' => 'grader',
-                        'userid' => $studentid,
-                    ]))->out(false);
+                    $gradeurl = self::review_url((int) $cm->id, $studentid);
 
                     $items[] = [
                         'fellow_id' => $studentid,
@@ -384,6 +400,263 @@ final class mentor_dashboard {
             'fellow_count' => $count,
             'fellow_count_label' => get_string('mentor_fellows_count', 'local_launchpad', $count),
         ];
+    }
+
+    /**
+     * LaunchPad review URL (ToBa chrome; grades via Moodle assign).
+     */
+    public static function review_url(int $cmid, int $fellowid): string {
+        return (new \moodle_url(persona_home::MENTOR_PATH, [
+            'view' => 'review',
+            'id' => $cmid,
+            'userid' => $fellowid,
+        ]))->out(false);
+    }
+
+    /**
+     * Load one fellow × assign for the mentor review page.
+     *
+     * @return array Mustache context
+     */
+    public static function get_review_context(int $mentorid, int $cmid, int $fellowid): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+
+        [$course, $cm] = get_course_and_cm_from_cmid($cmid, 'assign');
+        self::require_mentor_can_grade($mentorid, $course, $cm);
+
+        $context = \context_module::instance($cm->id);
+        $assign = new \assign($context, $cm, $course);
+        $instance = $assign->get_instance();
+        $fellow = $DB->get_record('user', ['id' => $fellowid, 'deleted' => 0], '*', MUST_EXIST);
+
+        $submission = $assign->get_user_submission($fellowid, false);
+        $substatus = $submission ? (string) $submission->status : '';
+        $attempt = $submission ? ((int) $submission->attemptnumber + 1) : 0;
+        $submittedat = 0;
+        if ($submission && ($substatus === 'submitted' || $substatus === 'reopened')) {
+            $submittedat = (int) ($submission->timemodified ?: $submission->timecreated);
+        }
+
+        $onlinetext = '';
+        $textplugin = $assign->get_submission_plugin_by_type('onlinetext');
+        if ($textplugin && $textplugin->is_enabled() && $submission) {
+            $raw = $textplugin->get_editor_text('onlinetext', (int) $submission->id);
+            if (is_string($raw) && trim($raw) !== '') {
+                $onlinetext = format_text($raw, FORMAT_HTML, ['context' => $context]);
+            }
+        }
+
+        $files = [];
+        $fileplugin = $assign->get_submission_plugin_by_type('file');
+        if ($fileplugin && $fileplugin->is_enabled() && $submission) {
+            foreach ($fileplugin->get_files($submission, $fellow) as $storedfile) {
+                /** @var \stored_file $storedfile */
+                $files[] = [
+                    'filename' => $storedfile->get_filename(),
+                    'filesize' => display_size($storedfile->get_filesize()),
+                    'ext' => strtoupper(pathinfo($storedfile->get_filename(), PATHINFO_EXTENSION) ?: 'FILE'),
+                    'url' => \moodle_url::make_pluginfile_url(
+                        $storedfile->get_contextid(),
+                        $storedfile->get_component(),
+                        $storedfile->get_filearea(),
+                        $storedfile->get_itemid(),
+                        $storedfile->get_filepath(),
+                        $storedfile->get_filename()
+                    )->out(false),
+                ];
+            }
+        }
+
+        $grade = $assign->get_user_grade($fellowid, false);
+        $grademax = (float) $instance->grade;
+        $gradepoints = '';
+        $gradepct = '';
+        $comment = '';
+        $hasgrade = false;
+        if ($grade && $grade->grade !== null && (float) $grade->grade >= 0) {
+            $hasgrade = true;
+            $gradepoints = format_float((float) $grade->grade, 2);
+            if ($grademax > 0) {
+                $gradepct = format_float((((float) $grade->grade) / $grademax) * 100, 0);
+            }
+            $fc = $DB->get_record('assignfeedback_comments', [
+                'assignment' => (int) $instance->id,
+                'grade' => (int) $grade->id,
+            ]);
+            if ($fc) {
+                $comment = (string) $fc->commenttext;
+            }
+        }
+
+        $cansubmitreview = ($substatus === 'submitted' || $substatus === 'reopened' || $hasgrade);
+        $moodlegrader = (new \moodle_url('/mod/assign/view.php', [
+            'id' => $cm->id,
+            'action' => 'grader',
+            'userid' => $fellowid,
+        ]))->out(false);
+
+        $queueurl = (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
+
+        return [
+            'cmid' => (int) $cm->id,
+            'fellow_id' => $fellowid,
+            'fellow_name' => fullname($fellow),
+            'assign_name' => $cm->get_formatted_name(),
+            'course_name' => format_string($course->fullname),
+            'attempt' => $attempt,
+            'has_attempt' => $attempt > 0,
+            'submitted_at' => $submittedat
+                ? userdate($submittedat, get_string('strftimedatetimeshort', 'langconfig'))
+                : '',
+            'substatus' => $substatus,
+            'can_submit_review' => $cansubmitreview,
+            'has_onlinetext' => $onlinetext !== '',
+            'onlinetext_html' => $onlinetext,
+            'files' => $files,
+            'has_files' => $files !== [],
+            'grade_max' => $grademax > 0 ? format_float($grademax, 0) : '100',
+            'grade_points' => $gradepoints,
+            'grade_pct' => $gradepct,
+            'has_grade' => $hasgrade,
+            'comment' => $comment,
+            'pass_bar' => 70,
+            'queue_url' => $queueurl,
+            'moodle_grader_url' => $moodlegrader,
+            'form_action' => self::review_url((int) $cm->id, $fellowid),
+            'sesskey' => sesskey(),
+            'is_released' => $hasgrade && $substatus !== 'reopened',
+            'status_chip' => $hasgrade
+                ? ($substatus === 'reopened'
+                    ? get_string('mentor_status_changes', 'local_launchpad')
+                    : get_string('mentor_status_released', 'local_launchpad'))
+                : get_string('mentor_status_waiting', 'local_launchpad'),
+            'status_chip_class' => $hasgrade
+                ? ($substatus === 'reopened' ? 'warn' : 'ok')
+                : '',
+            'outcome_met' => true,
+            'outcome_changes' => false,
+        ];
+    }
+
+    /**
+     * Save grade + change note into Moodle assign (native save_grade).
+     *
+     * @param string $outcome met|changes
+     * @return string redirect message key suffix
+     */
+    public static function save_review(
+        int $mentorid,
+        int $cmid,
+        int $fellowid,
+        string $gradepctraw,
+        string $comment,
+        string $outcome
+    ): string {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+
+        [$course, $cm] = get_course_and_cm_from_cmid($cmid, 'assign');
+        self::require_mentor_can_grade($mentorid, $course, $cm);
+
+        $context = \context_module::instance($cm->id);
+        $assign = new \assign($context, $cm, $course);
+        $instance = $assign->get_instance();
+        $grademax = (float) $instance->grade;
+        if ($grademax <= 0) {
+            $grademax = 100.0;
+        }
+
+        $pct = unformat_float($gradepctraw);
+        if ($pct === false || $pct === null) {
+            throw new \moodle_exception('mentor_review_grade_invalid', 'local_launchpad');
+        }
+        $pct = (float) $pct;
+        if ($pct < 0 || $pct > 100) {
+            throw new \moodle_exception('mentor_review_grade_invalid', 'local_launchpad');
+        }
+
+        $comment = trim($comment);
+        if ($comment === '') {
+            throw new \moodle_exception('mentor_review_comment_required', 'local_launchpad');
+        }
+
+        if ($outcome !== 'met' && $outcome !== 'changes') {
+            $outcome = 'met';
+        }
+        // Pass bar 70: Met below 70 is invalid — coerce to Changes (HTML canRel rule).
+        if ($outcome === 'met' && $pct < 70) {
+            $outcome = 'changes';
+        }
+
+        // Change notes require assignfeedback_comments. Curriculum placeholders often ship with
+        // that plugin disabled — enable before save_grade or Moodle silently drops the text.
+        $commentsplugin = $assign->get_feedback_plugin_by_type('comments');
+        if ($commentsplugin && !$commentsplugin->is_enabled()) {
+            $commentsplugin->set_config('enabled', '1');
+            // Reload so plugin enabledcache is fresh for save_grade.
+            $assign = new \assign($context, $cm, $course);
+        }
+
+        // Changes → reopen. Placeholders often ship as untilpass + maxattempts=1 (blocks reopen).
+        if ($outcome === 'changes') {
+            $reopen = (string) ($instance->attemptreopenmethod ?? '');
+            $maxattempts = (int) ($instance->maxattempts ?? 1);
+            $needfix = ($reopen === '' || $reopen === 'none' || $reopen === 'untilpass' || $maxattempts === 1);
+            if ($needfix) {
+                $DB->set_field('assign', 'attemptreopenmethod', 'manual', ['id' => (int) $instance->id]);
+                if ($maxattempts === 1) {
+                    $DB->set_field('assign', 'maxattempts', -1, ['id' => (int) $instance->id]); // unlimited
+                }
+                $assign = new \assign($context, $cm, $course);
+                $instance = $assign->get_instance();
+            }
+        }
+
+        $submission = $assign->get_user_submission($fellowid, false);
+        $attemptnumber = $submission ? (int) $submission->attemptnumber : -1;
+
+        $data = new \stdClass();
+        $data->attemptnumber = $attemptnumber;
+        $data->grade = ($pct / 100.0) * $grademax;
+        $data->assignfeedbackcomments_editor = [
+            'text' => $comment,
+            'format' => FORMAT_MOODLE,
+        ];
+        $data->sendstudentnotifications = 0;
+        // Allow another attempt when requesting changes (Moodle manual reopen).
+        $data->addattempt = ($outcome === 'changes') ? 1 : 0;
+
+        $assign->save_grade($fellowid, $data);
+
+        return $outcome === 'changes' ? 'changes' : 'released';
+    }
+
+    /**
+     * Mentor must teach this lp-* course and hold grade capability.
+     */
+    private static function require_mentor_can_grade(int $mentorid, \stdClass $course, \cm_info $cm): void {
+        if (!self::can_access($mentorid)) {
+            throw new \moodle_exception('mentor_access_denied', 'local_launchpad');
+        }
+        $idnumber = (string) ($course->idnumber ?? '');
+        if ($idnumber === '' || stripos($idnumber, account_persona::COURSE_IDNUMBER_PREFIX) !== 0) {
+            throw new \moodle_exception('mentor_review_course_denied', 'local_launchpad');
+        }
+        $allowed = false;
+        foreach (persona_home::list_mentor_courses($mentorid) as $c) {
+            if ((int) $c->id === (int) $course->id) {
+                $allowed = true;
+                break;
+            }
+        }
+        if (!$allowed && !is_siteadmin($mentorid)) {
+            throw new \moodle_exception('mentor_review_course_denied', 'local_launchpad');
+        }
+        $context = \context_module::instance($cm->id);
+        require_capability('mod/assign:grade', $context);
     }
 
     /**

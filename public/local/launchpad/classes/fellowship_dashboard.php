@@ -1680,16 +1680,39 @@ final class fellowship_dashboard {
                     'status' => 'submitted',
                 ]);
 
-                $agrades = $DB->get_records_select(
-                    'assign_grades',
-                    'assignment = :assignment AND userid = :userid AND grade >= 0',
-                    ['assignment' => $instanceid, 'userid' => $userid],
-                    'attemptnumber DESC, timemodified DESC',
-                    '*',
-                    0,
-                    1
-                );
-                $agrade = $agrades ? reset($agrades) : false;
+                // Prefer grade for the latest attempt. If latest is only reopened/draft (no mark yet),
+                // fall back to the most recent graded attempt so released comments still show.
+                // A fresh *submitted* attempt with no grade stays pending (do not inherit old marks).
+                $substatus = $latest ? (string) $latest->status : '';
+                $attemptnumber = $latest ? (int) $latest->attemptnumber : -1;
+                $agrade = false;
+                if ($attemptnumber >= 0) {
+                    $agrade = $DB->get_record('assign_grades', [
+                        'assignment' => $instanceid,
+                        'userid' => $userid,
+                        'attemptnumber' => $attemptnumber,
+                    ]);
+                    $agradeusable = $agrade && $agrade->grade !== null && (float) $agrade->grade >= 0;
+                    if (!$agradeusable) {
+                        $agrade = false;
+                    }
+                }
+                if (!$agrade && $latest && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
+                    $prior = $DB->get_records_select(
+                        'assign_grades',
+                        'assignment = :assignment AND userid = :userid AND grade >= 0 AND attemptnumber < :attempt',
+                        [
+                            'assignment' => $instanceid,
+                            'userid' => $userid,
+                            'attempt' => max(0, $attemptnumber),
+                        ],
+                        'attemptnumber DESC, timemodified DESC',
+                        '*',
+                        0,
+                        1
+                    );
+                    $agrade = $prior ? reset($prior) : false;
+                }
 
                 $commenttext = '';
                 $gradedat = 0;
@@ -1724,26 +1747,27 @@ final class fellowship_dashboard {
                     }
                 }
 
-                $gradeinfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
-                $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
-                $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
-                if ($gg && $gg->grade !== null && $grademax > 0) {
-                    $hasgrade = true;
-                    $gradepct = (((float) $gg->grade) / $grademax) * 100;
-                    $gradestr = format_float($gradepct, 0) . '%';
-                    if (!empty($gg->dategraded)) {
-                        $gradedat = max($gradedat, (int) $gg->dategraded);
-                    }
-                    if ($commenttext === '' && !empty($gg->feedback)) {
-                        $commenttext = format_text(
-                            $gg->feedback,
-                            (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
-                            ['context' => \context_module::instance($cm->id), 'para' => false]
-                        );
+                // Gradebook fallback only when we already have an assign grade for display.
+                if ($hasgrade) {
+                    $gradeinfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
+                    $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
+                    $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
+                    if ($gg && $gg->grade !== null && $grademax > 0) {
+                        $gradepct = (((float) $gg->grade) / $grademax) * 100;
+                        $gradestr = format_float($gradepct, 0) . '%';
+                        if (!empty($gg->dategraded)) {
+                            $gradedat = max($gradedat, (int) $gg->dategraded);
+                        }
+                        if ($commenttext === '' && !empty($gg->feedback)) {
+                            $commenttext = format_text(
+                                $gg->feedback,
+                                (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
+                                ['context' => \context_module::instance($cm->id), 'para' => false]
+                            );
+                        }
                     }
                 }
 
-                $substatus = $latest ? (string) $latest->status : '';
                 $attempt = $latest ? ((int) $latest->attemptnumber + 1) : 0;
                 $submittedat = 0;
                 if ($latest && ($substatus === 'submitted' || $substatus === 'reopened')) {
@@ -1764,19 +1788,25 @@ final class fellowship_dashboard {
                 }
 
                 // Classify.
+                // Attention badge = fellow must act (revise). A released Met (≥70) clears it
+                // even if the attempt was previously reopened for changes.
                 $status = 'not_submitted';
                 $chip = 'line';
                 $needsattention = false;
-                if ($hasgrade && ($substatus === 'reopened' || $substatus === 'draft' || $substatus === 'new')) {
+                $passedgate = ($gradepct !== null && $gradepct >= 70);
+                if ($hasgrade && $passedgate) {
+                    $status = 'reviewed';
+                    $chip = 'ok';
+                    $needsattention = false;
+                } else if ($hasgrade && ($substatus === 'reopened' || $substatus === 'draft' || $substatus === 'new')) {
                     $status = 'changes';
                     $chip = 'warn';
                     $needsattention = true;
                 } else if ($hasgrade) {
+                    // Released below 70 without reopen — warn, but no revise badge unless changes.
                     $status = 'reviewed';
-                    $chip = ($gradepct !== null && $gradepct < 70) ? 'warn' : 'ok';
-                    if ($gradepct !== null && $gradepct < 70) {
-                        $needsattention = true;
-                    }
+                    $chip = 'warn';
+                    $needsattention = false;
                 } else if ($substatus === 'submitted' || $submittedcount > 0) {
                     $status = 'pending';
                     $chip = '';
