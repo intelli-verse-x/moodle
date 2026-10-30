@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Fellow Feedback: show prior attempt grade/comment when latest is only reopened.
-$plugin->version   = 2026103017;
+// Logged-in back to /login → landing (/), not Moodle "Log out?" card.
+$plugin->version   = 2026103018;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

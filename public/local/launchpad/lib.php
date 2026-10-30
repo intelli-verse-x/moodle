@@ -36,6 +36,8 @@ function local_launchpad_before_http_headers(): void {
     \local_launchpad\registration::ensure_email_self_registration(true);
     // On /login/index.php?portal=… pin gated wantsurl early (GET display + POST).
     \local_launchpad\login_portal::maybe_pin_wantsurl_from_request();
+    // Logged-in browser-back to login → landing, not Moodle "Log out?" card.
+    \local_launchpad\login_portal::maybe_redirect_logged_in_from_login();
 }
 
 /**

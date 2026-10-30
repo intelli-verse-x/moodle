@@ -101,4 +101,53 @@ final class login_portal {
         $SESSION->wantsurl = $target->out(false);
         return true;
     }
+
+    /**
+     * Whether a logged-in GET of /login/index.php should skip Moodle's "Log out?" card.
+     *
+     * Browser back after Sign in reloads the login URL; core shows alreadyloggedin.
+     * LaunchPad sends those users to the public landing (/) instead.
+     */
+    public static function should_redirect_logged_in_from_login(
+        bool $loggedin,
+        bool $isguest,
+        string $method,
+        string $script
+    ): bool {
+        if (!$loggedin || $isguest) {
+            return false;
+        }
+        if (strtoupper($method) !== 'GET') {
+            return false;
+        }
+        $script = str_replace('\\', '/', $script);
+        return str_contains($script, '/login/index.php');
+    }
+
+    /**
+     * Redirect already-signed-in users off /login/index.php onto the landing page.
+     *
+     * @return bool True when a redirect was issued
+     */
+    public static function maybe_redirect_logged_in_from_login(): bool {
+        global $SCRIPT;
+
+        if (during_initial_install()) {
+            return false;
+        }
+
+        $method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $script = (string) ($SCRIPT ?? ($_SERVER['SCRIPT_NAME'] ?? ''));
+        if (!self::should_redirect_logged_in_from_login(
+            isloggedin(),
+            isguestuser(),
+            $method,
+            $script
+        )) {
+            return false;
+        }
+
+        redirect(new \moodle_url('/'));
+        return true;
+    }
 }
