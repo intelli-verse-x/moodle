@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Logged-in back to /login → landing (/), not Moodle "Log out?" card.
-$plugin->version   = 2026103018;
+// Mentor login tab pins mentor.php; clearer wrong-portal deny copy for all three.
+$plugin->version   = 2026103019;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

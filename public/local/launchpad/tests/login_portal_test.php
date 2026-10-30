@@ -32,7 +32,22 @@ final class login_portal_test extends \basic_testcase {
         $this->assertSame(login_portal::FELLOWSHIP, login_portal::normalise('Fellow'));
         $this->assertSame(login_portal::EMPLOYER, login_portal::normalise('employer'));
         $this->assertSame(login_portal::EMPLOYER, login_portal::normalise('employee'));
+        $this->assertSame(login_portal::MENTOR, login_portal::normalise('mentor'));
+        $this->assertSame(login_portal::MENTOR, login_portal::normalise('Mentors'));
         $this->assertSame('', login_portal::normalise('admin'));
+    }
+
+    public function test_wantsurl_for_all_portals(): void {
+        $employer = login_portal::wantsurl_for('employer');
+        $fellow = login_portal::wantsurl_for('fellowship');
+        $mentor = login_portal::wantsurl_for('mentor');
+        $this->assertNotNull($employer);
+        $this->assertNotNull($fellow);
+        $this->assertNotNull($mentor);
+        $this->assertStringContainsString('employee.php', $employer->out(false));
+        $this->assertStringContainsString('fellow.php', $fellow->out(false));
+        $this->assertStringContainsString('mentor.php', $mentor->out(false));
+        $this->assertNull(login_portal::wantsurl_for('admin'));
     }
 
     public function test_should_redirect_logged_in_from_login(): void {

@@ -75,7 +75,7 @@ class observer {
         if ($userid <= 0) {
             return;
         }
-        // Login form portal field (employer/fellowship) must win over /my/ defaults.
+        // Login form portal field (employer/fellowship/mentor) must win over /my/ defaults.
         login_portal::maybe_pin_wantsurl_from_request();
         persona_home::maybe_set_wantsurl($userid);
     }

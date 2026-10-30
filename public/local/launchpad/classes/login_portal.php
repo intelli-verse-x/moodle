@@ -39,6 +39,7 @@ final class login_portal {
 
     public const EMPLOYER = 'employer';
     public const FELLOWSHIP = 'fellowship';
+    public const MENTOR = 'mentor';
 
     /**
      * Normalise raw portal query/post value.
@@ -51,6 +52,9 @@ final class login_portal {
         if ($portal === 'employer' || $portal === 'employee') {
             return self::EMPLOYER;
         }
+        if ($portal === 'mentor' || $portal === 'mentors') {
+            return self::MENTOR;
+        }
         return '';
     }
 
@@ -60,19 +64,24 @@ final class login_portal {
     public static function wantsurl_for(string $portal): ?\moodle_url {
         $portal = self::normalise($portal);
         if ($portal === self::EMPLOYER) {
-            return new \moodle_url('/local/launchpad/employee.php');
+            return new \moodle_url(persona_home::EMPLOYEE_PATH);
         }
         if ($portal === self::FELLOWSHIP) {
-            return new \moodle_url('/local/launchpad/fellow.php');
+            return new \moodle_url(persona_home::FELLOW_PATH);
+        }
+        if ($portal === self::MENTOR) {
+            return new \moodle_url(persona_home::MENTOR_PATH);
         }
         return null;
     }
 
     /**
-     * If request carries portal=employer|fellowship, pin SESSION wantsurl to that gate.
+     * If request carries portal=employer|fellowship|mentor, pin SESSION wantsurl to that gate.
      *
      * Safe on non-login pages when the param is absent. When present on login GET/POST,
      * this must run before core_login_get_return_url() consumes wantsurl.
+     * Wrong persona then hits the gated PHP page and sees the access-denied exception
+     * (same pattern for all three portals).
      *
      * @return bool True when wantsurl was set
      */
