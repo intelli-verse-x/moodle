@@ -1272,6 +1272,28 @@ body.local-launchpad-fellowship {
 .lp-act-t:hover { color: var(--lp-blue); }
 .lp-act.is-done .lp-act-t { color: var(--lp-muted); }
 
+.lp-foundations-card .lp-act-list { padding-bottom: 0; }
+.lp-news-item h3,
+.lp-port-item h3 {
+  margin: 4px 0 6px;
+  font-family: var(--lp-head);
+  font-size: 17px;
+  font-weight: 600;
+}
+.lp-news-item h3 a,
+.lp-port-item h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+.lp-news-item h3 a:hover,
+.lp-port-item h3 a:hover { color: var(--lp-blue); }
+.lp-cal-list li a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 0;
+}
+
 .lp-empty {
   background: var(--lp-surface);
   border: 1px solid var(--lp-line);

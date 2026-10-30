@@ -56,6 +56,35 @@
     </section>
   {{/journey.has_gates}}
 
+  {{#has_foundations_activities}}
+    <section class="lp-card lift lp-foundations-card">
+      <div class="lp-card-head">
+        <h3>{{#str}} fellowship_foundations_heading, local_launchpad {{/str}}</h3>
+        <a class="lp-link" href="{{track_url}}">{{#str}} fellowship_nav_track, local_launchpad {{/str}} →</a>
+      </div>
+      <ul class="lp-act-list lp-foundations-list">
+        {{#foundations_activities}}
+          <li class="lp-act{{#complete}} is-done{{/complete}}">
+            <span class="lp-chk{{#complete}} on{{/complete}}" aria-hidden="true">{{#complete}}✓{{/complete}}</span>
+            <div class="lp-act-meta">
+              <span class="lp-act-k">{{modname_display}}</span>
+              <a class="lp-act-t" href="{{url}}">{{{name}}}</a>
+            </div>
+            {{#tracked}}
+              <span class="lp-chip {{#complete}}ok{{/complete}}{{^complete}}line{{/complete}}">
+                {{#complete}}{{#str}} fellowship_complete, local_launchpad {{/str}}{{/complete}}
+                {{^complete}}{{#str}} fellowship_incomplete, local_launchpad {{/str}}{{/complete}}
+              </span>
+            {{/tracked}}
+            {{^tracked}}
+              <span class="lp-chip line">{{#str}} fellowship_not_tracked, local_launchpad {{/str}}</span>
+            {{/tracked}}
+          </li>
+        {{/foundations_activities}}
+      </ul>
+    </section>
+  {{/has_foundations_activities}}
+
   <div class="lp-stats" role="list">
     <div class="lp-stat" role="listitem">
       <b>{{stat_badges_value}}</b>

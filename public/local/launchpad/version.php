@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Above main 1.1 (2026102820); always show home hero ring (0% when untracked).
-$plugin->version   = 2026102910;
+// Above main 1.1 (2026102820); news/calendar/portfolio + Foundations home list.
+$plugin->version   = 2026102911;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

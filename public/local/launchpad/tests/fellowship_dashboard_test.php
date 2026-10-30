@@ -136,5 +136,35 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $this->assertSame('Foundations', $summary['ring_label']);
         $this->assertFalse($summary['has_recent_badges']);
         $this->assertSame('—', $summary['stat_required_value']);
+        $this->assertFalse($summary['has_foundations_activities']);
+        $this->assertSame([], $summary['foundations_activities']);
+    }
+
+    public function test_section_activities_from_outline_picks_section(): void {
+        $outline = [
+            'sections' => [
+                [
+                    'sectionnum' => 0,
+                    'activities' => [['name' => 'Orient']],
+                ],
+                [
+                    'sectionnum' => 1,
+                    'activities' => [
+                        ['name' => 'Lesson A', 'modname' => 'page'],
+                        ['name' => 'Quiz 1', 'modname' => 'quiz'],
+                    ],
+                ],
+            ],
+        ];
+        $acts = fellowship_dashboard::section_activities_from_outline($outline, 1);
+        $this->assertCount(2, $acts);
+        $this->assertSame('Lesson A', $acts[0]['name']);
+        $this->assertSame([], fellowship_dashboard::section_activities_from_outline($outline, 9));
+    }
+
+    public function test_list_portfolio_evidence_empty_without_courses(): void {
+        $out = fellowship_dashboard::list_portfolio_evidence(1, []);
+        $this->assertFalse($out['has_items']);
+        $this->assertSame([], $out['items']);
     }
 }

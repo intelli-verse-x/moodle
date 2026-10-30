@@ -64,7 +64,8 @@ $jsurl = $pluginbase . '/fellowship.js?v=' . rawurlencode($assetv);
 $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
-$progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false);
+// Legacy Progress tab redirects to Phase progress; keep URL for shell/home links.
+$progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
 $notificationsurl = (new moodle_url('/message/index.php'))->out(false);
 
 $firstname = format_string($USER->firstname);
@@ -92,13 +93,6 @@ $nav = [
                 'current' => $view === 'track',
                 'key' => 'track',
                 'icon_svg' => $icon('<path d="M4 6h16M4 12h10M4 18h13"/><circle cx="18" cy="12" r="2"/><circle cx="19" cy="18" r="2"/>'),
-            ],
-            [
-                'label' => get_string('fellowship_nav_progress', 'local_launchpad'),
-                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false),
-                'current' => $view === 'progress',
-                'key' => 'progress',
-                'icon_svg' => $icon('<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15v-4"/><path d="M12 15V8"/><path d="M16 15v-6"/>'),
             ],
             [
                 'label' => get_string('fellowship_nav_achievements', 'local_launchpad'),
@@ -138,6 +132,27 @@ $nav = [
     [
         'group' => get_string('fellowship_nav_you', 'local_launchpad'),
         'items' => [
+            [
+                'label' => get_string('fellowship_nav_news', 'local_launchpad'),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'news']))->out(false),
+                'current' => $view === 'news',
+                'key' => 'news',
+                'icon_svg' => $icon('<path d="M4 5h12v14H4z"/><path d="M16 8h4v11h-4"/><path d="M7 9h6"/><path d="M7 13h6"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_nav_calendar', 'local_launchpad'),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'calendar']))->out(false),
+                'current' => $view === 'calendar',
+                'key' => 'calendar',
+                'icon_svg' => $icon('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16"/><path d="M8 3v4"/><path d="M16 3v4"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_nav_portfolio', 'local_launchpad'),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'portfolio']))->out(false),
+                'current' => $view === 'portfolio',
+                'key' => 'portfolio',
+                'icon_svg' => $icon('<path d="M4 8h16v12H4z"/><path d="M9 8V6a2 2 0 012-2h2a2 2 0 012 2v2"/>'),
+            ],
             [
                 'label' => get_string('fellowship_nav_help', 'local_launchpad'),
                 'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'help']))->out(false),
@@ -231,42 +246,53 @@ switch ($view) {
         break;
 
     case 'progress':
-        $pagetitle = get_string('fellowship_nav_progress', 'local_launchpad');
-        $progresscards = [];
-        foreach ($courses as $c) {
-            $o = fellowship_dashboard::course_outline($c, $userid);
-            $progresscards[] = [
-                'fullname' => format_string($c->fullname),
-                'idnumber' => s($c->idnumber),
-                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track', 'id' => $c->id]))->out(false),
-                'moodle_url' => (new moodle_url('/course/view.php', ['id' => $c->id]))->out(false),
-                'completion_enabled' => $o['completion_enabled'],
-                'completed' => $o['completed'],
-                'trackable' => $o['trackable'],
-                'percent' => $o['percent'],
-                'has_percent' => $o['percent'] !== null,
-                'honest_note' => !$o['completion_enabled'] || $o['trackable'] === 0
-                    ? get_string('fellowship_progress_not_tracked', 'local_launchpad')
-                    : get_string('fellowship_progress_summary', 'local_launchpad', [
-                        'done' => $o['completed'],
-                        'total' => $o['trackable'],
-                        'percent' => $o['percent'],
-                    ]),
-            ];
-        }
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_progress', [
-            'courses' => $progresscards,
-            'has_courses' => $progresscards !== [],
-            'empty_message' => get_string('fellowship_no_courses', 'local_launchpad'),
+        // Sidebar Progress removed — Phase progress is the programme record view.
+        redirect(new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']));
+        break;
+
+    case 'news':
+        $pagetitle = get_string('fellowship_nav_news', 'local_launchpad');
+        $newsdata = fellowship_dashboard::list_announcements($userid, $courses);
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_news', array_merge($newsdata, [
             'has_crumbs' => true,
             'crumbs' => [
                 $crumbhome,
                 [
-                    'label' => get_string('fellowship_nav_progress', 'local_launchpad'),
+                    'label' => get_string('fellowship_nav_news', 'local_launchpad'),
                     'url' => '',
                 ],
             ],
-        ]);
+        ]));
+        break;
+
+    case 'calendar':
+        $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
+        $caldata = fellowship_dashboard::list_calendar_events($userid, $courses);
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', array_merge($caldata, [
+            'has_crumbs' => true,
+            'crumbs' => [
+                $crumbhome,
+                [
+                    'label' => get_string('fellowship_nav_calendar', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
+        ]));
+        break;
+
+    case 'portfolio':
+        $pagetitle = get_string('fellowship_nav_portfolio', 'local_launchpad');
+        $portdata = fellowship_dashboard::list_portfolio_evidence($userid, $courses);
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_portfolio', array_merge($portdata, [
+            'has_crumbs' => true,
+            'crumbs' => [
+                $crumbhome,
+                [
+                    'label' => get_string('fellowship_nav_portfolio', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
+        ]));
         break;
 
     case 'achievements':
@@ -404,7 +430,8 @@ if ($view === 'home') {
             'view' => 'track',
             'id' => $courseid > 0 ? $courseid : null,
         ])))->out(false),
-        'progress_url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false),
+        'progress_url' => $progressurl,
+        'phases_url' => $progressurl,
     ], $homesummary));
 }
 
@@ -471,12 +498,15 @@ $notificationslabel = $unread > 0
 $orbittips = [
     'home' => get_string('fellowship_orbit_tip_home', 'local_launchpad'),
     'track' => get_string('fellowship_orbit_tip_track', 'local_launchpad'),
-    'progress' => get_string('fellowship_orbit_tip_progress', 'local_launchpad'),
+    'progress' => get_string('fellowship_orbit_tip_phases', 'local_launchpad'),
     'achievements' => get_string('fellowship_orbit_tip_achievements', 'local_launchpad'),
     'feedback' => get_string('fellowship_orbit_tip_feedback', 'local_launchpad'),
     'phases' => get_string('fellowship_orbit_tip_phases', 'local_launchpad'),
     'completion' => get_string('fellowship_orbit_tip_completion', 'local_launchpad'),
     'help' => get_string('fellowship_orbit_tip_help', 'local_launchpad'),
+    'news' => get_string('fellowship_orbit_tip_news', 'local_launchpad'),
+    'calendar' => get_string('fellowship_orbit_tip_calendar', 'local_launchpad'),
+    'portfolio' => get_string('fellowship_orbit_tip_portfolio', 'local_launchpad'),
 ];
 $orbittip = $orbittips[$view] ?? $orbittips['home'];
 

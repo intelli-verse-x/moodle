@@ -1375,6 +1375,8 @@ final class fellowship_dashboard {
             $requiredvalue = $gatecompleted . '/' . $gatetrackable;
         }
 
+        $foundations = self::section_activities_from_outline($outline, 1);
+
         return [
             // Always render the hero ring for enrolled fellows (0% is honest).
             'show_hero_ring' => true,
@@ -1396,6 +1398,176 @@ final class fellowship_dashboard {
             'recent_badges' => $recent,
             'has_recent_badges' => $recent !== [],
             'achievements_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false),
+            'foundations_activities' => $foundations,
+            'has_foundations_activities' => $foundations !== [],
+        ];
+    }
+
+    /**
+     * Activities for one course section from a course_outline() result.
+     *
+     * @param array $outline
+     * @param int $sectionnum
+     * @return list<array>
+     */
+    public static function section_activities_from_outline(array $outline, int $sectionnum): array {
+        foreach ($outline['sections'] ?? [] as $section) {
+            if ((int) ($section['sectionnum'] ?? -1) === $sectionnum) {
+                return array_values($section['activities'] ?? []);
+            }
+        }
+        return [];
+    }
+
+    /**
+     * Course news-forum posts for enrolled lp-* courses (newest first).
+     *
+     * @param list<\stdClass> $courses
+     * @return array{items: list<array>, has_items: bool, moodle_news_url: string}
+     */
+    public static function list_announcements(int $userid, array $courses): array {
+        global $DB;
+
+        // Read-only: never call forum_get_course_forum() — it creates a news forum if missing.
+        $items = [];
+        $firstforumurl = (new \moodle_url('/my/'))->out(false);
+
+        foreach ($courses as $course) {
+            $modinfo = get_fast_modinfo($course, $userid);
+            foreach ($modinfo->get_cms() as $cm) {
+                if ($cm->modname !== 'forum' || !$cm->uservisible || $cm->deletioninprogress) {
+                    continue;
+                }
+                $forum = $DB->get_record('forum', ['id' => (int) $cm->instance], 'id,type', IGNORE_MISSING);
+                if (!$forum || $forum->type !== 'news') {
+                    continue;
+                }
+
+                $forumurl = (new \moodle_url('/mod/forum/view.php', ['id' => $cm->id]))->out(false);
+                if ($firstforumurl === (new \moodle_url('/my/'))->out(false)) {
+                    $firstforumurl = $forumurl;
+                }
+
+                $discussions = $DB->get_records('forum_discussions', [
+                    'forum' => (int) $forum->id,
+                ], 'timemodified DESC', '*', 0, 20);
+                foreach ($discussions as $discussion) {
+                    $post = $DB->get_record('forum_posts', [
+                        'discussion' => (int) $discussion->id,
+                        'parent' => 0,
+                    ]);
+                    if (!$post) {
+                        continue;
+                    }
+                    $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
+                    $items[] = [
+                        'id' => (int) $discussion->id,
+                        'subject' => format_string($discussion->name),
+                        'excerpt' => shorten_text(format_text(
+                            $post->message,
+                            (int) $post->messageformat,
+                            ['context' => \context_module::instance((int) $cm->id), 'para' => false]
+                        ), 180),
+                        'author' => $author ? fullname($author) : '',
+                        'when' => userdate((int) $discussion->timemodified, get_string('strftimedatetimeshort', 'langconfig')),
+                        'timemodified' => (int) $discussion->timemodified,
+                        'url' => (new \moodle_url('/mod/forum/discuss.php', ['d' => $discussion->id]))->out(false),
+                        'course_name' => format_string($course->fullname),
+                    ];
+                }
+            }
+        }
+
+        usort($items, static fn(array $a, array $b): int => ($b['timemodified'] <=> $a['timemodified']));
+        $items = array_slice($items, 0, 15);
+
+        return [
+            'items' => $items,
+            'has_items' => $items !== [],
+            'moodle_news_url' => $firstforumurl,
+        ];
+    }
+
+    /**
+     * Upcoming calendar events for the fellow across enrolled courses + user events.
+     *
+     * @param list<\stdClass> $courses
+     * @return array{items: list<array>, has_items: bool, moodle_calendar_url: string}
+     */
+    public static function list_calendar_events(int $userid, array $courses): array {
+        global $CFG;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $courseids = array_map(static fn($c) => (int) $c->id, $courses);
+        $tstart = time() - (1 * DAYSECS);
+        $tend = time() + (90 * DAYSECS);
+        $raw = calendar_get_legacy_events(
+            $tstart,
+            $tend,
+            $userid,
+            true,
+            $courseids === [] ? true : $courseids,
+            true,
+            true
+        );
+
+        $coursenames = [];
+        foreach ($courses as $c) {
+            $coursenames[(int) $c->id] = format_string($c->fullname);
+        }
+
+        $items = [];
+        foreach ($raw as $event) {
+            $courseid = (int) ($event->courseid ?? 0);
+            $items[] = [
+                'id' => (int) $event->id,
+                'name' => format_string($event->name),
+                'when' => userdate((int) $event->timestart, get_string('strftimedatetimeshort', 'langconfig')),
+                'timestart' => (int) $event->timestart,
+                'course_name' => $courseid > 0 ? ($coursenames[$courseid] ?? '') : get_string('fellowship_calendar_personal', 'local_launchpad'),
+                'url' => (new \moodle_url('/calendar/view.php', [
+                    'view' => 'day',
+                    'time' => (int) $event->timestart,
+                ]))->out(false),
+            ];
+        }
+        usort($items, static fn(array $a, array $b): int => ($a['timestart'] <=> $b['timestart']));
+
+        return [
+            'items' => $items,
+            'has_items' => $items !== [],
+            'moodle_calendar_url' => (new \moodle_url('/calendar/view.php', ['view' => 'month']))->out(false),
+        ];
+    }
+
+    /**
+     * Portfolio = assign evidence from enrolled tracks (submissions + grades), not invented files.
+     *
+     * @param list<\stdClass> $courses
+     * @return array{items: list<array>, has_items: bool}
+     */
+    public static function list_portfolio_evidence(int $userid, array $courses): array {
+        $feedback = self::list_assignment_feedback($userid, $courses);
+        $items = [];
+        foreach ($feedback['items'] ?? [] as $row) {
+            $when = (string) ($row['graded_at'] ?? '');
+            if ($when === '') {
+                $when = (string) ($row['submitted_at'] ?? '');
+            }
+            $items[] = [
+                'name' => $row['name'],
+                'course_name' => $row['course_name'] ?? '',
+                'status' => $row['status_label'] ?? '',
+                'chip' => $row['chip'] ?? 'line',
+                'when' => $when,
+                'url' => $row['url'],
+                'has_comment' => !empty($row['has_comment']),
+            ];
+        }
+        return [
+            'items' => $items,
+            'has_items' => $items !== [],
         ];
     }
 
