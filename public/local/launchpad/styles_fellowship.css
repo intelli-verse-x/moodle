@@ -24,7 +24,8 @@
 *::before,
 *::after { box-sizing: border-box; }
 
-body.local-launchpad-fellowship {
+body.local-launchpad-fellowship,
+body.local-launchpad-mentor {
   margin: 0;
   background: var(--lp-bg);
   color: var(--lp-ink);
@@ -1548,3 +1549,36 @@ body.lp-orbit-is-hidden .lp-orbit { display: none; }
     transition: none !important;
   }
 }
+
+/* Mentor review queue */
+.lp-mentor-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.lp-mentor-filters .lp-chip {
+  text-decoration: none;
+}
+.lp-mentor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+.lp-mentor-table th,
+.lp-mentor-table td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--lp-line);
+  vertical-align: top;
+}
+.lp-mentor-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--lp-muted);
+  font-weight: 600;
+}
+.lp-mentor-table tr:last-child td { border-bottom: 0; }
+body.local-launchpad-mentor .lp-side .lp-lvcard,
+body.local-launchpad-mentor .lp-xp-chip { display: none; }
