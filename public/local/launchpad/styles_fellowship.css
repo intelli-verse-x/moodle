@@ -1582,3 +1582,45 @@ body.lp-orbit-is-hidden .lp-orbit { display: none; }
 .lp-mentor-table tr:last-child td { border-bottom: 0; }
 body.local-launchpad-mentor .lp-side .lp-lvcard,
 body.local-launchpad-mentor .lp-xp-chip { display: none; }
+
+.lp-fellow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+.lp-fellow-card .lp-fellow-who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.lp-fellow-card .lp-fellow-who b {
+  display: block;
+  font-size: 15.5px;
+}
+.lp-fellow-progress-label {
+  margin: 14px 0 8px;
+}
+.lp-fellow-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--lp-blue-soft);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.lp-fellow-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--lp-blue), #5B8DF6);
+  min-width: 0;
+  transition: width .6s cubic-bezier(.2, .8, .2, 1);
+}
+.lp-fellow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}

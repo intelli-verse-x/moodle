@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Mentor shell: Dashboard + Review queue (scoped; not all HTML tabs).
-$plugin->version   = 2026103010;
+// Mentor My fellows: always show blue progress bar on cards.
+$plugin->version   = 2026103012;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

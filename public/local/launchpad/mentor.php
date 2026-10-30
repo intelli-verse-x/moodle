@@ -59,6 +59,7 @@ $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->ou
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::MENTOR_PATH))->out(false);
 $queueurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
+$fellowsurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false);
 $notificationsurl = (new moodle_url('/message/index.php'))->out(false);
 
 $firstname = format_string($USER->firstname);
@@ -69,7 +70,7 @@ $icon = static function (string $paths): string {
         . $paths . '</svg>';
 };
 
-// Scoped nav — HTML has more tabs; ship Dashboard + Review queue only.
+// Nav: Dashboard + Review queue + My fellows (HTML also has track/history — deferred).
 $queuepreview = mentor_dashboard::list_review_queue($userid, $courses, 'waiting');
 $waitingcount = (int) ($queuepreview['waiting_count'] ?? 0);
 
@@ -95,6 +96,18 @@ $nav = [
             ],
         ],
     ],
+    [
+        'group' => get_string('mentor_nav_course', 'local_launchpad'),
+        'items' => [
+            [
+                'label' => get_string('mentor_nav_fellows', 'local_launchpad'),
+                'url' => $fellowsurl,
+                'current' => $view === 'fellows',
+                'key' => 'fellows',
+                'icon_svg' => $icon('<path d="M16 11a4 4 0 10-8 0 4 4 0 008 0z"/><path d="M4 20a8 8 0 0116 0"/><path d="M19 8a3 3 0 110 6"/>'),
+            ],
+        ],
+    ],
 ];
 
 $content = '';
@@ -107,6 +120,16 @@ switch ($view) {
         $content = $OUTPUT->render_from_template('local_launchpad/mentor_queue', array_merge($queuedata, [
             'has_courses' => $courses !== [],
             'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
+        ]));
+        break;
+
+    case 'fellows':
+        $pagetitle = get_string('mentor_nav_fellows', 'local_launchpad');
+        $fellowsdata = mentor_dashboard::list_fellows($userid, $courses);
+        $content = $OUTPUT->render_from_template('local_launchpad/mentor_fellows', array_merge($fellowsdata, [
+            'has_courses' => $courses !== [],
+            'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
+            'queue_url' => $queueurl,
         ]));
         break;
 

@@ -52,4 +52,11 @@ final class mentor_dashboard_test extends \basic_testcase {
         $this->assertSame(0, $out['waiting_count']);
         $this->assertSame([], $out['courses']);
     }
+
+    public function test_list_fellows_empty_without_courses(): void {
+        $out = mentor_dashboard::list_fellows(1, []);
+        $this->assertFalse($out['has_items']);
+        $this->assertSame([], $out['items']);
+        $this->assertSame(0, $out['fellow_count']);
+    }
 }
