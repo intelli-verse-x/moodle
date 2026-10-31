@@ -265,7 +265,22 @@ switch ($view) {
 
     case 'calendar':
         $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
-        $caldata = fellowship_dashboard::list_calendar_events($userid, $courses);
+        $calmode = optional_param('cal', 'month', PARAM_ALPHA);
+        $caltime = optional_param('time', 0, PARAM_INT);
+        $calyear = optional_param('year', 0, PARAM_INT);
+        $calmonth = optional_param('month', 0, PARAM_INT);
+        $resolved = \local_launchpad\calendar_service::resolve_month(
+            $caltime > 0 ? $caltime : null,
+            $calyear > 0 ? $calyear : null,
+            $calmonth > 0 ? $calmonth : null
+        );
+        $caldata = \local_launchpad\calendar_service::fellow_context(
+            $userid,
+            $courses,
+            (int) $resolved['year'],
+            (int) $resolved['month'],
+            $calmode
+        );
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', array_merge($caldata, [
             'has_crumbs' => true,
             'crumbs' => [

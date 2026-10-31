@@ -1495,50 +1495,7 @@ final class fellowship_dashboard {
      * @return array{items: list<array>, has_items: bool, moodle_calendar_url: string}
      */
     public static function list_calendar_events(int $userid, array $courses): array {
-        global $CFG;
-
-        require_once($CFG->dirroot . '/calendar/lib.php');
-
-        $courseids = array_map(static fn($c) => (int) $c->id, $courses);
-        $tstart = time() - (1 * DAYSECS);
-        $tend = time() + (90 * DAYSECS);
-        $raw = calendar_get_legacy_events(
-            $tstart,
-            $tend,
-            $userid,
-            true,
-            $courseids === [] ? true : $courseids,
-            true,
-            true
-        );
-
-        $coursenames = [];
-        foreach ($courses as $c) {
-            $coursenames[(int) $c->id] = format_string($c->fullname);
-        }
-
-        $items = [];
-        foreach ($raw as $event) {
-            $courseid = (int) ($event->courseid ?? 0);
-            $items[] = [
-                'id' => (int) $event->id,
-                'name' => format_string($event->name),
-                'when' => userdate((int) $event->timestart, get_string('strftimedatetimeshort', 'langconfig')),
-                'timestart' => (int) $event->timestart,
-                'course_name' => $courseid > 0 ? ($coursenames[$courseid] ?? '') : get_string('fellowship_calendar_personal', 'local_launchpad'),
-                'url' => (new \moodle_url('/calendar/view.php', [
-                    'view' => 'day',
-                    'time' => (int) $event->timestart,
-                ]))->out(false),
-            ];
-        }
-        usort($items, static fn(array $a, array $b): int => ($a['timestart'] <=> $b['timestart']));
-
-        return [
-            'items' => $items,
-            'has_items' => $items !== [],
-            'moodle_calendar_url' => (new \moodle_url('/calendar/view.php', ['view' => 'month']))->out(false),
-        ];
+        return calendar_service::upcoming($userid, $courses);
     }
 
     /**

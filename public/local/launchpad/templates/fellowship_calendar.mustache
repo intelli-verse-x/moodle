@@ -1,5 +1,7 @@
 {{!
     @template local_launchpad/fellowship_calendar
+
+    Fellow calendar: Month grid | Upcoming list (Moodle-backed, read-only Phase 1).
 }}
 {{#has_crumbs}}
   <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
@@ -21,22 +23,60 @@
   </div>
 </div>
 
-{{#has_items}}
-  <ul class="lp-course-list lp-cal-list">
-    {{#items}}
-      <li>
-        <a href="{{url}}">
-          <b>{{{name}}}</b>
-          <span class="lp-muted">{{when}}{{#course_name}} · {{{course_name}}}{{/course_name}}</span>
-        </a>
-      </li>
-    {{/items}}
-  </ul>
-{{/has_items}}
-{{^has_items}}
-  <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">··</div>
-    <h2>{{#str}} fellowship_calendar_empty_title, local_launchpad {{/str}}</h2>
-    <p>{{#str}} fellowship_calendar_empty_body, local_launchpad {{/str}}</p>
+<div class="lp-cal-tabs" role="tablist" aria-label="{{#str}} fellowship_calendar_view_aria, local_launchpad {{/str}}">
+  <a class="lp-chip{{#mode_month}} is-on{{/mode_month}}" href="{{month_toggle_url}}" role="tab" aria-selected="{{#mode_month}}true{{/mode_month}}{{^mode_month}}false{{/mode_month}}">
+    {{#str}} fellowship_calendar_tab_month, local_launchpad {{/str}}
+  </a>
+  <a class="lp-chip{{#mode_upcoming}} is-on{{/mode_upcoming}}" href="{{upcoming_toggle_url}}" role="tab" aria-selected="{{#mode_upcoming}}true{{/mode_upcoming}}{{^mode_upcoming}}false{{/mode_upcoming}}">
+    {{#str}} fellowship_calendar_tab_upcoming, local_launchpad {{/str}}
+  </a>
+</div>
+
+{{#mode_month}}
+  {{> local_launchpad/fellowship_calendar_month}}
+{{/mode_month}}
+
+{{#mode_upcoming}}
+  {{#has_upcoming_items}}
+    <ul class="lp-course-list lp-cal-list">
+      {{#upcoming_items}}
+        <li>
+          <button type="button" class="lp-cal-list-btn"
+            data-lp-cal-open
+            data-id="{{id}}"
+            data-name="{{name}}"
+            data-when="{{when}}"
+            data-course="{{course_name}}"
+            data-desc="{{description_excerpt}}"
+            data-url="{{url}}"
+            data-module="{{#is_module}}1{{/is_module}}{{^is_module}}0{{/is_module}}">
+            <b>{{{name}}}</b>
+            <span class="lp-muted">{{when}}{{#course_name}} · {{{course_name}}}{{/course_name}}</span>
+          </button>
+        </li>
+      {{/upcoming_items}}
+    </ul>
+  {{/has_upcoming_items}}
+  {{^has_upcoming_items}}
+    <div class="lp-empty" role="status">
+      <div class="lp-empty-mark" aria-hidden="true">··</div>
+      <h2>{{#str}} fellowship_calendar_empty_title, local_launchpad {{/str}}</h2>
+      <p>{{#str}} fellowship_calendar_empty_body, local_launchpad {{/str}}</p>
+    </div>
+  {{/has_upcoming_items}}
+{{/mode_upcoming}}
+
+<div class="lp-cal-detail" data-lp-cal-detail hidden>
+  <div class="lp-cal-detail-scrim" data-lp-cal-detail-close aria-hidden="true"></div>
+  <div class="lp-cal-detail-card" role="dialog" aria-modal="true" aria-labelledby="lp-cal-detail-title">
+    <p class="lp-eyebrow" data-lp-cal-detail-course></p>
+    <h2 id="lp-cal-detail-title" data-lp-cal-detail-title></h2>
+    <p class="lp-sm lp-muted" data-lp-cal-detail-when></p>
+    <p class="lp-sm" data-lp-cal-detail-desc hidden></p>
+    <p class="lp-xs lp-muted" data-lp-cal-detail-module hidden>{{#str}} fellowship_calendar_module_note, local_launchpad {{/str}}</p>
+    <div class="lp-cal-detail-actions">
+      <a class="lp-btn lp-btn-primary" data-lp-cal-detail-link href="#">{{#str}} fellowship_calendar_open_day, local_launchpad {{/str}}</a>
+      <button type="button" class="lp-btn lp-btn-light" data-lp-cal-detail-close>{{#str}} fellowship_calendar_close, local_launchpad {{/str}}</button>
+    </div>
   </div>
-{{/has_items}}
+</div>

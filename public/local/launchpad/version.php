@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Mentor home: always show Queue card (top 6) + coach tip + Rubric at a glance.
-$plugin->version   = 2026103102;
+// Fellow calendar: AJAX month prev/next (no full page reload).
+$plugin->version   = 2026103104;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

@@ -69,8 +69,164 @@
             });
         });
     }
+    var calDetail = document.querySelector('[data-lp-cal-detail]');
+    var calMonthFetch = null;
+    function closeCalDetail() {
+        if (!calDetail) {
+            return;
+        }
+        calDetail.classList.remove('is-open');
+        calDetail.setAttribute('hidden', 'hidden');
+        document.body.classList.remove('lp-cal-detail-lock');
+    }
+    function openCalDetail(btn) {
+        if (!calDetail || !btn) {
+            return;
+        }
+        var title = calDetail.querySelector('[data-lp-cal-detail-title]');
+        var when = calDetail.querySelector('[data-lp-cal-detail-when]');
+        var course = calDetail.querySelector('[data-lp-cal-detail-course]');
+        var desc = calDetail.querySelector('[data-lp-cal-detail-desc]');
+        var moduleNote = calDetail.querySelector('[data-lp-cal-detail-module]');
+        var link = calDetail.querySelector('[data-lp-cal-detail-link]');
+        if (title) {
+            title.textContent = btn.getAttribute('data-name') || '';
+        }
+        if (when) {
+            when.textContent = btn.getAttribute('data-when') || '';
+        }
+        if (course) {
+            course.textContent = btn.getAttribute('data-course') || '';
+        }
+        if (desc) {
+            var excerpt = btn.getAttribute('data-desc') || '';
+            if (excerpt) {
+                desc.textContent = excerpt;
+                desc.removeAttribute('hidden');
+            } else {
+                desc.textContent = '';
+                desc.setAttribute('hidden', 'hidden');
+            }
+        }
+        if (moduleNote) {
+            if (btn.getAttribute('data-module') === '1') {
+                moduleNote.removeAttribute('hidden');
+            } else {
+                moduleNote.setAttribute('hidden', 'hidden');
+            }
+        }
+        if (link) {
+            link.setAttribute('href', btn.getAttribute('data-url') || '#');
+        }
+        calDetail.classList.add('is-open');
+        calDetail.removeAttribute('hidden');
+        document.body.classList.add('lp-cal-detail-lock');
+    }
+    function loadCalMonth(time, fallbackHref, pushHistory) {
+        var month = shell.querySelector('[data-lp-cal-month]');
+        if (!month || !time) {
+            if (fallbackHref) {
+                window.location.href = fallbackHref;
+            }
+            return;
+        }
+        var ajaxUrl = month.getAttribute('data-ajax-url');
+        var sesskey = month.getAttribute('data-sesskey');
+        if (!ajaxUrl || !sesskey) {
+            if (fallbackHref) {
+                window.location.href = fallbackHref;
+            }
+            return;
+        }
+        if (calMonthFetch && typeof calMonthFetch.abort === 'function') {
+            calMonthFetch.abort();
+        }
+        var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        calMonthFetch = controller;
+        month.classList.add('is-loading');
+        month.setAttribute('aria-busy', 'true');
+        var sep = ajaxUrl.indexOf('?') >= 0 ? '&' : '?';
+        var reqUrl = ajaxUrl + sep + 'time=' + encodeURIComponent(time)
+            + '&sesskey=' + encodeURIComponent(sesskey);
+        fetch(reqUrl, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+            signal: controller ? controller.signal : undefined
+        }).then(function (res) {
+            if (!res.ok) {
+                throw new Error('calendar month http ' + res.status);
+            }
+            return res.json();
+        }).then(function (data) {
+            if (!data || !data.html) {
+                throw new Error('calendar month empty');
+            }
+            var host = month.parentNode;
+            if (!host) {
+                throw new Error('calendar month host');
+            }
+            month.insertAdjacentHTML('afterend', data.html);
+            month.remove();
+            if (pushHistory !== false && data.pageurl) {
+                history.pushState({ lpCalTime: String(data.time) }, '', data.pageurl);
+            }
+        }).catch(function (err) {
+            if (err && err.name === 'AbortError') {
+                return;
+            }
+            if (fallbackHref) {
+                window.location.href = fallbackHref;
+            }
+        }).finally(function () {
+            var next = shell.querySelector('[data-lp-cal-month]');
+            if (next) {
+                next.classList.remove('is-loading');
+                next.removeAttribute('aria-busy');
+            }
+        });
+    }
+    if (calDetail) {
+        calDetail.querySelectorAll('[data-lp-cal-detail-close]').forEach(function (el) {
+            el.addEventListener('click', closeCalDetail);
+        });
+    }
+    shell.addEventListener('click', function (e) {
+        var nav = e.target.closest('[data-lp-cal-nav]');
+        if (nav) {
+            e.preventDefault();
+            loadCalMonth(nav.getAttribute('data-time'), nav.getAttribute('href'), true);
+            return;
+        }
+        var openBtn = e.target.closest('[data-lp-cal-open]');
+        if (openBtn) {
+            openCalDetail(openBtn);
+        }
+    });
+    var initialMonth = shell.querySelector('[data-lp-cal-month]');
+    if (initialMonth && initialMonth.getAttribute('data-time')) {
+        history.replaceState(
+            { lpCalTime: String(initialMonth.getAttribute('data-time')) },
+            '',
+            window.location.href
+        );
+    }
+    window.addEventListener('popstate', function (e) {
+        if (!shell.querySelector('[data-lp-cal-month]')) {
+            return;
+        }
+        var t = e.state && e.state.lpCalTime ? e.state.lpCalTime : null;
+        if (!t) {
+            return;
+        }
+        loadCalMonth(t, null, false);
+    });
+
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            if (calDetail && calDetail.classList.contains('is-open')) {
+                closeCalDetail();
+                return;
+            }
             setOpen(false);
         }
     });

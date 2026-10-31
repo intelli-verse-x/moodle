@@ -1,0 +1,58 @@
+{{!
+    @template local_launchpad/fellowship_calendar_month
+
+    Month grid panel (swapped via AJAX on prev/next).
+}}
+<div class="lp-cal-month" data-lp-cal-month
+  data-ajax-url="{{ajax_url}}"
+  data-sesskey="{{sesskey}}"
+  data-time="{{current_time}}">
+  <div class="lp-cal-month-head">
+    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{prev_url}}" data-lp-cal-nav data-time="{{prev_time}}"
+      aria-label="{{#str}} fellowship_calendar_prev_month, local_launchpad {{/str}}">←</a>
+    <h3 class="lp-cal-month-label">{{month_label}}</h3>
+    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{next_url}}" data-lp-cal-nav data-time="{{next_time}}"
+      aria-label="{{#str}} fellowship_calendar_next_month, local_launchpad {{/str}}">→</a>
+  </div>
+  <div class="lp-cal-grid" role="grid" aria-label="{{month_label}}">
+    <div class="lp-cal-weekdays" role="row">
+      {{#weekday_labels}}
+        <div class="lp-cal-wd" role="columnheader" title="{{label_full}}">{{label}}</div>
+      {{/weekday_labels}}
+    </div>
+    {{#weeks}}
+      <div class="lp-cal-week" role="row">
+        {{#days}}
+          <div class="lp-cal-day{{#is_othermonth}} is-other{{/is_othermonth}}{{#is_today}} is-today{{/is_today}}{{#has_events}} has-events{{/has_events}}" role="gridcell">
+            <span class="lp-cal-daynum">{{day}}</span>
+            {{#has_events}}
+              <ul class="lp-cal-chips">
+                {{#events}}
+                  <li>
+                    <button type="button" class="lp-cal-chip{{#is_personal}} is-personal{{/is_personal}}"
+                      data-lp-cal-open
+                      data-id="{{id}}"
+                      data-name="{{name}}"
+                      data-when="{{when}}"
+                      data-course="{{course_name}}"
+                      data-desc="{{description_excerpt}}"
+                      data-url="{{url}}"
+                      data-module="{{#is_module}}1{{/is_module}}{{^is_module}}0{{/is_module}}">
+                      {{name}}
+                    </button>
+                  </li>
+                {{/events}}
+              </ul>
+              {{#has_more}}
+                <span class="lp-cal-more">+{{more_count}}</span>
+              {{/has_more}}
+            {{/has_events}}
+          </div>
+        {{/days}}
+      </div>
+    {{/weeks}}
+  </div>
+  {{^has_month_events}}
+    <p class="lp-muted lp-sm lp-cal-month-empty">{{#str}} fellowship_calendar_month_empty, local_launchpad {{/str}}</p>
+  {{/has_month_events}}
+</div>
