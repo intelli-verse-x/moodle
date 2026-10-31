@@ -49,8 +49,22 @@ final class mentor_dashboard_test extends \basic_testcase {
         $out = mentor_dashboard::home_summary(1, []);
         $this->assertFalse($out['has_courses']);
         $this->assertFalse($out['has_waiting']);
+        $this->assertFalse($out['has_waiting_preview']);
         $this->assertSame(0, $out['waiting_count']);
         $this->assertSame([], $out['courses']);
+        $this->assertCount(4, $out['rubric_rows']);
+        $this->assertNotSame('', $out['coach_tip']);
+    }
+
+    public function test_rubric_at_a_glance_weights(): void {
+        $rows = mentor_dashboard::rubric_at_a_glance();
+        $this->assertCount(4, $rows);
+        $sum = 0;
+        foreach ($rows as $row) {
+            $sum += (int) $row['weight'];
+        }
+        $this->assertSame(100, $sum);
+        $this->assertSame(6, mentor_dashboard::HOME_QUEUE_PREVIEW);
     }
 
     public function test_list_fellows_empty_without_courses(): void {

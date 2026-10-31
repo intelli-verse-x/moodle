@@ -211,6 +211,7 @@ switch ($view) {
         $content = $OUTPUT->render_from_template('local_launchpad/mentor_home', array_merge([
             'firstname' => $firstname,
             'welcome_back' => get_string('mentor_welcome_back', 'local_launchpad', $firstname),
+            'prof_url' => $pluginbase . '/assets/img/prof.webp',
         ], $homesummary));
         break;
 }

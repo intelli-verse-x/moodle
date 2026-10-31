@@ -1737,6 +1737,40 @@ body.local-launchpad-mentor .lp-xp-chip { display: none; }
   margin-top: 18px;
 }
 
+/* Mentor home — queue preview rows + rubric glance. */
+.lp-mentor-queue-preview li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lp-mentor-queue-preview li > a:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.lp-btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.lp-rubric-glance {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lp-rubric-glance li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.lp-rubric-glance li span { color: var(--lp-ink); }
+.lp-rubric-glance li b { font-variant-numeric: tabular-nums; }
+
 /* Wrong-portal mismatch modal (over the user's real home). */
 .lp-portal-mismatch {
   position: fixed;

@@ -659,6 +659,35 @@ final class mentor_dashboard {
         require_capability('mod/assign:grade', $context);
     }
 
+    /** Max waiting rows on mentor home Queue card (full list lives in sidebar Queue). */
+    public const HOME_QUEUE_PREVIEW = 6;
+
+    /**
+     * Programme Foundations rubric weights (HTML “Rubric at a glance” — not per-assign Moodle rubrics).
+     *
+     * @return list<array{label:string,weight:string}>
+     */
+    public static function rubric_at_a_glance(): array {
+        return [
+            [
+                'label' => get_string('mentor_rubric_evidence', 'local_launchpad'),
+                'weight' => '30',
+            ],
+            [
+                'label' => get_string('mentor_rubric_acceptance', 'local_launchpad'),
+                'weight' => '25',
+            ],
+            [
+                'label' => get_string('mentor_rubric_prioritisation', 'local_launchpad'),
+                'weight' => '25',
+            ],
+            [
+                'label' => get_string('mentor_rubric_communication', 'local_launchpad'),
+                'weight' => '20',
+            ],
+        ];
+    }
+
     /**
      * Dashboard summary for mentor home.
      *
@@ -673,7 +702,7 @@ final class mentor_dashboard {
         ));
         usort($waiting, static fn(array $a, array $b): int =>
             ((int) ($b['submitted_ts'] ?? 0)) <=> ((int) ($a['submitted_ts'] ?? 0)));
-        $preview = array_slice($waiting, 0, 5);
+        $preview = array_slice($waiting, 0, self::HOME_QUEUE_PREVIEW);
 
         $coursecards = [];
         foreach ($courses as $c) {
@@ -691,11 +720,14 @@ final class mentor_dashboard {
             'waiting_label' => get_string('mentor_waiting_count', 'local_launchpad', $waitingcount),
             'released_count' => (int) ($queue['released_count'] ?? 0),
             'open_count' => (int) ($queue['open_count'] ?? 0),
-            'has_waiting' => $preview !== [],
+            'has_waiting' => $waitingcount > 0,
+            'has_waiting_preview' => $preview !== [],
             'waiting_preview' => $preview,
             'courses' => $coursecards,
             'has_courses' => $coursecards !== [],
             'queue_url' => (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false),
+            'rubric_rows' => self::rubric_at_a_glance(),
+            'coach_tip' => get_string('mentor_home_coach_tip', 'local_launchpad'),
         ];
     }
 }

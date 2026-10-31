@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Wrong portal → redirect to persona home + ToBa mismatch modal (not Moodle error page).
-$plugin->version   = 2026103101;
+// Mentor home: always show Queue card (top 6) + coach tip + Rubric at a glance.
+$plugin->version   = 2026103102;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';
