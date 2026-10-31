@@ -26,26 +26,24 @@ require(__DIR__ . '/../../config.php');
 
 use local_launchpad\account_persona;
 use local_launchpad\fellowship_dashboard;
+use local_launchpad\login_portal;
 use local_launchpad\persona_home;
+use local_launchpad\portal_gate;
 
 require_login();
 
 $userid = (int) $USER->id;
-if (!fellowship_dashboard::can_access($userid)) {
-    throw new \moodle_exception('fellowship_access_denied', 'local_launchpad');
-}
+// Mentors/employees must not land here; admins may preview (can_access).
+portal_gate::assert_or_redirect_home(
+    fellowship_dashboard::can_access($userid),
+    login_portal::FELLOWSHIP
+);
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
 $courseid = optional_param('id', 0, PARAM_INT);
 
 $courses = fellowship_dashboard::list_courses($userid);
 $courseids = array_map(static fn($c) => (int) $c->id, $courses);
-
-// Mentors/employees must not land here via persona_home; still refuse if someone
-// is mentor-only without fellowship (admins may preview).
-if (!account_persona::is_fellowship($userid) && !is_siteadmin()) {
-    throw new \moodle_exception('fellowship_access_denied', 'local_launchpad');
-}
 
 $context = context_system::instance();
 $PAGE->set_context($context);
@@ -510,7 +508,8 @@ $orbittips = [
 ];
 $orbittip = $orbittips[$view] ?? $orbittips['home'];
 
-$shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', [
+$mismatch = portal_gate::consume_modal_context();
+$shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array_merge([
     'data_region' => fellowship_dashboard::DATA_REGION,
     'displayname' => $displayname,
     'firstname' => $firstname,
@@ -538,7 +537,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', [
     'initials' => fellowship_dashboard::initials($USER),
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,
-]);
+], $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";
@@ -552,7 +551,11 @@ echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
 echo '</head>' . "\n";
-echo '<body class="local-launchpad-fellowship">' . "\n";
+$bodyclass = 'local-launchpad-fellowship';
+if (!empty($mismatch['show_portal_mismatch'])) {
+    $bodyclass .= ' lp-portal-mismatch-lock';
+}
+echo '<body class="' . $bodyclass . '">' . "\n";
 echo $shell;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
 echo '</body>' . "\n";

@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Mentor login tab pins mentor.php; clearer wrong-portal deny copy for all three.
-$plugin->version   = 2026103019;
+// Wrong portal → redirect to persona home + ToBa mismatch modal (not Moodle error page).
+$plugin->version   = 2026103101;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

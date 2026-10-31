@@ -8,6 +8,25 @@
 (function () {
     'use strict';
 
+    // Wrong-portal modal: already on the correct home; dismiss stays here.
+    var mismatch = document.querySelector('[data-lp-portal-mismatch]');
+    if (mismatch) {
+        function closeMismatch() {
+            mismatch.classList.remove('is-open');
+            mismatch.setAttribute('hidden', 'hidden');
+            document.body.classList.remove('lp-portal-mismatch-lock');
+        }
+        document.body.classList.add('lp-portal-mismatch-lock');
+        mismatch.querySelectorAll('[data-lp-portal-mismatch-dismiss]').forEach(function (el) {
+            el.addEventListener('click', closeMismatch);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && mismatch.classList.contains('is-open')) {
+                closeMismatch();
+            }
+        });
+    }
+
     var shell = document.getElementById('lp-shell');
     if (!shell) {
         return;

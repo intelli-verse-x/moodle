@@ -26,15 +26,18 @@ require(__DIR__ . '/../../config.php');
 
 use local_launchpad\account_persona;
 use local_launchpad\fellowship_dashboard;
+use local_launchpad\login_portal;
 use local_launchpad\mentor_dashboard;
 use local_launchpad\persona_home;
+use local_launchpad\portal_gate;
 
 require_login();
 
 $userid = (int) $USER->id;
-if (!mentor_dashboard::can_access($userid)) {
-    throw new \moodle_exception('mentor_access_denied', 'local_launchpad');
-}
+portal_gate::assert_or_redirect_home(
+    mentor_dashboard::can_access($userid),
+    login_portal::MENTOR
+);
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
 $filter = optional_param('filter', 'waiting', PARAM_ALPHA);
@@ -233,7 +236,8 @@ $notificationslabel = $unread > 0
     ? get_string('fellowship_notifications_unread', 'local_launchpad', $unread)
     : get_string('fellowship_notifications', 'local_launchpad');
 
-$shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', [
+$mismatch = portal_gate::consume_modal_context();
+$shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_merge([
     'data_region' => mentor_dashboard::DATA_REGION,
     'displayname' => $displayname,
     'firstname' => $firstname,
@@ -249,7 +253,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', [
     'unread_notifications' => $unread,
     'has_unread_notifications' => $unread > 0,
     'initials' => fellowship_dashboard::initials($USER),
-]);
+], $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";
@@ -263,7 +267,11 @@ echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
 echo '</head>' . "\n";
-echo '<body class="local-launchpad-fellowship local-launchpad-mentor">' . "\n";
+$bodyclass = 'local-launchpad-fellowship local-launchpad-mentor';
+if (!empty($mismatch['show_portal_mismatch'])) {
+    $bodyclass .= ' lp-portal-mismatch-lock';
+}
+echo '<body class="' . $bodyclass . '">' . "\n";
 echo $shell;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
 echo '</body>' . "\n";
