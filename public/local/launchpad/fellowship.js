@@ -69,26 +69,127 @@
             });
         });
     }
-    var calDetail = document.querySelector('[data-lp-cal-detail]');
+    var calRoot = shell.querySelector('[data-lp-cal-root]');
+    var calDetail = shell.querySelector('[data-lp-cal-detail]');
+    var calForm = shell.querySelector('[data-lp-cal-form]');
+    var calFormEl = shell.querySelector('[data-lp-cal-form-el]');
+    var calFlash = shell.querySelector('[data-lp-cal-flash]');
+    var calDayPanel = shell.querySelector('[data-lp-cal-daypanel]');
     var calMonthFetch = null;
+    var calDetailSource = null;
+    var calStrings = {
+        addTitle: (calForm && calForm.querySelector('[data-lp-cal-form-title]')
+            ? calForm.querySelector('[data-lp-cal-form-title]').textContent
+            : 'Add personal event'),
+        editTitle: 'Edit personal event',
+        saved: 'Personal event saved.',
+        deleted: 'Personal event deleted.',
+        deleteConfirm: 'Delete this personal event? It will also leave your Moodle calendar.',
+        network: 'Network error — try again.'
+    };
+    if (calRoot) {
+        calStrings.editTitle = calRoot.getAttribute('data-str-edit-title') || calStrings.editTitle;
+        calStrings.saved = calRoot.getAttribute('data-str-saved') || calStrings.saved;
+        calStrings.deleted = calRoot.getAttribute('data-str-deleted') || calStrings.deleted;
+        calStrings.deleteConfirm = calRoot.getAttribute('data-str-delete-confirm') || calStrings.deleteConfirm;
+        calStrings.network = calRoot.getAttribute('data-str-network') || calStrings.network;
+    }
+
+    function anyCalOverlayOpen() {
+        return (calDetail && calDetail.classList.contains('is-open'))
+            || (calForm && calForm.classList.contains('is-open'))
+            || (calDayPanel && calDayPanel.classList.contains('is-open'));
+    }
     function closeCalDetail() {
         if (!calDetail) {
             return;
         }
         calDetail.classList.remove('is-open');
         calDetail.setAttribute('hidden', 'hidden');
-        document.body.classList.remove('lp-cal-detail-lock');
+        if (!anyCalOverlayOpen()) {
+            document.body.classList.remove('lp-cal-detail-lock');
+        }
+        calDetailSource = null;
+    }
+    function closeCalDayPanel() {
+        if (!calDayPanel) {
+            return;
+        }
+        calDayPanel.classList.remove('is-open');
+        calDayPanel.setAttribute('hidden', 'hidden');
+        var list = calDayPanel.querySelector('[data-lp-cal-daypanel-list]');
+        if (list) {
+            list.innerHTML = '';
+        }
+        if (!anyCalOverlayOpen()) {
+            document.body.classList.remove('lp-cal-detail-lock');
+        }
+    }
+    function openCalDayPanel(trigger) {
+        if (!calDayPanel || !trigger) {
+            return;
+        }
+        var day = trigger.closest('.lp-cal-day');
+        if (!day) {
+            return;
+        }
+        var source = day.querySelector('[data-lp-cal-day-source]');
+        var list = calDayPanel.querySelector('[data-lp-cal-daypanel-list]');
+        var title = calDayPanel.querySelector('[data-lp-cal-daypanel-title]');
+        if (!source || !list) {
+            return;
+        }
+        list.innerHTML = source.innerHTML;
+        if (title) {
+            var dayNum = day.querySelector('.lp-cal-daynum');
+            title.textContent = trigger.getAttribute('data-day-label')
+                || (dayNum ? dayNum.textContent : '')
+                || '';
+        }
+        calDayPanel.classList.add('is-open');
+        calDayPanel.removeAttribute('hidden');
+        document.body.classList.add('lp-cal-detail-lock');
+    }
+    function closeCalForm() {
+        if (!calForm) {
+            return;
+        }
+        calForm.classList.remove('is-open');
+        calForm.setAttribute('hidden', 'hidden');
+        if (!anyCalOverlayOpen()) {
+            document.body.classList.remove('lp-cal-detail-lock');
+        }
+        if (calFormEl) {
+            calFormEl.reset();
+        }
+        var err = shell.querySelector('[data-lp-cal-form-error]');
+        if (err) {
+            err.textContent = '';
+            err.setAttribute('hidden', 'hidden');
+        }
+    }
+    function showCalFlash(msg) {
+        if (!calFlash || !msg) {
+            return;
+        }
+        calFlash.textContent = msg;
+        calFlash.removeAttribute('hidden');
+        window.setTimeout(function () {
+            calFlash.setAttribute('hidden', 'hidden');
+        }, 3200);
     }
     function openCalDetail(btn) {
         if (!calDetail || !btn) {
             return;
         }
+        calDetailSource = btn;
         var title = calDetail.querySelector('[data-lp-cal-detail-title]');
         var when = calDetail.querySelector('[data-lp-cal-detail-when]');
         var course = calDetail.querySelector('[data-lp-cal-detail-course]');
         var desc = calDetail.querySelector('[data-lp-cal-detail-desc]');
         var moduleNote = calDetail.querySelector('[data-lp-cal-detail-module]');
         var link = calDetail.querySelector('[data-lp-cal-detail-link]');
+        var editBtn = calDetail.querySelector('[data-lp-cal-detail-edit]');
         if (title) {
             title.textContent = btn.getAttribute('data-name') || '';
         }
@@ -118,9 +219,127 @@
         if (link) {
             link.setAttribute('href', btn.getAttribute('data-url') || '#');
         }
+        if (editBtn) {
+            if (btn.getAttribute('data-can-edit') === '1') {
+                editBtn.removeAttribute('hidden');
+            } else {
+                editBtn.setAttribute('hidden', 'hidden');
+            }
+        }
         calDetail.classList.add('is-open');
         calDetail.removeAttribute('hidden');
         document.body.classList.add('lp-cal-detail-lock');
+    }
+    function openCalForm(mode, sourceBtn) {
+        if (!calForm || !calFormEl) {
+            return;
+        }
+        closeCalDetail();
+        var titleEl = calForm.querySelector('[data-lp-cal-form-title]');
+        var idEl = calForm.querySelector('[data-lp-cal-form-id]');
+        var nameEl = calForm.querySelector('[data-lp-cal-form-name]');
+        var dateEl = calForm.querySelector('[data-lp-cal-form-date]');
+        var timeEl = calForm.querySelector('[data-lp-cal-form-time]');
+        var durEl = calForm.querySelector('[data-lp-cal-form-duration]');
+        var descEl = calForm.querySelector('[data-lp-cal-form-description]');
+        var delBtn = calForm.querySelector('[data-lp-cal-form-delete]');
+        var err = calForm.querySelector('[data-lp-cal-form-error]');
+        if (err) {
+            err.textContent = '';
+            err.setAttribute('hidden', 'hidden');
+        }
+        if (mode === 'edit' && sourceBtn) {
+            if (titleEl) {
+                titleEl.textContent = calStrings.editTitle;
+            }
+            if (idEl) {
+                idEl.value = sourceBtn.getAttribute('data-id') || '';
+            }
+            if (nameEl) {
+                nameEl.value = sourceBtn.getAttribute('data-name') || '';
+            }
+            if (dateEl) {
+                dateEl.value = sourceBtn.getAttribute('data-date') || '';
+            }
+            if (timeEl) {
+                timeEl.value = sourceBtn.getAttribute('data-time') || '';
+            }
+            if (durEl) {
+                durEl.value = sourceBtn.getAttribute('data-duration') || '0';
+            }
+            if (descEl) {
+                descEl.value = sourceBtn.getAttribute('data-description') || '';
+            }
+            if (delBtn) {
+                delBtn.removeAttribute('hidden');
+            }
+        } else {
+            calFormEl.reset();
+            if (titleEl) {
+                titleEl.textContent = calStrings.addTitle;
+            }
+            if (idEl) {
+                idEl.value = '';
+            }
+            if (dateEl && !dateEl.value) {
+                var now = new Date();
+                var m = String(now.getMonth() + 1).padStart(2, '0');
+                var d = String(now.getDate()).padStart(2, '0');
+                dateEl.value = now.getFullYear() + '-' + m + '-' + d;
+            }
+            if (timeEl && !timeEl.value) {
+                timeEl.value = '09:00';
+            }
+            if (delBtn) {
+                delBtn.setAttribute('hidden', 'hidden');
+            }
+        }
+        calForm.classList.add('is-open');
+        calForm.removeAttribute('hidden');
+        document.body.classList.add('lp-cal-detail-lock');
+        if (nameEl) {
+            nameEl.focus();
+        }
+    }
+    function refreshCalMonth() {
+        var month = shell.querySelector('[data-lp-cal-month]');
+        if (!month) {
+            window.location.reload();
+            return;
+        }
+        loadCalMonth(month.getAttribute('data-time'), null, false);
+    }
+    function postPersonal(payload) {
+        if (!calRoot) {
+            return Promise.reject(new Error('no root'));
+        }
+        var url = calRoot.getAttribute('data-personal-ajax');
+        var sesskey = calRoot.getAttribute('data-sesskey');
+        if (!url || !sesskey) {
+            return Promise.reject(new Error('no ajax'));
+        }
+        var body = new URLSearchParams();
+        Object.keys(payload).forEach(function (k) {
+            body.set(k, payload[k] == null ? '' : String(payload[k]));
+        });
+        body.set('sesskey', sesskey);
+        return fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            body: body.toString()
+        }).then(function (res) {
+            return res.json().then(function (data) {
+                if (!res.ok || !data || !data.ok) {
+                    var err = (data && data.error) ? data.error : calStrings.network;
+                    throw new Error(err);
+                }
+                return data;
+            });
+        });
     }
     function loadCalMonth(time, fallbackHref, pushHistory) {
         var month = shell.querySelector('[data-lp-cal-month]');
@@ -161,8 +380,7 @@
             if (!data || !data.html) {
                 throw new Error('calendar month empty');
             }
-            var host = month.parentNode;
-            if (!host) {
+            if (!month.parentNode) {
                 throw new Error('calendar month host');
             }
             month.insertAdjacentHTML('afterend', data.html);
@@ -189,12 +407,139 @@
         calDetail.querySelectorAll('[data-lp-cal-detail-close]').forEach(function (el) {
             el.addEventListener('click', closeCalDetail);
         });
+        var detailEdit = calDetail.querySelector('[data-lp-cal-detail-edit]');
+        if (detailEdit) {
+            detailEdit.addEventListener('click', function () {
+                if (calDetailSource) {
+                    openCalForm('edit', calDetailSource);
+                }
+            });
+        }
+    }
+    if (calDayPanel) {
+        calDayPanel.querySelectorAll('[data-lp-cal-daypanel-close]').forEach(function (el) {
+            el.addEventListener('click', closeCalDayPanel);
+        });
+    }
+    if (calForm) {
+        calForm.querySelectorAll('[data-lp-cal-form-close]').forEach(function (el) {
+            el.addEventListener('click', closeCalForm);
+        });
+        var delBtn = calForm.querySelector('[data-lp-cal-form-delete]');
+        if (delBtn) {
+            delBtn.addEventListener('click', function () {
+                var idEl = calForm.querySelector('[data-lp-cal-form-id]');
+                var id = idEl ? idEl.value : '';
+                if (!id) {
+                    return;
+                }
+                if (!window.confirm(calStrings.deleteConfirm)) {
+                    return;
+                }
+                delBtn.disabled = true;
+                postPersonal({ action: 'delete', id: id }).then(function () {
+                    closeCalForm();
+                    showCalFlash(calStrings.deleted);
+                    if (shell.querySelector('[data-lp-cal-month]')) {
+                        refreshCalMonth();
+                    } else {
+                        window.location.reload();
+                    }
+                }).catch(function (err) {
+                    var box = calForm.querySelector('[data-lp-cal-form-error]');
+                    if (box) {
+                        box.textContent = err.message || calStrings.network;
+                        box.removeAttribute('hidden');
+                    }
+                }).finally(function () {
+                    delBtn.disabled = false;
+                });
+            });
+        }
+        if (calFormEl) {
+            calFormEl.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var idEl = calForm.querySelector('[data-lp-cal-form-id]');
+                var nameEl = calForm.querySelector('[data-lp-cal-form-name]');
+                var dateEl = calForm.querySelector('[data-lp-cal-form-date]');
+                var timeEl = calForm.querySelector('[data-lp-cal-form-time]');
+                var durEl = calForm.querySelector('[data-lp-cal-form-duration]');
+                var descEl = calForm.querySelector('[data-lp-cal-form-description]');
+                var err = calForm.querySelector('[data-lp-cal-form-error]');
+                var id = idEl ? idEl.value : '';
+                var payload = {
+                    action: id ? 'update' : 'create',
+                    id: id || '0',
+                    name: nameEl ? nameEl.value : '',
+                    date: dateEl ? dateEl.value : '',
+                    time: timeEl ? timeEl.value : '',
+                    duration: durEl ? durEl.value : '0',
+                    description: descEl ? descEl.value : ''
+                };
+                var saveBtn = calForm.querySelector('[data-lp-cal-form-save]');
+                if (saveBtn) {
+                    saveBtn.disabled = true;
+                }
+                if (err) {
+                    err.setAttribute('hidden', 'hidden');
+                }
+                postPersonal(payload).then(function () {
+                    closeCalForm();
+                    showCalFlash(calStrings.saved);
+                    if (shell.querySelector('[data-lp-cal-month]')) {
+                        refreshCalMonth();
+                    } else {
+                        window.location.reload();
+                    }
+                }).catch(function (ex) {
+                    if (err) {
+                        err.textContent = ex.message || calStrings.network;
+                        err.removeAttribute('hidden');
+                    }
+                }).finally(function () {
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                    }
+                });
+            });
+        }
     }
     shell.addEventListener('click', function (e) {
         var nav = e.target.closest('[data-lp-cal-nav]');
         if (nav) {
             e.preventDefault();
             loadCalMonth(nav.getAttribute('data-time'), nav.getAttribute('href'), true);
+            return;
+        }
+        if (e.target.closest('[data-lp-cal-add]')) {
+            openCalForm('create', null);
+            return;
+        }
+        var dayOpen = e.target.closest('[data-lp-cal-day-open]');
+        if (dayOpen) {
+            openCalDayPanel(dayOpen);
+            return;
+        }
+        var moreUpcoming = e.target.closest('[data-lp-cal-upcoming-more]');
+        if (moreUpcoming) {
+            var list = shell.querySelector('[data-lp-cal-upcoming-list]');
+            if (!list) {
+                return;
+            }
+            var pageSize = parseInt(list.getAttribute('data-page-size') || '25', 10) || 25;
+            var hidden = list.querySelectorAll('li.is-paged-out[hidden]');
+            var show = Math.min(pageSize, hidden.length);
+            for (var i = 0; i < show; i++) {
+                hidden[i].removeAttribute('hidden');
+                hidden[i].classList.remove('is-paged-out');
+            }
+            var left = list.querySelectorAll('li.is-paged-out[hidden]').length;
+            if (left === 0) {
+                moreUpcoming.setAttribute('hidden', 'hidden');
+            } else {
+                moreUpcoming.setAttribute('data-remaining', String(left));
+                moreUpcoming.textContent = 'Show more (' + left + ')';
+            }
             return;
         }
         var openBtn = e.target.closest('[data-lp-cal-open]');
@@ -223,8 +568,16 @@
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            if (calForm && calForm.classList.contains('is-open')) {
+                closeCalForm();
+                return;
+            }
             if (calDetail && calDetail.classList.contains('is-open')) {
                 closeCalDetail();
+                return;
+            }
+            if (calDayPanel && calDayPanel.classList.contains('is-open')) {
+                closeCalDayPanel();
                 return;
             }
             setOpen(false);

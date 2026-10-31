@@ -24,28 +24,41 @@
       <div class="lp-cal-week" role="row">
         {{#days}}
           <div class="lp-cal-day{{#is_othermonth}} is-other{{/is_othermonth}}{{#is_today}} is-today{{/is_today}}{{#has_events}} has-events{{/has_events}}" role="gridcell">
-            <span class="lp-cal-daynum">{{day}}</span>
+            {{#has_events}}
+              <button type="button" class="lp-cal-daynum is-action" data-lp-cal-day-open
+                data-day-label="{{day_label}}"
+                aria-label="{{#str}} fellowship_calendar_day_events_aria, local_launchpad {{/str}} {{day_label}}">{{day}}</button>
+            {{/has_events}}
+            {{^has_events}}
+              <span class="lp-cal-daynum">{{day}}</span>
+            {{/has_events}}
             {{#has_events}}
               <ul class="lp-cal-chips">
                 {{#events}}
                   <li>
                     <button type="button" class="lp-cal-chip{{#is_personal}} is-personal{{/is_personal}}"
-                      data-lp-cal-open
-                      data-id="{{id}}"
-                      data-name="{{name}}"
-                      data-when="{{when}}"
-                      data-course="{{course_name}}"
-                      data-desc="{{description_excerpt}}"
-                      data-url="{{url}}"
-                      data-module="{{#is_module}}1{{/is_module}}{{^is_module}}0{{/is_module}}">
+                      {{> local_launchpad/fellowship_calendar_event_open}}>
                       {{name}}
                     </button>
                   </li>
                 {{/events}}
               </ul>
               {{#has_more}}
-                <span class="lp-cal-more">+{{more_count}}</span>
+                <button type="button" class="lp-cal-more" data-lp-cal-day-open data-day-label="{{day_label}}">
+                  {{#str}} fellowship_calendar_more_events, local_launchpad, {{more_count}} {{/str}}
+                </button>
               {{/has_more}}
+              <ul class="lp-cal-day-source" data-lp-cal-day-source hidden>
+                {{#all_events}}
+                  <li>
+                    <button type="button" class="lp-cal-list-btn{{#is_personal}} is-personal{{/is_personal}}"
+                      {{> local_launchpad/fellowship_calendar_event_open}}>
+                      <b>{{name}}</b>
+                      <span class="lp-muted">{{when}}{{#course_name}} · {{course_name}}{{/course_name}}</span>
+                    </button>
+                  </li>
+                {{/all_events}}
+              </ul>
             {{/has_events}}
           </div>
         {{/days}}

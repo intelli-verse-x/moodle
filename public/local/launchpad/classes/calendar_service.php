@@ -17,7 +17,7 @@
 namespace local_launchpad;
 
 /**
- * Moodle-backed calendar helper for LaunchPad (read path Phase 1).
+ * Moodle-backed calendar helper for LaunchPad (browse + personal CRUD).
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -27,6 +27,12 @@ final class calendar_service {
 
     /** Upcoming list window after "now". */
     public const UPCOMING_DAYS = 90;
+
+    /** Chips shown in a month day cell (Moodle month UI folds around 5; rest via day panel). */
+    public const MONTH_CELL_CHIP_LIMIT = 3;
+
+    /** Initial Upcoming rows before "Show more" (Moodle uses lookahead settings, not an infinite list). */
+    public const UPCOMING_PAGE_SIZE = 25;
 
     /**
      * Resolve calendar month from request time (unix) or explicit month/year.
@@ -94,21 +100,32 @@ final class calendar_service {
      * @param array<int,string> $coursenames
      * @return array<string,mixed>
      */
-    public static function map_event(\stdClass $event, array $coursenames): array {
+    public static function map_event(\stdClass $event, array $coursenames, ?int $viewerid = null): array {
         $courseid = (int) ($event->courseid ?? 0);
         $timestart = (int) ($event->timestart ?? 0);
-        $ispersonal = $courseid <= 0;
-        $desc = '';
+        $timeduration = (int) ($event->timeduration ?? 0);
+        $ispersonal = $courseid <= 0 && (string) ($event->eventtype ?? '') !== 'site';
+        $descplain = '';
         if (!empty($event->description)) {
             $html = format_text(
                 (string) $event->description,
                 (int) ($event->format ?? FORMAT_HTML),
                 ['para' => false, 'filter' => false]
             );
-            $desc = trim(html_to_text($html, 0, false));
-            if (\core_text::strlen($desc) > 280) {
-                $desc = \core_text::substr($desc, 0, 277) . '…';
-            }
+            $descplain = trim(html_to_text($html, 0, false));
+        }
+        $descexcerpt = $descplain;
+        if (\core_text::strlen($descexcerpt) > 280) {
+            $descexcerpt = \core_text::substr($descexcerpt, 0, 277) . '…';
+        }
+
+        $canedit = false;
+        if ($viewerid && $ispersonal && empty($event->modulename) && empty($event->component)
+                && (int) ($event->userid ?? 0) === $viewerid) {
+            $canedit = has_capability(
+                'moodle/calendar:manageownentries',
+                \context_user::instance($viewerid)
+            );
         }
 
         return [
@@ -116,14 +133,20 @@ final class calendar_service {
             'name' => format_string((string) ($event->name ?? '')),
             'when' => userdate($timestart, get_string('strftimedatetimeshort', 'langconfig')),
             'timestart' => $timestart,
+            'timeduration' => $timeduration,
+            'duration_minutes' => $timeduration > 0 ? (int) round($timeduration / 60) : 0,
+            'date_value' => userdate($timestart, '%Y-%m-%d'),
+            'time_value' => userdate($timestart, '%H:%M'),
             'day_key' => userdate($timestart, '%Y-%m-%d'),
             'courseid' => $courseid,
             'is_personal' => $ispersonal,
+            'can_edit' => $canedit,
             'course_name' => $ispersonal
                 ? get_string('fellowship_calendar_personal', 'local_launchpad')
                 : ($coursenames[$courseid] ?? ''),
-            'description_excerpt' => $desc,
-            'has_description' => $desc !== '',
+            'description_excerpt' => $descexcerpt,
+            'description_plain' => $descplain,
+            'has_description' => $descplain !== '',
             'url' => (new \moodle_url('/calendar/view.php', [
                 'view' => 'day',
                 'time' => $timestart,
@@ -146,12 +169,20 @@ final class calendar_service {
         $coursenames = self::course_name_map($courses);
         $items = [];
         foreach (self::fetch_raw_events($userid, $courses, $tstart, $tend) as $event) {
-            $items[] = self::map_event($event, $coursenames);
+            $items[] = self::map_event($event, $coursenames, $userid);
         }
         usort($items, static fn(array $a, array $b): int => ($a['timestart'] <=> $b['timestart']));
+        $paged = [];
+        foreach ($items as $i => $item) {
+            $item['paged_out'] = $i >= self::UPCOMING_PAGE_SIZE;
+            $paged[] = $item;
+        }
         return [
-            'items' => $items,
-            'has_items' => $items !== [],
+            'items' => $paged,
+            'has_items' => $paged !== [],
+            'upcoming_has_more' => count($paged) > self::UPCOMING_PAGE_SIZE,
+            'upcoming_more_count' => max(0, count($paged) - self::UPCOMING_PAGE_SIZE),
+            'upcoming_page_size' => self::UPCOMING_PAGE_SIZE,
             'moodle_calendar_url' => self::moodle_month_url(),
         ];
     }
@@ -179,7 +210,7 @@ final class calendar_service {
         $coursenames = self::course_name_map($courses);
         $monthitems = [];
         foreach (self::fetch_raw_events($userid, $courses, $padstart, $padend) as $event) {
-            $monthitems[] = self::map_event($event, $coursenames);
+            $monthitems[] = self::map_event($event, $coursenames, $userid);
         }
         usort($monthitems, static fn(array $a, array $b): int => ($a['timestart'] <=> $b['timestart']));
 
@@ -227,14 +258,199 @@ final class calendar_service {
                 'time' => $basemonth,
             ]))->out(false),
             'ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_month.php'))->out(false),
+            'personal_ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_personal.php'))->out(false),
             'sesskey' => sesskey(),
+            'can_add_personal' => has_capability(
+                'moodle/calendar:manageownentries',
+                \context_user::instance($userid)
+            ),
             'upcoming_items' => $upcoming['items'],
             'has_upcoming_items' => $upcoming['has_items'],
+            'upcoming_has_more' => !empty($upcoming['upcoming_has_more']),
+            'upcoming_more_count' => (int) ($upcoming['upcoming_more_count'] ?? 0),
+            'upcoming_page_size' => (int) ($upcoming['upcoming_page_size'] ?? self::UPCOMING_PAGE_SIZE),
             'moodle_calendar_url' => self::moodle_month_url(),
             // Flat list for detail modal lookups.
             'detail_events' => $monthitems,
             'has_detail_events' => $monthitems !== [],
         ]);
+    }
+
+    /**
+     * Parse a user-local date (Y-m-d) + time (H:i) into a unix timestamp.
+     */
+    public static function parse_user_datetime(string $date, string $time): ?int {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($date), $d)) {
+            return null;
+        }
+        if (!preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/', trim($time), $t)) {
+            return null;
+        }
+        $year = (int) $d[1];
+        $month = (int) $d[2];
+        $day = (int) $d[3];
+        $hour = (int) $t[1];
+        $minute = (int) $t[2];
+        if ($year < 1970 || $month < 1 || $month > 12 || $day < 1 || $day > 31
+                || $hour < 0 || $hour > 23 || $minute < 0 || $minute > 59) {
+            return null;
+        }
+        return make_timestamp($year, $month, $day, $hour, $minute, 0);
+    }
+
+    /**
+     * Create a personal (user) calendar event for the given user.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function create_personal(
+        int $userid,
+        string $name,
+        int $timestart,
+        int $timeduration = 0,
+        string $description = ''
+    ): array {
+        global $CFG, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $name = trim($name);
+        if ($name === '') {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_name', 'local_launchpad'), 'id' => null];
+        }
+        if ($timestart <= 0) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_when', 'local_launchpad'), 'id' => null];
+        }
+        if ($timeduration < 0) {
+            $timeduration = 0;
+        }
+        if ((int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        if (!has_capability('moodle/calendar:manageownentries', \context_user::instance($userid))) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        $props = (object) [
+            'name' => $name,
+            'description' => $description,
+            'format' => FORMAT_PLAIN,
+            'courseid' => 0,
+            'groupid' => 0,
+            'userid' => $userid,
+            'modulename' => '',
+            'instance' => 0,
+            'eventtype' => 'user',
+            'timestart' => $timestart,
+            'timeduration' => $timeduration,
+            'visible' => 1,
+        ];
+        try {
+            $probe = new \calendar_event($props);
+            if (!calendar_add_event_allowed($probe)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $created = \calendar_event::create($props, true);
+            if (!$created) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+            }
+            return ['ok' => true, 'error' => null, 'id' => (int) $created->id];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
+    }
+
+    /**
+     * Update an owned personal calendar event.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function update_personal(
+        int $userid,
+        int $eventid,
+        string $name,
+        int $timestart,
+        int $timeduration = 0,
+        string $description = ''
+    ): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $name = trim($name);
+        if ($eventid <= 0 || $name === '' || $timestart <= 0) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_when', 'local_launchpad'), 'id' => null];
+        }
+        if ($timeduration < 0) {
+            $timeduration = 0;
+        }
+        if ((int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        $record = $DB->get_record('event', ['id' => $eventid]);
+        if (!$record) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
+        }
+        if ((int) $record->userid !== $userid || (int) $record->courseid !== 0
+                || (string) $record->eventtype !== 'user' || !empty($record->modulename)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        try {
+            $event = new \calendar_event($record);
+            if (!calendar_edit_event_allowed($event, true)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $event->update((object) [
+                'name' => $name,
+                'description' => $description,
+                'format' => FORMAT_PLAIN,
+                'timestart' => $timestart,
+                'timeduration' => $timeduration,
+                'eventtype' => 'user',
+                'courseid' => 0,
+                'userid' => $userid,
+            ], true);
+            return ['ok' => true, 'error' => null, 'id' => $eventid];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
+    }
+
+    /**
+     * Delete an owned personal calendar event.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function delete_personal(int $userid, int $eventid): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        if ($eventid <= 0 || (int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        $record = $DB->get_record('event', ['id' => $eventid]);
+        if (!$record) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
+        }
+        if ((int) $record->userid !== $userid || (int) $record->courseid !== 0
+                || (string) $record->eventtype !== 'user' || !empty($record->modulename)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        try {
+            $event = new \calendar_event($record);
+            if (!calendar_delete_event_allowed($event)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $event->delete(false);
+            return ['ok' => true, 'error' => null, 'id' => $eventid];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
     }
 
     /**
@@ -347,16 +563,19 @@ final class calendar_service {
         // Match map_event day_key (user timezone).
         $key = userdate($ts, '%Y-%m-%d');
         $events = $byday[$key] ?? [];
-        // Cap chips in cell; rest implied via detail.
-        $chips = array_slice($events, 0, 3);
+        // Cap chips in cell; full day list opens via "+N more" / day number (Moodle-style fold).
+        $chips = array_slice($events, 0, self::MONTH_CELL_CHIP_LIMIT);
         $more = max(0, count($events) - count($chips));
         return [
             'day' => $day,
             'day_key' => $key,
+            'day_label' => userdate($ts, get_string('strftimedaydate', 'langconfig')),
             'is_othermonth' => $othermonth,
             'is_today' => ($key === $todaykey),
             'has_events' => $events !== [],
             'events' => $chips,
+            'all_events' => $events,
+            'event_count' => count($events),
             'more_count' => $more,
             'has_more' => $more > 0,
         ];

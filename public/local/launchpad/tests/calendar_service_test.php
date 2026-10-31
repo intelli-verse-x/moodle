@@ -94,6 +94,7 @@ final class calendar_service_test extends \advanced_testcase {
         $this->assertNotNull($found);
         $this->assertTrue($found['has_events']);
         $this->assertCount(3, $found['events']);
+        $this->assertCount(5, $found['all_events']);
         $this->assertTrue($found['has_more']);
         $this->assertSame(2, $found['more_count']);
     }
@@ -131,6 +132,56 @@ final class calendar_service_test extends \advanced_testcase {
         $this->assertSame('Track A', $mappedmod['course_name']);
         $this->assertTrue($mappedmod['has_description']);
         $this->assertStringContainsString('Submit evidence', $mappedmod['description_excerpt']);
+    }
+
+    public function test_parse_user_datetime(): void {
+        $this->resetAfterTest();
+        $ts = calendar_service::parse_user_datetime('2026-06-15', '10:30');
+        $this->assertNotNull($ts);
+        $this->assertSame(make_timestamp(2026, 6, 15, 10, 30, 0), $ts);
+        $this->assertNull(calendar_service::parse_user_datetime('bad', '10:30'));
+        $this->assertNull(calendar_service::parse_user_datetime('2026-06-15', '25:00'));
+    }
+
+    public function test_create_update_delete_personal_event(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+        $timestart = make_timestamp(2026, 7, 4, 14, 0, 0);
+
+        $created = calendar_service::create_personal(
+            (int) $user->id,
+            'LP personal probe',
+            $timestart,
+            1800,
+            'Bring laptop'
+        );
+        $this->assertTrue($created['ok'], $created['error'] ?? '');
+        $this->assertNotEmpty($created['id']);
+
+        $row = $DB->get_record('event', ['id' => $created['id']], '*', MUST_EXIST);
+        $this->assertSame('user', $row->eventtype);
+        $this->assertSame(0, (int) $row->courseid);
+        $this->assertSame((int) $user->id, (int) $row->userid);
+        $this->assertSame('LP personal probe', $row->name);
+
+        $updated = calendar_service::update_personal(
+            (int) $user->id,
+            (int) $created['id'],
+            'LP personal updated',
+            $timestart + HOURSECS,
+            0,
+            ''
+        );
+        $this->assertTrue($updated['ok'], $updated['error'] ?? '');
+        $row2 = $DB->get_record('event', ['id' => $created['id']], '*', MUST_EXIST);
+        $this->assertSame('LP personal updated', $row2->name);
+
+        $deleted = calendar_service::delete_personal((int) $user->id, (int) $created['id']);
+        $this->assertTrue($deleted['ok'], $deleted['error'] ?? '');
+        $this->assertFalse($DB->record_exists('event', ['id' => $created['id']]));
     }
 
     public function test_upcoming_returns_course_event(): void {

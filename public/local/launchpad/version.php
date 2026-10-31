@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Fellow calendar: AJAX month prev/next (no full page reload).
-$plugin->version   = 2026103104;
+// Fix: hidden Edit on course events (lp-btn display overrode [hidden]).
+$plugin->version   = 2026103107;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

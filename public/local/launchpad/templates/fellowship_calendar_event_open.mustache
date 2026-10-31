@@ -1,0 +1,18 @@
+{{!
+    @template local_launchpad/fellowship_calendar_event_open
+
+    Shared data-* attributes for opening calendar event detail / edit.
+}}
+data-lp-cal-open
+data-id="{{id}}"
+data-name="{{name}}"
+data-when="{{when}}"
+data-course="{{course_name}}"
+data-desc="{{description_excerpt}}"
+data-description="{{description_plain}}"
+data-date="{{date_value}}"
+data-time="{{time_value}}"
+data-duration="{{duration_minutes}}"
+data-url="{{url}}"
+data-module="{{#is_module}}1{{/is_module}}{{^is_module}}0{{/is_module}}"
+data-can-edit="{{#can_edit}}1{{/can_edit}}{{^can_edit}}0{{/can_edit}}"
