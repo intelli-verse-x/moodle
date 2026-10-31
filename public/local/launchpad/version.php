@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Fix: hidden Edit on course events (lp-btn display overrode [hidden]).
-$plugin->version   = 2026103107;
+// Clearer personal-event validation (empty title vs bad date/time).
+$plugin->version   = 2026103108;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

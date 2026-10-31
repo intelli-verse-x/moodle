@@ -378,7 +378,13 @@ final class calendar_service {
         require_once($CFG->dirroot . '/calendar/lib.php');
 
         $name = trim($name);
-        if ($eventid <= 0 || $name === '' || $timestart <= 0) {
+        if ($eventid <= 0) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
+        }
+        if ($name === '') {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_name', 'local_launchpad'), 'id' => null];
+        }
+        if ($timestart <= 0) {
             return ['ok' => false, 'error' => get_string('fellowship_calendar_err_when', 'local_launchpad'), 'id' => null];
         }
         if ($timeduration < 0) {

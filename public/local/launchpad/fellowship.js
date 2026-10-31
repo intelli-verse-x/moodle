@@ -256,7 +256,12 @@
                 idEl.value = sourceBtn.getAttribute('data-id') || '';
             }
             if (nameEl) {
-                nameEl.value = sourceBtn.getAttribute('data-name') || '';
+                var fromData = sourceBtn.getAttribute('data-name') || '';
+                var fromBold = sourceBtn.querySelector('b');
+                var fromText = fromBold
+                    ? (fromBold.textContent || '')
+                    : (sourceBtn.textContent || '');
+                nameEl.value = fromData || fromText.replace(/\s+/g, ' ').trim();
             }
             if (dateEl) {
                 dateEl.value = sourceBtn.getAttribute('data-date') || '';
@@ -476,6 +481,16 @@
                     duration: durEl ? durEl.value : '0',
                     description: descEl ? descEl.value : ''
                 };
+                if (!String(payload.name || '').trim()) {
+                    if (err) {
+                        err.textContent = 'Enter a title for the event.';
+                        err.removeAttribute('hidden');
+                    }
+                    if (nameEl) {
+                        nameEl.focus();
+                    }
+                    return;
+                }
                 var saveBtn = calForm.querySelector('[data-lp-cal-form-save]');
                 if (saveBtn) {
                     saveBtn.disabled = true;
