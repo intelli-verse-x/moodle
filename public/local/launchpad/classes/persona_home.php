@@ -320,7 +320,8 @@ final class persona_home {
 
         if (during_initial_install() || (defined('CLI_SCRIPT') && CLI_SCRIPT)
                 || (defined('AJAX_SCRIPT') && AJAX_SCRIPT)
-                || (defined('WS_SERVER') && WS_SERVER)) {
+                || (defined('WS_SERVER') && WS_SERVER)
+                || (defined('PHPUNIT_TEST') && PHPUNIT_TEST)) {
             return;
         }
         if (!isloggedin() || isguestuser() || empty($USER->id)) {

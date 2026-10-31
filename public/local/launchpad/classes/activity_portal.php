@@ -296,14 +296,16 @@ final class activity_portal {
     public static function maybe_redirect_from_mod(): void {
         global $PAGE, $USER;
 
-        if (!isloggedin() || isguestuser()) {
-            return;
-        }
+        // Guard CLI/PHPUnit/AJAX before isloggedin() — matching persona_home — so
+        // PHPUnit (failOnWarning=true) never sees session/user warnings from this hook.
         if (during_initial_install()
                 || (defined('CLI_SCRIPT') && CLI_SCRIPT)
                 || (defined('AJAX_SCRIPT') && AJAX_SCRIPT)
                 || (defined('WS_SERVER') && WS_SERVER)
                 || (defined('PHPUNIT_TEST') && PHPUNIT_TEST)) {
+            return;
+        }
+        if (!isloggedin() || isguestuser()) {
             return;
         }
         if (!account_persona::is_employee((int) $USER->id) && !is_siteadmin()) {
