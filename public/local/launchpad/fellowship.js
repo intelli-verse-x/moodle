@@ -78,21 +78,75 @@
     var calMonthFetch = null;
     var calDetailSource = null;
     var calStrings = {
-        addTitle: (calForm && calForm.querySelector('[data-lp-cal-form-title]')
-            ? calForm.querySelector('[data-lp-cal-form-title]').textContent
-            : 'Add personal event'),
-        editTitle: 'Edit personal event',
-        saved: 'Personal event saved.',
-        deleted: 'Personal event deleted.',
-        deleteConfirm: 'Delete this personal event? It will also leave your Moodle calendar.',
-        network: 'Network error — try again.'
+        addTitle: 'Add event',
+        editTitle: 'Edit event',
+        saved: 'Event saved.',
+        deleted: 'Event deleted.',
+        deleteConfirm: 'Delete this event? It will also leave your Moodle calendar.',
+        network: 'Network error — try again.',
+        courseRequired: 'Choose a course for this event.'
     };
     if (calRoot) {
+        calStrings.addTitle = calRoot.getAttribute('data-str-add-title') || calStrings.addTitle;
         calStrings.editTitle = calRoot.getAttribute('data-str-edit-title') || calStrings.editTitle;
         calStrings.saved = calRoot.getAttribute('data-str-saved') || calStrings.saved;
         calStrings.deleted = calRoot.getAttribute('data-str-deleted') || calStrings.deleted;
         calStrings.deleteConfirm = calRoot.getAttribute('data-str-delete-confirm') || calStrings.deleteConfirm;
         calStrings.network = calRoot.getAttribute('data-str-network') || calStrings.network;
+        calStrings.courseRequired = calRoot.getAttribute('data-str-course-required') || calStrings.courseRequired;
+    }
+    function getCalScope() {
+        var checked = calForm ? calForm.querySelector('[data-lp-cal-form-scope]:checked') : null;
+        if (checked) {
+            return checked.value === 'course' ? 'course' : 'personal';
+        }
+        var fixed = calForm ? calForm.querySelector('[data-lp-cal-form-scope-fixed]') : null;
+        if (fixed && fixed.value) {
+            return fixed.value === 'course' ? 'course' : 'personal';
+        }
+        return (calRoot && calRoot.getAttribute('data-default-scope') === 'course') ? 'course' : 'personal';
+    }
+    function setCalScope(scope, lock) {
+        var radios = calForm ? calForm.querySelectorAll('[data-lp-cal-form-scope]') : [];
+        radios.forEach(function (r) {
+            r.checked = (r.value === scope);
+            r.disabled = !!lock;
+        });
+        var fixed = calForm ? calForm.querySelector('[data-lp-cal-form-scope-fixed]') : null;
+        if (fixed) {
+            fixed.value = scope;
+        }
+        syncCalScopeUi(scope);
+    }
+    function syncCalScopeUi(scope) {
+        if (!calForm) {
+            return;
+        }
+        var courseWrap = calForm.querySelector('[data-lp-cal-form-course-wrap]');
+        var helpPersonal = calForm.querySelector('[data-lp-cal-form-help]');
+        var helpCourse = calForm.querySelector('[data-lp-cal-form-help-course]');
+        var isCourse = scope === 'course';
+        if (courseWrap) {
+            if (isCourse) {
+                courseWrap.removeAttribute('hidden');
+            } else {
+                courseWrap.setAttribute('hidden', 'hidden');
+            }
+        }
+        if (helpPersonal) {
+            if (isCourse) {
+                helpPersonal.setAttribute('hidden', 'hidden');
+            } else {
+                helpPersonal.removeAttribute('hidden');
+            }
+        }
+        if (helpCourse) {
+            if (isCourse) {
+                helpCourse.removeAttribute('hidden');
+            } else {
+                helpCourse.setAttribute('hidden', 'hidden');
+            }
+        }
     }
 
     function anyCalOverlayOpen() {
@@ -248,6 +302,7 @@
             err.textContent = '';
             err.setAttribute('hidden', 'hidden');
         }
+        var courseEl = calForm.querySelector('[data-lp-cal-form-course]');
         if (mode === 'edit' && sourceBtn) {
             if (titleEl) {
                 titleEl.textContent = calStrings.editTitle;
@@ -275,6 +330,12 @@
             if (descEl) {
                 descEl.value = sourceBtn.getAttribute('data-description') || '';
             }
+            var editScope = sourceBtn.getAttribute('data-scope') === 'course' ? 'course' : 'personal';
+            setCalScope(editScope, true);
+            if (courseEl && editScope === 'course') {
+                courseEl.value = sourceBtn.getAttribute('data-courseid') || courseEl.value;
+                courseEl.disabled = false;
+            }
             if (delBtn) {
                 delBtn.removeAttribute('hidden');
             }
@@ -294,6 +355,13 @@
             }
             if (timeEl && !timeEl.value) {
                 timeEl.value = '09:00';
+            }
+            var defaultScope = (calRoot && calRoot.getAttribute('data-default-scope') === 'course')
+                ? 'course'
+                : 'personal';
+            setCalScope(defaultScope, false);
+            if (courseEl) {
+                courseEl.disabled = false;
             }
             if (delBtn) {
                 delBtn.setAttribute('hidden', 'hidden');
@@ -430,6 +498,11 @@
         calForm.querySelectorAll('[data-lp-cal-form-close]').forEach(function (el) {
             el.addEventListener('click', closeCalForm);
         });
+        calForm.querySelectorAll('[data-lp-cal-form-scope]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                syncCalScopeUi(getCalScope());
+            });
+        });
         var delBtn = calForm.querySelector('[data-lp-cal-form-delete]');
         if (delBtn) {
             delBtn.addEventListener('click', function () {
@@ -442,7 +515,7 @@
                     return;
                 }
                 delBtn.disabled = true;
-                postPersonal({ action: 'delete', id: id }).then(function () {
+                postPersonal({ action: 'delete', id: id, scope: getCalScope() }).then(function () {
                     closeCalForm();
                     showCalFlash(calStrings.deleted);
                     if (shell.querySelector('[data-lp-cal-month]')) {
@@ -472,9 +545,14 @@
                 var descEl = calForm.querySelector('[data-lp-cal-form-description]');
                 var err = calForm.querySelector('[data-lp-cal-form-error]');
                 var id = idEl ? idEl.value : '';
+                var scope = getCalScope();
+                var courseEl = calForm.querySelector('[data-lp-cal-form-course]');
+                var courseid = courseEl ? courseEl.value : '0';
                 var payload = {
                     action: id ? 'update' : 'create',
                     id: id || '0',
+                    scope: scope,
+                    courseid: courseid || '0',
                     name: nameEl ? nameEl.value : '',
                     date: dateEl ? dateEl.value : '',
                     time: timeEl ? timeEl.value : '',
@@ -488,6 +566,13 @@
                     }
                     if (nameEl) {
                         nameEl.focus();
+                    }
+                    return;
+                }
+                if (scope === 'course' && (!courseid || courseid === '0')) {
+                    if (err) {
+                        err.textContent = calStrings.courseRequired;
+                        err.removeAttribute('hidden');
                     }
                     return;
                 }

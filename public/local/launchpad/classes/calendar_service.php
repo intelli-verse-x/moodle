@@ -120,12 +120,19 @@ final class calendar_service {
         }
 
         $canedit = false;
-        if ($viewerid && $ispersonal && empty($event->modulename) && empty($event->component)
-                && (int) ($event->userid ?? 0) === $viewerid) {
-            $canedit = has_capability(
-                'moodle/calendar:manageownentries',
-                \context_user::instance($viewerid)
-            );
+        if ($viewerid && empty($event->modulename) && empty($event->component)) {
+            if ($ispersonal && (int) ($event->userid ?? 0) === $viewerid) {
+                $canedit = has_capability(
+                    'moodle/calendar:manageownentries',
+                    \context_user::instance($viewerid)
+                );
+            } else if (!$ispersonal && $courseid > 0
+                    && (string) ($event->eventtype ?? '') === 'course') {
+                $canedit = has_capability(
+                    'moodle/calendar:manageentries',
+                    \context_course::instance($courseid)
+                );
+            }
         }
 
         return [
@@ -140,6 +147,7 @@ final class calendar_service {
             'day_key' => userdate($timestart, '%Y-%m-%d'),
             'courseid' => $courseid,
             'is_personal' => $ispersonal,
+            'is_course_event' => !$ispersonal && (string) ($event->eventtype ?? '') === 'course',
             'can_edit' => $canedit,
             'course_name' => $ispersonal
                 ? get_string('fellowship_calendar_personal', 'local_launchpad')
@@ -188,7 +196,30 @@ final class calendar_service {
     }
 
     /**
-     * Full fellow Calendar page context (month grid + upcoming + nav URLs).
+     * Courses from the visible set where the user may manage course calendar events.
+     *
+     * @param list<\stdClass> $courses
+     * @return list<array{id:int,name:string}>
+     */
+    public static function courses_user_can_manage(int $userid, array $courses): array {
+        $out = [];
+        foreach ($courses as $c) {
+            $cid = (int) $c->id;
+            if ($cid <= 0) {
+                continue;
+            }
+            if (has_capability('moodle/calendar:manageentries', \context_course::instance($cid))) {
+                $out[] = [
+                    'id' => $cid,
+                    'name' => format_string($c->fullname),
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Fellow calendar page context.
      *
      * @param list<\stdClass> $courses
      * @param string $mode month|upcoming
@@ -200,11 +231,68 @@ final class calendar_service {
         int $month,
         string $mode = 'month'
     ): array {
+        return self::page_context(
+            $userid,
+            $courses,
+            $year,
+            $month,
+            $mode,
+            persona_home::FELLOW_PATH,
+            'fellow'
+        );
+    }
+
+    /**
+     * Mentor calendar page context.
+     *
+     * @param list<\stdClass> $courses
+     * @param string $mode month|upcoming
+     */
+    public static function mentor_context(
+        int $userid,
+        array $courses,
+        int $year,
+        int $month,
+        string $mode = 'month'
+    ): array {
+        return self::page_context(
+            $userid,
+            $courses,
+            $year,
+            $month,
+            $mode,
+            persona_home::MENTOR_PATH,
+            'mentor'
+        );
+    }
+
+    /**
+     * Shared Calendar page context (month grid + upcoming + nav URLs).
+     *
+     * @param list<\stdClass> $courses
+     * @param string $mode month|upcoming
+     * @param string $basepath Persona home path for calendar URLs
+     * @param string $portal fellow|mentor
+     */
+    public static function page_context(
+        int $userid,
+        array $courses,
+        int $year,
+        int $month,
+        string $mode = 'month',
+        string $basepath = '',
+        string $portal = 'fellow'
+    ): array {
         if ($mode !== 'upcoming') {
             $mode = 'month';
         }
+        if ($basepath === '') {
+            $basepath = persona_home::FELLOW_PATH;
+        }
+        if ($portal !== 'mentor') {
+            $portal = 'fellow';
+        }
         [$tstart, $tend] = self::month_range($year, $month);
-        // Load a slightly wider window so grid edge padding days can show events.
         $padstart = $tstart - (7 * DAYSECS);
         $padend = $tend + (7 * DAYSECS);
         $coursenames = self::course_name_map($courses);
@@ -229,7 +317,13 @@ final class calendar_service {
             $nexttime = make_timestamp($year, $month + 1, 1, 0, 0, 0);
         }
 
-        $fellowpath = persona_home::FELLOW_PATH;
+        $manageable = self::courses_user_can_manage($userid, $courses);
+        $canaddpersonal = has_capability(
+            'moodle/calendar:manageownentries',
+            \context_user::instance($userid)
+        );
+        $canaddcourse = $manageable !== [];
+
         return array_merge($grid, [
             'mode_month' => $mode === 'month',
             'mode_upcoming' => $mode === 'upcoming',
@@ -237,40 +331,50 @@ final class calendar_service {
             'current_time' => $basemonth,
             'prev_time' => $prevtime,
             'next_time' => $nexttime,
-            'prev_url' => (new \moodle_url($fellowpath, [
+            'prev_url' => (new \moodle_url($basepath, [
                 'view' => 'calendar',
                 'cal' => 'month',
                 'time' => $prevtime,
             ]))->out(false),
-            'next_url' => (new \moodle_url($fellowpath, [
+            'next_url' => (new \moodle_url($basepath, [
                 'view' => 'calendar',
                 'cal' => 'month',
                 'time' => $nexttime,
             ]))->out(false),
-            'month_toggle_url' => (new \moodle_url($fellowpath, [
+            'month_toggle_url' => (new \moodle_url($basepath, [
                 'view' => 'calendar',
                 'cal' => 'month',
                 'time' => $basemonth,
             ]))->out(false),
-            'upcoming_toggle_url' => (new \moodle_url($fellowpath, [
+            'upcoming_toggle_url' => (new \moodle_url($basepath, [
                 'view' => 'calendar',
                 'cal' => 'upcoming',
                 'time' => $basemonth,
             ]))->out(false),
-            'ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_month.php'))->out(false),
-            'personal_ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_personal.php'))->out(false),
+            'ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_month.php', [
+                'portal' => $portal,
+            ]))->out(false),
+            'personal_ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_personal.php', [
+                'portal' => $portal,
+            ]))->out(false),
+            'portal' => $portal,
+            'is_mentor_calendar' => $portal === 'mentor',
             'sesskey' => sesskey(),
-            'can_add_personal' => has_capability(
-                'moodle/calendar:manageownentries',
-                \context_user::instance($userid)
-            ),
+            'can_add_personal' => $canaddpersonal,
+            'can_add_course' => $canaddcourse,
+            'can_add_event' => $canaddpersonal || $canaddcourse,
+            'has_scope_choice' => $canaddpersonal && $canaddcourse,
+            'default_scope' => ($portal === 'mentor' && $canaddcourse)
+                ? 'course'
+                : ($canaddcourse && !$canaddpersonal ? 'course' : 'personal'),
+            'manageable_courses' => $manageable,
+            'has_manageable_courses' => $manageable !== [],
             'upcoming_items' => $upcoming['items'],
             'has_upcoming_items' => $upcoming['has_items'],
             'upcoming_has_more' => !empty($upcoming['upcoming_has_more']),
             'upcoming_more_count' => (int) ($upcoming['upcoming_more_count'] ?? 0),
             'upcoming_page_size' => (int) ($upcoming['upcoming_page_size'] ?? self::UPCOMING_PAGE_SIZE),
             'moodle_calendar_url' => self::moodle_month_url(),
-            // Flat list for detail modal lookups.
             'detail_events' => $monthitems,
             'has_detail_events' => $monthitems !== [],
         ]);
@@ -457,6 +561,196 @@ final class calendar_service {
         } catch (\Throwable $e) {
             return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
         }
+    }
+
+    /**
+     * Create a course calendar event (eventtype=course). Fail closed on caps.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function create_course(
+        int $userid,
+        int $courseid,
+        string $name,
+        int $timestart,
+        int $timeduration = 0,
+        string $description = ''
+    ): array {
+        global $CFG, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $name = trim($name);
+        if ($name === '') {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_name', 'local_launchpad'), 'id' => null];
+        }
+        if ($timestart <= 0) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_when', 'local_launchpad'), 'id' => null];
+        }
+        if ($courseid <= 0 || (int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        if ($timeduration < 0) {
+            $timeduration = 0;
+        }
+        $coursectx = \context_course::instance($courseid);
+        if (!has_capability('moodle/calendar:manageentries', $coursectx)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        $props = (object) [
+            'name' => $name,
+            'description' => $description,
+            'format' => FORMAT_PLAIN,
+            'courseid' => $courseid,
+            'groupid' => 0,
+            'userid' => $userid,
+            'modulename' => '',
+            'instance' => 0,
+            'eventtype' => 'course',
+            'timestart' => $timestart,
+            'timeduration' => $timeduration,
+            'visible' => 1,
+        ];
+        try {
+            $probe = new \calendar_event($props);
+            if (!calendar_add_event_allowed($probe)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $created = \calendar_event::create($props, true);
+            if (!$created) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+            }
+            return ['ok' => true, 'error' => null, 'id' => (int) $created->id];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
+    }
+
+    /**
+     * Update a managed course calendar event (not module-generated).
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function update_course(
+        int $userid,
+        int $eventid,
+        int $courseid,
+        string $name,
+        int $timestart,
+        int $timeduration = 0,
+        string $description = ''
+    ): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $name = trim($name);
+        if ($eventid <= 0) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
+        }
+        if ($name === '') {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_name', 'local_launchpad'), 'id' => null];
+        }
+        if ($timestart <= 0 || $courseid <= 0) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_when', 'local_launchpad'), 'id' => null];
+        }
+        if ($timeduration < 0) {
+            $timeduration = 0;
+        }
+        if ((int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        $record = $DB->get_record('event', ['id' => $eventid]);
+        if (!$record) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
+        }
+        if ((string) $record->eventtype !== 'course' || !empty($record->modulename) || !empty($record->component)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        // Must manage both the existing and target course.
+        foreach ([(int) $record->courseid, $courseid] as $cid) {
+            if ($cid <= 0 || !has_capability('moodle/calendar:manageentries', \context_course::instance($cid))) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+        }
+
+        try {
+            $event = new \calendar_event($record);
+            if (!calendar_edit_event_allowed($event, true)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $event->update((object) [
+                'name' => $name,
+                'description' => $description,
+                'format' => FORMAT_PLAIN,
+                'timestart' => $timestart,
+                'timeduration' => $timeduration,
+                'eventtype' => 'course',
+                'courseid' => $courseid,
+                'userid' => $userid,
+            ], true);
+            return ['ok' => true, 'error' => null, 'id' => $eventid];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
+    }
+
+    /**
+     * Delete a managed course calendar event.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function delete_course(int $userid, int $eventid): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        if ($eventid <= 0 || (int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        $record = $DB->get_record('event', ['id' => $eventid]);
+        if (!$record) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
+        }
+        if ((string) $record->eventtype !== 'course' || (int) $record->courseid <= 0
+                || !empty($record->modulename) || !empty($record->component)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        if (!has_capability('moodle/calendar:manageentries', \context_course::instance((int) $record->courseid))) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        try {
+            $event = new \calendar_event($record);
+            if (!calendar_delete_event_allowed($event)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $event->delete(false);
+            return ['ok' => true, 'error' => null, 'id' => $eventid];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
+    }
+
+    /**
+     * Delete personal or course event by inspecting the stored row.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function delete_event(int $userid, int $eventid): array {
+        global $DB;
+
+        $record = $DB->get_record('event', ['id' => $eventid]);
+        if (!$record) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
+        }
+        if ((string) $record->eventtype === 'course' && (int) $record->courseid > 0) {
+            return self::delete_course($userid, $eventid);
+        }
+        return self::delete_personal($userid, $eventid);
     }
 
     /**

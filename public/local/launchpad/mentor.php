@@ -95,6 +95,7 @@ $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(fals
 $homeurl = (new moodle_url(persona_home::MENTOR_PATH))->out(false);
 $queueurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
 $fellowsurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false);
+$calendarurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'calendar']))->out(false);
 $notificationsurl = (new moodle_url('/message/index.php'))->out(false);
 
 $firstname = format_string($USER->firstname);
@@ -141,6 +142,13 @@ $nav = [
                 'key' => 'fellows',
                 'icon_svg' => $icon('<path d="M16 11a4 4 0 10-8 0 4 4 0 008 0z"/><path d="M4 20a8 8 0 0116 0"/><path d="M19 8a3 3 0 110 6"/>'),
             ],
+            [
+                'label' => get_string('fellowship_nav_calendar', 'local_launchpad'),
+                'url' => $calendarurl,
+                'current' => $view === 'calendar',
+                'key' => 'calendar',
+                'icon_svg' => $icon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+            ],
         ],
     ],
 ];
@@ -165,6 +173,39 @@ switch ($view) {
             'has_courses' => $courses !== [],
             'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
             'queue_url' => $queueurl,
+        ]));
+        break;
+
+    case 'calendar':
+        $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
+        $calmode = optional_param('cal', 'month', PARAM_ALPHA);
+        $caltime = optional_param('time', 0, PARAM_INT);
+        $calyear = optional_param('year', 0, PARAM_INT);
+        $calmonth = optional_param('month', 0, PARAM_INT);
+        $resolved = \local_launchpad\calendar_service::resolve_month(
+            $caltime > 0 ? $caltime : null,
+            $calyear > 0 ? $calyear : null,
+            $calmonth > 0 ? $calmonth : null
+        );
+        $caldata = \local_launchpad\calendar_service::mentor_context(
+            $userid,
+            $courses,
+            (int) $resolved['year'],
+            (int) $resolved['month'],
+            $calmode
+        );
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', array_merge($caldata, [
+            'has_crumbs' => true,
+            'crumbs' => [
+                [
+                    'label' => get_string('mentor_nav_home', 'local_launchpad'),
+                    'url' => $homeurl,
+                ],
+                [
+                    'label' => get_string('fellowship_nav_calendar', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
         ]));
         break;
 

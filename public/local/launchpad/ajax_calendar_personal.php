@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * AJAX: create / update / delete personal calendar events (fellow).
+ * AJAX: create / update / delete personal or course calendar events.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -28,6 +28,7 @@ require(__DIR__ . '/../../config.php');
 
 use local_launchpad\calendar_service;
 use local_launchpad\fellowship_dashboard;
+use local_launchpad\mentor_dashboard;
 
 require_login();
 require_sesskey();
@@ -35,7 +36,13 @@ require_sesskey();
 header('Content-Type: application/json; charset=utf-8');
 
 $userid = (int) $USER->id;
-if (!fellowship_dashboard::can_access($userid) && !is_siteadmin()) {
+$portal = optional_param('portal', 'fellow', PARAM_ALPHA);
+if ($portal === 'mentor') {
+    $allowed = mentor_dashboard::can_access($userid) || is_siteadmin();
+} else {
+    $allowed = fellowship_dashboard::can_access($userid) || is_siteadmin();
+}
+if (!$allowed) {
     echo json_encode([
         'ok' => false,
         'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'),
@@ -48,13 +55,18 @@ $result = ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 
 
 if ($action === 'delete') {
     $eventid = required_param('id', PARAM_INT);
-    $result = calendar_service::delete_personal($userid, $eventid);
+    $result = calendar_service::delete_event($userid, $eventid);
 } else if ($action === 'create' || $action === 'update') {
+    $scope = optional_param('scope', 'personal', PARAM_ALPHA);
+    if ($scope !== 'course') {
+        $scope = 'personal';
+    }
     $name = required_param('name', PARAM_TEXT);
     $date = required_param('date', PARAM_TEXT);
     $time = required_param('time', PARAM_TEXT);
     $durationmin = optional_param('duration', 0, PARAM_INT);
     $description = optional_param('description', '', PARAM_RAW);
+    $courseid = optional_param('courseid', 0, PARAM_INT);
     $timestart = calendar_service::parse_user_datetime((string) $date, (string) $time);
     if ($timestart === null) {
         $result = [
@@ -65,7 +77,29 @@ if ($action === 'delete') {
     } else {
         $timeduration = max(0, $durationmin) * 60;
         $description = trim(clean_param($description, PARAM_TEXT));
-        if ($action === 'create') {
+        if ($scope === 'course') {
+            if ($action === 'create') {
+                $result = calendar_service::create_course(
+                    $userid,
+                    $courseid,
+                    (string) $name,
+                    $timestart,
+                    $timeduration,
+                    $description
+                );
+            } else {
+                $eventid = required_param('id', PARAM_INT);
+                $result = calendar_service::update_course(
+                    $userid,
+                    $eventid,
+                    $courseid,
+                    (string) $name,
+                    $timestart,
+                    $timeduration,
+                    $description
+                );
+            }
+        } else if ($action === 'create') {
             $result = calendar_service::create_personal(
                 $userid,
                 (string) $name,

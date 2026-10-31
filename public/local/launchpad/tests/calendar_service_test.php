@@ -184,6 +184,54 @@ final class calendar_service_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('event', ['id' => $created['id']]));
     }
 
+    public function test_create_update_delete_course_event(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course(['idnumber' => 'lp-cal-p3']);
+        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+        $this->setUser($teacher);
+        $timestart = make_timestamp(2026, 8, 12, 16, 0, 0);
+
+        $created = calendar_service::create_course(
+            (int) $teacher->id,
+            (int) $course->id,
+            'LP course deadline',
+            $timestart,
+            0,
+            'Bring evidence'
+        );
+        $this->assertTrue($created['ok'], $created['error'] ?? '');
+        $row = $DB->get_record('event', ['id' => $created['id']], '*', MUST_EXIST);
+        $this->assertSame('course', $row->eventtype);
+        $this->assertSame((int) $course->id, (int) $row->courseid);
+
+        $manageable = calendar_service::courses_user_can_manage((int) $teacher->id, [$course]);
+        $this->assertCount(1, $manageable);
+        $this->assertSame((int) $course->id, $manageable[0]['id']);
+
+        $updated = calendar_service::update_course(
+            (int) $teacher->id,
+            (int) $created['id'],
+            (int) $course->id,
+            'LP course deadline updated',
+            $timestart + DAYSECS,
+            0,
+            ''
+        );
+        $this->assertTrue($updated['ok'], $updated['error'] ?? '');
+
+        $fellow = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $this->setUser($fellow);
+        $mapped = calendar_service::map_event($row, [(int) $course->id => $course->fullname], (int) $fellow->id);
+        $this->assertFalse($mapped['can_edit']);
+
+        $this->setUser($teacher);
+        $deleted = calendar_service::delete_course((int) $teacher->id, (int) $created['id']);
+        $this->assertTrue($deleted['ok'], $deleted['error'] ?? '');
+        $this->assertFalse($DB->record_exists('event', ['id' => $created['id']]));
+    }
+
     public function test_upcoming_returns_course_event(): void {
         global $CFG;
         $this->resetAfterTest();

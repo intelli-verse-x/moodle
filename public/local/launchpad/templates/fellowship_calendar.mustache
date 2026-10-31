@@ -16,22 +16,26 @@
   data-lp-cal-root
   data-personal-ajax="{{personal_ajax_url}}"
   data-sesskey="{{sesskey}}"
-  data-str-edit-title="{{#str}} fellowship_calendar_edit_personal, local_launchpad {{/str}}"
+  data-portal="{{portal}}"
+  data-default-scope="{{default_scope}}"
+  data-str-edit-title="{{#str}} fellowship_calendar_edit_event, local_launchpad {{/str}}"
+  data-str-add-title="{{#str}} fellowship_calendar_add_event, local_launchpad {{/str}}"
   data-str-saved="{{#str}} fellowship_calendar_saved, local_launchpad {{/str}}"
   data-str-deleted="{{#str}} fellowship_calendar_deleted, local_launchpad {{/str}}"
   data-str-delete-confirm="{{#str}} fellowship_calendar_delete_confirm, local_launchpad {{/str}}"
-  data-str-network="{{#str}} fellowship_calendar_err_network, local_launchpad {{/str}}">
+  data-str-network="{{#str}} fellowship_calendar_err_network, local_launchpad {{/str}}"
+  data-str-course-required="{{#str}} fellowship_calendar_err_course, local_launchpad {{/str}}">
 <div class="lp-ach-head">
   <div class="lp-row-sb">
     <div>
-      <span class="lp-eyebrow">{{#str}} fellowship_nav_you, local_launchpad {{/str}}</span>
+      <span class="lp-eyebrow">{{#is_mentor_calendar}}{{#str}} mentor_role_label, local_launchpad {{/str}}{{/is_mentor_calendar}}{{^is_mentor_calendar}}{{#str}} fellowship_nav_you, local_launchpad {{/str}}{{/is_mentor_calendar}}</span>
       <h2>{{#str}} fellowship_nav_calendar, local_launchpad {{/str}}</h2>
-      <p class="lp-muted">{{#str}} fellowship_calendar_intro, local_launchpad {{/str}}</p>
+      <p class="lp-muted">{{#is_mentor_calendar}}{{#str}} mentor_calendar_intro, local_launchpad {{/str}}{{/is_mentor_calendar}}{{^is_mentor_calendar}}{{#str}} fellowship_calendar_intro, local_launchpad {{/str}}{{/is_mentor_calendar}}</p>
     </div>
     <div class="lp-cal-head-actions">
-      {{#can_add_personal}}
-        <button type="button" class="lp-btn lp-btn-primary" data-lp-cal-add>{{#str}} fellowship_calendar_add_personal, local_launchpad {{/str}}</button>
-      {{/can_add_personal}}
+      {{#can_add_event}}
+        <button type="button" class="lp-btn lp-btn-primary" data-lp-cal-add>{{#str}} fellowship_calendar_add_event, local_launchpad {{/str}}</button>
+      {{/can_add_event}}
       <a class="lp-btn lp-btn-light" href="{{moodle_calendar_url}}">{{#str}} fellowship_calendar_open_moodle, local_launchpad {{/str}}</a>
     </div>
   </div>
@@ -114,9 +118,30 @@
 <div class="lp-cal-form" data-lp-cal-form hidden>
   <div class="lp-cal-form-scrim" data-lp-cal-form-close aria-hidden="true"></div>
   <form class="lp-cal-form-card" data-lp-cal-form-el novalidate role="dialog" aria-modal="true" aria-labelledby="lp-cal-form-title">
-    <h2 id="lp-cal-form-title" data-lp-cal-form-title>{{#str}} fellowship_calendar_add_personal, local_launchpad {{/str}}</h2>
-    <p class="lp-sm lp-muted">{{#str}} fellowship_calendar_personal_help, local_launchpad {{/str}}</p>
+    <h2 id="lp-cal-form-title" data-lp-cal-form-title>{{#str}} fellowship_calendar_add_event, local_launchpad {{/str}}</h2>
+    <p class="lp-sm lp-muted" data-lp-cal-form-help>{{#str}} fellowship_calendar_personal_help, local_launchpad {{/str}}</p>
+    <p class="lp-sm lp-muted" data-lp-cal-form-help-course hidden>{{#str}} fellowship_calendar_course_help, local_launchpad {{/str}}</p>
     <input type="hidden" name="id" value="" data-lp-cal-form-id>
+    {{#has_scope_choice}}
+      <fieldset class="lp-cal-scope" data-lp-cal-form-scope-wrap>
+        <legend class="lp-cal-field"><span>{{#str}} fellowship_calendar_field_scope, local_launchpad {{/str}}</span></legend>
+        <label class="lp-cal-scope-opt"><input type="radio" name="scope" value="personal" data-lp-cal-form-scope checked> {{#str}} fellowship_calendar_scope_personal, local_launchpad {{/str}}</label>
+        <label class="lp-cal-scope-opt"><input type="radio" name="scope" value="course" data-lp-cal-form-scope> {{#str}} fellowship_calendar_scope_course, local_launchpad {{/str}}</label>
+      </fieldset>
+    {{/has_scope_choice}}
+    {{^has_scope_choice}}
+      <input type="hidden" name="scope" value="{{#can_add_course}}{{^can_add_personal}}course{{/can_add_personal}}{{/can_add_course}}{{#can_add_personal}}personal{{/can_add_personal}}" data-lp-cal-form-scope-fixed>
+    {{/has_scope_choice}}
+    {{#can_add_course}}
+      <label class="lp-cal-field" data-lp-cal-form-course-wrap{{^has_scope_choice}}{{#can_add_personal}} hidden{{/can_add_personal}}{{/has_scope_choice}}{{#has_scope_choice}} hidden{{/has_scope_choice}}>
+        <span>{{#str}} fellowship_calendar_field_course, local_launchpad {{/str}}</span>
+        <select name="courseid" data-lp-cal-form-course>
+          {{#manageable_courses}}
+            <option value="{{id}}">{{name}}</option>
+          {{/manageable_courses}}
+        </select>
+      </label>
+    {{/can_add_course}}
     <label class="lp-cal-field">
       <span>{{#str}} fellowship_calendar_field_name, local_launchpad {{/str}}</span>
       <input type="text" name="name" required maxlength="200" data-lp-cal-form-name>
