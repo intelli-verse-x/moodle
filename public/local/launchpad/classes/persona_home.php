@@ -159,7 +159,10 @@ final class persona_home {
             return false;
         }
 
-        $homepath = rtrim((string) $home->get_path(), '/') ?: '/';
+        $homepath = self::local_path_of_url($home);
+        if ($homepath === null) {
+            return false;
+        }
         // Same shell (possibly with ?view=) — keep the deep link.
         return $path !== $homepath;
     }
@@ -280,9 +283,30 @@ final class persona_home {
         if ($home === null) {
             return true;
         }
-        $path = rtrim((string) $home->get_path(), '/') ?: '/';
+        // Compare wwwroot-relative paths so subdirectory installs / PHPUnit
+        // (wwwroot https://www.example.com/moodle) still match EMPLOYEE_PATH.
+        $path = self::local_path_of_url($home);
+        if ($path === null) {
+            return true;
+        }
         $employee = rtrim(self::EMPLOYEE_PATH, '/') ?: '/';
         return $path !== $employee;
+    }
+
+    /**
+     * Path of a moodle_url relative to $CFG->wwwroot (no query), or null if external.
+     *
+     * @param \moodle_url $url
+     * @return string|null Normalised path starting with /
+     */
+    private static function local_path_of_url(\moodle_url $url): ?string {
+        try {
+            $local = $url->out_as_local_url(false);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        $path = strtok($local, '?') ?: $local;
+        return rtrim($path, '/') ?: '/';
     }
 
     /**

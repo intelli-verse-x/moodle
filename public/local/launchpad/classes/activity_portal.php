@@ -299,17 +299,29 @@ final class activity_portal {
         if (!isloggedin() || isguestuser()) {
             return;
         }
-        if (during_initial_install() || CLI_SCRIPT || AJAX_SCRIPT || WS_SERVER) {
+        if (during_initial_install()
+                || (defined('CLI_SCRIPT') && CLI_SCRIPT)
+                || (defined('AJAX_SCRIPT') && AJAX_SCRIPT)
+                || (defined('WS_SERVER') && WS_SERVER)
+                || (defined('PHPUNIT_TEST') && PHPUNIT_TEST)) {
             return;
         }
         if (!account_persona::is_employee((int) $USER->id) && !is_siteadmin()) {
             return;
         }
 
-        $path = $PAGE->url ? $PAGE->url->get_path() : '';
+        $path = '';
+        if ($PAGE->url) {
+            try {
+                $path = $PAGE->url->out_as_local_url(false);
+            } catch (\Throwable $e) {
+                $path = (string) $PAGE->url->get_path();
+            }
+        }
         if ($path === '') {
             $path = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
         }
+        $path = strtok($path, '?') ?: $path;
         if (!preg_match('#/mod/(page|url|resource)/view\.php$#', $path)) {
             return;
         }
