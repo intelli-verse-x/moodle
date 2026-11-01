@@ -57,6 +57,13 @@ final class messaging {
     }
 
     /**
+     * Moodle's default notifications list (popup processor "See all").
+     */
+    public static function moodle_notifications_url(): string {
+        return (new \moodle_url('/message/output/popup/notifications.php'))->out(false);
+    }
+
+    /**
      * Whether $fromid may open a private message to $toid.
      */
     public static function can_message(int $fromid, int $toid): bool {
@@ -79,47 +86,64 @@ final class messaging {
     }
 
     /**
-     * Combined unread for LaunchPad's single top-bar control.
+     * Unread Moodle popup notifications (top-bar bell).
      */
-    public static function unread_count(int $userid): int {
-        global $CFG;
-
-        if ($userid <= 0) {
+    public static function notification_unread_count(int $userid): int {
+        if ($userid <= 0 || !class_exists('\message_popup\api')) {
             return 0;
         }
-
-        $count = 0;
-        if (class_exists('\message_popup\api')) {
-            try {
-                $count += (int) \message_popup\api::count_unread_popup_notifications($userid);
-            } catch (\Throwable $e) {
-                // Continue.
-            }
+        try {
+            return max(0, (int) \message_popup\api::count_unread_popup_notifications($userid));
+        } catch (\Throwable $e) {
+            return 0;
         }
-
-        if (!empty($CFG->messaging) && class_exists('\core_message\api')) {
-            try {
-                $user = \core_user::get_user($userid);
-                if ($user) {
-                    $count += (int) \core_message\api::count_unread_conversations($user);
-                    $count += (int) \core_message\api::get_received_contact_requests_count($userid);
-                }
-            } catch (\Throwable $e) {
-                // Fail soft.
-            }
-        }
-
-        return max(0, $count);
     }
 
     /**
-     * Aria / title label for the Messages top-bar control.
+     * Unread private conversations (sidebar Messages badge).
+     */
+    public static function conversation_unread_count(int $userid): int {
+        global $CFG;
+
+        if ($userid <= 0 || empty($CFG->messaging) || !class_exists('\core_message\api')) {
+            return 0;
+        }
+        try {
+            $user = \core_user::get_user($userid);
+            if (!$user) {
+                return 0;
+            }
+            return max(0, (int) \core_message\api::count_unread_conversations($user));
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * @deprecated Prefer notification_unread_count(); kept for older callers.
+     */
+    public static function unread_count(int $userid): int {
+        return self::notification_unread_count($userid);
+    }
+
+    /**
+     * Aria / title label for the Messages control.
      */
     public static function messages_label(int $unread): string {
         if ($unread > 0) {
             return get_string('fellowship_messages_unread', 'local_launchpad', $unread);
         }
         return get_string('fellowship_messages', 'local_launchpad');
+    }
+
+    /**
+     * Aria / title label for the notifications bell.
+     */
+    public static function notifications_label(int $unread): string {
+        if ($unread > 0) {
+            return get_string('fellowship_notifications_unread', 'local_launchpad', $unread);
+        }
+        return get_string('fellowship_notifications', 'local_launchpad');
     }
 
     /**

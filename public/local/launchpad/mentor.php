@@ -117,7 +117,9 @@ $homeurl = (new moodle_url(persona_home::MENTOR_PATH))->out(false);
 $queueurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
 $fellowsurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false);
 $calendarurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'calendar']))->out(false);
-$notificationsurl = messaging::messages_url(null, 'mentor');
+$notificationsurl = messaging::moodle_notifications_url();
+$messagesurl = messaging::messages_url(null, 'mentor');
+$msgunread = messaging::conversation_unread_count($userid);
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -169,6 +171,15 @@ $nav = [
                 'current' => $view === 'calendar',
                 'key' => 'calendar',
                 'icon_svg' => $icon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => $messagesurl,
+                'current' => $view === 'messages',
+                'key' => 'messages',
+                'icon_svg' => $icon('<path d="M5 5h14v10H9l-4 4V5z"/>'),
+                'has_badge' => $msgunread > 0,
+                'badge' => $msgunread > 0 ? (string) $msgunread : '',
             ],
         ],
     ],
@@ -342,8 +353,8 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = messaging::unread_count($userid);
-$notificationslabel = messaging::messages_label($unread);
+$unread = messaging::notification_unread_count($userid);
+$notificationslabel = messaging::notifications_label($unread);
 
 $mismatch = portal_gate::consume_modal_context();
 $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_merge([

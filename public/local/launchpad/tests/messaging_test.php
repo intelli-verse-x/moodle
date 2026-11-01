@@ -56,16 +56,27 @@ final class messaging_test extends \basic_testcase {
         $CFG->messaging = $prev;
     }
 
-    public function test_unread_count_zero_for_invalid_user(): void {
+    public function test_unread_counts_zero_for_invalid_user(): void {
         $this->assertSame(0, messaging::unread_count(0));
-        $this->assertSame(0, messaging::unread_count(-3));
+        $this->assertSame(0, messaging::notification_unread_count(-3));
+        $this->assertSame(0, messaging::conversation_unread_count(0));
     }
 
-    public function test_messages_label_strings(): void {
+    public function test_messages_and_notifications_labels(): void {
         $plain = messaging::messages_label(0);
         $this->assertNotSame('', $plain);
         $unread = messaging::messages_label(3);
         $this->assertStringContainsString('3', $unread);
+
+        $notif = messaging::notifications_label(0);
+        $this->assertNotSame('', $notif);
+        $notifunread = messaging::notifications_label(2);
+        $this->assertStringContainsString('2', $notifunread);
+    }
+
+    public function test_moodle_notifications_url(): void {
+        $url = messaging::moodle_notifications_url();
+        $this->assertStringContainsString('/message/output/popup/notifications.php', $url);
     }
 
     public function test_send_rejects_empty_and_invalid(): void {

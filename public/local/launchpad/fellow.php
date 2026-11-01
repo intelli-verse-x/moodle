@@ -92,7 +92,9 @@ $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(fals
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
 // Legacy Progress tab redirects to Phase progress; keep URL for shell/home links.
 $progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
-$notificationsurl = messaging::messages_url(null, 'fellow');
+$notificationsurl = messaging::moodle_notifications_url();
+$messagesurl = messaging::messages_url(null, 'fellow');
+$msgunread = messaging::conversation_unread_count($userid);
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -178,6 +180,15 @@ $nav = [
                 'current' => $view === 'portfolio',
                 'key' => 'portfolio',
                 'icon_svg' => $icon('<path d="M4 8h16v12H4z"/><path d="M9 8V6a2 2 0 012-2h2a2 2 0 012 2v2"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => $messagesurl,
+                'current' => $view === 'messages',
+                'key' => 'messages',
+                'icon_svg' => $icon('<path d="M5 5h14v10H9l-4 4V5z"/>'),
+                'has_badge' => $msgunread > 0,
+                'badge' => $msgunread > 0 ? (string) $msgunread : '',
             ],
             [
                 'label' => get_string('fellowship_nav_help', 'local_launchpad'),
@@ -551,8 +562,8 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = messaging::unread_count($userid);
-$notificationslabel = messaging::messages_label($unread);
+$unread = messaging::notification_unread_count($userid);
+$notificationslabel = messaging::notifications_label($unread);
 
 $orbittips = [
     'home' => get_string('fellowship_orbit_tip_home', 'local_launchpad'),
