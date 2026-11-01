@@ -23,14 +23,22 @@
     {{#weeks}}
       <div class="lp-cal-week" role="row">
         {{#days}}
-          <div class="lp-cal-day{{#is_othermonth}} is-other{{/is_othermonth}}{{#is_today}} is-today{{/is_today}}{{#has_events}} has-events{{/has_events}}" role="gridcell">
+          <div class="lp-cal-day{{#is_othermonth}} is-other{{/is_othermonth}}{{#is_today}} is-today{{/is_today}}{{#has_events}} has-events{{/has_events}}{{^has_events}}{{#can_add_event}} is-addable{{/can_add_event}}{{/has_events}}"
+            role="gridcell" data-lp-cal-drop data-day-key="{{day_key}}">
             {{#has_events}}
               <button type="button" class="lp-cal-daynum is-action" data-lp-cal-day-open
                 data-day-label="{{day_label}}"
                 aria-label="{{#str}} fellowship_calendar_day_events_aria, local_launchpad {{/str}} {{day_label}}">{{day}}</button>
             {{/has_events}}
             {{^has_events}}
-              <span class="lp-cal-daynum">{{day}}</span>
+              {{#can_add_event}}
+                <button type="button" class="lp-cal-daynum is-action is-add"
+                  data-lp-cal-day-add data-day-key="{{day_key}}"
+                  aria-label="{{#str}} fellowship_calendar_add_on_day, local_launchpad {{/str}} {{day_label}}">{{day}}</button>
+              {{/can_add_event}}
+              {{^can_add_event}}
+                <span class="lp-cal-daynum">{{day}}</span>
+              {{/can_add_event}}
             {{/has_events}}
             {{#has_events}}
               <ul class="lp-cal-chips">

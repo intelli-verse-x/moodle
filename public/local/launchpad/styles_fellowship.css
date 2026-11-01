@@ -1316,8 +1316,70 @@ body.local-launchpad-mentor {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 4px 0 18px;
+  margin: 4px 0 12px;
 }
+.lp-cal-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 4px 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+.lp-cal-filters-label {
+  flex: 0 0 auto;
+}
+.lp-cal-filter-select {
+  flex: 0 1 auto;
+  min-width: 9.5rem;
+  max-width: 100%;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lp-ink);
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  padding: 8px 36px 8px 12px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235B6B8C' d='M1.1 1.2 6 6.1l4.9-4.9 1.1 1.1L6 8.3.0 2.3z'/%3E%3C/svg%3E") no-repeat right 12px center;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.lp-cal-filter-select:focus {
+  outline: 2px solid var(--lp-blue);
+  outline-offset: 1px;
+}
+.lp-cal-dayview,
+.lp-cal-weekview {
+  margin-top: 4px;
+}
+.lp-cal-dayview .lp-cal-month-head,
+.lp-cal-weekview .lp-cal-month-head {
+  margin-bottom: 14px;
+}
+.lp-cal-grid-week .lp-cal-week-day {
+  min-height: 140px;
+}
+.lp-cal-detail-location {
+  margin: 4px 0 0;
+  color: var(--lp-ink);
+  font-weight: 500;
+}
+.lp-cal-detail-html {
+  margin: 8px 0 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.lp-cal-detail-html p { margin: 0 0 0.6em; }
+.lp-cal-day.is-drop-target {
+  outline: 2px dashed var(--lp-blue);
+  outline-offset: -2px;
+  background: var(--lp-blue-soft);
+}
+.lp-cal-chip[draggable="true"] { cursor: grab; }
+.lp-cal-chip[draggable="true"]:active { cursor: grabbing; }
 .lp-cal-head-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1432,6 +1494,26 @@ body.local-launchpad-mentor {
   text-align: left;
 }
 .lp-cal-daynum.is-action:hover { color: var(--lp-blue); }
+.lp-cal-day.is-addable {
+  cursor: pointer;
+}
+.lp-cal-day.is-addable:hover {
+  background: var(--lp-blue-soft, #eef4ff);
+}
+.lp-cal-day.is-addable.is-other:hover {
+  background: #eef1f6;
+}
+.lp-cal-daynum.is-add::after {
+  content: '+';
+  margin-left: 4px;
+  font-weight: 500;
+  color: var(--lp-muted);
+  opacity: 0;
+}
+.lp-cal-day.is-addable:hover .lp-cal-daynum.is-add::after {
+  opacity: 1;
+  color: var(--lp-blue);
+}
 .lp-cal-more {
   display: inline-block;
   margin-top: 3px;
@@ -1457,9 +1539,12 @@ body.local-launchpad-mentor {
   inset: 0;
   z-index: 1095;
   display: none;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .lp-cal-daypanel.is-open { display: flex; }
 .lp-cal-daypanel-scrim {
@@ -1471,8 +1556,10 @@ body.local-launchpad-mentor {
   position: relative;
   z-index: 1;
   width: min(480px, 100%);
-  max-height: min(80vh, 640px);
+  margin-block: auto;
+  max-height: calc(100dvh - 24px);
   overflow: auto;
+  overscroll-behavior: contain;
   background: var(--lp-surface);
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-r);
@@ -1492,9 +1579,12 @@ body.local-launchpad-mentor {
   inset: 0;
   z-index: 1100;
   display: none;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .lp-cal-detail.is-open { display: flex; }
 .lp-cal-detail-scrim {
@@ -1506,6 +1596,11 @@ body.local-launchpad-mentor {
   position: relative;
   z-index: 1;
   width: min(440px, 100%);
+  margin-block: auto;
+  max-height: calc(100dvh - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--lp-surface);
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-r);
@@ -1532,9 +1627,12 @@ body.lp-cal-detail-lock { overflow: hidden; }
   inset: 0;
   z-index: 1110;
   display: none;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .lp-cal-form.is-open { display: flex; }
 .lp-cal-form-scrim {
@@ -1546,14 +1644,42 @@ body.lp-cal-detail-lock { overflow: hidden; }
   position: relative;
   z-index: 1;
   width: min(480px, 100%);
+  margin-block: auto;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  background: #fff;
   background: var(--lp-surface);
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-r);
-  padding: 24px;
   box-shadow: var(--lp-shadow);
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+.lp-cal-form-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 24px 16px;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  background: #fff;
+  background: var(--lp-surface);
+}
+.lp-cal-form-footer {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 14px 24px 20px;
+  background: #fff;
+  background: var(--lp-surface);
+  border-top: 1px solid var(--lp-line);
+  box-shadow: 0 -10px 18px -14px rgba(15, 23, 42, 0.28);
+  position: relative;
+  z-index: 2;
 }
 .lp-cal-form-card h2 {
   margin: 0;

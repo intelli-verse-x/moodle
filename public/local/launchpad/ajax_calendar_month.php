@@ -57,21 +57,28 @@ if ($portal === 'mentor') {
 }
 
 $time = required_param('time', PARAM_INT);
+$filter = optional_param('filter', 'all', PARAM_ALPHA);
 $resolved = calendar_service::resolve_month($time > 0 ? $time : null, null, null);
 $ctx = calendar_service::{$ctxfn}(
     $userid,
     $courses,
     (int) $resolved['year'],
     (int) $resolved['month'],
-    'month'
+    'month',
+    $filter,
+    null
 );
 
 $html = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar_month', $ctx);
-$pageurl = (new moodle_url($basepath, [
+$pageparams = [
     'view' => 'calendar',
     'cal' => 'month',
     'time' => (int) $resolved['time'],
-]))->out(false);
+];
+if ($filter === 'course' || $filter === 'personal') {
+    $pageparams['filter'] = $filter;
+}
+$pageurl = (new moodle_url($basepath, $pageparams))->out(false);
 
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode([

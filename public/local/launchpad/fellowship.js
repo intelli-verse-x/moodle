@@ -77,6 +77,8 @@
     var calDayPanel = shell.querySelector('[data-lp-cal-daypanel]');
     var calMonthFetch = null;
     var calDetailSource = null;
+    var calDragId = null;
+    var calDragMoved = false;
     var calStrings = {
         addTitle: 'Add event',
         editTitle: 'Edit event',
@@ -147,6 +149,79 @@
                 helpCourse.setAttribute('hidden', 'hidden');
             }
         }
+    }
+    function getDurationMode() {
+        var checked = calForm ? calForm.querySelector('[data-lp-cal-form-duration-mode]:checked') : null;
+        return checked ? checked.value : 'none';
+    }
+    function setDurationMode(mode) {
+        if (!calForm) {
+            return;
+        }
+        calForm.querySelectorAll('[data-lp-cal-form-duration-mode]').forEach(function (r) {
+            r.checked = (r.value === mode);
+        });
+        syncDurationModeUi(mode);
+    }
+    function syncDurationModeUi(mode) {
+        if (!calForm) {
+            return;
+        }
+        var untilWrap = calForm.querySelector('[data-lp-cal-form-until-wrap]');
+        var minutesWrap = calForm.querySelector('[data-lp-cal-form-minutes-wrap]');
+        if (untilWrap) {
+            if (mode === 'until') {
+                untilWrap.removeAttribute('hidden');
+            } else {
+                untilWrap.setAttribute('hidden', 'hidden');
+            }
+        }
+        if (minutesWrap) {
+            if (mode === 'minutes') {
+                minutesWrap.removeAttribute('hidden');
+            } else {
+                minutesWrap.setAttribute('hidden', 'hidden');
+            }
+        }
+    }
+    function syncRepeatUi(isCreate) {
+        if (!calForm) {
+            return;
+        }
+        var wrap = calForm.querySelector('[data-lp-cal-form-repeat-wrap]');
+        var modeEl = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
+        var countWrap = calForm.querySelector('[data-lp-cal-form-repeat-count-wrap]');
+        if (!wrap) {
+            return;
+        }
+        if (!isCreate) {
+            wrap.setAttribute('hidden', 'hidden');
+            return;
+        }
+        wrap.removeAttribute('hidden');
+        var weekly = modeEl && modeEl.value === 'weekly';
+        if (countWrap) {
+            if (weekly) {
+                countWrap.removeAttribute('hidden');
+            } else {
+                countWrap.setAttribute('hidden', 'hidden');
+            }
+        }
+    }
+    function getRepeatCount() {
+        if (!calForm) {
+            return 1;
+        }
+        var modeEl = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
+        if (!modeEl || modeEl.value !== 'weekly') {
+            return 1;
+        }
+        var countEl = calForm.querySelector('[data-lp-cal-form-repeats]');
+        var n = countEl ? parseInt(countEl.value || '1', 10) : 1;
+        if (isNaN(n) || n < 1) {
+            return 1;
+        }
+        return Math.min(52, n);
     }
 
     function anyCalOverlayOpen() {
@@ -242,26 +317,46 @@
         var course = calDetail.querySelector('[data-lp-cal-detail-course]');
         var desc = calDetail.querySelector('[data-lp-cal-detail-desc]');
         var moduleNote = calDetail.querySelector('[data-lp-cal-detail-module]');
-        var link = calDetail.querySelector('[data-lp-cal-detail-link]');
+        var locEl = calDetail.querySelector('[data-lp-cal-detail-location]');
+        var htmlEl = calDetail.querySelector('[data-lp-cal-detail-html]');
         var editBtn = calDetail.querySelector('[data-lp-cal-detail-edit]');
         if (title) {
             title.textContent = btn.getAttribute('data-name') || '';
         }
         if (when) {
-            when.textContent = btn.getAttribute('data-when') || '';
+            var whenText = btn.getAttribute('data-when') || '';
+            var whenEnd = btn.getAttribute('data-when-end') || '';
+            when.textContent = whenEnd ? (whenText + ' – ' + whenEnd) : whenText;
         }
         if (course) {
             course.textContent = btn.getAttribute('data-course') || '';
         }
-        if (desc) {
-            var excerpt = btn.getAttribute('data-desc') || '';
-            if (excerpt) {
-                desc.textContent = excerpt;
-                desc.removeAttribute('hidden');
+        if (locEl) {
+            var loc = btn.getAttribute('data-location') || '';
+            if (loc) {
+                locEl.textContent = loc;
+                locEl.removeAttribute('hidden');
             } else {
-                desc.textContent = '';
-                desc.setAttribute('hidden', 'hidden');
+                locEl.textContent = '';
+                locEl.setAttribute('hidden', 'hidden');
             }
+        }
+        if (htmlEl) {
+            var rich = btn.getAttribute('data-description-html') || '';
+            var plain = btn.getAttribute('data-description') || btn.getAttribute('data-desc') || '';
+            if (rich) {
+                htmlEl.innerHTML = rich;
+                htmlEl.removeAttribute('hidden');
+            } else if (plain) {
+                htmlEl.textContent = plain;
+                htmlEl.removeAttribute('hidden');
+            } else {
+                htmlEl.innerHTML = '';
+                htmlEl.setAttribute('hidden', 'hidden');
+            }
+        }
+        if (desc) {
+            desc.setAttribute('hidden', 'hidden');
         }
         if (moduleNote) {
             if (btn.getAttribute('data-module') === '1') {
@@ -269,9 +364,6 @@
             } else {
                 moduleNote.setAttribute('hidden', 'hidden');
             }
-        }
-        if (link) {
-            link.setAttribute('href', btn.getAttribute('data-url') || '#');
         }
         if (editBtn) {
             if (btn.getAttribute('data-can-edit') === '1') {
@@ -284,11 +376,12 @@
         calDetail.removeAttribute('hidden');
         document.body.classList.add('lp-cal-detail-lock');
     }
-    function openCalForm(mode, sourceBtn) {
+    function openCalForm(mode, sourceBtn, presetDate) {
         if (!calForm || !calFormEl) {
             return;
         }
         closeCalDetail();
+        closeCalDayPanel();
         var titleEl = calForm.querySelector('[data-lp-cal-form-title]');
         var idEl = calForm.querySelector('[data-lp-cal-form-id]');
         var nameEl = calForm.querySelector('[data-lp-cal-form-name]');
@@ -303,6 +396,9 @@
             err.setAttribute('hidden', 'hidden');
         }
         var courseEl = calForm.querySelector('[data-lp-cal-form-course]');
+        var locEl = calForm.querySelector('[data-lp-cal-form-location]');
+        var endDateEl = calForm.querySelector('[data-lp-cal-form-end-date]');
+        var endTimeEl = calForm.querySelector('[data-lp-cal-form-end-time]');
         if (mode === 'edit' && sourceBtn) {
             if (titleEl) {
                 titleEl.textContent = calStrings.editTitle;
@@ -327,9 +423,23 @@
             if (durEl) {
                 durEl.value = sourceBtn.getAttribute('data-duration') || '0';
             }
+            if (endDateEl) {
+                endDateEl.value = sourceBtn.getAttribute('data-end-date') || '';
+            }
+            if (endTimeEl) {
+                endTimeEl.value = sourceBtn.getAttribute('data-end-time') || '';
+            }
+            if (locEl) {
+                locEl.value = sourceBtn.getAttribute('data-location') || '';
+            }
             if (descEl) {
                 descEl.value = sourceBtn.getAttribute('data-description') || '';
             }
+            var durMode = sourceBtn.getAttribute('data-duration-mode') || 'none';
+            if (durMode !== 'until' && durMode !== 'minutes') {
+                durMode = (parseInt(sourceBtn.getAttribute('data-duration') || '0', 10) > 0) ? 'until' : 'none';
+            }
+            setDurationMode(durMode);
             var editScope = sourceBtn.getAttribute('data-scope') === 'course' ? 'course' : 'personal';
             setCalScope(editScope, true);
             if (courseEl && editScope === 'course') {
@@ -339,6 +449,7 @@
             if (delBtn) {
                 delBtn.removeAttribute('hidden');
             }
+            syncRepeatUi(false);
         } else {
             calFormEl.reset();
             if (titleEl) {
@@ -347,15 +458,32 @@
             if (idEl) {
                 idEl.value = '';
             }
-            if (dateEl && !dateEl.value) {
-                var now = new Date();
-                var m = String(now.getMonth() + 1).padStart(2, '0');
-                var d = String(now.getDate()).padStart(2, '0');
-                dateEl.value = now.getFullYear() + '-' + m + '-' + d;
+            if (dateEl) {
+                if (presetDate && /^\d{4}-\d{2}-\d{2}$/.test(presetDate)) {
+                    dateEl.value = presetDate;
+                } else if (!dateEl.value) {
+                    var now = new Date();
+                    var m = String(now.getMonth() + 1).padStart(2, '0');
+                    var d = String(now.getDate()).padStart(2, '0');
+                    dateEl.value = now.getFullYear() + '-' + m + '-' + d;
+                }
             }
             if (timeEl && !timeEl.value) {
                 timeEl.value = '09:00';
             }
+            if (endDateEl && presetDate && /^\d{4}-\d{2}-\d{2}$/.test(presetDate)) {
+                endDateEl.value = presetDate;
+            }
+            setDurationMode('none');
+            var repeatMode = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
+            if (repeatMode) {
+                repeatMode.value = 'none';
+            }
+            var repeatCount = calForm.querySelector('[data-lp-cal-form-repeats]');
+            if (repeatCount) {
+                repeatCount.value = '4';
+            }
+            syncRepeatUi(true);
             var defaultScope = (calRoot && calRoot.getAttribute('data-default-scope') === 'course')
                 ? 'course'
                 : 'personal';
@@ -503,6 +631,18 @@
                 syncCalScopeUi(getCalScope());
             });
         });
+        calForm.querySelectorAll('[data-lp-cal-form-duration-mode]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                syncDurationModeUi(getDurationMode());
+            });
+        });
+        var repeatModeEl = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
+        if (repeatModeEl) {
+            repeatModeEl.addEventListener('change', function () {
+                var idEl = calForm.querySelector('[data-lp-cal-form-id]');
+                syncRepeatUi(!(idEl && idEl.value));
+            });
+        }
         var delBtn = calForm.querySelector('[data-lp-cal-form-delete]');
         if (delBtn) {
             delBtn.addEventListener('click', function () {
@@ -548,6 +688,9 @@
                 var scope = getCalScope();
                 var courseEl = calForm.querySelector('[data-lp-cal-form-course]');
                 var courseid = courseEl ? courseEl.value : '0';
+                var locField = calForm.querySelector('[data-lp-cal-form-location]');
+                var endDateField = calForm.querySelector('[data-lp-cal-form-end-date]');
+                var endTimeField = calForm.querySelector('[data-lp-cal-form-end-time]');
                 var payload = {
                     action: id ? 'update' : 'create',
                     id: id || '0',
@@ -556,8 +699,13 @@
                     name: nameEl ? nameEl.value : '',
                     date: dateEl ? dateEl.value : '',
                     time: timeEl ? timeEl.value : '',
+                    duration_mode: getDurationMode(),
                     duration: durEl ? durEl.value : '0',
-                    description: descEl ? descEl.value : ''
+                    end_date: endDateField ? endDateField.value : '',
+                    end_time: endTimeField ? endTimeField.value : '',
+                    location: locField ? locField.value : '',
+                    description: descEl ? descEl.value : '',
+                    repeats: id ? '1' : String(getRepeatCount())
                 };
                 if (!String(payload.name || '').trim()) {
                     if (err) {
@@ -604,6 +752,17 @@
             });
         }
     }
+    shell.addEventListener('change', function (e) {
+        var filter = e.target.closest('[data-lp-cal-filter]');
+        if (!filter) {
+            return;
+        }
+        var opt = filter.options[filter.selectedIndex];
+        var url = opt ? opt.getAttribute('data-url') : '';
+        if (url) {
+            window.location.href = url;
+        }
+    });
     shell.addEventListener('click', function (e) {
         var nav = e.target.closest('[data-lp-cal-nav]');
         if (nav) {
@@ -613,6 +772,24 @@
         }
         if (e.target.closest('[data-lp-cal-add]')) {
             openCalForm('create', null);
+            return;
+        }
+        var dayAdd = e.target.closest('[data-lp-cal-day-add]');
+        if (dayAdd) {
+            if (calDragMoved) {
+                calDragMoved = false;
+                return;
+            }
+            openCalForm('create', null, dayAdd.getAttribute('data-day-key') || '');
+            return;
+        }
+        var emptyDay = e.target.closest('.lp-cal-day.is-addable');
+        if (emptyDay && !e.target.closest('[data-lp-cal-open],[data-lp-cal-day-open],[data-lp-cal-day-add]')) {
+            if (calDragMoved) {
+                calDragMoved = false;
+                return;
+            }
+            openCalForm('create', null, emptyDay.getAttribute('data-day-key') || '');
             return;
         }
         var dayOpen = e.target.closest('[data-lp-cal-day-open]');
@@ -644,8 +821,90 @@
         }
         var openBtn = e.target.closest('[data-lp-cal-open]');
         if (openBtn) {
+            if (calDragMoved) {
+                calDragMoved = false;
+                return;
+            }
             openCalDetail(openBtn);
         }
+    });
+    shell.addEventListener('dragstart', function (e) {
+        var chip = e.target.closest('[data-lp-cal-open][draggable="true"]');
+        if (!chip) {
+            return;
+        }
+        calDragId = chip.getAttribute('data-id') || '';
+        calDragMoved = false;
+        if (e.dataTransfer) {
+            e.dataTransfer.setData('text/plain', calDragId);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+    });
+    shell.addEventListener('dragend', function () {
+        calDragId = null;
+        shell.querySelectorAll('[data-lp-cal-drop].is-drop-target').forEach(function (el) {
+            el.classList.remove('is-drop-target');
+        });
+        window.setTimeout(function () {
+            calDragMoved = false;
+        }, 0);
+    });
+    shell.addEventListener('dragover', function (e) {
+        var drop = e.target.closest('[data-lp-cal-drop]');
+        if (!drop || !calDragId) {
+            return;
+        }
+        e.preventDefault();
+        drop.classList.add('is-drop-target');
+    });
+    shell.addEventListener('dragleave', function (e) {
+        var drop = e.target.closest('[data-lp-cal-drop]');
+        if (drop) {
+            drop.classList.remove('is-drop-target');
+        }
+    });
+    shell.addEventListener('drop', function (e) {
+        var drop = e.target.closest('[data-lp-cal-drop]');
+        if (!drop) {
+            return;
+        }
+        e.preventDefault();
+        drop.classList.remove('is-drop-target');
+        var dayKey = drop.getAttribute('data-day-key');
+        var eventId = calDragId || (e.dataTransfer ? e.dataTransfer.getData('text/plain') : '');
+        calDragId = null;
+        calDragMoved = true;
+        if (!dayKey || !eventId || !calRoot) {
+            return;
+        }
+        var url = calRoot.getAttribute('data-reschedule-ajax');
+        var sesskey = calRoot.getAttribute('data-sesskey');
+        if (!url || !sesskey) {
+            return;
+        }
+        var body = new URLSearchParams();
+        body.set('id', eventId);
+        body.set('day_key', dayKey);
+        body.set('sesskey', sesskey);
+        fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            body: body.toString()
+        }).then(function (res) {
+            return res.json();
+        }).then(function (data) {
+            if (!data || !data.ok) {
+                throw new Error((data && data.error) || calStrings.network);
+            }
+            showCalFlash(calStrings.saved);
+            refreshCalMonth();
+        }).catch(function (err) {
+            showCalFlash(err.message || calStrings.network);
+        });
     });
     var initialMonth = shell.querySelector('[data-lp-cal-month]');
     if (initialMonth && initialMonth.getAttribute('data-time')) {

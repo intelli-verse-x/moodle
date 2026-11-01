@@ -64,9 +64,14 @@ if ($action === 'delete') {
     $name = required_param('name', PARAM_TEXT);
     $date = required_param('date', PARAM_TEXT);
     $time = required_param('time', PARAM_TEXT);
+    $durationmode = optional_param('duration_mode', 'none', PARAM_ALPHA);
     $durationmin = optional_param('duration', 0, PARAM_INT);
+    $enddate = optional_param('end_date', '', PARAM_TEXT);
+    $endtime = optional_param('end_time', '', PARAM_TEXT);
     $description = optional_param('description', '', PARAM_RAW);
+    $location = optional_param('location', '', PARAM_TEXT);
     $courseid = optional_param('courseid', 0, PARAM_INT);
+    $repeats = optional_param('repeats', 1, PARAM_INT);
     $timestart = calendar_service::parse_user_datetime((string) $date, (string) $time);
     if ($timestart === null) {
         $result = [
@@ -75,48 +80,68 @@ if ($action === 'delete') {
             'id' => null,
         ];
     } else {
-        $timeduration = max(0, $durationmin) * 60;
-        $description = trim(clean_param($description, PARAM_TEXT));
-        if ($scope === 'course') {
-            if ($action === 'create') {
-                $result = calendar_service::create_course(
+        $dur = calendar_service::timeduration_from_form(
+            (string) $durationmode,
+            $timestart,
+            $durationmin,
+            (string) $enddate,
+            (string) $endtime
+        );
+        if (!$dur['ok']) {
+            $result = ['ok' => false, 'error' => $dur['error'], 'id' => null];
+        } else {
+            $description = trim(clean_param($description, PARAM_RAW));
+            // Allow basic HTML from textarea (escaped by clean_text on store via Moodle).
+            $description = clean_text($description, FORMAT_HTML);
+            $location = trim(clean_param((string) $location, PARAM_TEXT));
+            $timeduration = (int) $dur['timeduration'];
+            if ($scope === 'course') {
+                if ($action === 'create') {
+                    $result = calendar_service::create_course(
+                        $userid,
+                        $courseid,
+                        (string) $name,
+                        $timestart,
+                        $timeduration,
+                        $description,
+                        $location,
+                        $repeats
+                    );
+                } else {
+                    $eventid = required_param('id', PARAM_INT);
+                    $result = calendar_service::update_course(
+                        $userid,
+                        $eventid,
+                        $courseid,
+                        (string) $name,
+                        $timestart,
+                        $timeduration,
+                        $description,
+                        $location
+                    );
+                }
+            } else if ($action === 'create') {
+                $result = calendar_service::create_personal(
                     $userid,
-                    $courseid,
                     (string) $name,
                     $timestart,
                     $timeduration,
-                    $description
+                    $description,
+                    $location,
+                    $repeats
                 );
             } else {
                 $eventid = required_param('id', PARAM_INT);
-                $result = calendar_service::update_course(
+                $result = calendar_service::update_personal(
                     $userid,
                     $eventid,
-                    $courseid,
                     (string) $name,
                     $timestart,
                     $timeduration,
-                    $description
+                    $description,
+                    $location
                 );
             }
-        } else if ($action === 'create') {
-            $result = calendar_service::create_personal(
-                $userid,
-                (string) $name,
-                $timestart,
-                $timeduration,
-                $description
-            );
-        } else {
-            $eventid = required_param('id', PARAM_INT);
-            $result = calendar_service::update_personal(
-                $userid,
-                $eventid,
-                (string) $name,
-                $timestart,
-                $timeduration,
-                $description
-            );
         }
     }
 } else {

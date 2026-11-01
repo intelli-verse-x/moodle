@@ -266,6 +266,7 @@ switch ($view) {
     case 'calendar':
         $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
         $calmode = optional_param('cal', 'month', PARAM_ALPHA);
+        $calfilter = optional_param('filter', 'all', PARAM_ALPHA);
         $caltime = optional_param('time', 0, PARAM_INT);
         $calyear = optional_param('year', 0, PARAM_INT);
         $calmonth = optional_param('month', 0, PARAM_INT);
@@ -279,7 +280,9 @@ switch ($view) {
             $courses,
             (int) $resolved['year'],
             (int) $resolved['month'],
-            $calmode
+            $calmode,
+            $calfilter,
+            $caltime > 0 ? $caltime : null
         );
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', array_merge($caldata, [
             'has_crumbs' => true,

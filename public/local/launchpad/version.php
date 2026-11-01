@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Calendar Phase 3: course event CRUD + mentor Calendar tab.
-$plugin->version   = 2026103109;
+// Calendar Phase 4+: week view + weekly repeat.
+$plugin->version   = 2026103115;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

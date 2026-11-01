@@ -56,7 +56,7 @@ final class calendar_service_test extends \advanced_testcase {
         $this->resetAfterTest();
 
         $ts = make_timestamp(2026, 6, 15, 10, 0, 0);
-        $daykey = userdate($ts, '%Y-%m-%d');
+        $daykey = calendar_service::user_ymd($ts);
         $items = [];
         for ($i = 1; $i <= 5; $i++) {
             $items[] = [
@@ -260,5 +260,179 @@ final class calendar_service_test extends \advanced_testcase {
         $this->assertTrue($result['has_items']);
         $names = array_column($result['items'], 'name');
         $this->assertContains('LP cal probe', $names);
+    }
+
+    public function test_user_ymd_zero_pads(): void {
+        $this->resetAfterTest();
+        $ts = make_timestamp(2026, 11, 3, 9, 5, 0);
+        $this->assertSame('2026-11-03', calendar_service::user_ymd($ts));
+        $this->assertSame('09:05', calendar_service::user_hi($ts));
+    }
+
+    public function test_resolve_week_has_seven_days(): void {
+        global $CFG;
+        $this->resetAfterTest();
+        $CFG->calendar_startwday = 1; // Monday.
+        $week = calendar_service::resolve_week(make_timestamp(2026, 11, 4, 15, 0, 0)); // Wednesday.
+        $this->assertCount(7, $week['days']);
+        $this->assertSame(2026, $week['days'][0]['year']);
+        $this->assertSame(11, $week['days'][0]['month']);
+        $this->assertSame(2, $week['days'][0]['day']); // Monday.
+        $this->assertSame(8, $week['days'][6]['day']); // Sunday.
+        $this->assertSame(7 * DAYSECS, $week['end'] - $week['start']);
+    }
+
+    public function test_normalize_repeats(): void {
+        $this->assertSame(1, calendar_service::normalize_repeats(0));
+        $this->assertSame(4, calendar_service::normalize_repeats(4));
+        $this->assertSame(52, calendar_service::normalize_repeats(99));
+    }
+
+    public function test_create_personal_weekly_repeat(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+        $timestart = make_timestamp(2026, 12, 1, 10, 0, 0);
+        $created = calendar_service::create_personal(
+            (int) $user->id,
+            'LP weekly probe',
+            $timestart,
+            0,
+            '',
+            '',
+            3
+        );
+        $this->assertTrue($created['ok'], $created['error'] ?? '');
+        $rows = $DB->get_records('event', ['userid' => $user->id, 'name' => 'LP weekly probe'], 'timestart ASC');
+        $this->assertCount(3, $rows);
+        $starts = array_values(array_map(static fn($r) => (int) $r->timestart, $rows));
+        $this->assertSame($timestart, $starts[0]);
+        $this->assertSame($timestart + (7 * DAYSECS), $starts[1]);
+        $this->assertSame($timestart + (14 * DAYSECS), $starts[2]);
+        $repeatid = (int) reset($rows)->repeatid;
+        $this->assertGreaterThan(0, $repeatid);
+        foreach ($rows as $row) {
+            $this->assertSame($repeatid, (int) $row->repeatid);
+            $DB->delete_records('event', ['id' => $row->id]);
+        }
+    }
+
+    public function test_resolve_day_and_filter_items(): void {
+        $this->resetAfterTest();
+
+        $day = calendar_service::resolve_day(make_timestamp(2026, 9, 18, 15, 30, 0));
+        $this->assertSame(2026, $day['year']);
+        $this->assertSame(9, $day['month']);
+        $this->assertSame(18, $day['day']);
+
+        $items = [
+            ['id' => 1, 'filter_bucket' => 'personal', 'is_personal' => true],
+            ['id' => 2, 'filter_bucket' => 'course', 'is_personal' => false],
+            ['id' => 3, 'is_personal' => true],
+        ];
+        $this->assertCount(3, calendar_service::filter_items($items, 'all'));
+        $this->assertCount(2, calendar_service::filter_items($items, 'personal'));
+        $this->assertCount(1, calendar_service::filter_items($items, 'course'));
+    }
+
+    public function test_timeduration_from_form_modes(): void {
+        $this->resetAfterTest();
+
+        $start = make_timestamp(2026, 10, 1, 9, 0, 0);
+        $none = calendar_service::timeduration_from_form('none', $start, 0, '', '');
+        $this->assertTrue($none['ok']);
+        $this->assertSame(0, $none['timeduration']);
+
+        $mins = calendar_service::timeduration_from_form('minutes', $start, 45, '', '');
+        $this->assertTrue($mins['ok']);
+        $this->assertSame(45 * 60, $mins['timeduration']);
+
+        $until = calendar_service::timeduration_from_form('until', $start, 0, '2026-10-01', '10:30');
+        $this->assertTrue($until['ok']);
+        $this->assertSame(90 * 60, $until['timeduration']);
+
+        $bad = calendar_service::timeduration_from_form('until', $start, 0, '2026-10-01', '08:00');
+        $this->assertFalse($bad['ok']);
+    }
+
+    public function test_map_event_location_html_and_duration(): void {
+        $this->resetAfterTest();
+
+        $event = (object) [
+            'id' => 44,
+            'name' => 'Studio block',
+            'courseid' => 0,
+            'timestart' => make_timestamp(2026, 10, 5, 11, 0, 0),
+            'timeduration' => 3600,
+            'description' => '<p><strong>Bring</strong> kit</p>',
+            'format' => FORMAT_HTML,
+            'eventtype' => 'user',
+            'modulename' => '',
+            'location' => 'Lab 2',
+            'userid' => 1,
+        ];
+        $mapped = calendar_service::map_event($event, []);
+        $this->assertTrue($mapped['has_location']);
+        $this->assertSame('Lab 2', $mapped['location']);
+        $this->assertTrue($mapped['has_description']);
+        $this->assertStringContainsString('<strong>', $mapped['description_html']);
+        $this->assertStringContainsString('Bring', $mapped['description_plain']);
+        $this->assertSame('until', $mapped['duration_mode']);
+        $this->assertSame(60, $mapped['duration_minutes']);
+        $this->assertSame('personal', $mapped['filter_bucket']);
+    }
+
+    public function test_reschedule_to_day_keeps_clock_time(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        $this->setUser($user);
+        $timestart = make_timestamp(2026, 11, 2, 14, 30, 0);
+        $created = calendar_service::create_personal(
+            (int) $user->id,
+            'LP drag probe',
+            $timestart,
+            0,
+            '',
+            'Room A'
+        );
+        $this->assertTrue($created['ok'], $created['error'] ?? '');
+
+        $moved = calendar_service::reschedule_to_day(
+            (int) $user->id,
+            (int) $created['id'],
+            '2026-11-09'
+        );
+        $this->assertTrue($moved['ok'], $moved['error'] ?? '');
+        $row = $DB->get_record('event', ['id' => $created['id']], '*', MUST_EXIST);
+        $this->assertSame(make_timestamp(2026, 11, 9, 14, 30, 0), (int) $row->timestart);
+        $this->assertSame('Room A', $row->location);
+    }
+
+    public function test_build_ical_includes_event(): void {
+        $this->resetAfterTest();
+
+        $user = $this->getDataGenerator()->create_user();
+        $course = $this->getDataGenerator()->create_course();
+        $this->getDataGenerator()->enrol_user($user->id, $course->id);
+        $this->setUser($user);
+
+        $created = calendar_service::create_personal(
+            (int) $user->id,
+            'LP ical probe',
+            time() + DAYSECS,
+            1800,
+            'Body',
+            'Hall'
+        );
+        $this->assertTrue($created['ok'], $created['error'] ?? '');
+
+        $ical = calendar_service::build_ical((int) $user->id, [$course]);
+        $this->assertStringContainsString('BEGIN:VCALENDAR', $ical);
+        $this->assertStringContainsString('LP ical probe', $ical);
+        $this->assertStringContainsString('Hall', $ical);
     }
 }
