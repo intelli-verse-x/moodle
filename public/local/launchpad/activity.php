@@ -32,6 +32,7 @@ require_login();
 
 $cmid = required_param('id', PARAM_INT);
 
+// Persona gate first — then activity_portal::export() enforces course login + mod caps.
 if (!account_persona::is_employee((int) $USER->id) && !is_siteadmin()) {
     throw new \moodle_exception('employee_access_denied', 'local_launchpad');
 }

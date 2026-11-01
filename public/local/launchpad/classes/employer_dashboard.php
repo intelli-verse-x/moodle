@@ -993,6 +993,7 @@ final class employer_dashboard {
             $completion = new \completion_info($course);
             $completionon = $completion->is_enabled();
         } catch (\Throwable $e) {
+            debugging('employer_dashboard course_workspace: ' . $e->getMessage(), DEBUG_DEVELOPER);
             return $empty;
         }
 
@@ -1120,7 +1121,7 @@ final class employer_dashboard {
                 return (int) $DB->count_records_select(
                     'notifications',
                     'useridto = :uid AND timeread IS NULL',
-                    ['uid' => $userid]
+                    ['uid' => (int) $userid]
                 );
             }
         } catch (\Throwable $e) {

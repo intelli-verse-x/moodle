@@ -164,8 +164,13 @@ final class activity_portal {
             } else {
                 $completion->set_module_viewed($cm);
             }
-            $externalurl = $urlmod->externalurl ?? '';
-            $hasexternal = $externalurl !== '';
+            // Only expose http(s) destinations in the Employer shell.
+            $rawurl = clean_param((string) ($urlmod->externalurl ?? ''), PARAM_URL);
+            $scheme = $rawurl !== '' ? strtolower((string) (parse_url($rawurl, PHP_URL_SCHEME) ?? '')) : '';
+            if ($rawurl !== '' && in_array($scheme, ['http', 'https'], true)) {
+                $externalurl = $rawurl;
+                $hasexternal = true;
+            }
             if (!empty($urlmod->intro)) {
                 $introhtml = format_module_intro('url', $urlmod, $cm->id);
                 $hasintro = trim(strip_tags($introhtml)) !== '';
@@ -338,6 +343,17 @@ final class activity_portal {
             }
         }
         if ($cmid <= 0) {
+            return;
+        }
+
+        // Only wrap LaunchPad (lp-*) courses — keep native Moodle chrome elsewhere.
+        $cm = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+        if (!$cm) {
+            return;
+        }
+        $course = get_course((int) $cm->course);
+        $idnumber = (string) ($course->idnumber ?? '');
+        if (!str_starts_with($idnumber, account_persona::COURSE_IDNUMBER_PREFIX)) {
             return;
         }
 
