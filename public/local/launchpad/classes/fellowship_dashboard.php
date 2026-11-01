@@ -649,9 +649,10 @@ final class fellowship_dashboard {
         $summary = trim(format_string($course->summary ?? ''));
         $hasrealsummary = $summary !== '' && stripos($summary, 'placeholder') === false;
 
-        $mentors = self::course_mentor_names($course);
-        $mentorlabel = $mentors !== []
-            ? implode(', ', $mentors)
+        $mentors = self::course_mentors($course, $userid);
+        $mentornames = array_map(static fn(array $m): string => (string) $m['name'], $mentors);
+        $mentorlabel = $mentornames !== []
+            ? implode(', ', $mentornames)
             : get_string('fellowship_track_mentor_tba', 'local_launchpad');
 
         return [
@@ -668,6 +669,8 @@ final class fellowship_dashboard {
             'device' => get_string('fellowship_track_device', 'local_launchpad'),
             'tools' => get_string('fellowship_track_tools', 'local_launchpad'),
             'mentor' => $mentorlabel,
+            'mentors' => $mentors,
+            'has_mentors' => $mentors !== [],
             'weight_rows' => $weights,
             'completion_enabled' => !empty($outline['completion_enabled']),
             'completed' => (int) ($outline['completed'] ?? 0),
@@ -678,11 +681,11 @@ final class fellowship_dashboard {
     }
 
     /**
-     * Display names of teachers / editing teachers on a course (Mentors card).
+     * Course teachers / editing teachers as mentor contacts (Message CTAs for fellows).
      *
-     * @return list<string>
+     * @return list<array{id:int,name:string,can_message:bool,message_url:string}>
      */
-    public static function course_mentor_names(\stdClass $course): array {
+    public static function course_mentors(\stdClass $course, int $viewerid = 0): array {
         global $CFG, $DB;
 
         require_once($CFG->libdir . '/enrollib.php');
@@ -713,11 +716,33 @@ final class fellowship_dashboard {
               ORDER BY u.lastname ASC, u.firstname ASC";
         $params['courseid'] = (int) $course->id;
 
-        $names = [];
+        $out = [];
         foreach ($DB->get_records_sql($sql, $params) as $user) {
-            $names[] = fullname($user);
+            $mentorid = (int) $user->id;
+            if ($viewerid > 0 && $mentorid === $viewerid) {
+                continue;
+            }
+            $out[] = [
+                'id' => $mentorid,
+                'name' => fullname($user),
+                'can_message' => $viewerid > 0 && messaging::can_message($viewerid, $mentorid),
+                'message_url' => messaging::messages_url($mentorid, 'fellow'),
+            ];
         }
-        return array_values($names);
+        return array_values($out);
+    }
+
+    /**
+     * Display names of teachers / editing teachers on a course (Mentors card).
+     *
+     * @return list<string>
+     */
+    public static function course_mentor_names(\stdClass $course): array {
+        $names = [];
+        foreach (self::course_mentors($course) as $mentor) {
+            $names[] = (string) $mentor['name'];
+        }
+        return $names;
     }
 
     /**

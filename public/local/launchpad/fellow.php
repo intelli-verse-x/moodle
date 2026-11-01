@@ -41,7 +41,14 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$courseid = optional_param('id', 0, PARAM_INT);
+// On messages, id is the other user — never a course (avoids fellowship_course_denied).
+$messageuserid = 0;
+$courseid = 0;
+if ($view === 'messages') {
+    $messageuserid = optional_param('id', 0, PARAM_INT);
+} else {
+    $courseid = optional_param('id', 0, PARAM_INT);
+}
 
 $courses = fellowship_dashboard::list_courses($userid);
 $courseids = array_map(static fn($c) => (int) $c->id, $courses);
@@ -68,7 +75,9 @@ $context = context_system::instance();
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url(persona_home::FELLOW_PATH, array_filter([
     'view' => $view !== 'home' ? $view : null,
-    'id' => $courseid > 0 ? $courseid : null,
+    'id' => $view === 'messages'
+        ? ($messageuserid > 0 ? $messageuserid : null)
+        : ($courseid > 0 ? $courseid : null),
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('fellowship_area_title', 'local_launchpad'));
@@ -284,7 +293,7 @@ switch ($view) {
 
     case 'messages':
         $pagetitle = get_string('fellowship_messages_heading', 'local_launchpad');
-        $otherid = $courseid > 0 ? $courseid : null;
+        $otherid = $messageuserid > 0 ? $messageuserid : null;
         $msgdata = messaging::page_context($userid, 'fellow', $otherid);
         $msgcrumbs = [
             $crumbhome,

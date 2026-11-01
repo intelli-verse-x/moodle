@@ -1210,6 +1210,21 @@ body.local-launchpad-mentor {
 }
 .lp-kv dt { color: var(--lp-muted); }
 .lp-kv dd { margin: 0; color: var(--lp-ink); }
+.lp-mentor-contact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp-mentor-contact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .lp-weight-row { display: flex; flex-direction: column; gap: 4px; }
 .lp-bar-thin { height: 6px; }
 
