@@ -2464,13 +2464,57 @@ body.lp-portal-mismatch-lock {
   flex-wrap: wrap;
 }
 .lp-msg-delete-form { display: none; }
-.lp-msg-compose {
+.lp-msg-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.lp-msg-confirm.is-open { display: flex; }
+.lp-msg-confirm[hidden] { display: none !important; }
+.lp-msg-confirm-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 20, 41, 0.48);
+  backdrop-filter: blur(2px);
+}
+.lp-msg-confirm-card {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  background: #fff;
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(13, 20, 41, 0.28);
+  padding: 22px 22px 18px;
+}
+.lp-msg-confirm-card h2 {
+  margin: 0 0 10px;
+  font-family: var(--lp-display, Syne, sans-serif);
+  font-size: 1.35rem;
+  line-height: 1.25;
+  color: var(--lp-ink);
+}
+.lp-msg-confirm-card .lp-sm {
+  margin: 0;
+  color: var(--lp-muted, #5a657a);
+  line-height: 1.5;
+}
+.lp-msg-confirm-actions {
   display: flex;
-  gap: 10px;
-  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.lp-msg-compose {
   padding: 12px 14px;
   border-top: 1px solid var(--lp-line);
   background: #fff;
+  position: relative;
 }
 .lp-msg-compose[hidden] { display: none !important; }
 .lp-msg-compose .lp-msg-label {
@@ -2479,6 +2523,15 @@ body.lp-portal-mismatch-lock {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+.lp-msg-compose-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.lp-msg-compose-tools {
+  position: relative;
+  flex: 0 0 auto;
 }
 .lp-msg-compose textarea {
   flex: 1;
@@ -2489,6 +2542,54 @@ body.lp-portal-mismatch-lock {
   border-radius: 12px;
   padding: 10px 12px;
   font: inherit;
+}
+.lp-msg-emoji-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--lp-line);
+  background: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+}
+.lp-msg-emoji-btn:hover,
+.lp-msg-emoji-btn[aria-expanded="true"] {
+  background: var(--lp-blue-soft, #eef4ff);
+  border-color: transparent;
+}
+.lp-msg-emoji-panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: min(280px, 70vw);
+  max-height: 200px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--lp-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(20, 30, 60, 0.12);
+}
+.lp-msg-emoji-panel[hidden] { display: none !important; }
+.lp-msg-emoji-item {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.lp-msg-emoji-item:hover {
+  background: var(--lp-blue-soft, #eef4ff);
 }
 .lp-msg-pick { margin: auto; }
 @media (max-width: 860px) {

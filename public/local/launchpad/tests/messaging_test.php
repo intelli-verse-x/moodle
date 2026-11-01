@@ -79,9 +79,11 @@ final class messaging_test extends \basic_testcase {
         $none = messaging::delete_messages(1, []);
         $this->assertFalse($none['ok']);
         $this->assertSame(0, $none['deleted']);
+        $this->assertSame([], $none['deleted_ids']);
 
         $baduser = messaging::delete_messages(0, [12, 13]);
         $this->assertFalse($baduser['ok']);
         $this->assertSame(0, $baduser['deleted']);
+        $this->assertSame([], $baduser['deleted_ids']);
     }
 }

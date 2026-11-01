@@ -32,7 +32,13 @@
 {{/messaging_enabled}}
 
 {{#messaging_enabled}}
-  <div class="lp-msg-layout{{#has_thread}} has-thread{{/has_thread}}">
+  <div class="lp-msg-layout{{#has_thread}} has-thread{{/has_thread}}"
+    data-lp-msg-root
+    data-ajax-url="{{ajax_url}}"
+    data-sesskey="{{sesskey}}"
+    data-portal="{{portal}}"
+    data-other-id="{{other_id}}"
+    data-can-delete="{{#can_delete_messages}}1{{/can_delete_messages}}{{^can_delete_messages}}0{{/can_delete_messages}}">
     <aside class="lp-msg-inbox" aria-label="{{#str}} fellowship_messages_inbox, local_launchpad {{/str}}">
       {{#has_conversations}}
         <ul class="lp-msg-list">
@@ -82,12 +88,11 @@
 
           {{#can_delete_messages}}
             <div class="lp-msg-select-bar" data-lp-msg-select-bar hidden
-              data-count-tpl="{{#str}} fellowship_messages_delete_selected, local_launchpad, __N__ {{/str}}"
-              data-confirm="{{#str}} fellowship_messages_delete_confirm, local_launchpad {{/str}}">
+              data-count-tpl="{{#str}} fellowship_messages_delete_selected, local_launchpad, __N__ {{/str}}">
               <span class="lp-sm" data-lp-msg-select-count>{{#str}} fellowship_messages_delete_selected, local_launchpad, 0 {{/str}}</span>
               <div class="lp-msg-select-actions">
                 <button type="button" class="lp-btn lp-btn-light" data-lp-msg-select-cancel>{{#str}} fellowship_messages_delete_cancel, local_launchpad {{/str}}</button>
-                <button type="submit" class="lp-btn lp-btn-primary" form="lp-msg-delete-form" data-lp-msg-select-delete disabled>{{#str}} fellowship_messages_delete, local_launchpad {{/str}}</button>
+                <button type="button" class="lp-btn lp-btn-primary" data-lp-msg-select-delete disabled>{{#str}} fellowship_messages_delete, local_launchpad {{/str}}</button>
               </div>
             </div>
             <form id="lp-msg-delete-form" class="lp-msg-delete-form" method="post" action="{{form_action}}" data-lp-msg-delete-form hidden>
@@ -97,6 +102,18 @@
               <input type="hidden" name="msgaction" value="delete">
               <div data-lp-msg-delete-ids></div>
             </form>
+            <div class="lp-msg-confirm" data-lp-msg-confirm hidden role="presentation">
+              <div class="lp-msg-confirm-scrim" data-lp-msg-confirm-cancel aria-hidden="true"></div>
+              <div class="lp-msg-confirm-card" role="dialog" aria-modal="true"
+                aria-labelledby="lp-msg-confirm-title" aria-describedby="lp-msg-confirm-body">
+                <h2 id="lp-msg-confirm-title">{{#str}} fellowship_messages_delete_confirm_title, local_launchpad {{/str}}</h2>
+                <p id="lp-msg-confirm-body" class="lp-sm">{{#str}} fellowship_messages_delete_confirm, local_launchpad {{/str}}</p>
+                <div class="lp-msg-confirm-actions">
+                  <button type="button" class="lp-btn lp-btn-light" data-lp-msg-confirm-cancel>{{#str}} fellowship_messages_delete_cancel, local_launchpad {{/str}}</button>
+                  <button type="button" class="lp-btn lp-btn-primary" data-lp-msg-confirm-ok>{{#str}} fellowship_messages_delete, local_launchpad {{/str}}</button>
+                </div>
+              </div>
+            </div>
             <p class="lp-xs lp-muted lp-msg-select-hint" data-lp-msg-select-hint>{{#str}} fellowship_messages_select_hint, local_launchpad {{/str}}</p>
           {{/can_delete_messages}}
 
@@ -127,9 +144,20 @@
               <input type="hidden" name="id" value="{{other_id}}">
               <input type="hidden" name="msgaction" value="send">
               <label class="lp-msg-label" for="lp-msg-body">{{#str}} fellowship_messages_compose, local_launchpad {{/str}}</label>
-              <textarea id="lp-msg-body" name="message" rows="2" maxlength="4000" required
-                placeholder="{{#str}} fellowship_messages_compose_placeholder, local_launchpad {{/str}}"></textarea>
-              <button type="submit" class="lp-btn lp-btn-primary">{{#str}} fellowship_messages_send, local_launchpad {{/str}}</button>
+              <div class="lp-msg-compose-row">
+                <div class="lp-msg-compose-tools">
+                  <button type="button" class="lp-msg-emoji-btn" data-lp-msg-emoji-toggle
+                    aria-expanded="false" aria-controls="lp-msg-emoji-panel"
+                    title="{{#str}} fellowship_messages_emoji, local_launchpad {{/str}}"
+                    aria-label="{{#str}} fellowship_messages_emoji, local_launchpad {{/str}}">☺</button>
+                  <div id="lp-msg-emoji-panel" class="lp-msg-emoji-panel" data-lp-msg-emoji-panel hidden role="dialog"
+                    aria-label="{{#str}} fellowship_messages_emoji, local_launchpad {{/str}}"></div>
+                </div>
+                <textarea id="lp-msg-body" name="message" rows="2" maxlength="4000" required
+                  placeholder="{{#str}} fellowship_messages_compose_placeholder, local_launchpad {{/str}}"
+                  data-lp-msg-body></textarea>
+                <button type="submit" class="lp-btn lp-btn-primary" data-lp-msg-send>{{#str}} fellowship_messages_send, local_launchpad {{/str}}</button>
+              </div>
             </form>
           {{/can_send}}
           {{^can_send}}

@@ -144,13 +144,16 @@ final class messaging {
             'moodle_messages_url' => self::moodle_messages_url($otherid),
             'has_thread' => false,
             'can_send' => false,
+            'can_delete_messages' => false,
             'conversations' => [],
             'has_conversations' => false,
             'messages' => [],
             'has_messages' => false,
             'form_action' => $inboxurl,
+            'ajax_url' => (new \moodle_url('/local/launchpad/ajax_messaging.php'))->out(false),
             'sesskey' => sesskey(),
             'portal' => $portal,
+            'other_id' => $otherid ?: 0,
             'is_mentor' => $portal === 'mentor',
         ];
 
@@ -227,6 +230,8 @@ final class messaging {
         $ctx['can_send'] = \core_message\api::can_send_message_to_conversation($userid, $convid);
         $ctx['can_delete_messages'] = $candelete;
         $ctx['form_action'] = $threadurl;
+        $ctx['ajax_url'] = (new \moodle_url('/local/launchpad/ajax_messaging.php'))->out(false);
+        $ctx['portal'] = $portal === 'mentor' ? 'mentor' : 'fellow';
         $ctx['moodle_messages_url'] = self::moodle_messages_url($otherid);
 
         return $ctx;
@@ -236,7 +241,7 @@ final class messaging {
      * Soft-delete messages for this user only (Moodle MESSAGE_ACTION_DELETED).
      *
      * @param list<int> $messageids
-     * @return array{ok:bool,error:?string,deleted:int}
+     * @return array{ok:bool,error:?string,deleted:int,deleted_ids:list<int>}
      */
     public static function delete_messages(int $userid, array $messageids): array {
         if ($userid <= 0) {
@@ -244,6 +249,7 @@ final class messaging {
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
                 'deleted' => 0,
+                'deleted_ids' => [],
             ];
         }
 
@@ -259,6 +265,7 @@ final class messaging {
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_delete_none', 'local_launchpad'),
                 'deleted' => 0,
+                'deleted_ids' => [],
             ];
         }
 
@@ -267,32 +274,39 @@ final class messaging {
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_delete', 'local_launchpad'),
                 'deleted' => 0,
+                'deleted_ids' => [],
             ];
         }
 
-        $deleted = 0;
+        $deletedids = [];
         foreach ($ids as $messageid) {
             try {
                 if (!\core_message\api::can_delete_message($userid, $messageid)) {
                     continue;
                 }
                 if (\core_message\api::delete_message($userid, $messageid)) {
-                    $deleted++;
+                    $deletedids[] = $messageid;
                 }
             } catch (\Throwable $e) {
                 // Skip failed ids; continue batch.
             }
         }
 
-        if ($deleted === 0) {
+        if ($deletedids === []) {
             return [
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_delete', 'local_launchpad'),
                 'deleted' => 0,
+                'deleted_ids' => [],
             ];
         }
 
-        return ['ok' => true, 'error' => null, 'deleted' => $deleted];
+        return [
+            'ok' => true,
+            'error' => null,
+            'deleted' => count($deletedids),
+            'deleted_ids' => $deletedids,
+        ];
     }
 
     /**
@@ -311,7 +325,7 @@ final class messaging {
     /**
      * Send a private message; creates the individual conversation if needed.
      *
-     * @return array{ok:bool,error:?string}
+     * @return array{ok:bool,error:?string,message?:array}
      */
     public static function send(int $fromid, int $toid, string $text): array {
         $text = trim($text);
@@ -352,8 +366,23 @@ final class messaging {
                     'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
                 ];
             }
-            \core_message\api::send_message_to_conversation($fromid, $convid, $clean, FORMAT_PLAIN);
-            return ['ok' => true, 'error' => null];
+            $sent = \core_message\api::send_message_to_conversation($fromid, $convid, $clean, FORMAT_PLAIN);
+            $mid = (int) ($sent->id ?? 0);
+            $when = !empty($sent->timecreated)
+                ? userdate((int) $sent->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
+                : '';
+            return [
+                'ok' => true,
+                'error' => null,
+                'message' => [
+                    'id' => $mid,
+                    'text' => (string) ($sent->text ?? $clean),
+                    'is_mine' => true,
+                    'can_delete' => $mid > 0 && self::user_can_delete_own_messages($fromid)
+                        && \core_message\api::can_delete_message($fromid, $mid),
+                    'when' => $when,
+                ],
+            ];
         } catch (\Throwable $e) {
             return [
                 'ok' => false,
