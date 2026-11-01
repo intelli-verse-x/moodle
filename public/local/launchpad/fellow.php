@@ -27,6 +27,7 @@ require(__DIR__ . '/../../config.php');
 use local_launchpad\account_persona;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
+use local_launchpad\messaging;
 use local_launchpad\persona_home;
 use local_launchpad\portal_gate;
 
@@ -44,6 +45,24 @@ $courseid = optional_param('id', 0, PARAM_INT);
 
 $courses = fellowship_dashboard::list_courses($userid);
 $courseids = array_map(static fn($c) => (int) $c->id, $courses);
+
+// Send / delete LaunchPad messages (Moodle-backed) before rendering.
+if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
+    $toid = required_param('id', PARAM_INT);
+    $msgaction = optional_param('msgaction', 'send', PARAM_ALPHA);
+    $redirect = new moodle_url(persona_home::FELLOW_PATH, ['view' => 'messages', 'id' => $toid]);
+    if ($msgaction === 'delete') {
+        $messageids = optional_param_array('messageids', [], PARAM_INT);
+        $result = messaging::delete_messages($userid, $messageids);
+    } else {
+        $body = required_param('message', PARAM_RAW_TRIMMED);
+        $result = messaging::send($userid, $toid, $body);
+    }
+    if (!$result['ok']) {
+        redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);
+    }
+    redirect($redirect);
+}
 
 $context = context_system::instance();
 $PAGE->set_context($context);
@@ -64,7 +83,7 @@ $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(fals
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
 // Legacy Progress tab redirects to Phase progress; keep URL for shell/home links.
 $progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
-$notificationsurl = (new moodle_url('/message/index.php'))->out(false);
+$notificationsurl = messaging::messages_url(null, 'fellow');
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -260,6 +279,30 @@ switch ($view) {
                     'url' => '',
                 ],
             ],
+        ]));
+        break;
+
+    case 'messages':
+        $pagetitle = get_string('fellowship_messages_heading', 'local_launchpad');
+        $otherid = $courseid > 0 ? $courseid : null;
+        $msgdata = messaging::page_context($userid, 'fellow', $otherid);
+        $msgcrumbs = [
+            $crumbhome,
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => !empty($msgdata['has_thread']) ? messaging::messages_url(null, 'fellow') : '',
+            ],
+        ];
+        if (!empty($msgdata['has_thread']) && !empty($msgdata['other_name'])) {
+            $pagetitle = (string) $msgdata['other_name'];
+            $msgcrumbs[] = [
+                'label' => (string) $msgdata['other_name'],
+                'url' => '',
+            ];
+        }
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', array_merge($msgdata, [
+            'has_crumbs' => true,
+            'crumbs' => $msgcrumbs,
         ]));
         break;
 
@@ -499,17 +542,8 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = 0;
-if (class_exists('\message_popup\api')) {
-    try {
-        $unread = (int) \message_popup\api::count_unread_popup_notifications($userid);
-    } catch (\Throwable $e) {
-        $unread = 0;
-    }
-}
-$notificationslabel = $unread > 0
-    ? get_string('fellowship_notifications_unread', 'local_launchpad', $unread)
-    : get_string('fellowship_notifications', 'local_launchpad');
+$unread = messaging::unread_count($userid);
+$notificationslabel = messaging::messages_label($unread);
 
 $orbittips = [
     'home' => get_string('fellowship_orbit_tip_home', 'local_launchpad'),

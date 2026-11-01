@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Disable Review on not-submitted rows (fellow detail + queue).
-$plugin->version   = 2026103120;
+// LaunchPad messages: select + multi-delete (Moodle soft-delete).
+$plugin->version   = 2026103123;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';

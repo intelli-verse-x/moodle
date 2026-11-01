@@ -1030,4 +1030,134 @@
             });
         }
     }
+    var msgScroll = document.querySelector('[data-lp-msg-scroll]');
+    if (msgScroll) {
+        msgScroll.scrollTop = msgScroll.scrollHeight;
+    }
+
+    // Message select + multi-delete (Moodle soft-delete for current user).
+    (function initMsgSelectDelete() {
+        var root = document.querySelector('[data-lp-msg-bubbles]');
+        var bar = document.querySelector('[data-lp-msg-select-bar]');
+        var form = document.querySelector('[data-lp-msg-delete-form]');
+        var idsHost = form ? form.querySelector('[data-lp-msg-delete-ids]') : null;
+        var countEl = bar ? bar.querySelector('[data-lp-msg-select-count]') : null;
+        var deleteBtn = bar ? bar.querySelector('[data-lp-msg-select-delete]') : null;
+        var cancelBtn = bar ? bar.querySelector('[data-lp-msg-select-cancel]') : null;
+        var compose = document.querySelector('[data-lp-msg-compose]');
+        var hint = document.querySelector('[data-lp-msg-select-hint]');
+        if (!root || !bar || !form || !idsHost || !deleteBtn) {
+            return;
+        }
+
+        var selected = Object.create(null);
+        var selecting = false;
+        var countTpl = bar.getAttribute('data-count-tpl') || '__N__ selected';
+        var confirmMsg = bar.getAttribute('data-confirm') || 'Delete selected messages?';
+
+        function selectedIds() {
+            return Object.keys(selected).filter(function (id) {
+                return selected[id];
+            });
+        }
+
+        function syncUi() {
+            var ids = selectedIds();
+            var n = ids.length;
+            // Select mode stays on until Cancel (even if last box unchecked).
+            bar.hidden = !selecting;
+            if (hint) {
+                hint.hidden = selecting;
+            }
+            if (compose) {
+                compose.hidden = selecting;
+            }
+            root.classList.toggle('is-selecting', selecting);
+            if (countEl) {
+                countEl.textContent = countTpl.replace(/__N__/g, String(n));
+            }
+            deleteBtn.disabled = n === 0;
+            idsHost.innerHTML = '';
+            ids.forEach(function (id) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'messageids[]';
+                input.value = id;
+                idsHost.appendChild(input);
+            });
+            root.querySelectorAll('[data-lp-msg-bubble].is-selectable').forEach(function (bubble) {
+                var id = bubble.getAttribute('data-id');
+                var on = !!(id && selected[id]);
+                bubble.classList.toggle('is-selected', on);
+                bubble.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+
+        function toggleBubble(bubble) {
+            if (!bubble || !bubble.classList.contains('is-selectable')) {
+                return;
+            }
+            var id = bubble.getAttribute('data-id');
+            if (!id) {
+                return;
+            }
+            if (!selecting) {
+                selecting = true;
+                selected[id] = true;
+                syncUi();
+                return;
+            }
+            if (selected[id]) {
+                delete selected[id];
+            } else {
+                selected[id] = true;
+            }
+            syncUi();
+        }
+
+        function clearSelection() {
+            selected = Object.create(null);
+            selecting = false;
+            syncUi();
+        }
+
+        root.addEventListener('click', function (e) {
+            var bubble = e.target.closest('[data-lp-msg-bubble].is-selectable');
+            if (!bubble || !root.contains(bubble)) {
+                return;
+            }
+            e.preventDefault();
+            toggleBubble(bubble);
+        });
+
+        root.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') {
+                return;
+            }
+            var bubble = e.target.closest('[data-lp-msg-bubble].is-selectable');
+            if (!bubble || !root.contains(bubble)) {
+                return;
+            }
+            e.preventDefault();
+            toggleBubble(bubble);
+        });
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                clearSelection();
+            });
+        }
+
+        form.addEventListener('submit', function (e) {
+            if (selectedIds().length === 0) {
+                e.preventDefault();
+                return;
+            }
+            if (!window.confirm(confirmMsg)) {
+                e.preventDefault();
+            }
+        });
+
+        syncUi();
+    })();
 })();

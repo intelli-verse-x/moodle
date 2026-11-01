@@ -28,6 +28,7 @@ use local_launchpad\account_persona;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\mentor_dashboard;
+use local_launchpad\messaging;
 use local_launchpad\persona_home;
 use local_launchpad\portal_gate;
 
@@ -48,6 +49,24 @@ $saved = optional_param('saved', '', PARAM_ALPHA);
 $err = optional_param('err', '', PARAM_ALPHANUMEXT);
 
 $courses = persona_home::list_mentor_courses($userid);
+
+// Send / delete LaunchPad messages (Moodle-backed) before rendering.
+if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
+    $toid = required_param('id', PARAM_INT);
+    $msgaction = optional_param('msgaction', 'send', PARAM_ALPHA);
+    $redirect = new moodle_url(persona_home::MENTOR_PATH, ['view' => 'messages', 'id' => $toid]);
+    if ($msgaction === 'delete') {
+        $messageids = optional_param_array('messageids', [], PARAM_INT);
+        $result = messaging::delete_messages($userid, $messageids);
+    } else {
+        $body = required_param('message', PARAM_RAW_TRIMMED);
+        $result = messaging::send($userid, $toid, $body);
+    }
+    if (!$result['ok']) {
+        redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);
+    }
+    redirect($redirect);
+}
 
 // Persist review into Moodle assign before rendering.
 if ($view === 'review' && $cmid > 0 && $fellowid > 0 && data_submitted() && confirm_sesskey()) {
@@ -98,7 +117,7 @@ $homeurl = (new moodle_url(persona_home::MENTOR_PATH))->out(false);
 $queueurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
 $fellowsurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false);
 $calendarurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'calendar']))->out(false);
-$notificationsurl = (new moodle_url('/message/index.php'))->out(false);
+$notificationsurl = messaging::messages_url(null, 'mentor');
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -203,6 +222,33 @@ switch ($view) {
         ]));
         break;
 
+    case 'messages':
+        $pagetitle = get_string('fellowship_messages_heading', 'local_launchpad');
+        $otherid = $cmid > 0 ? $cmid : null;
+        $msgdata = messaging::page_context($userid, 'mentor', $otherid);
+        $msgcrumbs = [
+            [
+                'label' => get_string('mentor_nav_home', 'local_launchpad'),
+                'url' => $homeurl,
+            ],
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => !empty($msgdata['has_thread']) ? messaging::messages_url(null, 'mentor') : '',
+            ],
+        ];
+        if (!empty($msgdata['has_thread']) && !empty($msgdata['other_name'])) {
+            $pagetitle = (string) $msgdata['other_name'];
+            $msgcrumbs[] = [
+                'label' => (string) $msgdata['other_name'],
+                'url' => '',
+            ];
+        }
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', array_merge($msgdata, [
+            'has_crumbs' => true,
+            'crumbs' => $msgcrumbs,
+        ]));
+        break;
+
     case 'calendar':
         $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
         $calmode = optional_param('cal', 'month', PARAM_ALPHA);
@@ -296,17 +342,8 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = 0;
-if (class_exists('\message_popup\api')) {
-    try {
-        $unread = (int) \message_popup\api::count_unread_popup_notifications($userid);
-    } catch (\Throwable $e) {
-        $unread = 0;
-    }
-}
-$notificationslabel = $unread > 0
-    ? get_string('fellowship_notifications_unread', 'local_launchpad', $unread)
-    : get_string('fellowship_notifications', 'local_launchpad');
+$unread = messaging::unread_count($userid);
+$notificationslabel = messaging::messages_label($unread);
 
 $mismatch = portal_gate::consume_modal_context();
 $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_merge([
