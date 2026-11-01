@@ -26,13 +26,13 @@
       {{#items}}
         <article class="lp-card lift lp-fellow-card">
           <div class="lp-row-sb">
-            <div class="lp-fellow-who">
+            <a class="lp-fellow-who lp-fellow-who-link" href="{{detail_url}}">
               <div class="lp-av" aria-hidden="true">{{initials}}</div>
               <div>
                 <b>{{{fellow_name}}}</b>
                 <div class="lp-xs lp-muted">{{{course_name}}}</div>
               </div>
-            </div>
+            </a>
             <span class="lp-chip {{chip}}">{{status_label}}</span>
           </div>
           <p class="lp-sm lp-muted lp-fellow-progress-label">{{progress_label}}</p>
@@ -45,7 +45,8 @@
               {{#has_waiting}}
                 <a class="lp-btn lp-btn-primary" href="{{review_url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
               {{/has_waiting}}
-              <a class="lp-link-sm" href="{{profile_url}}">{{#str}} mentor_fellow_profile, local_launchpad {{/str}}</a>
+              <a class="lp-btn lp-btn-light" href="{{detail_url}}">{{#str}} mentor_fellow_open, local_launchpad {{/str}}</a>
+              <a class="lp-link-sm" href="{{profile_url}}">{{#str}} mentor_fellow_moodle_profile, local_launchpad {{/str}}</a>
             </div>
           </div>
         </article>

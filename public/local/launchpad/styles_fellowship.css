@@ -561,6 +561,14 @@ body.local-launchpad-mentor {
   display: none !important;
 }
 .lp-btn:active { transform: scale(.97); }
+.lp-btn:disabled,
+.lp-btn[disabled],
+.lp-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
 .lp-btn-primary {
   background: #fff;
   color: var(--lp-navy);
@@ -2049,9 +2057,34 @@ body.local-launchpad-mentor .lp-xp-chip { display: none; }
   gap: 10px;
   min-width: 0;
 }
+.lp-fellow-who-link {
+  color: inherit;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+.lp-fellow-who-link:hover b {
+  color: var(--lp-blue);
+}
 .lp-fellow-card .lp-fellow-who b {
   display: block;
   font-size: 15.5px;
+}
+.lp-fellow-detail-summary {
+  margin-top: 8px;
+  padding: 16px 18px;
+}
+.lp-fellow-detail-summary .lp-fellow-bar {
+  margin-bottom: 0;
+}
+.lp-fellow-detail-assigns-head {
+  margin-top: 22px;
+  margin-bottom: 10px;
+}
+.lp-fellow-detail-assigns-title {
+  margin: 0 0 4px;
+  font-family: var(--lp-head);
+  font-size: 18px;
 }
 .lp-fellow-progress-label {
   margin: 14px 0 8px;

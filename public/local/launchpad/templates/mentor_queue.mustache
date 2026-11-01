@@ -44,7 +44,19 @@
               <td>{{#submitted_at}}{{submitted_at}}{{/submitted_at}}{{^submitted_at}}—{{/submitted_at}}</td>
               <td><span class="lp-chip {{chip}}">{{status_label}}</span></td>
               <td>{{#has_grade}}{{grade_display}}{{/has_grade}}{{^has_grade}}—{{/has_grade}}</td>
-              <td><a class="lp-btn lp-btn-light" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a></td>
+              <td>
+                {{#is_waiting}}
+                  <a class="lp-btn lp-btn-light" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+                {{/is_waiting}}
+                {{^is_waiting}}
+                  {{#is_released}}
+                    <a class="lp-btn lp-btn-light" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+                  {{/is_released}}
+                  {{^is_released}}
+                    <button type="button" class="lp-btn lp-btn-light" disabled aria-disabled="true">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</button>
+                  {{/is_released}}
+                {{/is_waiting}}
+              </td>
             </tr>
           {{/items}}
         </tbody>

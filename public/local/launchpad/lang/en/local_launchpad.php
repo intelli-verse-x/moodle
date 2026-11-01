@@ -135,6 +135,12 @@ $string['mentor_fellow_status_reviewed'] = 'Reviewed';
 $string['mentor_fellow_status_active'] = 'In progress';
 $string['mentor_fellow_status_new'] = 'Not started';
 $string['mentor_fellow_profile'] = 'Profile';
+$string['mentor_fellow_moodle_profile'] = 'Moodle profile';
+$string['mentor_fellow_open'] = 'Open';
+$string['mentor_fellow_assigns_heading'] = 'Assignments';
+$string['mentor_fellow_assigns_intro'] = 'Waiting, reviewed, and open work on this track.';
+$string['mentor_fellow_assigns_empty_title'] = 'No assignments yet';
+$string['mentor_fellow_assigns_empty_body'] = 'When assigns appear on this track, their status will show here.';
 
 $string['mentor_welcome_back'] = 'Welcome back, {$a}';
 $string['mentor_home_lead'] = 'Review submitted evidence on your assigned tracks. Grades and change notes live in Moodle.';

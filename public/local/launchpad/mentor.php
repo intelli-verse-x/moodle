@@ -43,6 +43,7 @@ $view = optional_param('view', 'home', PARAM_ALPHA);
 $filter = optional_param('filter', 'waiting', PARAM_ALPHA);
 $cmid = optional_param('id', 0, PARAM_INT);
 $fellowid = optional_param('userid', 0, PARAM_INT);
+$courseid = optional_param('course', 0, PARAM_INT);
 $saved = optional_param('saved', '', PARAM_ALPHA);
 $err = optional_param('err', '', PARAM_ALPHANUMEXT);
 
@@ -80,7 +81,8 @@ $PAGE->set_url(new moodle_url(persona_home::MENTOR_PATH, array_filter([
     'view' => $view !== 'home' ? $view : null,
     'filter' => ($view === 'queue' && $filter !== 'waiting') ? $filter : null,
     'id' => ($view === 'review' && $cmid > 0) ? $cmid : null,
-    'userid' => ($view === 'review' && $fellowid > 0) ? $fellowid : null,
+    'userid' => (($view === 'review' || $view === 'fellow') && $fellowid > 0) ? $fellowid : null,
+    'course' => ($view === 'fellow' && $courseid > 0) ? $courseid : null,
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('mentor_area_title', 'local_launchpad'));
@@ -138,7 +140,7 @@ $nav = [
             [
                 'label' => get_string('mentor_nav_fellows', 'local_launchpad'),
                 'url' => $fellowsurl,
-                'current' => $view === 'fellows',
+                'current' => $view === 'fellows' || $view === 'fellow',
                 'key' => 'fellows',
                 'icon_svg' => $icon('<path d="M16 11a4 4 0 10-8 0 4 4 0 008 0z"/><path d="M4 20a8 8 0 0116 0"/><path d="M19 8a3 3 0 110 6"/>'),
             ],
@@ -173,6 +175,31 @@ switch ($view) {
             'has_courses' => $courses !== [],
             'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
             'queue_url' => $queueurl,
+        ]));
+        break;
+
+    case 'fellow':
+        $pagetitle = get_string('mentor_nav_fellows', 'local_launchpad');
+        if ($fellowid <= 0 || $courseid <= 0) {
+            redirect(new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']));
+        }
+        $detaildata = mentor_dashboard::get_fellow_detail($userid, $fellowid, $courseid, $courses);
+        if ($detaildata === null) {
+            redirect(new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']));
+        }
+        $pagetitle = (string) ($detaildata['fellow_name'] ?? $pagetitle);
+        $content = $OUTPUT->render_from_template('local_launchpad/mentor_fellow_detail', array_merge($detaildata, [
+            'has_crumbs' => true,
+            'crumbs' => [
+                [
+                    'label' => get_string('mentor_nav_fellows', 'local_launchpad'),
+                    'url' => $fellowsurl,
+                ],
+                [
+                    'label' => (string) ($detaildata['fellow_name'] ?? ''),
+                    'url' => '',
+                ],
+            ],
         ]));
         break;
 

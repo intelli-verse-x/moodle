@@ -173,6 +173,7 @@ final class mentor_dashboard {
                         'fellow_id' => $studentid,
                         'fellow_name' => fullname($student),
                         'assign_name' => $assignname,
+                        'course_id' => $courseid,
                         'course_name' => format_string($course->fullname),
                         'course_idnumber' => s($course->idnumber),
                         'status' => $status,
@@ -281,11 +282,13 @@ final class mentor_dashboard {
         $byfellow = [];
         foreach ($queue['items'] ?? [] as $row) {
             $fid = (int) ($row['fellow_id'] ?? 0);
-            if ($fid <= 0) {
+            $cid = (int) ($row['course_id'] ?? 0);
+            if ($fid <= 0 || $cid <= 0) {
                 continue;
             }
-            if (!isset($byfellow[$fid])) {
-                $byfellow[$fid] = [
+            $fkey = $fid . ':' . $cid;
+            if (!isset($byfellow[$fkey])) {
+                $byfellow[$fkey] = [
                     'waiting' => 0,
                     'released' => 0,
                     'grade_display' => '',
@@ -293,15 +296,15 @@ final class mentor_dashboard {
                 ];
             }
             if (!empty($row['is_waiting'])) {
-                $byfellow[$fid]['waiting']++;
-                if ($byfellow[$fid]['first_waiting_url'] === '') {
-                    $byfellow[$fid]['first_waiting_url'] = (string) ($row['url'] ?? '');
+                $byfellow[$fkey]['waiting']++;
+                if ($byfellow[$fkey]['first_waiting_url'] === '') {
+                    $byfellow[$fkey]['first_waiting_url'] = (string) ($row['url'] ?? '');
                 }
             }
             if (!empty($row['is_released'])) {
-                $byfellow[$fid]['released']++;
-                if ($byfellow[$fid]['grade_display'] === '' && !empty($row['has_grade'])) {
-                    $byfellow[$fid]['grade_display'] = (string) ($row['grade_display'] ?? '');
+                $byfellow[$fkey]['released']++;
+                if ($byfellow[$fkey]['grade_display'] === '' && !empty($row['has_grade'])) {
+                    $byfellow[$fkey]['grade_display'] = (string) ($row['grade_display'] ?? '');
                 }
             }
         }
@@ -332,7 +335,7 @@ final class mentor_dashboard {
                 $percent = $outline['percent'] ?? null;
                 $hasprogress = $percent !== null;
 
-                $q = $byfellow[$studentid] ?? [
+                $q = $byfellow[$studentid . ':' . $courseid] ?? [
                     'waiting' => 0,
                     'released' => 0,
                     'grade_display' => '',
@@ -368,6 +371,7 @@ final class mentor_dashboard {
                     'fellow_id' => $studentid,
                     'fellow_name' => fullname($student),
                     'initials' => fellowship_dashboard::initials($student),
+                    'course_id' => $courseid,
                     'course_name' => format_string($course->fullname),
                     'course_idnumber' => s($course->idnumber),
                     'completed' => $completed,
@@ -381,6 +385,7 @@ final class mentor_dashboard {
                     'waiting_count' => (int) $q['waiting'],
                     'has_waiting' => $q['waiting'] > 0,
                     'grade_display' => $q['grade_display'] !== '' ? $q['grade_display'] : '—',
+                    'detail_url' => self::fellow_detail_url($studentid, $courseid),
                     'profile_url' => (new \moodle_url('/user/view.php', [
                         'id' => $studentid,
                         'course' => $courseid,
@@ -411,6 +416,146 @@ final class mentor_dashboard {
             'id' => $cmid,
             'userid' => $fellowid,
         ]))->out(false);
+    }
+
+    /**
+     * LaunchPad per-fellow coaching URL for one mentor track course.
+     */
+    public static function fellow_detail_url(int $fellowid, int $courseid): string {
+        return (new \moodle_url(persona_home::MENTOR_PATH, [
+            'view' => 'fellow',
+            'userid' => $fellowid,
+            'course' => $courseid,
+        ]))->out(false);
+    }
+
+    /**
+     * One fellow on one mentor course: progress + assign rows (fail closed).
+     *
+     * @param list<\stdClass> $courses Mentor course list already scoped for this mentor
+     * @return array|null Null when mentor/course/fellow access is invalid
+     */
+    public static function get_fellow_detail(int $mentorid, int $fellowid, int $courseid, array $courses): ?array {
+        global $CFG;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        if ($mentorid <= 0 || $fellowid <= 0 || $courseid <= 0 || !self::can_access($mentorid)) {
+            return null;
+        }
+
+        $course = null;
+        foreach ($courses as $c) {
+            if ((int) $c->id === $courseid) {
+                $course = $c;
+                break;
+            }
+        }
+        if (!$course) {
+            return null;
+        }
+
+        $context = \context_course::instance($courseid);
+        $students = get_enrolled_users(
+            $context,
+            'mod/assign:submit',
+            0,
+            'u.id,u.firstname,u.lastname',
+            'u.lastname ASC, u.firstname ASC'
+        );
+        if (!isset($students[$fellowid])) {
+            return null;
+        }
+        $student = $students[$fellowid];
+
+        $outline = fellowship_dashboard::course_outline($course, $fellowid);
+        $completed = (int) ($outline['completed'] ?? 0);
+        $trackable = (int) ($outline['trackable'] ?? 0);
+        $percent = $outline['percent'] ?? null;
+        $hasprogress = $percent !== null;
+
+        $queue = self::list_review_queue($mentorid, [$course], 'all');
+        $assigns = [];
+        $waiting = 0;
+        $released = 0;
+        $gradeDisplay = '';
+        $firstWaitingUrl = '';
+        foreach ($queue['items'] ?? [] as $row) {
+            if ((int) ($row['fellow_id'] ?? 0) !== $fellowid) {
+                continue;
+            }
+            if ((int) ($row['course_id'] ?? 0) !== $courseid) {
+                continue;
+            }
+            $assigns[] = $row;
+            if (!empty($row['is_waiting'])) {
+                $waiting++;
+                if ($firstWaitingUrl === '') {
+                    $firstWaitingUrl = (string) ($row['url'] ?? '');
+                }
+            }
+            if (!empty($row['is_released'])) {
+                $released++;
+                if ($gradeDisplay === '' && !empty($row['has_grade'])) {
+                    $gradeDisplay = (string) ($row['grade_display'] ?? '');
+                }
+            }
+        }
+
+        if ($waiting > 0) {
+            $status = 'pending';
+            $statuslabel = get_string('mentor_status_waiting', 'local_launchpad');
+            $chip = '';
+        } else if ($released > 0) {
+            $status = 'reviewed';
+            $statuslabel = get_string('mentor_fellow_status_reviewed', 'local_launchpad');
+            $chip = 'ok';
+        } else if ($hasprogress && $completed > 0) {
+            $status = 'active';
+            $statuslabel = get_string('mentor_fellow_status_active', 'local_launchpad');
+            $chip = 'line';
+        } else {
+            $status = 'not_started';
+            $statuslabel = get_string('mentor_fellow_status_new', 'local_launchpad');
+            $chip = 'line';
+        }
+
+        $progresslabel = $hasprogress
+            ? get_string('mentor_fellow_progress', 'local_launchpad', [
+                'done' => $completed,
+                'total' => $trackable,
+            ])
+            : get_string('mentor_fellow_progress_untracked', 'local_launchpad');
+
+        return [
+            'fellow_id' => $fellowid,
+            'fellow_name' => fullname($student),
+            'initials' => fellowship_dashboard::initials($student),
+            'course_id' => $courseid,
+            'course_name' => format_string($course->fullname),
+            'course_idnumber' => s($course->idnumber),
+            'completed' => $completed,
+            'trackable' => $trackable,
+            'percent' => $hasprogress ? (int) $percent : 0,
+            'has_percent' => $hasprogress,
+            'progress_label' => $progresslabel,
+            'status' => $status,
+            'status_label' => $statuslabel,
+            'chip' => $chip,
+            'waiting_count' => $waiting,
+            'has_waiting' => $waiting > 0,
+            'grade_display' => $gradeDisplay !== '' ? $gradeDisplay : '—',
+            'review_url' => $firstWaitingUrl !== ''
+                ? $firstWaitingUrl
+                : (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false),
+            'profile_url' => (new \moodle_url('/user/view.php', [
+                'id' => $fellowid,
+                'course' => $courseid,
+            ]))->out(false),
+            'assigns' => $assigns,
+            'has_assigns' => $assigns !== [],
+            'fellows_url' => (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false),
+        ];
     }
 
     /**

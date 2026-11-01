@@ -80,4 +80,21 @@ final class mentor_dashboard_test extends \basic_testcase {
         $this->assertStringContainsString('id=15', $url);
         $this->assertStringContainsString('userid=3', $url);
     }
+
+    public function test_fellow_detail_url_contains_view_and_ids(): void {
+        $url = mentor_dashboard::fellow_detail_url(9, 42);
+        $this->assertStringContainsString('view=fellow', $url);
+        $this->assertStringContainsString('userid=9', $url);
+        $this->assertStringContainsString('course=42', $url);
+    }
+
+    public function test_get_fellow_detail_fail_closed(): void {
+        $course = (object) ['id' => 3, 'fullname' => 'Track', 'idnumber' => 'lp-track'];
+        $this->assertNull(mentor_dashboard::get_fellow_detail(0, 2, 3, [$course]));
+        $this->assertNull(mentor_dashboard::get_fellow_detail(1, 0, 3, [$course]));
+        $this->assertNull(mentor_dashboard::get_fellow_detail(1, 2, 0, [$course]));
+        $this->assertNull(mentor_dashboard::get_fellow_detail(1, 2, 3, []));
+        // Course not in mentor list — no enroll lookup.
+        $this->assertNull(mentor_dashboard::get_fellow_detail(1, 2, 99, [$course]));
+    }
 }

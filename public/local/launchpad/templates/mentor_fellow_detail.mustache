@@ -1,0 +1,94 @@
+{{!
+    @template local_launchpad/mentor_fellow_detail
+
+    LaunchPad coaching page for one fellow on one mentor track.
+}}
+{{#has_crumbs}}
+  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
+    {{#crumbs}}
+      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
+      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
+    {{/crumbs}}
+  </nav>
+{{/has_crumbs}}
+
+<div class="lp-ach-head">
+  <div class="lp-row-sb">
+    <div class="lp-fellow-who">
+      <div class="lp-av" aria-hidden="true">{{initials}}</div>
+      <div>
+        <span class="lp-eyebrow">{{#str}} mentor_nav_fellows, local_launchpad {{/str}}</span>
+        <h2>{{{fellow_name}}}</h2>
+        <p class="lp-muted">{{{course_name}}}</p>
+      </div>
+    </div>
+    <div class="lp-fellow-actions">
+      {{#has_waiting}}
+        <a class="lp-btn lp-btn-primary" href="{{review_url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+      {{/has_waiting}}
+      <a class="lp-btn lp-btn-light" href="{{profile_url}}">{{#str}} mentor_fellow_moodle_profile, local_launchpad {{/str}}</a>
+    </div>
+  </div>
+</div>
+
+<div class="lp-fellow-detail-summary lp-card">
+  <div class="lp-row-sb">
+    <span class="lp-chip {{chip}}">{{status_label}}</span>
+    <span class="lp-sm lp-muted">{{#str}} mentor_col_score, local_launchpad {{/str}}: {{grade_display}}</span>
+  </div>
+  <p class="lp-sm lp-muted lp-fellow-progress-label">{{progress_label}}</p>
+  <div class="lp-fellow-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{percent}}" aria-label="{{progress_label}}">
+    <i style="width:{{percent}}%"></i>
+  </div>
+</div>
+
+<div class="lp-fellow-detail-assigns-head">
+  <h3 class="lp-fellow-detail-assigns-title">{{#str}} mentor_fellow_assigns_heading, local_launchpad {{/str}}</h3>
+  <p class="lp-muted lp-sm">{{#str}} mentor_fellow_assigns_intro, local_launchpad {{/str}}</p>
+</div>
+
+{{#has_assigns}}
+  <div class="lp-card lift" style="overflow-x:auto">
+    <table class="lp-mentor-table">
+      <thead>
+        <tr>
+          <th>{{#str}} mentor_col_assign, local_launchpad {{/str}}</th>
+          <th>{{#str}} mentor_col_submitted, local_launchpad {{/str}}</th>
+          <th>{{#str}} mentor_col_state, local_launchpad {{/str}}</th>
+          <th>{{#str}} mentor_col_score, local_launchpad {{/str}}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#assigns}}
+          <tr>
+            <td>{{{assign_name}}}{{#has_attempt}} <span class="lp-xs lp-muted">· {{#str}} fellowship_feedback_attempt, local_launchpad {{/str}} {{attempt}}</span>{{/has_attempt}}</td>
+            <td>{{#submitted_at}}{{submitted_at}}{{/submitted_at}}{{^submitted_at}}—{{/submitted_at}}</td>
+            <td><span class="lp-chip {{chip}}">{{status_label}}</span></td>
+            <td>{{#has_grade}}{{grade_display}}{{/has_grade}}{{^has_grade}}—{{/has_grade}}</td>
+            <td>
+              {{#is_waiting}}
+                <a class="lp-btn lp-btn-light" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+              {{/is_waiting}}
+              {{^is_waiting}}
+                {{#is_released}}
+                  <a class="lp-btn lp-btn-light" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+                {{/is_released}}
+                {{^is_released}}
+                  <button type="button" class="lp-btn lp-btn-light" disabled aria-disabled="true">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</button>
+                {{/is_released}}
+              {{/is_waiting}}
+            </td>
+          </tr>
+        {{/assigns}}
+      </tbody>
+    </table>
+  </div>
+{{/has_assigns}}
+{{^has_assigns}}
+  <div class="lp-empty" role="status">
+    <div class="lp-empty-mark" aria-hidden="true">··</div>
+    <h2>{{#str}} mentor_fellow_assigns_empty_title, local_launchpad {{/str}}</h2>
+    <p>{{#str}} mentor_fellow_assigns_empty_body, local_launchpad {{/str}}</p>
+  </div>
+{{/has_assigns}}

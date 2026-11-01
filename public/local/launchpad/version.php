@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_launchpad';
-// Calendar Phase 4+: week view + weekly repeat.
-$plugin->version   = 2026103115;
+// Disable Review on not-submitted rows (fellow detail + queue).
+$plugin->version   = 2026103120;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->release   = '1.2-dev';
