@@ -297,6 +297,9 @@ final class activity_portal {
 
     /**
      * Redirect Employer learners from stock mod/page (and friends) into the portal.
+     *
+     * Site admins are excluded so Course builder / Moodle edit stays on native
+     * mod pages (not the Employer activity shell).
      */
     public static function maybe_redirect_from_mod(): void {
         global $PAGE, $USER;
@@ -310,10 +313,10 @@ final class activity_portal {
                 || (defined('PHPUNIT_TEST') && PHPUNIT_TEST)) {
             return;
         }
-        if (!isloggedin() || isguestuser()) {
+        if (!isloggedin() || isguestuser() || is_siteadmin()) {
             return;
         }
-        if (!account_persona::is_employee((int) $USER->id) && !is_siteadmin()) {
+        if (!account_persona::is_employee((int) $USER->id)) {
             return;
         }
 
