@@ -1,0 +1,232 @@
+{{!
+    @template local_launchpad/employer_badges
+
+    Badges — design-matched progress / collection / next + detail popup.
+}}
+<div class="lp-tools-page lp-reveal" data-region="employer-badges-page" style="--lp-d:0">
+  {{#badges_enabled}}
+    <script type="application/json" data-region="employer-badges-data">{{{badges_json}}}</script>
+
+    <section class="lp-card lift lp-stack-lg lp-grade-progress">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:champion" width="22" height="22"></iconify-icon>
+          </span>
+          <div>
+            <h3>{{strings.badges_progress_heading}}</h3>
+            <p class="lp-sm lp-muted">{{strings.badges_progress_sub}}</p>
+          </div>
+        </div>
+        <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.badges_open_moodle}}</a>
+      </div>
+      <div class="lp-grade-hero-body">
+        <div class="lp-grade-hero-metrics">
+          <p class="lp-grade-hero-metric">
+            <b>{{badges_earned}}</b>
+            <span>{{strings.badges_of}} {{badges_total}} {{strings.badges_earned_label}}</span>
+          </p>
+          <p class="lp-sm lp-muted">{{strings.badges_progress_meta}}</p>
+          <div class="lp-ach-next">
+            <div class="lp-row-sb lp-sm">
+              <span>{{strings.badges_progress_heading}}</span>
+              <span><b>{{badges_pct}}%</b></span>
+            </div>
+            <div class="lp-bar" aria-hidden="true"><i style="width:{{badges_pct}}%"></i></div>
+          </div>
+        </div>
+        <div class="lp-grade-hero-art" aria-hidden="true">
+          <iconify-icon icon="hugeicons:champion" width="88" height="88"></iconify-icon>
+        </div>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-stack-lg" data-region="employer-badges-tabs">
+      <div class="lp-card-head lp-badges-tabs-head">
+        <h3>{{strings.badges_collection_heading}}</h3>
+      </div>
+
+      <div class="lp-tabs lp-tabs-block" role="tablist" aria-label="{{strings.badges_collection_heading}}">
+        <a class="lp-tab{{#tab_all}} is-on{{/tab_all}}"
+           role="tab"
+           id="lp-badges-tab-all"
+           href="{{tab_all_url}}"
+           aria-selected="{{#tab_all}}true{{/tab_all}}{{^tab_all}}false{{/tab_all}}"
+           aria-controls="lp-badges-panel-all"
+           data-lp-badges-tab="all">
+          {{strings.badges_tab_all}}
+          <span class="lp-tab-count">{{badges_total}}</span>
+        </a>
+        <a class="lp-tab{{#tab_earned}} is-on{{/tab_earned}}"
+           role="tab"
+           id="lp-badges-tab-earned"
+           href="{{tab_earned_url}}"
+           aria-selected="{{#tab_earned}}true{{/tab_earned}}{{^tab_earned}}false{{/tab_earned}}"
+           aria-controls="lp-badges-panel-earned"
+           data-lp-badges-tab="earned">
+          {{strings.badges_tab_earned}}
+          <span class="lp-tab-count">{{badges_earned}}</span>
+        </a>
+      </div>
+
+      {{#tab_all}}
+        <div class="lp-tab-panel"
+             role="tabpanel"
+             id="lp-badges-panel-all"
+             aria-labelledby="lp-badges-tab-all"
+             data-lp-badges-panel="all">
+          {{#has_items}}
+            <div class="lp-badges">
+              {{#page_items}}
+                <button type="button"
+                        class="lp-bdg {{css}}"
+                        data-lp-badge-open="{{id}}"
+                        aria-haspopup="dialog">
+                  <span class="lp-bi" aria-hidden="true">
+                    <img src="{{imageurl}}" alt="" width="48" height="48">
+                  </span>
+                  <b>{{name}}</b>
+                  <small>{{detail}}</small>
+                  <span class="lp-grade-tile-pill{{#earned}} is-earned{{/earned}}">{{status_pill}}</span>
+                </button>
+              {{/page_items}}
+            </div>
+          {{/has_items}}
+          {{^has_items}}
+            <div class="lp-empty lp-empty-inline" role="status">
+              <h2>{{strings.badges_all_empty_title}}</h2>
+              <p>{{strings.badges_all_empty_body}}</p>
+              <div class="lp-empty-actions">
+                <a class="lp-btn" href="{{moodle_url}}">{{strings.badges_open_moodle}}</a>
+              </div>
+            </div>
+          {{/has_items}}
+        </div>
+      {{/tab_all}}
+
+      {{#tab_earned}}
+        <div class="lp-tab-panel"
+             role="tabpanel"
+             id="lp-badges-panel-earned"
+             aria-labelledby="lp-badges-tab-earned"
+             data-lp-badges-panel="earned">
+          {{#has_earned_items}}
+            <div class="lp-badges">
+              {{#earned_items}}
+                <button type="button"
+                        class="lp-bdg {{css}}"
+                        data-lp-badge-open="{{id}}"
+                        aria-haspopup="dialog">
+                  <span class="lp-bi" aria-hidden="true">
+                    <img src="{{imageurl}}" alt="" width="48" height="48">
+                  </span>
+                  <b>{{name}}</b>
+                  <small>{{detail}}</small>
+                  <span class="lp-grade-tile-pill is-earned">{{status_pill}}</span>
+                </button>
+              {{/earned_items}}
+            </div>
+          {{/has_earned_items}}
+          {{^has_earned_items}}
+            <div class="lp-empty lp-empty-inline" role="status">
+              <h2>{{strings.badgesempty}}</h2>
+              <p>{{strings.badges_earned_empty}}</p>
+              <div class="lp-empty-actions">
+                <a class="lp-btn" href="{{moodle_url}}">{{strings.badges_open_moodle}}</a>
+              </div>
+            </div>
+          {{/has_earned_items}}
+        </div>
+      {{/tab_earned}}
+    </section>
+
+    {{#has_side_panels}}
+      <div class="lp-grid-2">
+        <section class="lp-card lift lp-stack">
+          <h3>{{strings.badges_recent_heading}}</h3>
+          {{#has_recent}}
+            <ul class="lp-badge-recent-list">
+              {{#recent_items}}
+                <li>
+                  <button type="button" class="lp-badge-recent-row" data-lp-badge-open="{{id}}">
+                    <span class="lp-badge-recent-img" aria-hidden="true">
+                      <img src="{{imageurl}}" alt="" width="36" height="36">
+                    </span>
+                    <span class="lp-badge-recent-copy">
+                      <b>{{name}}</b>
+                      <small class="lp-muted">{{detail}}</small>
+                    </span>
+                    <span class="lp-badge-recent-chev" aria-hidden="true">
+                      <iconify-icon icon="hugeicons:arrow-right-01" width="18" height="18"></iconify-icon>
+                    </span>
+                  </button>
+                </li>
+              {{/recent_items}}
+            </ul>
+          {{/has_recent}}
+          {{^has_recent}}
+            <p class="lp-muted">{{strings.badges_recent_empty}}</p>
+          {{/has_recent}}
+        </section>
+        <section class="lp-card lift lp-stack">
+          <h3>{{strings.badges_next_heading}}</h3>
+          {{#has_next}}
+            <ul class="lp-grade-next-list">
+              {{#next_items}}
+                <li class="lp-grade-next-item">
+                  <button type="button" class="lp-grade-next-link lp-badge-next-btn" data-lp-badge-open="{{id}}">
+                    <span class="lp-grade-next-icon" aria-hidden="true">
+                      <img src="{{imageurl}}" alt="" width="28" height="28">
+                    </span>
+                    <span class="lp-grade-next-copy">
+                      <b>{{name}}</b>
+                      <small class="lp-muted">{{description}}</small>
+                    </span>
+                    <span class="lp-grade-next-lock" aria-hidden="true">
+                      <iconify-icon icon="hugeicons:locked" width="18" height="18"></iconify-icon>
+                    </span>
+                  </button>
+                </li>
+              {{/next_items}}
+            </ul>
+          {{/has_next}}
+          {{^has_next}}
+            <p class="lp-sm">{{strings.badges_how_body}}</p>
+            <p class="lp-xs lp-muted">{{strings.native_tools_note}}</p>
+            <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.badges_open_moodle}}</a>
+          {{/has_next}}
+        </section>
+      </div>
+    {{/has_side_panels}}
+
+    <dialog class="lp-badge-dialog" data-region="employer-badge-dialog" aria-labelledby="lp-badge-dialog-title">
+      <form method="dialog" class="lp-badge-dialog-panel">
+        <button type="submit" class="lp-badge-dialog-close" value="cancel" aria-label="{{strings.badges_dialog_close}}">
+          <iconify-icon icon="hugeicons:cancel-01" width="20" height="20"></iconify-icon>
+        </button>
+        <div class="lp-badge-dialog-hero">
+          <img data-lp-badge-img src="" alt="" width="96" height="96">
+          <span class="lp-grade-tile-pill" data-lp-badge-status></span>
+        </div>
+        <p class="lp-eyebrow" data-lp-badge-scope></p>
+        <h2 id="lp-badge-dialog-title" data-lp-badge-name></h2>
+        <p class="lp-sm lp-muted" data-lp-badge-detail></p>
+        <p class="lp-sm" data-lp-badge-desc></p>
+        <div class="lp-badge-dialog-actions">
+          <a class="lp-btn" data-lp-badge-moodle href="#" target="_blank" rel="noopener">{{strings.badges_dialog_open_moodle}}</a>
+          <button type="submit" class="lp-btn lp-btn-light" value="cancel">{{strings.badges_dialog_close}}</button>
+        </div>
+      </form>
+    </dialog>
+  {{/badges_enabled}}
+
+  {{^badges_enabled}}
+    <div class="lp-empty" role="status">
+      <div class="lp-empty-mark" aria-hidden="true">
+        <iconify-icon icon="hugeicons:champion" width="26" height="26"></iconify-icon>
+      </div>
+      <h2>{{strings.badges_disabled_title}}</h2>
+      <p>{{strings.badges_disabled_body}}</p>
+    </div>
+  {{/badges_enabled}}
+</div>

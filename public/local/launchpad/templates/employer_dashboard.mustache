@@ -56,6 +56,21 @@
         {{#is_activity}}
           {{> local_launchpad/employer_activity }}
         {{/is_activity}}
+        {{#is_grades}}
+          {{> local_launchpad/employer_grades }}
+        {{/is_grades}}
+        {{#is_badges}}
+          {{> local_launchpad/employer_badges }}
+        {{/is_badges}}
+        {{#is_calendar}}
+          {{> local_launchpad/employer_calendar }}
+        {{/is_calendar}}
+        {{#is_messages}}
+          {{> local_launchpad/employer_messages }}
+        {{/is_messages}}
+        {{#is_notifications}}
+          {{> local_launchpad/employer_notifications }}
+        {{/is_notifications}}
       </div>
     </main>
   </div>

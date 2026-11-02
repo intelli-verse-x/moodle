@@ -32,18 +32,46 @@ require_login();
 $context = context_system::instance();
 $view = optional_param('view', 'home', PARAM_ALPHA);
 $courseid = optional_param('id', 0, PARAM_INT);
-if (!in_array($view, ['home', 'courses', 'course'], true)) {
+$tab = optional_param('tab', 'all', PARAM_ALPHA);
+$mtab = optional_param('mtab', 'all', PARAM_ALPHA);
+$gtab = optional_param('gtab', 'all', PARAM_ALPHA);
+$convid = optional_param('convid', 0, PARAM_INT);
+$msgsent = optional_param('msgsent', 0, PARAM_INT);
+$msgerr = optional_param('msgerr', '', PARAM_ALPHA);
+$allowedviews = ['home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages', 'notifications'];
+if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
-// Course id scopes home focus or course detail; ignored on the courses list.
-if ($view === 'courses' || $courseid < 0) {
+if ($tab !== 'earned') {
+    $tab = 'all';
+}
+if (!in_array($mtab, ['all', 'starred', 'private', 'group'], true)) {
+    $mtab = 'all';
+}
+if (!in_array($gtab, ['all', 'graded', 'pending'], true)) {
+    $gtab = 'all';
+}
+if ($convid < 0) {
+    $convid = 0;
+}
+// Course id: home focus, course detail, or grades detail. Cleared on other tools.
+if ($view === 'courses' || $view === 'badges'
+        || $view === 'calendar' || $view === 'messages' || $view === 'notifications'
+        || $courseid < 0) {
     $courseid = 0;
+}
+if ($view !== 'messages') {
+    $convid = 0;
 }
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/launchpad/employee.php', array_filter([
     'view' => $view !== 'home' ? $view : null,
     'id' => $courseid > 0 ? $courseid : null,
+    'tab' => ($view === 'badges' && $tab !== 'all') ? $tab : null,
+    'mtab' => ($view === 'messages' && $mtab !== 'all') ? $mtab : null,
+    'gtab' => ($view === 'grades' && $courseid <= 0 && $gtab !== 'all') ? $gtab : null,
+    'convid' => ($view === 'messages' && $convid > 0) ? $convid : null,
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('employer_area_title', 'local_launchpad'));
@@ -53,7 +81,17 @@ if (!account_persona::is_employee((int) $USER->id) && !is_siteadmin()) {
     throw new \moodle_exception('employee_access_denied', 'local_launchpad');
 }
 
-$templatecontext = employer_dashboard::export_for_template($USER, $view, $courseid);
+$templatecontext = employer_dashboard::export_for_template(
+    $USER,
+    $view,
+    $courseid,
+    $tab,
+    $mtab,
+    $convid,
+    $msgsent > 0,
+    $msgerr,
+    $gtab
+);
 $pluginbase = $CFG->wwwroot . '/local/launchpad';
 // Cache-bust CSS/JS from this plugin's version.php (lives next to employee.php under public/).
 $plugin = new \stdClass();
@@ -65,8 +103,7 @@ $jsurl = $pluginbase . '/employer.js?v=' . rawurlencode($assetv);
 $title = s(get_string('employer_area_title', 'local_launchpad'));
 $body = $OUTPUT->render_from_template('local_launchpad/employer_dashboard', $templatecontext);
 
-// Standalone LaunchPad shell (Fellowship-aligned layout). Auth, enrolments,
-// activities, grades, calendar, and messages remain Moodle core pages.
+// Standalone LaunchPad shell. My tools: custom UI + Moodle deep-links (Fellowship pattern).
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";
 echo '<html lang="' . s(current_language()) . '">' . "\n";
@@ -78,7 +115,6 @@ echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
-// Hugeicons via Iconify (same stroke-rounded set as LaunchPad landing).
 echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '</head>' . "\n";
 echo '<body class="local-launchpad-employer">' . "\n";
