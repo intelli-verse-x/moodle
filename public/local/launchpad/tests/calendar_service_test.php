@@ -305,7 +305,14 @@ final class calendar_service_test extends \advanced_testcase {
             3
         );
         $this->assertTrue($created['ok'], $created['error'] ?? '');
-        $rows = $DB->get_records('event', ['userid' => $user->id, 'name' => 'LP weekly probe'], 'timestart ASC');
+        // event.name is TEXT — equality conditions need sql_compare_text (pgsql + Moodle DML).
+        $namematches = $DB->sql_compare_text('name') . ' = ' . $DB->sql_compare_text(':ename');
+        $rows = $DB->get_records_select(
+            'event',
+            'userid = :userid AND ' . $namematches,
+            ['userid' => (int) $user->id, 'ename' => 'LP weekly probe'],
+            'timestart ASC'
+        );
         $this->assertCount(3, $rows);
         $starts = array_values(array_map(static fn($r) => (int) $r->timestart, $rows));
         $this->assertSame($timestart, $starts[0]);
@@ -378,7 +385,9 @@ final class calendar_service_test extends \advanced_testcase {
         $this->assertSame('Lab 2', $mapped['location']);
         $this->assertTrue($mapped['has_description']);
         $this->assertStringContainsString('<strong>', $mapped['description_html']);
-        $this->assertStringContainsString('Bring', $mapped['description_plain']);
+        // html_to_text uppercases <strong> content (Moodle Html2Text convention).
+        $this->assertStringContainsString('BRING', $mapped['description_plain']);
+        $this->assertStringContainsString('kit', $mapped['description_plain']);
         $this->assertSame('until', $mapped['duration_mode']);
         $this->assertSame(60, $mapped['duration_minutes']);
         $this->assertSame('personal', $mapped['filter_bucket']);
