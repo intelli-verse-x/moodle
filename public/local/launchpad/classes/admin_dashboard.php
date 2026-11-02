@@ -599,6 +599,166 @@ final class admin_dashboard {
     }
 
     /**
+     * Mentors & capacity (HTML a-mentors) — one card per track.
+     *
+     * Capacity hours are not stored in Moodle yet; fellow counts and teachers are live.
+     *
+     * @param \stdClass $user
+     * @param array{ok?:string,error?:string} $flash
+     * @return array<string, mixed>
+     */
+    public static function mentors_context(\stdClass $user, array $flash = []): array {
+        $tracks = self::list_track_courses();
+        $cards = [];
+        foreach ($tracks as $course) {
+            $cards[] = self::mentor_track_card_context($course);
+        }
+
+        return [
+            'eyebrow' => get_string('admin_mentors_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_mentors_heading', 'local_launchpad'),
+            'lead' => get_string('admin_mentors_lead', 'local_launchpad'),
+            'has_tracks' => $cards !== [],
+            'tracks' => $cards,
+            'empty_body' => get_string('admin_mentors_empty', 'local_launchpad'),
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+            'form_action' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false),
+            'sesskey' => sesskey(),
+        ];
+    }
+
+    /**
+     * One Mentors & capacity track card.
+     *
+     * @param \stdClass $course
+     * @return array<string, mixed>
+     */
+    public static function mentor_track_card_context(\stdClass $course): array {
+        $courseid = (int) $course->id;
+        $teachers = self::list_track_teachers($courseid);
+        $fellows = self::fellow_count($courseid);
+        $hasteacher = $teachers !== [];
+        $primary = $hasteacher ? $teachers[0] : null;
+
+        return [
+            'id' => $courseid,
+            'name' => format_string($course->fullname),
+            'idnumber' => s($course->idnumber),
+            'has_teacher' => $hasteacher,
+            'teacher_name' => $primary ? $primary['name'] : '',
+            'teacher_initials' => $primary ? $primary['initials'] : '',
+            'teacher_role_label' => get_string('admin_mentors_teacher_role', 'local_launchpad'),
+            'more_teachers' => count($teachers) > 1
+                ? get_string('admin_mentors_more_teachers', 'local_launchpad', count($teachers) - 1)
+                : '',
+            'has_more_teachers' => count($teachers) > 1,
+            'capacity_label' => get_string('admin_mentors_capacity', 'local_launchpad'),
+            'capacity_value' => get_string('admin_mentors_capacity_unset', 'local_launchpad'),
+            'fellows_label' => get_string('admin_mentors_fellows', 'local_launchpad'),
+            'fellows_value' => (string) $fellows,
+            'email_label' => get_string('admin_mentors_email_label', 'local_launchpad'),
+            'email_placeholder' => get_string('admin_mentors_email_placeholder', 'local_launchpad'),
+            'submit_label' => get_string('admin_mentors_submit', 'local_launchpad'),
+            'assign_teacher_url' => self::assign_teacher_url($courseid)->out(false),
+            'assign_moodle_label' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Assign mentor (editingteacher) by email on a track course.
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function assign_mentor_by_email(
+        \stdClass $actor,
+        string $email,
+        int $trackcourseid
+    ): array {
+        global $CFG, $DB;
+
+        $email = trim($email);
+        if ($email === '' || strpos($email, '@') === false) {
+            return ['error' => get_string('admin_mentors_err_email', 'local_launchpad')];
+        }
+        if ($trackcourseid <= 0) {
+            return ['error' => get_string('admin_mentors_err_track', 'local_launchpad')];
+        }
+
+        $user = $DB->get_record_select(
+            'user',
+            'deleted = 0 AND mnethostid = :mnet AND ' . $DB->sql_equal('email', ':email', false, false),
+            [
+                'mnet' => $CFG->mnet_localhost_id,
+                'email' => $email,
+            ]
+        );
+        if (!$user) {
+            return ['error' => get_string('admin_mentors_err_nouser', 'local_launchpad', s($email))];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        try {
+            $result = account_provision::assign_mentor($actor, (int) $user->id, $trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $key = $result['status'] === 'already_enrolled'
+            ? 'admin_mentors_ok_already'
+            : 'admin_mentors_ok_assigned';
+        return [
+            'ok' => get_string($key, 'local_launchpad', (object) [
+                'name' => fullname($user),
+                'track' => format_string($course->fullname),
+            ]),
+        ];
+    }
+
+    /**
+     * Teachers on a track (editingteacher / teacher), ordered by name.
+     *
+     * @return list<array{id:int,name:string,initials:string}>
+     */
+    public static function list_track_teachers(int $courseid): array {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return [];
+        }
+        $context = \context_course::instance($courseid);
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email
+                  FROM {role_assignments} ra
+                  JOIN {role} r ON r.id = ra.roleid
+                  JOIN {user} u ON u.id = ra.userid
+                 WHERE ra.contextid = :ctx
+                   AND r.archetype IN ('teacher', 'editingteacher')
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $users = $DB->get_records_sql($sql, ['ctx' => $context->id]);
+        $out = [];
+        foreach ($users as $u) {
+            $out[] = [
+                'id' => (int) $u->id,
+                'name' => fullname($u),
+                'initials' => fellowship_dashboard::initials($u),
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * One track card for the Tracks & courses grid.
      *
      * @param \stdClass $course id, fullname, shortname, idnumber, visible, summary?

@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks, Cohorts, People.
+ * Admin portal — Overview, Tracks, Cohorts, People, Mentors.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -40,7 +40,7 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'cohorts', 'people'];
+$allowedviews = ['home', 'tracks', 'cohorts', 'people', 'mentors'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
@@ -51,13 +51,17 @@ if (!in_array($peopletab, ['all', 'fellow', 'mentor', 'admin'], true)) {
 }
 
 $flash = [];
-if ($view === 'cohorts' && data_submitted() && confirm_sesskey()) {
+if (($view === 'cohorts' || $view === 'mentors') && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
-    if ($action === 'enrol_fellow') {
+    if ($view === 'cohorts' && $action === 'enrol_fellow') {
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $alsoorient = (bool) optional_param('also_orient', 0, PARAM_BOOL);
         $flash = admin_dashboard::enrol_fellow_by_email($USER, $email, $trackid, $alsoorient);
+    } else if ($view === 'mentors' && $action === 'assign_mentor') {
+        $email = optional_param('email', '', PARAM_RAW_TRIMMED);
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $flash = admin_dashboard::assign_mentor_by_email($USER, $email, $trackid);
     }
 }
 
@@ -83,6 +87,7 @@ $homeurl = (new moodle_url(persona_home::ADMIN_PATH))->out(false);
 $tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
 $cohortsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
 $peopleurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'people']))->out(false);
+$mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 
 $firstname = format_string($USER->firstname);
@@ -143,6 +148,17 @@ $nav = [
                     . '<path d="M16 4.5a3.5 3.5 0 010 7M22 20c-.6-2.6-2-4.4-4-5.3"/>'
                 ),
             ],
+            [
+                'label' => get_string('admin_nav_mentors', 'local_launchpad'),
+                'url' => $mentorsurl,
+                'current' => $view === 'mentors',
+                'key' => 'mentors',
+                'icon_svg' => $icon(
+                    '<circle cx="12" cy="8" r="3.5"/>'
+                    . '<path d="M4 20c1.2-4 4.2-6 8-6s6.8 2 8 6"/>'
+                    . '<path d="M17 11l2 2 4-4"/>'
+                ),
+            ],
         ],
     ],
 ];
@@ -164,6 +180,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_people',
         admin_dashboard::people_context($USER, $peopletab)
+    );
+} else if ($view === 'mentors') {
+    $pagetitle = get_string('admin_nav_mentors', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_mentors',
+        admin_dashboard::mentors_context($USER, $flash)
     );
 } else {
     $view = 'home';

@@ -1,0 +1,79 @@
+{{!
+    @template local_launchpad/admin_mentors
+
+    Admin Mentors and capacity — per-track teacher cards and assign form.
+    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-mentors">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+    </div>
+  </div>
+</section>
+
+{{#flash_ok}}
+  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+{{/flash_ok}}
+{{#flash_err}}
+  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+{{/flash_err}}
+
+{{#has_tracks}}
+  <div class="lp-tgrid" style="margin-top:16px">
+    {{#tracks}}
+      <article class="lp-tcard">
+        <h3>{{name}}</h3>
+        <p class="lp-xs lp-muted">{{idnumber}}</p>
+        {{#has_teacher}}
+          <div class="lp-people-name" style="margin-top:4px">
+            <span class="lp-av lp-av-sm tone-green" aria-hidden="true">{{teacher_initials}}</span>
+            <div>
+              <b>{{teacher_name}}</b>
+              <div class="lp-xs lp-muted">{{teacher_role_label}}</div>
+              {{#has_more_teachers}}
+                <div class="lp-xs lp-muted">{{more_teachers}}</div>
+              {{/has_more_teachers}}
+            </div>
+          </div>
+          <div class="lp-mentor-meta">
+            <div class="lp-mentor-meta-row">
+              <span>{{capacity_label}}</span>
+              <b>{{capacity_value}}</b>
+            </div>
+            <div class="lp-mentor-meta-row">
+              <span>{{fellows_label}}</span>
+              <b>{{fellows_value}}</b>
+            </div>
+          </div>
+          <div class="lp-tcard-actions">
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{assign_teacher_url}}">{{assign_moodle_label}}</a>
+          </div>
+        {{/has_teacher}}
+        {{^has_teacher}}
+          <form method="post" action="{{form_action}}" class="lp-stack lp-enrol-form" style="margin-top:6px">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="action" value="assign_mentor">
+            <input type="hidden" name="trackid" value="{{id}}">
+            <label class="lp-field">
+              <span>{{email_label}}</span>
+              <input type="email" name="email" required autocomplete="email" placeholder="{{email_placeholder}}">
+            </label>
+            <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm" style="align-self:flex-start">{{submit_label}}</button>
+          </form>
+          <div class="lp-mentor-meta" style="margin-top:10px">
+            <div class="lp-mentor-meta-row">
+              <span>{{fellows_label}}</span>
+              <b>{{fellows_value}}</b>
+            </div>
+          </div>
+        {{/has_teacher}}
+      </article>
+    {{/tracks}}
+  </div>
+{{/has_tracks}}
+{{^has_tracks}}
+  <p class="lp-muted" style="margin-top:16px">{{empty_body}}</p>
+{{/has_tracks}}
