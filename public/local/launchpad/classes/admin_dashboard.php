@@ -528,7 +528,7 @@ final class admin_dashboard {
                     'courses' => [],
                 ];
             }
-            $cname = format_string($row->coursename);
+            $cname = format_string($row->coursefullname);
             if (!in_array($cname, $byuser[$uid]['courses'], true)) {
                 $byuser[$uid]['courses'][] = $cname;
             }
@@ -596,6 +596,228 @@ final class admin_dashboard {
             'sort_lastname' => (string) ($user->lastname ?? ''),
             'sort_firstname' => (string) ($user->firstname ?? ''),
         ];
+    }
+
+    /**
+     * Review oversight (HTML a-reviews) — pending assign reviews across tracks.
+     *
+     * @param \stdClass $user
+     * @return array<string, mixed>
+     */
+    public static function reviews_context(\stdClass $user): array {
+        $pending = self::list_pending_reviews(50);
+        $pendingtotal = self::count_reviews_pending();
+        $released = self::count_reviews_released();
+        $tracks = self::list_track_courses();
+        $bytrackpending = self::pending_counts_by_course($tracks);
+        $other = 0;
+        foreach ($tracks as $course) {
+            if (empty($bytrackpending[(int) $course->id])) {
+                $other++;
+            }
+        }
+
+        $toptrack = get_string('admin_reviews_tile_pending_sub_none', 'local_launchpad');
+        if ($bytrackpending !== []) {
+            arsort($bytrackpending);
+            $topid = (int) array_key_first($bytrackpending);
+            foreach ($tracks as $course) {
+                if ((int) $course->id === $topid) {
+                    $toptrack = format_string($course->fullname);
+                    break;
+                }
+            }
+        }
+
+        $icon = static function (string $paths): string {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+                . $paths . '</svg>';
+        };
+
+        $tiles = [
+            [
+                'label' => get_string('admin_reviews_tile_pending', 'local_launchpad'),
+                'value' => (string) $pendingtotal,
+                'sub' => $toptrack,
+                'icon_svg' => $icon(
+                    '<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_reviews_tile_released', 'local_launchpad'),
+                'value' => (string) $released,
+                'sub' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
+                'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),
+            ],
+            [
+                'label' => get_string('admin_reviews_tile_other', 'local_launchpad'),
+                'value' => (string) $other,
+                'sub' => get_string('admin_reviews_tile_other_sub', 'local_launchpad'),
+                'icon_svg' => $icon(
+                    '<path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/>'
+                    . '<path d="M8 12h8M12 8v8"/>'
+                ),
+            ],
+        ];
+
+        return [
+            'eyebrow' => get_string('admin_reviews_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_reviews_heading', 'local_launchpad'),
+            'lead' => get_string('admin_reviews_lead', 'local_launchpad'),
+            'tiles' => $tiles,
+            'col_fellow' => get_string('admin_reviews_col_fellow', 'local_launchpad'),
+            'col_track' => get_string('admin_reviews_col_track', 'local_launchpad'),
+            'col_submitted' => get_string('admin_reviews_col_submitted', 'local_launchpad'),
+            'col_teacher' => get_string('admin_reviews_col_teacher', 'local_launchpad'),
+            'col_state' => get_string('admin_reviews_col_state', 'local_launchpad'),
+            'pending' => $pending,
+            'has_pending' => $pending !== [],
+            'empty_body' => get_string('admin_reviews_empty', 'local_launchpad'),
+            'open_label' => get_string('admin_reviews_open', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Pending assign submissions on LaunchPad courses (oldest first).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function list_pending_reviews(int $limit = 50): array {
+        global $DB;
+
+        $tracks = self::list_track_courses();
+        $ids = array_map(static fn($c) => (int) $c->id, $tracks);
+        $ids = array_values(array_filter($ids));
+        if ($ids === []) {
+            return [];
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        $params['status'] = 'submitted';
+        $limit = max(1, min(100, $limit));
+
+        $sql = "SELECT s.id, s.userid, s.timemodified, s.timecreated, a.id AS assignid, a.name AS assignname,
+                       a.course AS courseid, c.fullname AS coursefullname,
+                       u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email,
+                       cm.id AS cmid
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+                  JOIN {user} u ON u.id = s.userid AND u.deleted = 0
+                  JOIN {modules} m ON m.name = 'assign'
+                  JOIN {course_modules} cm ON cm.module = m.id AND cm.instance = a.id AND cm.course = a.course
+             LEFT JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.latest = 1
+                   AND s.status = :status
+                   AND g.id IS NULL
+                   AND c.id {$insql}
+              ORDER BY s.timemodified ASC, s.id ASC";
+
+        $rows = $DB->get_records_sql($sql, $params, 0, $limit);
+        $teachercache = [];
+        $out = [];
+        foreach ($rows as $row) {
+            $courseid = (int) $row->courseid;
+            if (!isset($teachercache[$courseid])) {
+                $names = self::teacher_names($courseid);
+                $teachercache[$courseid] = $names !== []
+                    ? implode(', ', $names)
+                    : get_string('admin_tracks_no_teacher', 'local_launchpad');
+            }
+            $submitted = (int) ($row->timemodified ?: $row->timecreated);
+            $out[] = [
+                'courseid' => $courseid,
+                'fellow' => fullname($row),
+                'email' => s($row->email),
+                'track' => format_string($row->coursefullname),
+                'assign' => format_string($row->assignname),
+                'submitted' => $submitted > 0
+                    ? userdate($submitted, get_string('strftimedatetimeshort', 'langconfig'))
+                    : '—',
+                'teacher' => $teachercache[$courseid],
+                'state' => get_string('admin_reviews_state_pending', 'local_launchpad'),
+                'grader_url' => (new \moodle_url('/mod/assign/view.php', [
+                    'id' => (int) $row->cmid,
+                    'action' => 'grader',
+                    'userid' => (int) $row->userid,
+                ]))->out(false),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Pending review counts keyed by course id.
+     *
+     * @param list<\stdClass> $tracks
+     * @return array<int, int>
+     */
+    public static function pending_counts_by_course(array $tracks): array {
+        global $DB;
+
+        $ids = array_map(static fn($c) => (int) $c->id, $tracks);
+        $ids = array_values(array_filter($ids));
+        if ($ids === []) {
+            return [];
+        }
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        $params['status'] = 'submitted';
+        $sql = "SELECT a.course AS courseid, COUNT(1) AS pendingcount
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+             LEFT JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.latest = 1
+                   AND s.status = :status
+                   AND g.id IS NULL
+                   AND a.course {$insql}
+              GROUP BY a.course";
+        $rows = $DB->get_records_sql($sql, $params);
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int) $row->courseid] = (int) $row->pendingcount;
+        }
+        return $out;
+    }
+
+    /**
+     * Graded (released) latest submissions on LaunchPad track courses.
+     */
+    public static function count_reviews_released(): int {
+        global $DB;
+
+        $tracks = self::list_track_courses();
+        $ids = array_map(static fn($c) => (int) $c->id, $tracks);
+        $ids = array_values(array_filter($ids));
+        if ($ids === []) {
+            return 0;
+        }
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        $params['status'] = 'submitted';
+        $sql = "SELECT COUNT(1)
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+                  JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.latest = 1
+                   AND s.status = :status
+                   AND c.id {$insql}";
+        return (int) $DB->count_records_sql($sql, $params);
     }
 
     /**

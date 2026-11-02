@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks, Cohorts, People, Mentors.
+ * Admin portal — Overview, Tracks, Cohorts, People, Mentors, Reviews.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -40,7 +40,7 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'cohorts', 'people', 'mentors'];
+$allowedviews = ['home', 'tracks', 'cohorts', 'people', 'mentors', 'reviews'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
@@ -88,6 +88,7 @@ $tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->o
 $cohortsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
 $peopleurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'people']))->out(false);
 $mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
+$reviewsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 
 $firstname = format_string($USER->firstname);
@@ -159,6 +160,15 @@ $nav = [
                     . '<path d="M17 11l2 2 4-4"/>'
                 ),
             ],
+            [
+                'label' => get_string('admin_nav_reviews', 'local_launchpad'),
+                'url' => $reviewsurl,
+                'current' => $view === 'reviews',
+                'key' => 'reviews',
+                'icon_svg' => $icon(
+                    '<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/>'
+                ),
+            ],
         ],
     ],
 ];
@@ -186,6 +196,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_mentors',
         admin_dashboard::mentors_context($USER, $flash)
+    );
+} else if ($view === 'reviews') {
+    $pagetitle = get_string('admin_nav_reviews', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_reviews',
+        admin_dashboard::reviews_context($USER)
     );
 } else {
     $view = 'home';
