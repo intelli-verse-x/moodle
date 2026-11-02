@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks & courses, Cohort & enrolment.
+ * Admin portal — Overview, Tracks, Cohorts, People.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -40,9 +40,14 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'cohorts'];
+$allowedviews = ['home', 'tracks', 'cohorts', 'people'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+
+$peopletab = optional_param('tab', 'all', PARAM_ALPHA);
+if (!in_array($peopletab, ['all', 'fellow', 'mentor', 'admin'], true)) {
+    $peopletab = 'all';
 }
 
 $flash = [];
@@ -56,11 +61,14 @@ if ($view === 'cohorts' && data_submitted() && confirm_sesskey()) {
     }
 }
 
+$urlparams = array_filter([
+    'view' => $view !== 'home' ? $view : null,
+    'tab' => ($view === 'people' && $peopletab !== 'all') ? $peopletab : null,
+]);
+
 $context = context_system::instance();
 $PAGE->set_context($context);
-$PAGE->set_url(new moodle_url(persona_home::ADMIN_PATH, array_filter([
-    'view' => $view !== 'home' ? $view : null,
-])));
+$PAGE->set_url(new moodle_url(persona_home::ADMIN_PATH, $urlparams));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('admin_area_title', 'local_launchpad'));
 $PAGE->set_heading(get_string('admin_area_heading', 'local_launchpad'));
@@ -74,6 +82,7 @@ $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(fals
 $homeurl = (new moodle_url(persona_home::ADMIN_PATH))->out(false);
 $tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
 $cohortsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
+$peopleurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'people']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 
 $firstname = format_string($USER->firstname);
@@ -120,6 +129,22 @@ $nav = [
             ],
         ],
     ],
+    [
+        'group' => get_string('admin_nav_people_group', 'local_launchpad'),
+        'items' => [
+            [
+                'label' => get_string('admin_nav_people', 'local_launchpad'),
+                'url' => $peopleurl,
+                'current' => $view === 'people',
+                'key' => 'people',
+                'icon_svg' => $icon(
+                    '<circle cx="9" cy="8" r="3.5"/>'
+                    . '<path d="M2 20c1-4 4-6 7-6s6 2 7 6"/>'
+                    . '<path d="M16 4.5a3.5 3.5 0 010 7M22 20c-.6-2.6-2-4.4-4-5.3"/>'
+                ),
+            ],
+        ],
+    ],
 ];
 
 if ($view === 'tracks') {
@@ -133,6 +158,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_cohorts',
         admin_dashboard::cohorts_context($USER, $flash)
+    );
+} else if ($view === 'people') {
+    $pagetitle = get_string('admin_nav_people', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_people',
+        admin_dashboard::people_context($USER, $peopletab)
     );
 } else {
     $view = 'home';

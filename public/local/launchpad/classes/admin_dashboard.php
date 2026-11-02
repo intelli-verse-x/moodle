@@ -371,6 +371,234 @@ final class admin_dashboard {
     }
 
     /**
+     * People directory (HTML people) — fellows, mentors, admins from live Moodle.
+     *
+     * @param \stdClass $user
+     * @param string $tab all|fellow|mentor|admin
+     * @return array<string, mixed>
+     */
+    public static function people_context(\stdClass $user, string $tab = 'all'): array {
+        $tab = strtolower(trim($tab));
+        if (!in_array($tab, ['all', 'fellow', 'mentor', 'admin'], true)) {
+            $tab = 'all';
+        }
+
+        $all = self::list_people_rows();
+        $counts = [
+            'all' => count($all),
+            'fellow' => 0,
+            'mentor' => 0,
+            'admin' => 0,
+        ];
+        foreach ($all as $row) {
+            $counts[$row['role_key']] = ($counts[$row['role_key']] ?? 0) + 1;
+        }
+
+        $filtered = [];
+        foreach ($all as $row) {
+            if ($tab === 'all' || $row['role_key'] === $tab) {
+                $filtered[] = $row;
+            }
+        }
+
+        $tabs = [];
+        foreach (['all', 'fellow', 'mentor', 'admin'] as $key) {
+            $tabs[] = [
+                'key' => $key,
+                'label' => get_string('admin_people_tab_' . $key, 'local_launchpad'),
+                'count' => (string) $counts[$key],
+                'url' => (new \moodle_url(persona_home::ADMIN_PATH, array_filter([
+                    'view' => 'people',
+                    'tab' => $key !== 'all' ? $key : null,
+                ])))->out(false),
+                'current' => $tab === $key,
+            ];
+        }
+
+        return [
+            'eyebrow' => get_string('admin_people_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_people_heading', 'local_launchpad'),
+            'lead' => get_string('admin_people_lead', 'local_launchpad'),
+            'tabs' => $tabs,
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_email' => get_string('admin_people_col_email', 'local_launchpad'),
+            'col_role' => get_string('admin_people_col_role', 'local_launchpad'),
+            'col_reach' => get_string('admin_people_col_reach', 'local_launchpad'),
+            'people' => $filtered,
+            'has_people' => $filtered !== [],
+            'empty_body' => get_string('admin_people_empty', 'local_launchpad'),
+            'footnote' => get_string('admin_people_footnote', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * People rows: one row per user×role (fellow / mentor / admin).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function list_people_rows(): array {
+        $fellows = self::list_track_people_by_archetype(['student'], true);
+        $mentors = self::list_track_people_by_archetype(['teacher', 'editingteacher'], false);
+        $admins = self::list_admin_people();
+
+        $rows = [];
+        foreach ($fellows as $row) {
+            $rows[] = self::people_row_context($row, 'fellow');
+        }
+        foreach ($mentors as $row) {
+            $rows[] = self::people_row_context($row, 'mentor');
+        }
+        foreach ($admins as $row) {
+            $rows[] = self::people_row_context($row, 'admin');
+        }
+
+        usort($rows, static function (array $a, array $b): int {
+            $cmp = strcasecmp($a['sort_lastname'], $b['sort_lastname']);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = strcasecmp($a['sort_firstname'], $b['sort_firstname']);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcmp($a['role_key'], $b['role_key']);
+        });
+
+        return $rows;
+    }
+
+    /**
+     * Users with given role archetypes on track courses, courses listed for "Can reach".
+     *
+     * @param list<string> $archetypes
+     * @return list<array{user:\stdClass,courses:list<string>}>
+     */
+    public static function list_track_people_by_archetype(array $archetypes, bool $requireactiveenrol): array {
+        global $CFG, $DB;
+
+        $tracks = self::list_track_courses();
+        $ids = array_map(static fn($c) => (int) $c->id, $tracks);
+        $ids = array_values(array_filter($ids));
+        if ($ids === [] || $archetypes === []) {
+            return [];
+        }
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        [$archsql, $archparams] = $DB->get_in_or_equal($archetypes, SQL_PARAMS_NAMED, 'arch');
+        $params += $archparams;
+        $params['ctxlevel'] = CONTEXT_COURSE;
+
+        if ($requireactiveenrol) {
+            $params['uestatus'] = ENROL_USER_ACTIVE;
+            $params['estatus'] = ENROL_INSTANCE_ENABLED;
+            $sql = "SELECT u.id AS userid, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                           u.middlename, u.alternatename, u.email, c.id AS courseid, c.fullname AS coursefullname
+                      FROM {user_enrolments} ue
+                      JOIN {enrol} e ON e.id = ue.enrolid
+                      JOIN {course} c ON c.id = e.courseid
+                      JOIN {user} u ON u.id = ue.userid AND u.deleted = 0
+                      JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = :ctxlevel
+                      JOIN {role_assignments} ra ON ra.contextid = ctx.id AND ra.userid = u.id
+                      JOIN {role} r ON r.id = ra.roleid AND r.archetype {$archsql}
+                     WHERE ue.status = :uestatus
+                       AND e.status = :estatus
+                       AND c.id {$insql}
+                  ORDER BY u.lastname ASC, u.firstname ASC, c.fullname ASC";
+        } else {
+            $sql = "SELECT u.id AS userid, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                           u.middlename, u.alternatename, u.email, c.id AS courseid, c.fullname AS coursefullname
+                      FROM {role_assignments} ra
+                      JOIN {role} r ON r.id = ra.roleid AND r.archetype {$archsql}
+                      JOIN {context} ctx ON ctx.id = ra.contextid AND ctx.contextlevel = :ctxlevel
+                      JOIN {course} c ON c.id = ctx.instanceid
+                      JOIN {user} u ON u.id = ra.userid AND u.deleted = 0
+                     WHERE c.id {$insql}
+                  ORDER BY u.lastname ASC, u.firstname ASC, c.fullname ASC";
+        }
+
+        $raw = $DB->get_recordset_sql($sql, $params);
+        $byuser = [];
+        foreach ($raw as $row) {
+            $uid = (int) $row->userid;
+            if (!isset($byuser[$uid])) {
+                $byuser[$uid] = [
+                    'user' => $row,
+                    'courses' => [],
+                ];
+            }
+            $cname = format_string($row->coursename);
+            if (!in_array($cname, $byuser[$uid]['courses'], true)) {
+                $byuser[$uid]['courses'][] = $cname;
+            }
+        }
+        $raw->close();
+
+        return array_values($byuser);
+    }
+
+    /**
+     * Site admins for the People directory.
+     *
+     * @return list<array{user:\stdClass,courses:list<string>}>
+     */
+    public static function list_admin_people(): array {
+        $reach = get_string('admin_people_reach_admin', 'local_launchpad');
+        $root = self::fellowship_root_category();
+        if ($root) {
+            $reach = format_string($root->name);
+        }
+
+        $out = [];
+        foreach (get_admins() as $admin) {
+            if (empty($admin->id) || !empty($admin->deleted)) {
+                continue;
+            }
+            $out[] = [
+                'user' => $admin,
+                'courses' => [$reach],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * One People table row.
+     *
+     * @param array{user:\stdClass,courses:list<string>} $row
+     * @param string $rolekey fellow|mentor|admin
+     * @return array<string, mixed>
+     */
+    public static function people_row_context(array $row, string $rolekey): array {
+        $user = $row['user'];
+        $courses = $row['courses'];
+        $tone = match ($rolekey) {
+            'mentor' => 'green',
+            'admin' => 'navy',
+            default => 'blue',
+        };
+        $chip = match ($rolekey) {
+            'mentor' => 'ok',
+            'admin' => 'line',
+            default => '',
+        };
+
+        return [
+            'name' => fullname($user),
+            'email' => s($user->email ?? ''),
+            'initials' => fellowship_dashboard::initials($user),
+            'avatar_tone' => $tone,
+            'role_key' => $rolekey,
+            'role_label' => get_string('admin_people_role_' . $rolekey, 'local_launchpad'),
+            'role_chip' => $chip,
+            'reach' => $courses !== [] ? implode(', ', $courses) : '—',
+            'sort_lastname' => (string) ($user->lastname ?? ''),
+            'sort_firstname' => (string) ($user->firstname ?? ''),
+        ];
+    }
+
+    /**
      * One track card for the Tracks & courses grid.
      *
      * @param \stdClass $course id, fullname, shortname, idnumber, visible, summary?

@@ -558,6 +558,83 @@ body.local-launchpad-mentor {
   background: var(--lp-blue);
 }
 
+/* Admin People tabs + name cell. */
+.lp-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--lp-blue-softer, #EBF0FA);
+  border: 1px solid var(--lp-line);
+  flex-wrap: wrap;
+}
+.lp-tabs-block {
+  display: flex;
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+}
+.lp-tabs-block .lp-tab {
+  flex: 1;
+  justify-content: center;
+  text-decoration: none;
+  min-width: 0;
+}
+.lp-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--lp-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .15s ease, color .15s ease;
+  text-decoration: none;
+}
+.lp-tab:hover { color: var(--lp-ink); }
+.lp-tab.is-on {
+  background: #fff;
+  color: var(--lp-ink);
+  box-shadow: 0 1px 2px rgba(18, 22, 31, .08);
+}
+.lp-tab-count {
+  min-width: 1.25rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(18, 22, 31, .06);
+  font-size: 11px;
+  font-weight: 700;
+}
+.lp-tab.is-on .lp-tab-count {
+  background: var(--lp-blue-soft);
+  color: var(--lp-blue);
+}
+.lp-people-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.lp-people-name .lp-av-sm {
+  width: 30px;
+  height: 30px;
+  font-size: 11px;
+}
+.lp-people-name b {
+  overflow-wrap: anywhere;
+}
+.lp-av.tone-blue { background: var(--lp-blue); }
+.lp-av.tone-green { background: #2E9E4F; }
+.lp-av.tone-navy { background: var(--lp-navy); }
+
 /* Admin Cohort & enrolment tiles (HTML x-tile). */
 .lp-atiles {
   display: grid;
