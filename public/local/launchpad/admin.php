@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview shell for LaunchPad programme operators.
+ * Admin portal — Overview + Tracks & courses (no Course builder yet).
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -40,13 +40,16 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-if ($view !== 'home') {
+$allowedviews = ['home', 'tracks'];
+if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
 
 $context = context_system::instance();
 $PAGE->set_context($context);
-$PAGE->set_url(new moodle_url(persona_home::ADMIN_PATH));
+$PAGE->set_url(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+    'view' => $view !== 'home' ? $view : null,
+])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('admin_area_title', 'local_launchpad'));
 $PAGE->set_heading(get_string('admin_area_heading', 'local_launchpad'));
@@ -58,6 +61,7 @@ $jsurl = $pluginbase . '/fellowship.js?v=' . rawurlencode($assetv);
 $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::ADMIN_PATH))->out(false);
+$tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 
 $firstname = format_string($USER->firstname);
@@ -75,21 +79,39 @@ $nav = [
             [
                 'label' => get_string('admin_nav_overview', 'local_launchpad'),
                 'url' => $homeurl,
-                'current' => true,
+                'current' => $view === 'home',
                 'key' => 'home',
                 'icon_svg' => $icon(
                     '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_nav_tracks', 'local_launchpad'),
+                'url' => $tracksurl,
+                'current' => $view === 'tracks',
+                'key' => 'tracks',
+                'icon_svg' => $icon(
+                    '<path d="M4 6h16M4 12h10M4 18h14"/>'
                 ),
             ],
         ],
     ],
 ];
 
-$pagetitle = get_string('admin_nav_overview', 'local_launchpad');
-$content = $OUTPUT->render_from_template(
-    'local_launchpad/admin_overview',
-    admin_dashboard::overview_context($USER)
-);
+if ($view === 'tracks') {
+    $pagetitle = get_string('admin_nav_tracks', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_tracks',
+        admin_dashboard::tracks_context($USER)
+    );
+} else {
+    $view = 'home';
+    $pagetitle = get_string('admin_nav_overview', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_overview',
+        admin_dashboard::overview_context($USER)
+    );
+}
 
 $unread = messaging::notification_unread_count($userid);
 $notificationslabel = messaging::notifications_label($unread);
@@ -111,7 +133,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'unread_notifications' => $unread,
     'has_unread_notifications' => $unread > 0,
     'initials' => fellowship_dashboard::initials($USER),
-    // Pre-resolve chrome strings — {{#str}} can render [[]] on this custom HTML shell.
+    // Pre-resolve chrome strings — avoid Mustache str helpers on this custom shell.
     'str_skip' => get_string('admin_skip_to_content', 'local_launchpad'),
     'str_nav_aria' => get_string('admin_nav_aria', 'local_launchpad'),
     'str_signout' => get_string('fellowship_nav_signout', 'local_launchpad'),

@@ -55,4 +55,18 @@ final class admin_dashboard_test extends \basic_testcase {
         $url = admin_dashboard::assign_teacher_url(0);
         $this->assertStringContainsString('/user/index.php', $url->out(false));
     }
+
+    public function test_foundations_ready_invalid_course(): void {
+        $this->assertFalse(admin_dashboard::foundations_ready(0));
+    }
+
+    public function test_phase_visibility_shape_without_course(): void {
+        $phases = admin_dashboard::phase_visibility(0);
+        $this->assertCount(4, $phases);
+        foreach ($phases as $p) {
+            $this->assertArrayHasKey('on', $p);
+            $this->assertArrayHasKey('title', $p);
+            $this->assertFalse($p['on']);
+        }
+    }
 }
