@@ -34,6 +34,7 @@ final class hook_callbacks {
      * @param before_http_headers $hook
      */
     public static function before_http_headers(before_http_headers $hook): void {
+        login_portal::maybe_redirect_logged_in_from_login();
         persona_home::maybe_redirect_from_my();
     }
 

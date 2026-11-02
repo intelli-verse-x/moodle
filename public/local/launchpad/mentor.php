@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Minimal Mentor home (assigned lp-* courses; review UI comes later).
+ * Mentor dashboard — review queue for assigned lp-* courses (HTML-scoped: Dashboard + Queue).
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -25,41 +25,374 @@
 require(__DIR__ . '/../../config.php');
 
 use local_launchpad\account_persona;
+use local_launchpad\fellowship_dashboard;
+use local_launchpad\login_portal;
+use local_launchpad\mentor_dashboard;
+use local_launchpad\messaging;
 use local_launchpad\persona_home;
+use local_launchpad\portal_gate;
 
 require_login();
 
+$userid = (int) $USER->id;
+portal_gate::assert_or_redirect_home(
+    mentor_dashboard::can_access($userid),
+    login_portal::MENTOR
+);
+
+$view = optional_param('view', 'home', PARAM_ALPHA);
+$filter = optional_param('filter', 'waiting', PARAM_ALPHA);
+$cmid = optional_param('id', 0, PARAM_INT);
+$fellowid = optional_param('userid', 0, PARAM_INT);
+$courseid = optional_param('course', 0, PARAM_INT);
+$saved = optional_param('saved', '', PARAM_ALPHA);
+$err = optional_param('err', '', PARAM_ALPHANUMEXT);
+
+$courses = persona_home::list_mentor_courses($userid);
+
+// Send / delete LaunchPad messages (Moodle-backed) before rendering.
+if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
+    $toid = required_param('id', PARAM_INT);
+    $msgaction = optional_param('msgaction', 'send', PARAM_ALPHA);
+    $redirect = new moodle_url(persona_home::MENTOR_PATH, ['view' => 'messages', 'id' => $toid]);
+    if ($msgaction === 'delete') {
+        $messageids = optional_param_array('messageids', [], PARAM_INT);
+        $result = messaging::delete_messages($userid, $messageids);
+    } else {
+        $body = required_param('message', PARAM_RAW_TRIMMED);
+        $result = messaging::send($userid, $toid, $body);
+    }
+    if (!$result['ok']) {
+        redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);
+    }
+    redirect($redirect);
+}
+
+// Persist review into Moodle assign before rendering.
+if ($view === 'review' && $cmid > 0 && $fellowid > 0 && data_submitted() && confirm_sesskey()) {
+    $gradepct = required_param('grade_pct', PARAM_RAW_TRIMMED);
+    $comment = required_param('comment', PARAM_RAW_TRIMMED);
+    $outcome = optional_param('outcome', 'met', PARAM_ALPHA);
+    try {
+        $result = mentor_dashboard::save_review($userid, $cmid, $fellowid, $gradepct, $comment, $outcome);
+        redirect(new moodle_url(persona_home::MENTOR_PATH, [
+            'view' => 'review',
+            'id' => $cmid,
+            'userid' => $fellowid,
+            'saved' => $result,
+        ]));
+    } catch (\moodle_exception $e) {
+        // Stay in LaunchPad chrome — don't dump a bare Moodle exception page.
+        redirect(new moodle_url(persona_home::MENTOR_PATH, [
+            'view' => 'review',
+            'id' => $cmid,
+            'userid' => $fellowid,
+            'err' => $e->errorcode,
+            'grade_pct' => $gradepct,
+            'outcome' => $outcome,
+        ]), $e->getMessage(), null, \core\output\notification::NOTIFY_ERROR);
+    }
+}
+
 $context = context_system::instance();
 $PAGE->set_context($context);
-$PAGE->set_url(new moodle_url(persona_home::MENTOR_PATH));
-$PAGE->set_pagelayout('standard');
+$PAGE->set_url(new moodle_url(persona_home::MENTOR_PATH, array_filter([
+    'view' => $view !== 'home' ? $view : null,
+    'filter' => ($view === 'queue' && $filter !== 'waiting') ? $filter : null,
+    'id' => ($view === 'review' && $cmid > 0) ? $cmid : null,
+    'userid' => (($view === 'review' || $view === 'fellow') && $fellowid > 0) ? $fellowid : null,
+    'course' => ($view === 'fellow' && $courseid > 0) ? $courseid : null,
+])));
+$PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('mentor_area_title', 'local_launchpad'));
 $PAGE->set_heading(get_string('mentor_area_heading', 'local_launchpad'));
 
-if (!account_persona::is_mentor((int) $USER->id) && !is_siteadmin()) {
-    throw new \moodle_exception('mentor_access_denied', 'local_launchpad');
-}
+$pluginbase = $CFG->wwwroot . '/local/launchpad';
+$assetv = (string) (get_config('local_launchpad', 'version') ?: '1');
+$cssurl = $pluginbase . '/styles_fellowship.css?v=' . rawurlencode($assetv);
+$jsurl = $pluginbase . '/fellowship.js?v=' . rawurlencode($assetv);
+$logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
+$profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
+$homeurl = (new moodle_url(persona_home::MENTOR_PATH))->out(false);
+$queueurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
+$fellowsurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false);
+$calendarurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'calendar']))->out(false);
+$notificationsurl = messaging::moodle_notifications_url();
+$messagesurl = messaging::messages_url(null, 'mentor');
+$msgunread = messaging::conversation_unread_count($userid);
 
-$courses = persona_home::list_mentor_courses((int) $USER->id);
+$firstname = format_string($USER->firstname);
+$displayname = fullname($USER);
 
-echo $OUTPUT->header();
-echo $OUTPUT->heading(get_string('mentor_area_heading', 'local_launchpad'));
-echo html_writer::tag('p', get_string('mentor_area_body', 'local_launchpad'));
+$icon = static function (string $paths): string {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+        . $paths . '</svg>';
+};
 
-if ($courses === []) {
-    echo html_writer::tag('p', get_string('mentor_area_no_courses', 'local_launchpad'), ['class' => 'muted']);
-} else {
-    echo html_writer::tag('h3', get_string('mentor_area_courses', 'local_launchpad'));
-    $items = '';
-    foreach ($courses as $course) {
-        $url = new moodle_url('/course/view.php', ['id' => $course->id]);
-        $label = format_string($course->fullname);
-        if (!empty($course->idnumber)) {
-            $label .= ' (' . s($course->idnumber) . ')';
+// Nav: Dashboard + Review queue + My fellows (HTML also has track/history — deferred).
+$queuepreview = mentor_dashboard::list_review_queue($userid, $courses, 'waiting');
+$waitingcount = (int) ($queuepreview['waiting_count'] ?? 0);
+
+$nav = [
+    [
+        'group' => get_string('mentor_nav_review', 'local_launchpad'),
+        'items' => [
+            [
+                'label' => get_string('mentor_nav_home', 'local_launchpad'),
+                'url' => $homeurl,
+                'current' => $view === 'home',
+                'key' => 'home',
+                'icon_svg' => $icon('<path d="M3 11.5L12 4l9 7.5"/><path d="M6 10.5V20h12v-9.5"/>'),
+            ],
+            [
+                'label' => get_string('mentor_nav_queue', 'local_launchpad'),
+                'url' => $queueurl,
+                'current' => $view === 'queue',
+                'key' => 'queue',
+                'icon_svg' => $icon('<path d="M5 5h14v10H9l-4 4V5z"/>'),
+                'has_badge' => $waitingcount > 0,
+                'badge' => $waitingcount > 0 ? (string) $waitingcount : '',
+            ],
+        ],
+    ],
+    [
+        'group' => get_string('mentor_nav_course', 'local_launchpad'),
+        'items' => [
+            [
+                'label' => get_string('mentor_nav_fellows', 'local_launchpad'),
+                'url' => $fellowsurl,
+                'current' => $view === 'fellows' || $view === 'fellow',
+                'key' => 'fellows',
+                'icon_svg' => $icon('<path d="M16 11a4 4 0 10-8 0 4 4 0 008 0z"/><path d="M4 20a8 8 0 0116 0"/><path d="M19 8a3 3 0 110 6"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_nav_calendar', 'local_launchpad'),
+                'url' => $calendarurl,
+                'current' => $view === 'calendar',
+                'key' => 'calendar',
+                'icon_svg' => $icon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => $messagesurl,
+                'current' => $view === 'messages',
+                'key' => 'messages',
+                'icon_svg' => $icon('<path d="M5 5h14v10H9l-4 4V5z"/>'),
+                'has_badge' => $msgunread > 0,
+                'badge' => $msgunread > 0 ? (string) $msgunread : '',
+            ],
+        ],
+    ],
+];
+
+$content = '';
+$pagetitle = get_string('mentor_area_heading', 'local_launchpad');
+
+switch ($view) {
+    case 'queue':
+        $pagetitle = get_string('mentor_nav_queue', 'local_launchpad');
+        $queuedata = mentor_dashboard::list_review_queue($userid, $courses, $filter);
+        $content = $OUTPUT->render_from_template('local_launchpad/mentor_queue', array_merge($queuedata, [
+            'has_courses' => $courses !== [],
+            'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
+        ]));
+        break;
+
+    case 'fellows':
+        $pagetitle = get_string('mentor_nav_fellows', 'local_launchpad');
+        $fellowsdata = mentor_dashboard::list_fellows($userid, $courses);
+        $content = $OUTPUT->render_from_template('local_launchpad/mentor_fellows', array_merge($fellowsdata, [
+            'has_courses' => $courses !== [],
+            'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
+            'queue_url' => $queueurl,
+        ]));
+        break;
+
+    case 'fellow':
+        $pagetitle = get_string('mentor_nav_fellows', 'local_launchpad');
+        if ($fellowid <= 0 || $courseid <= 0) {
+            redirect(new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']));
         }
-        $items .= html_writer::tag('li', html_writer::link($url, $label));
-    }
-    echo html_writer::tag('ul', $items, ['class' => 'local-launchpad-mentor-courses']);
+        $detaildata = mentor_dashboard::get_fellow_detail($userid, $fellowid, $courseid, $courses);
+        if ($detaildata === null) {
+            redirect(new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']));
+        }
+        $pagetitle = (string) ($detaildata['fellow_name'] ?? $pagetitle);
+        $content = $OUTPUT->render_from_template('local_launchpad/mentor_fellow_detail', array_merge($detaildata, [
+            'has_crumbs' => true,
+            'crumbs' => [
+                [
+                    'label' => get_string('mentor_nav_fellows', 'local_launchpad'),
+                    'url' => $fellowsurl,
+                ],
+                [
+                    'label' => (string) ($detaildata['fellow_name'] ?? ''),
+                    'url' => '',
+                ],
+            ],
+        ]));
+        break;
+
+    case 'messages':
+        $pagetitle = get_string('fellowship_messages_heading', 'local_launchpad');
+        $otherid = $cmid > 0 ? $cmid : null;
+        $msgdata = messaging::page_context($userid, 'mentor', $otherid);
+        $msgcrumbs = [
+            [
+                'label' => get_string('mentor_nav_home', 'local_launchpad'),
+                'url' => $homeurl,
+            ],
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => !empty($msgdata['has_thread']) ? messaging::messages_url(null, 'mentor') : '',
+            ],
+        ];
+        if (!empty($msgdata['has_thread']) && !empty($msgdata['other_name'])) {
+            $pagetitle = (string) $msgdata['other_name'];
+            $msgcrumbs[] = [
+                'label' => (string) $msgdata['other_name'],
+                'url' => '',
+            ];
+        }
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', array_merge($msgdata, [
+            'has_crumbs' => true,
+            'crumbs' => $msgcrumbs,
+        ]));
+        break;
+
+    case 'calendar':
+        $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
+        $calmode = optional_param('cal', 'month', PARAM_ALPHA);
+        $calfilter = optional_param('filter', 'all', PARAM_ALPHA);
+        $caltime = optional_param('time', 0, PARAM_INT);
+        $calyear = optional_param('year', 0, PARAM_INT);
+        $calmonth = optional_param('month', 0, PARAM_INT);
+        $resolved = \local_launchpad\calendar_service::resolve_month(
+            $caltime > 0 ? $caltime : null,
+            $calyear > 0 ? $calyear : null,
+            $calmonth > 0 ? $calmonth : null
+        );
+        $caldata = \local_launchpad\calendar_service::mentor_context(
+            $userid,
+            $courses,
+            (int) $resolved['year'],
+            (int) $resolved['month'],
+            $calmode,
+            $calfilter,
+            $caltime > 0 ? $caltime : null
+        );
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', array_merge($caldata, [
+            'has_crumbs' => true,
+            'crumbs' => [
+                [
+                    'label' => get_string('mentor_nav_home', 'local_launchpad'),
+                    'url' => $homeurl,
+                ],
+                [
+                    'label' => get_string('fellowship_nav_calendar', 'local_launchpad'),
+                    'url' => '',
+                ],
+            ],
+        ]));
+        break;
+
+    case 'review':
+        $pagetitle = get_string('mentor_nav_review_page', 'local_launchpad');
+        if ($cmid <= 0 || $fellowid <= 0) {
+            redirect(new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']));
+        }
+        $reviewdata = mentor_dashboard::get_review_context($userid, $cmid, $fellowid);
+        // Preserve attempted form values after a soft validation redirect.
+        $postedgrade = optional_param('grade_pct', '', PARAM_RAW_TRIMMED);
+        if ($postedgrade !== '') {
+            $reviewdata['grade_pct'] = s($postedgrade);
+        }
+        $postedoutcome = optional_param('outcome', '', PARAM_ALPHA);
+        if ($postedoutcome === 'changes' || $postedoutcome === 'met') {
+            $reviewdata['outcome_met'] = ($postedoutcome === 'met');
+            $reviewdata['outcome_changes'] = ($postedoutcome === 'changes');
+        } else if (is_number((string) ($reviewdata['grade_pct'] ?? ''))
+                && (float) $reviewdata['grade_pct'] < 70 && (float) $reviewdata['grade_pct'] >= 0
+                && (string) $reviewdata['grade_pct'] !== '') {
+            // Existing score below pass bar → default to Changes.
+            $reviewdata['outcome_met'] = false;
+            $reviewdata['outcome_changes'] = true;
+        }
+        $reviewdata['has_saved'] = ($saved === 'released' || $saved === 'changes');
+        $reviewdata['saved_message'] = match ($saved) {
+            'released' => get_string('mentor_review_saved_released', 'local_launchpad'),
+            'changes' => get_string('mentor_review_saved_changes', 'local_launchpad'),
+            default => '',
+        };
+        $reviewdata['has_error'] = ($err !== '');
+        $reviewdata['error_message'] = $err !== ''
+            ? get_string($err, 'local_launchpad')
+            : '';
+        $content = $OUTPUT->render_from_template('local_launchpad/mentor_review', $reviewdata);
+        break;
+
+    case 'home':
+    default:
+        $view = 'home';
+        $pagetitle = get_string('mentor_nav_home', 'local_launchpad');
+        $homesummary = mentor_dashboard::home_summary($userid, $courses);
+        $content = $OUTPUT->render_from_template('local_launchpad/mentor_home', array_merge([
+            'firstname' => $firstname,
+            'welcome_back' => get_string('mentor_welcome_back', 'local_launchpad', $firstname),
+            'prof_url' => $pluginbase . '/assets/img/prof.webp',
+        ], $homesummary));
+        break;
 }
 
-echo $OUTPUT->footer();
+foreach ($nav as &$group) {
+    foreach ($group['items'] as &$item) {
+        $key = $item['key'] ?? '';
+        // Keep Review queue highlighted while grading.
+        $item['current'] = ($key === $view) || ($view === 'review' && $key === 'queue');
+    }
+}
+unset($group, $item);
+
+$unread = messaging::notification_unread_count($userid);
+$notificationslabel = messaging::notifications_label($unread);
+
+$mismatch = portal_gate::consume_modal_context();
+$shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_merge([
+    'data_region' => mentor_dashboard::DATA_REGION,
+    'displayname' => $displayname,
+    'firstname' => $firstname,
+    'role_label' => get_string('mentor_role_label', 'local_launchpad'),
+    'nav_groups' => $nav,
+    'content' => $content,
+    'pagetitle' => $pagetitle,
+    'home_url' => $homeurl,
+    'logout_url' => $logouturl,
+    'profile_url' => $profileurl,
+    'notifications_url' => $notificationsurl,
+    'notifications_label' => $notificationslabel,
+    'unread_notifications' => $unread,
+    'has_unread_notifications' => $unread > 0,
+    'initials' => fellowship_dashboard::initials($USER),
+], $mismatch));
+
+header('Content-Type: text/html; charset=utf-8');
+echo '<!doctype html>' . "\n";
+echo '<html lang="' . s(current_language()) . '">' . "\n";
+echo '<head>' . "\n";
+echo '<meta charset="utf-8">' . "\n";
+echo '<meta name="viewport" content="width=device-width, initial-scale=1">' . "\n";
+echo '<title>' . s(get_string('mentor_area_title', 'local_launchpad')) . '</title>' . "\n";
+echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
+echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
+echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
+echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
+echo '</head>' . "\n";
+$bodyclass = 'local-launchpad-fellowship local-launchpad-mentor';
+if (!empty($mismatch['show_portal_mismatch'])) {
+    $bodyclass .= ' lp-portal-mismatch-lock';
+}
+echo '<body class="' . $bodyclass . '">' . "\n";
+echo $shell;
+echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
+echo '</body>' . "\n";
+echo '</html>';

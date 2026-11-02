@@ -1,0 +1,125 @@
+{{!
+    @template local_launchpad/mentor_home
+}}
+{{^has_courses}}
+  <div class="lp-empty" role="status">
+    <div class="lp-empty-mark" aria-hidden="true">MN</div>
+    <h2>{{welcome_back}}</h2>
+    <p>{{#str}} mentor_area_no_courses, local_launchpad {{/str}}</p>
+  </div>
+{{/has_courses}}
+{{#has_courses}}
+  <div class="lp-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{#str}} mentor_role_label, local_launchpad {{/str}}</span>
+        <h2>{{welcome_back}}</h2>
+        <p class="lp-hero-lead">{{#str}} mentor_home_lead, local_launchpad {{/str}}</p>
+        {{#has_waiting}}
+          <div class="lp-quest">
+            <div>
+              <span class="lp-eyebrow">{{#str}} mentor_waiting_eyebrow, local_launchpad {{/str}}</span>
+              <p class="lp-quest-title">{{waiting_label}}</p>
+              <p class="lp-muted">{{#str}} mentor_waiting_hint, local_launchpad {{/str}}</p>
+            </div>
+            <a class="lp-btn lp-btn-primary" href="{{queue_url}}">{{#str}} mentor_open_queue, local_launchpad {{/str}}</a>
+          </div>
+        {{/has_waiting}}
+        {{^has_waiting}}
+          <div class="lp-quest">
+            <div>
+              <p class="lp-quest-title">{{#str}} mentor_queue_clear_title, local_launchpad {{/str}}</p>
+              <p class="lp-muted">{{#str}} mentor_queue_caught_up, local_launchpad {{/str}}</p>
+            </div>
+          </div>
+        {{/has_waiting}}
+      </div>
+    </div>
+  </div>
+
+  <div class="lp-stats" role="list">
+    <div class="lp-stat" role="listitem">
+      <b>{{waiting_count}}</b>
+      <span>{{#str}} mentor_stat_waiting, local_launchpad {{/str}}</span>
+    </div>
+    <div class="lp-stat" role="listitem">
+      <b>{{released_count}}</b>
+      <span>{{#str}} mentor_stat_released, local_launchpad {{/str}}</span>
+    </div>
+    <div class="lp-stat" role="listitem">
+      <b>{{open_count}}</b>
+      <span>{{#str}} mentor_stat_open, local_launchpad {{/str}}</span>
+    </div>
+  </div>
+
+  <div class="lp-grid-2" style="margin-top:16px">
+    <section class="lp-card lift">
+      <div class="lp-card-head">
+        <h3>{{#str}} mentor_home_queue_title, local_launchpad {{/str}}</h3>
+        <a class="lp-link" href="{{queue_url}}">{{#str}} mentor_open_queue_short, local_launchpad {{/str}}</a>
+      </div>
+      {{#has_waiting_preview}}
+        <ul class="lp-course-list lp-mentor-queue-preview">
+          {{#waiting_preview}}
+            <li>
+              <a href="{{url}}">
+                <b>{{{fellow_name}}}</b>
+                <span class="lp-muted">{{{assign_name}}}{{#submitted_at}} · {{submitted_at}}{{/submitted_at}}</span>
+              </a>
+              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+            </li>
+          {{/waiting_preview}}
+        </ul>
+        {{#has_waiting}}
+          <p class="lp-xs lp-muted" style="margin:12px 0 0">{{#str}} mentor_home_queue_more, local_launchpad {{/str}}</p>
+        {{/has_waiting}}
+      {{/has_waiting_preview}}
+      {{^has_waiting_preview}}
+        <p class="lp-muted">{{#str}} mentor_home_queue_empty, local_launchpad {{/str}}</p>
+      {{/has_waiting_preview}}
+    </section>
+
+    <div class="lp-stack">
+      <section class="lp-card soft">
+        <div class="lp-mascot">
+          {{#prof_url}}
+            <img src="{{prof_url}}" alt="" style="height:96px">
+          {{/prof_url}}
+          <div class="lp-bubble">
+            <p class="lp-sm">{{coach_tip}}</p>
+          </div>
+        </div>
+      </section>
+      <section class="lp-card lift">
+        <div class="lp-card-head">
+          <h3>{{#str}} mentor_rubric_glance_title, local_launchpad {{/str}}</h3>
+        </div>
+        <ul class="lp-rubric-glance">
+          {{#rubric_rows}}
+            <li>
+              <span>{{label}}</span>
+              <b class="lp-num">{{weight}}</b>
+            </li>
+          {{/rubric_rows}}
+        </ul>
+        <p class="lp-xs lp-muted" style="margin:12px 0 0">{{#str}} mentor_rubric_glance_note, local_launchpad {{/str}}</p>
+      </section>
+    </div>
+  </div>
+
+  <section class="lp-card lift" style="margin-top:16px">
+    <div class="lp-card-head">
+      <h3>{{#str}} mentor_your_courses, local_launchpad {{/str}}</h3>
+    </div>
+    <ul class="lp-course-list">
+      {{#courses}}
+        <li>
+          <a href="{{moodle_url}}">
+            <b>{{{fullname}}}</b>
+            <span class="lp-muted">{{idnumber}}</span>
+          </a>
+        </li>
+      {{/courses}}
+    </ul>
+  </section>
+{{/has_courses}}

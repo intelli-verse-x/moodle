@@ -649,9 +649,10 @@ final class fellowship_dashboard {
         $summary = trim(format_string($course->summary ?? ''));
         $hasrealsummary = $summary !== '' && stripos($summary, 'placeholder') === false;
 
-        $mentors = self::course_mentor_names($course);
-        $mentorlabel = $mentors !== []
-            ? implode(', ', $mentors)
+        $mentors = self::course_mentors($course, $userid);
+        $mentornames = array_map(static fn(array $m): string => (string) $m['name'], $mentors);
+        $mentorlabel = $mentornames !== []
+            ? implode(', ', $mentornames)
             : get_string('fellowship_track_mentor_tba', 'local_launchpad');
 
         return [
@@ -668,6 +669,8 @@ final class fellowship_dashboard {
             'device' => get_string('fellowship_track_device', 'local_launchpad'),
             'tools' => get_string('fellowship_track_tools', 'local_launchpad'),
             'mentor' => $mentorlabel,
+            'mentors' => $mentors,
+            'has_mentors' => $mentors !== [],
             'weight_rows' => $weights,
             'completion_enabled' => !empty($outline['completion_enabled']),
             'completed' => (int) ($outline['completed'] ?? 0),
@@ -678,11 +681,11 @@ final class fellowship_dashboard {
     }
 
     /**
-     * Display names of teachers / editing teachers on a course (Mentors card).
+     * Course teachers / editing teachers as mentor contacts (Message CTAs for fellows).
      *
-     * @return list<string>
+     * @return list<array{id:int,name:string,can_message:bool,message_url:string}>
      */
-    public static function course_mentor_names(\stdClass $course): array {
+    public static function course_mentors(\stdClass $course, int $viewerid = 0): array {
         global $CFG, $DB;
 
         require_once($CFG->libdir . '/enrollib.php');
@@ -713,11 +716,33 @@ final class fellowship_dashboard {
               ORDER BY u.lastname ASC, u.firstname ASC";
         $params['courseid'] = (int) $course->id;
 
-        $names = [];
+        $out = [];
         foreach ($DB->get_records_sql($sql, $params) as $user) {
-            $names[] = fullname($user);
+            $mentorid = (int) $user->id;
+            if ($viewerid > 0 && $mentorid === $viewerid) {
+                continue;
+            }
+            $out[] = [
+                'id' => $mentorid,
+                'name' => fullname($user),
+                'can_message' => $viewerid > 0 && messaging::can_message($viewerid, $mentorid),
+                'message_url' => messaging::messages_url($mentorid, 'fellow'),
+            ];
         }
-        return array_values($names);
+        return array_values($out);
+    }
+
+    /**
+     * Display names of teachers / editing teachers on a course (Mentors card).
+     *
+     * @return list<string>
+     */
+    public static function course_mentor_names(\stdClass $course): array {
+        $names = [];
+        foreach (self::course_mentors($course) as $mentor) {
+            $names[] = (string) $mentor['name'];
+        }
+        return $names;
     }
 
     /**
@@ -1495,50 +1520,7 @@ final class fellowship_dashboard {
      * @return array{items: list<array>, has_items: bool, moodle_calendar_url: string}
      */
     public static function list_calendar_events(int $userid, array $courses): array {
-        global $CFG;
-
-        require_once($CFG->dirroot . '/calendar/lib.php');
-
-        $courseids = array_map(static fn($c) => (int) $c->id, $courses);
-        $tstart = time() - (1 * DAYSECS);
-        $tend = time() + (90 * DAYSECS);
-        $raw = calendar_get_legacy_events(
-            $tstart,
-            $tend,
-            $userid,
-            true,
-            $courseids === [] ? true : $courseids,
-            true,
-            true
-        );
-
-        $coursenames = [];
-        foreach ($courses as $c) {
-            $coursenames[(int) $c->id] = format_string($c->fullname);
-        }
-
-        $items = [];
-        foreach ($raw as $event) {
-            $courseid = (int) ($event->courseid ?? 0);
-            $items[] = [
-                'id' => (int) $event->id,
-                'name' => format_string($event->name),
-                'when' => userdate((int) $event->timestart, get_string('strftimedatetimeshort', 'langconfig')),
-                'timestart' => (int) $event->timestart,
-                'course_name' => $courseid > 0 ? ($coursenames[$courseid] ?? '') : get_string('fellowship_calendar_personal', 'local_launchpad'),
-                'url' => (new \moodle_url('/calendar/view.php', [
-                    'view' => 'day',
-                    'time' => (int) $event->timestart,
-                ]))->out(false),
-            ];
-        }
-        usort($items, static fn(array $a, array $b): int => ($a['timestart'] <=> $b['timestart']));
-
-        return [
-            'items' => $items,
-            'has_items' => $items !== [],
-            'moodle_calendar_url' => (new \moodle_url('/calendar/view.php', ['view' => 'month']))->out(false),
-        ];
+        return calendar_service::upcoming($userid, $courses);
     }
 
     /**
@@ -1680,16 +1662,39 @@ final class fellowship_dashboard {
                     'status' => 'submitted',
                 ]);
 
-                $agrades = $DB->get_records_select(
-                    'assign_grades',
-                    'assignment = :assignment AND userid = :userid AND grade >= 0',
-                    ['assignment' => $instanceid, 'userid' => $userid],
-                    'attemptnumber DESC, timemodified DESC',
-                    '*',
-                    0,
-                    1
-                );
-                $agrade = $agrades ? reset($agrades) : false;
+                // Prefer grade for the latest attempt. If latest is only reopened/draft (no mark yet),
+                // fall back to the most recent graded attempt so released comments still show.
+                // A fresh *submitted* attempt with no grade stays pending (do not inherit old marks).
+                $substatus = $latest ? (string) $latest->status : '';
+                $attemptnumber = $latest ? (int) $latest->attemptnumber : -1;
+                $agrade = false;
+                if ($attemptnumber >= 0) {
+                    $agrade = $DB->get_record('assign_grades', [
+                        'assignment' => $instanceid,
+                        'userid' => $userid,
+                        'attemptnumber' => $attemptnumber,
+                    ]);
+                    $agradeusable = $agrade && $agrade->grade !== null && (float) $agrade->grade >= 0;
+                    if (!$agradeusable) {
+                        $agrade = false;
+                    }
+                }
+                if (!$agrade && $latest && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
+                    $prior = $DB->get_records_select(
+                        'assign_grades',
+                        'assignment = :assignment AND userid = :userid AND grade >= 0 AND attemptnumber < :attempt',
+                        [
+                            'assignment' => $instanceid,
+                            'userid' => $userid,
+                            'attempt' => max(0, $attemptnumber),
+                        ],
+                        'attemptnumber DESC, timemodified DESC',
+                        '*',
+                        0,
+                        1
+                    );
+                    $agrade = $prior ? reset($prior) : false;
+                }
 
                 $commenttext = '';
                 $gradedat = 0;
@@ -1724,26 +1729,27 @@ final class fellowship_dashboard {
                     }
                 }
 
-                $gradeinfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
-                $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
-                $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
-                if ($gg && $gg->grade !== null && $grademax > 0) {
-                    $hasgrade = true;
-                    $gradepct = (((float) $gg->grade) / $grademax) * 100;
-                    $gradestr = format_float($gradepct, 0) . '%';
-                    if (!empty($gg->dategraded)) {
-                        $gradedat = max($gradedat, (int) $gg->dategraded);
-                    }
-                    if ($commenttext === '' && !empty($gg->feedback)) {
-                        $commenttext = format_text(
-                            $gg->feedback,
-                            (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
-                            ['context' => \context_module::instance($cm->id), 'para' => false]
-                        );
+                // Gradebook fallback only when we already have an assign grade for display.
+                if ($hasgrade) {
+                    $gradeinfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
+                    $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
+                    $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
+                    if ($gg && $gg->grade !== null && $grademax > 0) {
+                        $gradepct = (((float) $gg->grade) / $grademax) * 100;
+                        $gradestr = format_float($gradepct, 0) . '%';
+                        if (!empty($gg->dategraded)) {
+                            $gradedat = max($gradedat, (int) $gg->dategraded);
+                        }
+                        if ($commenttext === '' && !empty($gg->feedback)) {
+                            $commenttext = format_text(
+                                $gg->feedback,
+                                (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
+                                ['context' => \context_module::instance($cm->id), 'para' => false]
+                            );
+                        }
                     }
                 }
 
-                $substatus = $latest ? (string) $latest->status : '';
                 $attempt = $latest ? ((int) $latest->attemptnumber + 1) : 0;
                 $submittedat = 0;
                 if ($latest && ($substatus === 'submitted' || $substatus === 'reopened')) {
@@ -1764,19 +1770,25 @@ final class fellowship_dashboard {
                 }
 
                 // Classify.
+                // Attention badge = fellow must act (revise). A released Met (≥70) clears it
+                // even if the attempt was previously reopened for changes.
                 $status = 'not_submitted';
                 $chip = 'line';
                 $needsattention = false;
-                if ($hasgrade && ($substatus === 'reopened' || $substatus === 'draft' || $substatus === 'new')) {
+                $passedgate = ($gradepct !== null && $gradepct >= 70);
+                if ($hasgrade && $passedgate) {
+                    $status = 'reviewed';
+                    $chip = 'ok';
+                    $needsattention = false;
+                } else if ($hasgrade && ($substatus === 'reopened' || $substatus === 'draft' || $substatus === 'new')) {
                     $status = 'changes';
                     $chip = 'warn';
                     $needsattention = true;
                 } else if ($hasgrade) {
+                    // Released below 70 without reopen — warn, but no revise badge unless changes.
                     $status = 'reviewed';
-                    $chip = ($gradepct !== null && $gradepct < 70) ? 'warn' : 'ok';
-                    if ($gradepct !== null && $gradepct < 70) {
-                        $needsattention = true;
-                    }
+                    $chip = 'warn';
+                    $needsattention = false;
                 } else if ($substatus === 'submitted' || $submittedcount > 0) {
                     $status = 'pending';
                     $chip = '';
