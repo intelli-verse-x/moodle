@@ -24,7 +24,6 @@
 
 require(__DIR__ . '/../../config.php');
 
-use local_launchpad\account_persona;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\messaging;

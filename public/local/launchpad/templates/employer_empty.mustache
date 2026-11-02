@@ -1,0 +1,33 @@
+{{!
+    @template local_launchpad/employer_empty
+
+    Empty employer home — one focused panel when no Moodle enrolments are assigned.
+}}
+<section class="lp-empty-shell lp-reveal" data-region="employer-empty" style="--lp-d:0" role="status">
+  <div class="lp-empty">
+    <div class="lp-empty-mark" aria-hidden="true">
+      <iconify-icon icon="hugeicons:book-open-01" width="26" height="26"></iconify-icon>
+    </div>
+    <h2>{{empty.title}}</h2>
+    <p>{{empty.body}}</p>
+
+    <div class="lp-empty-tools" aria-label="{{strings.corelinks}}">
+      <a class="lp-empty-tool" href="{{urls.calendar}}">
+        <iconify-icon icon="hugeicons:calendar-03" width="18" height="18" aria-hidden="true"></iconify-icon>
+        <span>{{strings.linkcalendar}}</span>
+      </a>
+      <a class="lp-empty-tool" href="{{urls.messages}}">
+        <iconify-icon icon="hugeicons:message-01" width="18" height="18" aria-hidden="true"></iconify-icon>
+        <span>{{strings.linkmessages}}</span>
+      </a>
+      <a class="lp-empty-tool" href="{{urls.notifications}}">
+        <iconify-icon icon="hugeicons:notification-01" width="18" height="18" aria-hidden="true"></iconify-icon>
+        <span>{{strings.notifications}}</span>
+      </a>
+      <a class="lp-empty-tool" href="{{urls.profile}}">
+        <iconify-icon icon="hugeicons:user" width="18" height="18" aria-hidden="true"></iconify-icon>
+        <span>{{strings.linkprofile}}</span>
+      </a>
+    </div>
+  </div>
+</section>

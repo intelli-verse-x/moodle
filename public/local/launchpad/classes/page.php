@@ -91,8 +91,13 @@ class page {
             'strsignupclosednote' => get_string('signupclosednote', 'local_launchpad'),
         ], $mentor, $footer));
 
-        $cssurl = $pluginbase . '/styles.css?v=202610291320';
-        $jsurl = $pluginbase . '/landing.js?v=202610291320';
+        // Landing CSS lives in styles_landing.css (same pattern as Fellowship /
+        // Employer: styles_*.css). Plugin styles.css stays Moodle-stylelint clean.
+        $plugin = new \stdClass();
+        require(__DIR__ . '/../version.php');
+        $assetv = (string) ($plugin->version ?? time());
+        $cssurl = $pluginbase . '/styles_landing.css?v=' . rawurlencode($assetv);
+        $jsurl = $pluginbase . '/landing.js?v=' . rawurlencode($assetv);
         $title = s(get_string('pagetitle', 'local_launchpad'));
 
         // Standalone document, no Boost header/footer.

@@ -1,0 +1,293 @@
+{{!
+    @template local_launchpad/employer_grades
+
+    Grades — badge-style layout; Moodle overview + full user report.
+}}
+<div class="lp-tools-page lp-reveal" data-region="employer-grades" style="--lp-d:0">
+  {{#has_grade_detail}}
+    {{#grade_detail}}
+      <section class="lp-card lift lp-stack-lg lp-grade-progress">
+        <div class="lp-card-head">
+          <div class="lp-grade-progress-copy">
+            <div class="lp-grade-progress-title">
+              <span class="lp-grade-progress-icon" aria-hidden="true">
+                <iconify-icon icon="hugeicons:chart-histogram" width="22" height="22"></iconify-icon>
+              </span>
+              <div>
+                <span class="lp-eyebrow">{{strings.grades_detail_title}}</span>
+                <h3 class="lp-grade-course-title">{{course_name}}</h3>
+                <p class="lp-sm lp-muted">{{strings.grades_detail_intro}}</p>
+              </div>
+            </div>
+          </div>
+          <div class="lp-tools-head-actions">
+            <a class="lp-btn lp-btn-light" href="{{back_url}}">{{strings.grades_back}}</a>
+            <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.grades_open_moodle_course}}</a>
+          </div>
+        </div>
+
+        {{^denied}}
+          <div class="lp-grade-hero-body">
+            <div class="lp-grade-hero-metrics">
+              <p class="lp-grade-hero-metric">
+                <b>{{#has_course_total}}{{course_total}}{{/has_course_total}}{{^has_course_total}}—{{/has_course_total}}</b>
+                <span>{{strings.grades_course_total}}</span>
+              </p>
+              <p class="lp-sm lp-muted">
+                {{graded_items}} {{strings.grades_of}} {{total_items}} {{strings.grades_items_meta}}
+                {{#has_course_percentage}} · {{course_percentage}}{{/has_course_percentage}}
+              </p>
+              {{#has_course_percentage}}
+                <div class="lp-ach-next">
+                  <div class="lp-row-sb lp-sm">
+                    <span>{{strings.grades_col_percentage}}</span>
+                    <span><b>{{course_percentage}}</b></span>
+                  </div>
+                  <div class="lp-bar" aria-hidden="true"><i style="width:{{course_pct_num}}%"></i></div>
+                </div>
+              {{/has_course_percentage}}
+            </div>
+            <div class="lp-grade-hero-art" aria-hidden="true">
+              <iconify-icon icon="hugeicons:champion" width="72" height="72"></iconify-icon>
+            </div>
+          </div>
+        {{/denied}}
+      </section>
+
+      {{#denied}}
+        <div class="lp-empty" role="status">
+          <h2>{{denied_message}}</h2>
+          <div class="lp-empty-actions">
+            <a class="lp-btn" href="{{back_url}}">{{strings.grades_back}}</a>
+          </div>
+        </div>
+      {{/denied}}
+
+      {{^denied}}
+        {{#has_rows}}
+          <section class="lp-card lift lp-stack-lg">
+            <div class="lp-card-head">
+              <h3>{{strings.grades_report_heading}}</h3>
+            </div>
+            <div class="lp-grade-table-wrap">
+              <table class="lp-grade-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{{strings.grades_col_item}}</th>
+                    {{#show_weight}}<th scope="col">{{strings.grades_col_weight}}</th>{{/show_weight}}
+                    <th scope="col">{{strings.grades_col_grade}}</th>
+                    <th scope="col">{{strings.grades_col_range}}</th>
+                    <th scope="col">{{strings.grades_col_percentage}}</th>
+                    {{#show_letter}}<th scope="col">{{strings.grades_col_letter}}</th>{{/show_letter}}
+                    {{#show_feedback}}<th scope="col">{{strings.grades_col_feedback}}</th>{{/show_feedback}}
+                    {{#show_contribution}}<th scope="col">{{strings.grades_col_contribution}}</th>{{/show_contribution}}
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#rows}}
+                    <tr class="{{css}}">
+                      <td>
+                        {{#has_modlabel}}<span class="lp-grade-mod">{{modlabel}}</span>{{/has_modlabel}}
+                        {{#has_activity_url}}
+                          <a class="lp-grade-item-link" href="{{activity_url}}"><b>{{name}}</b></a>
+                        {{/has_activity_url}}
+                        {{^has_activity_url}}
+                          <b>{{name}}</b>
+                        {{/has_activity_url}}
+                      </td>
+                      {{#show_weight}}<td class="lp-muted">{{weight}}</td>{{/show_weight}}
+                      <td class="lp-grade-val">{{grade}}</td>
+                      <td class="lp-muted">{{range}}</td>
+                      <td class="lp-grade-val">{{percentage}}</td>
+                      {{#show_letter}}<td class="lp-grade-val">{{letter}}</td>{{/show_letter}}
+                      {{#show_feedback}}
+                        <td class="lp-muted lp-sm">
+                          {{#has_feedback}}{{feedback}}{{/has_feedback}}{{^has_feedback}}—{{/has_feedback}}
+                        </td>
+                      {{/show_feedback}}
+                      {{#show_contribution}}<td class="lp-grade-val">{{contribution}}</td>{{/show_contribution}}
+                    </tr>
+                  {{/rows}}
+                </tbody>
+              </table>
+            </div>
+            <p class="lp-xs lp-muted">{{strings.native_tools_note}}</p>
+          </section>
+        {{/has_rows}}
+        {{^has_rows}}
+          <div class="lp-empty" role="status">
+            <div class="lp-empty-mark" aria-hidden="true">
+              <iconify-icon icon="hugeicons:chart-histogram" width="26" height="26"></iconify-icon>
+            </div>
+            <h2>{{strings.grades_empty_detail_title}}</h2>
+            <p>{{strings.grades_empty_detail_body}}</p>
+            <div class="lp-empty-actions">
+              <a class="lp-btn lp-btn-light" href="{{back_url}}">{{strings.grades_back}}</a>
+              <a class="lp-btn" href="{{moodle_url}}">{{strings.grades_open_moodle_course}}</a>
+            </div>
+          </div>
+        {{/has_rows}}
+      {{/denied}}
+    {{/grade_detail}}
+  {{/has_grade_detail}}
+
+  {{^has_grade_detail}}
+    {{! —— Badge-style overview: Progress → Collection tabs/grid → Recent | Next —— }}
+    <section class="lp-card lift lp-stack-lg lp-grade-progress">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:chart-histogram" width="22" height="22"></iconify-icon>
+          </span>
+          <div>
+            <h3>{{strings.grades_progress_heading}}</h3>
+            <p class="lp-sm lp-muted">{{strings.grades_progress_sub}}</p>
+          </div>
+        </div>
+        <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.grades_open_moodle}}</a>
+      </div>
+
+      <div class="lp-grade-hero-body">
+        <div class="lp-grade-hero-metrics">
+          <p class="lp-grade-hero-metric">
+            <b>{{graded_count}}</b>
+            <span>{{strings.grades_of}} {{course_count}} {{strings.grades_earned_label}}</span>
+          </p>
+          <p class="lp-sm lp-muted">{{strings.grades_progress_meta}}</p>
+          <div class="lp-ach-next">
+            <div class="lp-row-sb lp-sm">
+              <span>{{strings.grades_stat_average}}</span>
+              <span><b>{{grades_pct}}%</b></span>
+            </div>
+            <div class="lp-bar" aria-hidden="true"><i style="width:{{grades_pct}}%"></i></div>
+          </div>
+          {{#has_avg_percentage}}
+            <p class="lp-xs lp-muted">{{strings.grades_stat_average}}: {{avg_percentage}}%</p>
+          {{/has_avg_percentage}}
+        </div>
+        <div class="lp-grade-hero-art" aria-hidden="true">
+          <iconify-icon icon="hugeicons:champion" width="88" height="88"></iconify-icon>
+        </div>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-stack-lg" data-region="employer-grades-collection">
+      <div class="lp-card-head lp-badges-tabs-head">
+        <h3>{{strings.grades_collection_heading}}</h3>
+      </div>
+
+      <div class="lp-tabs lp-tabs-block lp-grade-tabs" role="tablist" aria-label="{{strings.grades_collection_heading}}">
+        <a class="lp-tab{{#gtab_all}} is-on{{/gtab_all}}"
+           role="tab"
+           href="{{tab_all_url}}"
+           aria-selected="{{#gtab_all}}true{{/gtab_all}}{{^gtab_all}}false{{/gtab_all}}">
+          {{strings.grades_tab_all}}
+          <span class="lp-tab-count">{{course_count}}</span>
+        </a>
+        <a class="lp-tab{{#gtab_graded}} is-on{{/gtab_graded}}"
+           role="tab"
+           href="{{tab_graded_url}}"
+           aria-selected="{{#gtab_graded}}true{{/gtab_graded}}{{^gtab_graded}}false{{/gtab_graded}}">
+          {{strings.grades_tab_graded}}
+          <span class="lp-tab-count">{{graded_count}}</span>
+        </a>
+        <a class="lp-tab{{#gtab_pending}} is-on{{/gtab_pending}}"
+           role="tab"
+           href="{{tab_pending_url}}"
+           aria-selected="{{#gtab_pending}}true{{/gtab_pending}}{{^gtab_pending}}false{{/gtab_pending}}">
+          {{strings.grades_tab_pending}}
+          <span class="lp-tab-count">{{pending_count}}</span>
+        </a>
+      </div>
+
+      {{#has_items}}
+        <div class="lp-grade-tiles">
+          {{#page_items}}
+            <a class="lp-grade-tile {{css}}" href="{{url}}">
+              <span class="lp-grade-tile-icon" aria-hidden="true">
+                {{#has_grade}}
+                  <iconify-icon icon="hugeicons:checkmark-circle-02" width="28" height="28"></iconify-icon>
+                {{/has_grade}}
+                {{^has_grade}}
+                  <iconify-icon icon="hugeicons:locked" width="28" height="28"></iconify-icon>
+                {{/has_grade}}
+              </span>
+              <b>{{name}}</b>
+              <small>{{detail}}</small>
+              <span class="lp-grade-tile-pill{{#has_grade}} is-earned{{/has_grade}}">{{status_pill}}</span>
+            </a>
+          {{/page_items}}
+        </div>
+      {{/has_items}}
+      {{^has_items}}
+        <div class="lp-empty lp-empty-inline" role="status">
+          {{#course_count}}
+            <h2>{{strings.grades_empty_filter_title}}</h2>
+            <p>{{strings.grades_empty_filter_body}}</p>
+          {{/course_count}}
+          {{^course_count}}
+            <h2>{{strings.grades_empty_title}}</h2>
+            <p>{{strings.grades_empty_body}}</p>
+          {{/course_count}}
+          <div class="lp-empty-actions">
+            <a class="lp-btn" href="{{moodle_url}}">{{strings.grades_open_moodle}}</a>
+          </div>
+        </div>
+      {{/has_items}}
+    </section>
+
+    {{#has_side_panels}}
+      <div class="lp-grid-2">
+        <section class="lp-card lift lp-stack">
+          <h3>{{strings.grades_recent_heading}}</h3>
+          {{#has_recent}}
+            <ul class="lp-course-list lp-tools-list">
+              {{#recent_items}}
+                <li>
+                  <a href="{{url}}">
+                    <b>{{name}}</b>
+                    <span class="lp-muted">{{detail}}</span>
+                  </a>
+                </li>
+              {{/recent_items}}
+            </ul>
+          {{/has_recent}}
+          {{^has_recent}}
+            <p class="lp-muted">{{strings.grades_recent_empty}}</p>
+          {{/has_recent}}
+        </section>
+        <section class="lp-card lift lp-stack">
+          <h3>{{strings.grades_next_heading}}</h3>
+          {{#has_next}}
+            <ul class="lp-grade-next-list">
+              {{#next_items}}
+                <li class="lp-grade-next-item">
+                  <a href="{{url}}" class="lp-grade-next-link">
+                    <span class="lp-grade-next-icon" aria-hidden="true">
+                      <iconify-icon icon="hugeicons:book-open-02" width="22" height="22"></iconify-icon>
+                    </span>
+                    <span class="lp-grade-next-copy">
+                      <b>{{name}}</b>
+                      <small class="lp-muted">{{detail}}</small>
+                      {{#has_percentage}}
+                        <span class="lp-bar lp-bar-thin" aria-hidden="true"><i style="width:{{pct_num}}%"></i></span>
+                      {{/has_percentage}}
+                    </span>
+                    <span class="lp-grade-next-lock" aria-hidden="true">
+                      <iconify-icon icon="hugeicons:locked" width="18" height="18"></iconify-icon>
+                    </span>
+                  </a>
+                </li>
+              {{/next_items}}
+            </ul>
+          {{/has_next}}
+          {{^has_next}}
+            <p class="lp-muted">{{strings.grades_next_empty}}</p>
+            <p class="lp-xs lp-muted">{{strings.native_tools_note}}</p>
+            <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.grades_open_moodle}}</a>
+          {{/has_next}}
+        </section>
+      </div>
+    {{/has_side_panels}}
+  {{/has_grade_detail}}
+</div>

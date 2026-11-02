@@ -19,8 +19,11 @@ namespace local_launchpad;
 /**
  * Persona post-login / My home routing.
  *
- * Priority: Admin (no override) → Mentor → Fellowship → Employee-only → Moodle /my/.
- * Deep wantsurl targets are never rewritten.
+ * Priority: Admin (no override) → Mentor → Employee → Fellowship → Moodle /my/.
+ * Employee (cohort lp-employee) wins over Fellowship so employer learners enrolled
+ * on lp-* courses still get the Employer shell — not fellow.php.
+ * Deep course/mod wantsurl targets are never rewritten. Stale persona-shell
+ * wantsurls (wrong shell for this user) are corrected on login.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -43,12 +46,15 @@ final class persona_home {
      */
     public const FELLOW_PATH = '/local/launchpad/fellow.php';
 
+    /** @var array<int, \moodle_url|null> Request-scoped home URL cache. */
+    private static array $homecache = [];
+
     /**
      * Persona home URL for this user, or null to keep Moodle default (/my/).
      *
      * Site admins always return null (no forced persona redirect).
-     * Mentors → mentor stub. Fellows → Fellowship shell.
-     * Employees without Fellowship → employee stub.
+     * Mentors → mentor stub. Employees → Employer portal.
+     * Fellows (without employee cohort) → Fellowship shell.
      *
      * @param int $userid
      * @return \moodle_url|null
@@ -57,19 +63,33 @@ final class persona_home {
         if ($userid <= 0) {
             return null;
         }
-        if (account_persona::is_admin($userid) || is_siteadmin($userid)) {
-            return null;
+        if (array_key_exists($userid, self::$homecache)) {
+            return self::$homecache[$userid];
         }
-        if (account_persona::is_mentor($userid)) {
-            return new \moodle_url(self::MENTOR_PATH);
+
+        $home = null;
+        // is_admin() already covers is_siteadmin() — avoid a second native check.
+        if (account_persona::is_admin($userid)) {
+            $home = null;
+        } else if (account_persona::is_mentor($userid)) {
+            $home = new \moodle_url(self::MENTOR_PATH);
+        } else if (account_persona::is_employee($userid)) {
+            // Employer cohort before Fellowship: lp-* student enrolments are normal
+            // for employee upskilling and must not force the Fellowship shell.
+            $home = new \moodle_url(self::EMPLOYEE_PATH);
+        } else if (account_persona::is_fellowship($userid)) {
+            $home = new \moodle_url(self::FELLOW_PATH);
         }
-        if (account_persona::is_fellowship($userid)) {
-            return new \moodle_url(self::FELLOW_PATH);
-        }
-        if (account_persona::is_employee($userid)) {
-            return new \moodle_url(self::EMPLOYEE_PATH);
-        }
-        return null;
+
+        self::$homecache[$userid] = $home;
+        return $home;
+    }
+
+    /**
+     * Clear request cache (tests / rare mid-request persona changes).
+     */
+    public static function reset_home_cache(): void {
+        self::$homecache = [];
     }
 
     /**
@@ -92,7 +112,7 @@ final class persona_home {
         }
 
         $path = rtrim($path, '/') ?: '/';
-        $defaults = ['/', '/my', '/my/courses.php'];
+        $defaults = ['/', '/my', '/my/index.php', '/my/courses.php'];
         foreach ($defaults as $default) {
             $d = rtrim($default, '/') ?: '/';
             if ($path === $d) {
@@ -103,6 +123,62 @@ final class persona_home {
         $www = rtrim((string) $CFG->wwwroot, '/');
         if ($raw === $www || $raw === $www . '/') {
             return true;
+        }
+        return false;
+    }
+
+    /**
+     * Whether login should rewrite wantsurl for this user.
+     *
+     * Overrides default homes and wrong persona shells (e.g. employee still
+     * holding fellow.php from an older priority bug). Keeps same-shell deep
+     * links (fellow.php?view=track) and all non-shell Moodle URLs.
+     *
+     * @param int $userid
+     * @param string|null $wantsurl
+     */
+    public static function should_rewrite_wantsurl(int $userid, ?string $wantsurl): bool {
+        if (self::should_override_default_home($wantsurl)) {
+            return true;
+        }
+        if ($wantsurl === null || trim($wantsurl) === '') {
+            return true;
+        }
+
+        $home = self::home_url_for($userid);
+        if ($home === null) {
+            return false;
+        }
+
+        $path = self::path_of(trim($wantsurl));
+        if ($path === null) {
+            return false;
+        }
+        $path = rtrim($path, '/') ?: '/';
+        if (!self::is_persona_shell_path($path)) {
+            return false;
+        }
+
+        $homepath = self::local_path_of_url($home);
+        if ($homepath === null) {
+            return false;
+        }
+        // Same shell (possibly with ?view=) — keep the deep link.
+        return $path !== $homepath;
+    }
+
+    /**
+     * Paths that are LaunchPad persona shells.
+     *
+     * @param string $path Normalised path starting with /
+     */
+    public static function is_persona_shell_path(string $path): bool {
+        $path = rtrim($path, '/') ?: '/';
+        foreach ([self::MENTOR_PATH, self::EMPLOYEE_PATH, self::FELLOW_PATH] as $shell) {
+            $shell = rtrim($shell, '/') ?: '/';
+            if ($path === $shell) {
+                return true;
+            }
         }
         return false;
     }
@@ -144,7 +220,8 @@ final class persona_home {
     }
 
     /**
-     * Apply persona home to SESSION wantsurl when it is still a default home.
+     * Apply persona home to SESSION wantsurl when it is still a default home
+     * or a wrong persona shell.
      *
      * @param int $userid
      * @return bool True when wantsurl was changed
@@ -158,11 +235,15 @@ final class persona_home {
         }
 
         $current = isset($SESSION->wantsurl) ? (string) $SESSION->wantsurl : '';
-        if (!self::should_override_default_home($current === '' ? null : $current)) {
+        if (!self::should_rewrite_wantsurl($userid, $current === '' ? null : $current)) {
             return false;
         }
 
-        $SESSION->wantsurl = $home->out(false);
+        $next = $home->out(false);
+        if ($current === $next) {
+            return false;
+        }
+        $SESSION->wantsurl = $next;
         return true;
     }
 
@@ -190,14 +271,57 @@ final class persona_home {
     }
 
     /**
+     * Whether ?noredirect=1 may keep the stock Moodle /my/ page for this home.
+     *
+     * Employees never: Employer portal is the canonical dashboard (PR #15 parity
+     * with Fellowship — persona shell replaces /my/, not a parallel page).
+     * Admins (null home), mentors, and fellows may still opt out.
+     *
+     * @param \moodle_url|null $home From home_url_for()
+     */
+    public static function should_honor_noredirect(?\moodle_url $home): bool {
+        if ($home === null) {
+            return true;
+        }
+        // Compare wwwroot-relative paths so subdirectory installs / PHPUnit
+        // (wwwroot https://www.example.com/moodle) still match EMPLOYEE_PATH.
+        $path = self::local_path_of_url($home);
+        if ($path === null) {
+            return true;
+        }
+        $employee = rtrim(self::EMPLOYEE_PATH, '/') ?: '/';
+        return $path !== $employee;
+    }
+
+    /**
+     * Path of a moodle_url relative to $CFG->wwwroot (no query), or null if external.
+     *
+     * @param \moodle_url $url
+     * @return string|null Normalised path starting with /
+     */
+    private static function local_path_of_url(\moodle_url $url): ?string {
+        try {
+            $local = $url->out_as_local_url(false);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        $path = strtok($local, '?') ?: $local;
+        return rtrim($path, '/') ?: '/';
+    }
+
+    /**
      * Redirect from /my/ to persona home when applicable (no loop).
+     *
+     * Pass ?noredirect=1 to keep stock Moodle /my/ for mentors/fellows/admins.
+     * Employees always redirect to employee.php (noredirect cannot bypass).
      */
     public static function maybe_redirect_from_my(): void {
         global $USER;
 
         if (during_initial_install() || (defined('CLI_SCRIPT') && CLI_SCRIPT)
                 || (defined('AJAX_SCRIPT') && AJAX_SCRIPT)
-                || (defined('WS_SERVER') && WS_SERVER)) {
+                || (defined('WS_SERVER') && WS_SERVER)
+                || (defined('PHPUNIT_TEST') && PHPUNIT_TEST)) {
             return;
         }
         if (!isloggedin() || isguestuser() || empty($USER->id)) {
@@ -209,6 +333,11 @@ final class persona_home {
 
         $home = self::home_url_for((int) $USER->id);
         if ($home === null) {
+            return;
+        }
+        // Opt-out only when this persona still allows stock /my/.
+        if (!empty(optional_param('noredirect', 0, PARAM_BOOL))
+                && self::should_honor_noredirect($home)) {
             return;
         }
         redirect($home);

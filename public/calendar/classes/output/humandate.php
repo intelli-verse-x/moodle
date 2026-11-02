@@ -283,8 +283,10 @@ class humandate implements externable, renderable, templatable {
         if ($this->near === null) {
             return false;
         }
-        $due = $this->datetime->diff($this->clock->now());
-        $intervalseconds = $this->interval_to_seconds($due);
+        // Compare unix timestamps. DateTime::diff() across mismatched timezones
+        // (e.g. UTC @timestamp vs Australia/Perth clock) can inflate a 1-hour gap
+        // into a multi-day interval when wall-clock dates disagree.
+        $intervalseconds = $this->datetime->getTimestamp() - $this->clock->now()->getTimestamp();
         return $intervalseconds < $this->near && $intervalseconds > 0;
     }
 

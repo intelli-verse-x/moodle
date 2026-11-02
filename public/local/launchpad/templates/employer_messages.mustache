@@ -1,0 +1,191 @@
+{{!
+    @template local_launchpad/employer_messages
+
+    Messages — Moodle conversation overview (All / Starred / Private / Group) + detail panel.
+}}
+<div class="lp-tools-page lp-reveal" data-region="employer-messages" style="--lp-d:0">
+  {{#has_flash}}
+    {{#flash}}
+      <div class="lp-flash{{#ok}} is-ok{{/ok}}{{^ok}} is-err{{/ok}}" role="status">{{text}}</div>
+    {{/flash}}
+  {{/has_flash}}
+
+  <section class="lp-card lift lp-stack-lg">
+    <div class="lp-card-head">
+      <h3>{{strings.messages_inbox_heading}}</h3>
+      <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.messages_open_moodle}}</a>
+    </div>
+    <div class="lp-msg-stats">
+      <div class="lp-msg-stat">
+        <b>{{conversation_count}}</b>
+        <span>{{strings.messages_total_label}}</span>
+      </div>
+      <div class="lp-msg-stat{{#has_unread_conversations}} is-hot{{/has_unread_conversations}}">
+        <b>{{unread_conversations}}</b>
+        <span>{{strings.messages_unread_label}}</span>
+      </div>
+    </div>
+    <p class="lp-sm lp-muted">{{strings.messages_intro}}</p>
+  </section>
+
+  <div class="lp-msg-layout{{#has_selected}} is-split{{/has_selected}}">
+    <section class="lp-card lift lp-msg-inbox" aria-label="{{strings.messages_inbox_heading}}">
+      <div class="lp-tabs lp-tabs-block lp-msg-tabs" role="tablist" aria-label="{{strings.messages_inbox_heading}}">
+        <a class="lp-tab{{#mtab_all}} is-on{{/mtab_all}}"
+           role="tab"
+           href="{{tab_all_url}}"
+           aria-selected="{{#mtab_all}}true{{/mtab_all}}{{^mtab_all}}false{{/mtab_all}}">
+          {{strings.messages_tab_all}}
+        </a>
+        <a class="lp-tab{{#mtab_starred}} is-on{{/mtab_starred}}"
+           role="tab"
+           href="{{tab_starred_url}}"
+           aria-selected="{{#mtab_starred}}true{{/mtab_starred}}{{^mtab_starred}}false{{/mtab_starred}}">
+          {{strings.messages_tab_starred}}
+        </a>
+        <a class="lp-tab{{#mtab_private}} is-on{{/mtab_private}}"
+           role="tab"
+           href="{{tab_private_url}}"
+           aria-selected="{{#mtab_private}}true{{/mtab_private}}{{^mtab_private}}false{{/mtab_private}}">
+          {{strings.messages_tab_private}}
+        </a>
+        <a class="lp-tab{{#mtab_group}} is-on{{/mtab_group}}"
+           role="tab"
+           href="{{tab_group_url}}"
+           aria-selected="{{#mtab_group}}true{{/mtab_group}}{{^mtab_group}}false{{/mtab_group}}">
+          {{strings.messages_tab_group}}
+        </a>
+      </div>
+
+      {{#has_items}}
+        <ul class="lp-msg-list">
+          {{#page_items}}
+            <li>
+              <a class="lp-msg-row{{#is_selected}} is-selected{{/is_selected}}{{#has_unread}} is-unread{{/has_unread}}"
+                 href="{{url}}">
+                <span class="lp-msg-avatar" aria-hidden="true">
+                  {{#has_image}}
+                    <img src="{{imageurl}}" alt="" width="40" height="40">
+                  {{/has_image}}
+                  {{^has_image}}
+                    <span class="lp-msg-initials">{{initials}}</span>
+                  {{/has_image}}
+                </span>
+                <span class="lp-msg-body">
+                  <span class="lp-msg-top">
+                    <b class="lp-msg-name">{{name}}</b>
+                    {{#has_when}}<time class="lp-msg-when">{{when}}</time>{{/has_when}}
+                  </span>
+                  <span class="lp-msg-meta-row">
+                    <span class="lp-msg-type">{{type_label}}</span>
+                    {{#isfavourite}}<span class="lp-msg-star" title="Starred" aria-label="Starred">★</span>{{/isfavourite}}
+                    {{#has_unread}}<span class="lp-msg-unread">{{unread}}</span>{{/has_unread}}
+                  </span>
+                  {{#has_subname}}
+                    <span class="lp-msg-sub">{{subname}}</span>
+                  {{/has_subname}}
+                  {{#has_preview}}
+                    <span class="lp-msg-preview">
+                      {{#has_preview_prefix}}<em>{{preview_prefix}}</em> {{/has_preview_prefix}}{{preview}}
+                    </span>
+                  {{/has_preview}}
+                </span>
+              </a>
+            </li>
+          {{/page_items}}
+        </ul>
+      {{/has_items}}
+      {{^has_items}}
+        <div class="lp-empty lp-empty-inline" role="status">
+          {{#conversation_count}}
+            <h2>{{strings.messages_empty_filter_title}}</h2>
+            <p>{{strings.messages_empty_filter_body}}</p>
+          {{/conversation_count}}
+          {{^conversation_count}}
+            <h2>{{strings.messages_empty_title}}</h2>
+            <p>{{strings.messages_empty_body}}</p>
+          {{/conversation_count}}
+          <div class="lp-empty-actions">
+            <a class="lp-btn" href="{{moodle_url}}">{{strings.messages_open_moodle}}</a>
+          </div>
+        </div>
+      {{/has_items}}
+    </section>
+
+    <section class="lp-card lift lp-msg-thread" aria-label="{{strings.messages_detail_heading}}">
+      {{#has_selected}}
+        {{#selected}}
+          <div class="lp-msg-thread-head">
+            <div class="lp-msg-thread-who">
+              <span class="lp-msg-avatar" aria-hidden="true">
+                {{#has_image}}
+                  <img src="{{imageurl}}" alt="" width="40" height="40">
+                {{/has_image}}
+                {{^has_image}}
+                  <span class="lp-msg-initials">{{initials}}</span>
+                {{/has_image}}
+              </span>
+              <div>
+                <span class="lp-eyebrow">{{type_label}}</span>
+                <h2>{{name}}</h2>
+                {{#has_subname}}<p class="lp-muted lp-sm">{{subname}}</p>{{/has_subname}}
+              </div>
+            </div>
+            <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.messages_open_thread}}</a>
+          </div>
+          <div class="lp-msg-scroll" data-region="employer-msg-scroll">
+            {{#has_messages}}
+              {{#messages}}
+                <article class="lp-msg-bubble{{#is_mine}} is-mine{{/is_mine}}">
+                  <header class="lp-msg-meta">
+                    <b>{{from_label}}</b>
+                    {{#when}} · {{when}}{{/when}}
+                  </header>
+                  <p>{{text}}</p>
+                </article>
+              {{/messages}}
+            {{/has_messages}}
+            {{^has_messages}}
+              <p class="lp-muted">{{strings.messages_detail_no_preview}}</p>
+            {{/has_messages}}
+          </div>
+          {{#can_reply}}
+            <form class="lp-msg-composer"
+                  method="post"
+                  action="{{action_url}}"
+                  data-region="employer-msg-composer">
+              <input type="hidden" name="sesskey" value="{{sesskey}}">
+              <input type="hidden" name="action" value="send_message">
+              <input type="hidden" name="convid" value="{{id}}">
+              <input type="hidden" name="mtab" value="{{mtab}}">
+              <label class="visually-hidden" for="lp-msg-input-{{id}}">{{strings.messages_compose_label}}</label>
+              <textarea id="lp-msg-input-{{id}}"
+                        name="message"
+                        rows="2"
+                        maxlength="65535"
+                        required
+                        placeholder="{{strings.messages_compose_placeholder}}"></textarea>
+              <button type="submit" class="lp-btn">{{strings.messages_send}}</button>
+            </form>
+          {{/can_reply}}
+          {{#cannot_reply}}
+            <div class="lp-msg-composer lp-msg-composer-cta">
+              <p class="lp-sm lp-muted">{{strings.messages_cannot_reply}}</p>
+              <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.messages_open_thread}}</a>
+            </div>
+          {{/cannot_reply}}
+        {{/selected}}
+      {{/has_selected}}
+      {{^has_selected}}
+        <div class="lp-msg-thread-empty">
+          <div class="lp-empty-mark" aria-hidden="true">
+            <iconify-icon icon="hugeicons:message-01" width="26" height="26"></iconify-icon>
+          </div>
+          <h2>{{strings.messages_detail_empty_title}}</h2>
+          <p>{{strings.messages_detail_empty_body}}</p>
+          <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.messages_open_moodle}}</a>
+        </div>
+      {{/has_selected}}
+    </section>
+  </div>
+</div>
