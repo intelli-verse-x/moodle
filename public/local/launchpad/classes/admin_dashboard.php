@@ -166,28 +166,7 @@ final class admin_dashboard {
             $trackid = (int) $selected->id;
         }
 
-        $tabs = [];
-        foreach ($tracks as $course) {
-            $label = format_string($course->fullname);
-            // Short tab label: first word / short name feel.
-            $short = preg_split('/\s+/', $label)[0] ?? $label;
-            $tabs[] = [
-                'id' => (int) $course->id,
-                'label' => $short,
-                'title' => $label,
-                'url' => (new \moodle_url(persona_home::ADMIN_PATH, [
-                    'view' => 'builder',
-                    'trackid' => (int) $course->id,
-                ]))->out(false),
-                'current' => (int) $course->id === $trackid,
-            ];
-        }
-
-        $phases = self::builder_phase_cards($selected);
-        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, [
-            'view' => 'builder',
-            'trackid' => $trackid,
-        ]))->out(false);
+        $pluginbase = (new \moodle_url('/local/launchpad'))->out(false);
         $sesskey = sesskey();
         $addlabel = get_string('admin_builder_add', 'local_launchpad');
         $editlabel = get_string('admin_builder_edit', 'local_launchpad');
@@ -196,60 +175,121 @@ final class admin_dashboard {
         $hidelabel = get_string('admin_builder_hide_section', 'local_launchpad');
         $showblocked = get_string('admin_builder_show_blocked', 'local_launchpad');
         $noacts = get_string('admin_builder_no_activities', 'local_launchpad');
-        foreach ($phases as &$phase) {
-            $phase['form_action'] = $formaction;
-            $phase['sesskey'] = $sesskey;
-            $phase['trackid'] = $trackid;
-            $phase['add_label'] = $addlabel;
-            $phase['show_label'] = $showlabel;
-            $phase['hide_label'] = $hidelabel;
-            $phase['show_blocked_title'] = $showblocked;
-            $phase['no_acts'] = $noacts;
-            foreach ($phase['activities'] as &$act) {
-                $act['form_action'] = $formaction;
-                $act['sesskey'] = $sesskey;
-                $act['trackid'] = $trackid;
-                $act['edit_label'] = $editlabel;
-                $act['mark_label'] = $marklabel;
+        $teacherkv = get_string('admin_builder_kv_teacher', 'local_launchpad');
+        $enrolledkv = get_string('admin_builder_kv_enrolled', 'local_launchpad');
+        $guestkv = get_string('admin_builder_kv_guest', 'local_launchpad');
+        $guestofflabel = get_string('admin_builder_guest_off', 'local_launchpad');
+        $guestonlabel = get_string('admin_builder_guest_on', 'local_launchpad');
+        $noteacher = get_string('admin_tracks_no_teacher', 'local_launchpad');
+        $opencourse = get_string('admin_tracks_open_course', 'local_launchpad');
+        $tipbody = get_string('admin_builder_tip', 'local_launchpad');
+        $tipurl = $pluginbase . '/assets/img/prof.webp';
+
+        $tabs = [];
+        $panels = [];
+        foreach ($tracks as $course) {
+            $cid = (int) $course->id;
+            $fullname = format_string($course->fullname);
+            $tablabel = self::builder_track_tab_label($course);
+            $current = $cid === $trackid;
+            $tabs[] = [
+                'id' => $cid,
+                'label' => $tablabel,
+                'title' => $fullname,
+                'url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'builder',
+                    'trackid' => $cid,
+                ]))->out(false),
+                'current' => $current,
+            ];
+
+            $formaction = (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'builder',
+                'trackid' => $cid,
+            ]))->out(false);
+            $phases = self::builder_phase_cards($course);
+            foreach ($phases as &$phase) {
+                $phase['form_action'] = $formaction;
+                $phase['sesskey'] = $sesskey;
+                $phase['trackid'] = $cid;
+                $phase['add_label'] = $addlabel;
+                $phase['show_label'] = $showlabel;
+                $phase['hide_label'] = $hidelabel;
+                $phase['show_blocked_title'] = $showblocked;
+                $phase['no_acts'] = $noacts;
+                foreach ($phase['activities'] as &$act) {
+                    $act['form_action'] = $formaction;
+                    $act['sesskey'] = $sesskey;
+                    $act['trackid'] = $cid;
+                    $act['edit_label'] = $editlabel;
+                    $act['mark_label'] = $marklabel;
+                }
+                unset($act);
             }
-            unset($act);
+            unset($phase);
+
+            $teachers = self::teacher_names($cid);
+            $panels[] = [
+                'id' => $cid,
+                'current' => $current,
+                'phases' => $phases,
+                'side_title' => $fullname,
+                'side_capstone' => self::capstone_line($course),
+                'side_teacher_label' => $teacherkv,
+                'side_teacher' => $teachers !== [] ? implode(', ', $teachers) : $noteacher,
+                'side_enrolled_label' => $enrolledkv,
+                'side_enrolled' => (string) self::fellow_count($cid),
+                'side_guest_label' => $guestkv,
+                'side_guest' => self::guest_enrol_enabled($cid) ? $guestonlabel : $guestofflabel,
+                'tip_prof_url' => $tipurl,
+                'tip_body' => $tipbody,
+                'course_url' => (new \moodle_url('/course/view.php', ['id' => $cid]))->out(false),
+                'open_course_label' => $opencourse,
+            ];
         }
-        unset($phase);
-
-        $teachers = self::teacher_names($trackid);
-        $fellows = self::fellow_count($trackid);
-        $guestoff = !self::guest_enrol_enabled($trackid);
-
-        $pluginbase = (new \moodle_url('/local/launchpad'))->out(false);
 
         return [
             'eyebrow' => get_string('admin_builder_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_builder_heading', 'local_launchpad'),
             'lead' => get_string('admin_builder_lead', 'local_launchpad'),
             'has_tracks' => true,
+            'initial_trackid' => (string) $trackid,
             'track_tabs' => $tabs,
-            'phases' => $phases,
-            'side_title' => format_string($selected->fullname),
-            'side_capstone' => self::capstone_line($selected),
-            'side_teacher_label' => get_string('admin_builder_kv_teacher', 'local_launchpad'),
-            'side_teacher' => $teachers !== []
-                ? implode(', ', $teachers)
-                : get_string('admin_tracks_no_teacher', 'local_launchpad'),
-            'side_enrolled_label' => get_string('admin_builder_kv_enrolled', 'local_launchpad'),
-            'side_enrolled' => (string) $fellows,
-            'side_guest_label' => get_string('admin_builder_kv_guest', 'local_launchpad'),
-            'side_guest' => $guestoff
-                ? get_string('admin_builder_guest_off', 'local_launchpad')
-                : get_string('admin_builder_guest_on', 'local_launchpad'),
-            'tip_prof_url' => $pluginbase . '/assets/img/prof.webp',
-            'tip_body' => get_string('admin_builder_tip', 'local_launchpad'),
+            'track_panels' => $panels,
             'flash_ok' => !empty($flash['ok']),
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
-            'course_url' => (new \moodle_url('/course/view.php', ['id' => $trackid]))->out(false),
-            'open_course_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
         ];
+    }
+
+    /**
+     * Compact track tab label (not the shared "LaunchPad" course prefix).
+     */
+    public static function builder_track_tab_label(\stdClass $course): string {
+        $idnumber = strtolower(trim((string) ($course->idnumber ?? '')));
+        if (preg_match('/^lp-([a-z0-9]+)-/', $idnumber, $m)) {
+            $code = $m[1];
+            foreach (blueprint::track_categories() as $catid => $name) {
+                if (str_replace('launchpad-', '', $catid) === $code) {
+                    return match ($code) {
+                        'ai' => 'AI',
+                        'fullstack' => 'Full Stack',
+                        'pm' => 'Product',
+                        'marketing' => 'Marketing',
+                        'startup' => 'Startup',
+                        default => $name,
+                    };
+                }
+            }
+        }
+
+        $fullname = format_string($course->fullname ?? '');
+        // "LaunchPad — AI & Automation — Cohort Pilot" → middle segment.
+        if (preg_match('/LaunchPad\s*[—–-]\s*(.+?)\s*[—–-]/u', $fullname, $m)) {
+            return trim($m[1]);
+        }
+        return $fullname !== '' ? $fullname : get_string('admin_builder_untitled', 'local_launchpad');
     }
 
     /**

@@ -1598,4 +1598,58 @@
 
         applyTab(root.getAttribute('data-lp-people-active') || 'all', false);
     })();
+
+    // Admin Course builder: switch tracks in-place (no full-page reload).
+    (function builderTabs() {
+        var root = shell.querySelector('[data-lp-builder]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-builder-tab]');
+        var panels = root.querySelectorAll('[data-lp-builder-panel]');
+        if (!tabs.length || !panels.length) {
+            return;
+        }
+
+        function applyTrack(trackId, pushUrl) {
+            var id = String(trackId || '');
+            if (!id) {
+                return;
+            }
+            root.setAttribute('data-lp-builder-active', id);
+
+            tabs.forEach(function (el) {
+                var on = el.getAttribute('data-lp-builder-tab') === id;
+                el.classList.toggle('is-on', on);
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+
+            panels.forEach(function (panel) {
+                var on = panel.getAttribute('data-lp-builder-panel') === id;
+                panel.hidden = !on;
+            });
+
+            if (pushUrl && window.history && window.history.replaceState) {
+                try {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('view', 'builder');
+                    url.searchParams.set('trackid', id);
+                    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+                } catch (err) {
+                    // Ignore URL sync failures.
+                }
+            }
+        }
+
+        root.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-builder-tab]');
+            if (!tab || !root.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyTrack(tab.getAttribute('data-lp-builder-tab'), true);
+        });
+
+        applyTrack(root.getAttribute('data-lp-builder-active') || tabs[0].getAttribute('data-lp-builder-tab'), false);
+    })();
 })();
