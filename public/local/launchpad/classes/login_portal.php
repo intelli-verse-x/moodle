@@ -40,6 +40,7 @@ final class login_portal {
     public const EMPLOYER = 'employer';
     public const FELLOWSHIP = 'fellowship';
     public const MENTOR = 'mentor';
+    public const ADMIN = 'admin';
 
     /**
      * Normalise raw portal query/post value.
@@ -54,6 +55,9 @@ final class login_portal {
         }
         if ($portal === 'mentor' || $portal === 'mentors') {
             return self::MENTOR;
+        }
+        if ($portal === 'admin' || $portal === 'administrator') {
+            return self::ADMIN;
         }
         return '';
     }
@@ -71,6 +75,9 @@ final class login_portal {
         }
         if ($portal === self::MENTOR) {
             return new \moodle_url(persona_home::MENTOR_PATH);
+        }
+        if ($portal === self::ADMIN) {
+            return new \moodle_url(persona_home::ADMIN_PATH);
         }
         return null;
     }

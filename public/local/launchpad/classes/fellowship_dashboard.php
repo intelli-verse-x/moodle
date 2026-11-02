@@ -1902,10 +1902,7 @@ final class fellowship_dashboard {
         if ($userid <= 0) {
             return false;
         }
-        if (is_siteadmin($userid)) {
-            // Admins may preview; persona_home still does not force them here.
-            return true;
-        }
+        // Site admins use admin.php — do not linger on the Fellowship shell.
         return account_persona::is_fellowship($userid);
     }
 

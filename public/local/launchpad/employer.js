@@ -68,6 +68,123 @@
                 }
             });
         });
+
+        // Keep #lp-side scroll + collapsed groups across full-page tab loads.
+        (function persistSide() {
+            var region = shell.getAttribute('data-region') || '';
+            var portal = 'employee';
+            if (region.indexOf('mentor') !== -1) {
+                portal = 'mentor';
+            } else if (region.indexOf('fellowship') !== -1) {
+                portal = 'fellow';
+            }
+            var key = 'lp.side.' + portal;
+
+            function readState() {
+                try {
+                    var raw = window.sessionStorage.getItem(key);
+                    return raw ? JSON.parse(raw) : {};
+                } catch (err) {
+                    return {};
+                }
+            }
+
+            function writeState(patch) {
+                try {
+                    var next = readState();
+                    Object.keys(patch).forEach(function (k) {
+                        next[k] = patch[k];
+                    });
+                    window.sessionStorage.setItem(key, JSON.stringify(next));
+                } catch (err) {
+                    // Private mode / quota — ignore.
+                }
+            }
+
+            var state = readState();
+            var groups = [];
+
+            side.querySelectorAll('.lp-nl').forEach(function (nl) {
+                var id = (nl.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!id) {
+                    return;
+                }
+                var items = [];
+                var el = nl.nextElementSibling;
+                while (el && !el.classList.contains('lp-nl')
+                        && !el.classList.contains('lp-me')
+                        && !el.classList.contains('lp-side-foot')) {
+                    if (el.classList.contains('lp-nav')) {
+                        items.push(el);
+                    }
+                    el = el.nextElementSibling;
+                }
+                groups.push({id: id, nl: nl, items: items});
+                nl.style.cursor = 'pointer';
+                nl.setAttribute('role', 'button');
+                nl.tabIndex = 0;
+            });
+
+            function setGroupCollapsed(group, collapsed) {
+                group.nl.classList.toggle('is-collapsed', collapsed);
+                group.nl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                group.items.forEach(function (item) {
+                    if (collapsed) {
+                        item.setAttribute('hidden', 'hidden');
+                    } else {
+                        item.removeAttribute('hidden');
+                    }
+                });
+            }
+
+            function saveCollapsed() {
+                var map = {};
+                groups.forEach(function (g) {
+                    if (g.nl.classList.contains('is-collapsed')) {
+                        map[g.id] = true;
+                    }
+                });
+                writeState({collapsed: map});
+            }
+
+            var collapsed = state.collapsed || {};
+            groups.forEach(function (g) {
+                var hasCurrent = g.items.some(function (item) {
+                    return item.classList.contains('is-current');
+                });
+                // Never hide the active tab's section after a navigation.
+                setGroupCollapsed(g, !hasCurrent && !!collapsed[g.id]);
+                function toggleGroup() {
+                    setGroupCollapsed(g, !g.nl.classList.contains('is-collapsed'));
+                    saveCollapsed();
+                }
+                g.nl.addEventListener('click', toggleGroup);
+                g.nl.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleGroup();
+                    }
+                });
+            });
+
+            function restoreScroll() {
+                if (typeof state.scroll === 'number') {
+                    side.scrollTop = state.scroll;
+                }
+            }
+            restoreScroll();
+            requestAnimationFrame(restoreScroll);
+
+            var scrollTimer = null;
+            side.addEventListener('scroll', function () {
+                if (scrollTimer) {
+                    window.clearTimeout(scrollTimer);
+                }
+                scrollTimer = window.setTimeout(function () {
+                    writeState({scroll: side.scrollTop});
+                }, 50);
+            }, {passive: true});
+        })();
     }
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {

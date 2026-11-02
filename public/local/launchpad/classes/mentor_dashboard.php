@@ -35,7 +35,8 @@ final class mentor_dashboard {
         if ($userid <= 0) {
             return false;
         }
-        return account_persona::is_mentor($userid) || is_siteadmin($userid);
+        // Site admins use admin.php — do not linger on the Mentor shell.
+        return account_persona::is_mentor($userid);
     }
 
     /**

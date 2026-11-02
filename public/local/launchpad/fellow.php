@@ -33,7 +33,7 @@ use local_launchpad\portal_gate;
 require_login();
 
 $userid = (int) $USER->id;
-// Mentors/employees must not land here; admins may preview (can_access).
+// Mentors/employees/admins must not land here — wrong portal → their home.
 portal_gate::assert_or_redirect_home(
     fellowship_dashboard::can_access($userid),
     login_portal::FELLOWSHIP

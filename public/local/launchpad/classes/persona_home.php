@@ -19,7 +19,7 @@ namespace local_launchpad;
 /**
  * Persona post-login / My home routing.
  *
- * Priority: Admin (no override) → Mentor → Employee → Fellowship → Moodle /my/.
+ * Priority: Admin → Mentor → Employee → Fellowship → Moodle /my/.
  * Employee (cohort lp-employee) wins over Fellowship so employer learners enrolled
  * on lp-* courses still get the Employer shell — not fellow.php.
  * Deep course/mod wantsurl targets are never rewritten. Stale persona-shell
@@ -30,6 +30,11 @@ namespace local_launchpad;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class persona_home {
+
+    /**
+     * Moodle path for the admin portal shell.
+     */
+    public const ADMIN_PATH = '/local/launchpad/admin.php';
 
     /**
      * Moodle path for the mentor dashboard shell.
@@ -52,8 +57,7 @@ final class persona_home {
     /**
      * Persona home URL for this user, or null to keep Moodle default (/my/).
      *
-     * Site admins always return null (no forced persona redirect).
-     * Mentors → mentor stub. Employees → Employer portal.
+     * Admins → admin portal. Mentors → mentor shell. Employees → Employer portal.
      * Fellows (without employee cohort) → Fellowship shell.
      *
      * @param int $userid
@@ -70,7 +74,7 @@ final class persona_home {
         $home = null;
         // is_admin() already covers is_siteadmin() — avoid a second native check.
         if (account_persona::is_admin($userid)) {
-            $home = null;
+            $home = new \moodle_url(self::ADMIN_PATH);
         } else if (account_persona::is_mentor($userid)) {
             $home = new \moodle_url(self::MENTOR_PATH);
         } else if (account_persona::is_employee($userid)) {
@@ -174,7 +178,7 @@ final class persona_home {
      */
     public static function is_persona_shell_path(string $path): bool {
         $path = rtrim($path, '/') ?: '/';
-        foreach ([self::MENTOR_PATH, self::EMPLOYEE_PATH, self::FELLOW_PATH] as $shell) {
+        foreach ([self::ADMIN_PATH, self::MENTOR_PATH, self::EMPLOYEE_PATH, self::FELLOW_PATH] as $shell) {
             $shell = rtrim($shell, '/') ?: '/';
             if ($path === $shell) {
                 return true;
@@ -273,9 +277,9 @@ final class persona_home {
     /**
      * Whether ?noredirect=1 may keep the stock Moodle /my/ page for this home.
      *
-     * Employees never: Employer portal is the canonical dashboard (PR #15 parity
-     * with Fellowship — persona shell replaces /my/, not a parallel page).
-     * Admins (null home), mentors, and fellows may still opt out.
+     * Employees and admins never: their LaunchPad shell is the canonical
+     * dashboard (persona shell replaces /my/, not a parallel page).
+     * Mentors and fellows may still opt out.
      *
      * @param \moodle_url|null $home From home_url_for()
      */
@@ -289,8 +293,11 @@ final class persona_home {
         if ($path === null) {
             return true;
         }
-        $employee = rtrim(self::EMPLOYEE_PATH, '/') ?: '/';
-        return $path !== $employee;
+        $forced = [
+            rtrim(self::EMPLOYEE_PATH, '/') ?: '/',
+            rtrim(self::ADMIN_PATH, '/') ?: '/',
+        ];
+        return !in_array($path, $forced, true);
     }
 
     /**
@@ -312,8 +319,8 @@ final class persona_home {
     /**
      * Redirect from /my/ to persona home when applicable (no loop).
      *
-     * Pass ?noredirect=1 to keep stock Moodle /my/ for mentors/fellows/admins.
-     * Employees always redirect to employee.php (noredirect cannot bypass).
+     * Pass ?noredirect=1 to keep stock Moodle /my/ for mentors/fellows.
+     * Employees and admins always redirect to their portal (noredirect cannot bypass).
      */
     public static function maybe_redirect_from_my(): void {
         global $USER;
