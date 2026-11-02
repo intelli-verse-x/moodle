@@ -1,0 +1,79 @@
+{{!
+    @template local_launchpad/fellowship_calendar_month
+
+    Month grid panel (swapped via AJAX on prev/next).
+}}
+<div class="lp-cal-month" data-lp-cal-month
+  data-ajax-url="{{ajax_url}}"
+  data-sesskey="{{sesskey}}"
+  data-time="{{current_time}}">
+  <div class="lp-cal-month-head">
+    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{prev_url}}" data-lp-cal-nav data-time="{{prev_time}}"
+      aria-label="{{#str}} fellowship_calendar_prev_month, local_launchpad {{/str}}">←</a>
+    <h3 class="lp-cal-month-label">{{month_label}}</h3>
+    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{next_url}}" data-lp-cal-nav data-time="{{next_time}}"
+      aria-label="{{#str}} fellowship_calendar_next_month, local_launchpad {{/str}}">→</a>
+  </div>
+  <div class="lp-cal-grid" role="grid" aria-label="{{month_label}}">
+    <div class="lp-cal-weekdays" role="row">
+      {{#weekday_labels}}
+        <div class="lp-cal-wd" role="columnheader" title="{{label_full}}">{{label}}</div>
+      {{/weekday_labels}}
+    </div>
+    {{#weeks}}
+      <div class="lp-cal-week" role="row">
+        {{#days}}
+          <div class="lp-cal-day{{#is_othermonth}} is-other{{/is_othermonth}}{{#is_today}} is-today{{/is_today}}{{#has_events}} has-events{{/has_events}}{{^has_events}}{{#can_add_event}} is-addable{{/can_add_event}}{{/has_events}}"
+            role="gridcell" data-lp-cal-drop data-day-key="{{day_key}}">
+            {{#has_events}}
+              <button type="button" class="lp-cal-daynum is-action" data-lp-cal-day-open
+                data-day-label="{{day_label}}"
+                aria-label="{{#str}} fellowship_calendar_day_events_aria, local_launchpad {{/str}} {{day_label}}">{{day}}</button>
+            {{/has_events}}
+            {{^has_events}}
+              {{#can_add_event}}
+                <button type="button" class="lp-cal-daynum is-action is-add"
+                  data-lp-cal-day-add data-day-key="{{day_key}}"
+                  aria-label="{{#str}} fellowship_calendar_add_on_day, local_launchpad {{/str}} {{day_label}}">{{day}}</button>
+              {{/can_add_event}}
+              {{^can_add_event}}
+                <span class="lp-cal-daynum">{{day}}</span>
+              {{/can_add_event}}
+            {{/has_events}}
+            {{#has_events}}
+              <ul class="lp-cal-chips">
+                {{#events}}
+                  <li>
+                    <button type="button" class="lp-cal-chip{{#is_personal}} is-personal{{/is_personal}}"
+                      {{> local_launchpad/fellowship_calendar_event_open}}>
+                      {{name}}
+                    </button>
+                  </li>
+                {{/events}}
+              </ul>
+              {{#has_more}}
+                <button type="button" class="lp-cal-more" data-lp-cal-day-open data-day-label="{{day_label}}">
+                  {{#str}} fellowship_calendar_more_events, local_launchpad, {{more_count}} {{/str}}
+                </button>
+              {{/has_more}}
+              <ul class="lp-cal-day-source" data-lp-cal-day-source hidden>
+                {{#all_events}}
+                  <li>
+                    <button type="button" class="lp-cal-list-btn{{#is_personal}} is-personal{{/is_personal}}"
+                      {{> local_launchpad/fellowship_calendar_event_open}}>
+                      <b>{{name}}</b>
+                      <span class="lp-muted">{{when}}{{#course_name}} · {{course_name}}{{/course_name}}</span>
+                    </button>
+                  </li>
+                {{/all_events}}
+              </ul>
+            {{/has_events}}
+          </div>
+        {{/days}}
+      </div>
+    {{/weeks}}
+  </div>
+  {{^has_month_events}}
+    <p class="lp-muted lp-sm lp-cal-month-empty">{{#str}} fellowship_calendar_month_empty, local_launchpad {{/str}}</p>
+  {{/has_month_events}}
+</div>

@@ -26,6 +26,8 @@ require(__DIR__ . '/../../config.php');
 
 use local_launchpad\account_persona;
 use local_launchpad\employer_dashboard;
+use local_launchpad\login_portal;
+use local_launchpad\portal_gate;
 
 require_login();
 
@@ -77,20 +79,23 @@ $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('employer_area_title', 'local_launchpad'));
 $PAGE->set_heading(get_string('employer_area_heading', 'local_launchpad'));
 
-if (!account_persona::is_employee((int) $USER->id) && !is_siteadmin()) {
-    throw new \moodle_exception('employee_access_denied', 'local_launchpad');
-}
+$allowed = account_persona::is_employee((int) $USER->id) || is_siteadmin();
+portal_gate::assert_or_redirect_home($allowed, login_portal::EMPLOYER);
 
-$templatecontext = employer_dashboard::export_for_template(
-    $USER,
-    $view,
-    $courseid,
-    $tab,
-    $mtab,
-    $convid,
-    $msgsent > 0,
-    $msgerr,
-    $gtab
+$mismatch = portal_gate::consume_modal_context();
+$templatecontext = array_merge(
+    employer_dashboard::export_for_template(
+        $USER,
+        $view,
+        $courseid,
+        $tab,
+        $mtab,
+        $convid,
+        $msgsent > 0,
+        $msgerr,
+        $gtab
+    ),
+    $mismatch
 );
 $pluginbase = $CFG->wwwroot . '/local/launchpad';
 // Cache-bust CSS/JS from this plugin's version.php (lives next to employee.php under public/).
@@ -117,7 +122,11 @@ echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
 echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '</head>' . "\n";
-echo '<body class="local-launchpad-employer">' . "\n";
+$bodyclass = 'local-launchpad-employer';
+if (!empty($mismatch['show_portal_mismatch'])) {
+    $bodyclass .= ' lp-portal-mismatch-lock';
+}
+echo '<body class="' . $bodyclass . '">' . "\n";
 echo $body;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
 echo '</body>' . "\n";

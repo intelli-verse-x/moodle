@@ -24,39 +24,59 @@
 
 require(__DIR__ . '/../../config.php');
 
-use local_launchpad\account_persona;
 use local_launchpad\fellowship_dashboard;
+use local_launchpad\login_portal;
+use local_launchpad\messaging;
 use local_launchpad\persona_home;
+use local_launchpad\portal_gate;
 
 require_login();
 
 $userid = (int) $USER->id;
-
-// Employer cohort never uses the Fellowship shell (even with lp-* enrolments).
-if (account_persona::is_employee($userid) && !is_siteadmin()) {
-    redirect(new moodle_url(persona_home::EMPLOYEE_PATH));
-}
-
-if (!fellowship_dashboard::can_access($userid)) {
-    throw new \moodle_exception('fellowship_access_denied', 'local_launchpad');
-}
+// Mentors/employees must not land here; admins may preview (can_access).
+portal_gate::assert_or_redirect_home(
+    fellowship_dashboard::can_access($userid),
+    login_portal::FELLOWSHIP
+);
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$courseid = optional_param('id', 0, PARAM_INT);
+// On messages, id is the other user — never a course (avoids fellowship_course_denied).
+$messageuserid = 0;
+$courseid = 0;
+if ($view === 'messages') {
+    $messageuserid = optional_param('id', 0, PARAM_INT);
+} else {
+    $courseid = optional_param('id', 0, PARAM_INT);
+}
 
 $courses = fellowship_dashboard::list_courses($userid);
 $courseids = array_map(static fn($c) => (int) $c->id, $courses);
 
-// Refuse mentor-only / non-fellow visitors (admins may preview).
-if (!account_persona::is_fellowship($userid) && !is_siteadmin()) {
-    throw new \moodle_exception('fellowship_access_denied', 'local_launchpad');
+// Send / delete LaunchPad messages (Moodle-backed) before rendering.
+if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
+    $toid = required_param('id', PARAM_INT);
+    $msgaction = optional_param('msgaction', 'send', PARAM_ALPHA);
+    $redirect = new moodle_url(persona_home::FELLOW_PATH, ['view' => 'messages', 'id' => $toid]);
+    if ($msgaction === 'delete') {
+        $messageids = optional_param_array('messageids', [], PARAM_INT);
+        $result = messaging::delete_messages($userid, $messageids);
+    } else {
+        $body = required_param('message', PARAM_RAW_TRIMMED);
+        $result = messaging::send($userid, $toid, $body);
+    }
+    if (!$result['ok']) {
+        redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);
+    }
+    redirect($redirect);
 }
 
 $context = context_system::instance();
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url(persona_home::FELLOW_PATH, array_filter([
     'view' => $view !== 'home' ? $view : null,
-    'id' => $courseid > 0 ? $courseid : null,
+    'id' => $view === 'messages'
+        ? ($messageuserid > 0 ? $messageuserid : null)
+        : ($courseid > 0 ? $courseid : null),
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('fellowship_area_title', 'local_launchpad'));
@@ -71,7 +91,9 @@ $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(fals
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
 // Legacy Progress tab redirects to Phase progress; keep URL for shell/home links.
 $progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
-$notificationsurl = (new moodle_url('/message/index.php'))->out(false);
+$notificationsurl = messaging::moodle_notifications_url();
+$messagesurl = messaging::messages_url(null, 'fellow');
+$msgunread = messaging::conversation_unread_count($userid);
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -157,6 +179,15 @@ $nav = [
                 'current' => $view === 'portfolio',
                 'key' => 'portfolio',
                 'icon_svg' => $icon('<path d="M4 8h16v12H4z"/><path d="M9 8V6a2 2 0 012-2h2a2 2 0 012 2v2"/>'),
+            ],
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => $messagesurl,
+                'current' => $view === 'messages',
+                'key' => 'messages',
+                'icon_svg' => $icon('<path d="M5 5h14v10H9l-4 4V5z"/>'),
+                'has_badge' => $msgunread > 0,
+                'badge' => $msgunread > 0 ? (string) $msgunread : '',
             ],
             [
                 'label' => get_string('fellowship_nav_help', 'local_launchpad'),
@@ -270,9 +301,51 @@ switch ($view) {
         ]));
         break;
 
+    case 'messages':
+        $pagetitle = get_string('fellowship_messages_heading', 'local_launchpad');
+        $otherid = $messageuserid > 0 ? $messageuserid : null;
+        $msgdata = messaging::page_context($userid, 'fellow', $otherid);
+        $msgcrumbs = [
+            $crumbhome,
+            [
+                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'url' => !empty($msgdata['has_thread']) ? messaging::messages_url(null, 'fellow') : '',
+            ],
+        ];
+        if (!empty($msgdata['has_thread']) && !empty($msgdata['other_name'])) {
+            $pagetitle = (string) $msgdata['other_name'];
+            $msgcrumbs[] = [
+                'label' => (string) $msgdata['other_name'],
+                'url' => '',
+            ];
+        }
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', array_merge($msgdata, [
+            'has_crumbs' => true,
+            'crumbs' => $msgcrumbs,
+        ]));
+        break;
+
     case 'calendar':
         $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
-        $caldata = fellowship_dashboard::list_calendar_events($userid, $courses);
+        $calmode = optional_param('cal', 'month', PARAM_ALPHA);
+        $calfilter = optional_param('filter', 'all', PARAM_ALPHA);
+        $caltime = optional_param('time', 0, PARAM_INT);
+        $calyear = optional_param('year', 0, PARAM_INT);
+        $calmonth = optional_param('month', 0, PARAM_INT);
+        $resolved = \local_launchpad\calendar_service::resolve_month(
+            $caltime > 0 ? $caltime : null,
+            $calyear > 0 ? $calyear : null,
+            $calmonth > 0 ? $calmonth : null
+        );
+        $caldata = \local_launchpad\calendar_service::fellow_context(
+            $userid,
+            $courses,
+            (int) $resolved['year'],
+            (int) $resolved['month'],
+            $calmode,
+            $calfilter,
+            $caltime > 0 ? $caltime : null
+        );
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', array_merge($caldata, [
             'has_crumbs' => true,
             'crumbs' => [
@@ -488,17 +561,8 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = 0;
-if (class_exists('\message_popup\api')) {
-    try {
-        $unread = (int) \message_popup\api::count_unread_popup_notifications($userid);
-    } catch (\Throwable $e) {
-        $unread = 0;
-    }
-}
-$notificationslabel = $unread > 0
-    ? get_string('fellowship_notifications_unread', 'local_launchpad', $unread)
-    : get_string('fellowship_notifications', 'local_launchpad');
+$unread = messaging::notification_unread_count($userid);
+$notificationslabel = messaging::notifications_label($unread);
 
 $orbittips = [
     'home' => get_string('fellowship_orbit_tip_home', 'local_launchpad'),
@@ -515,7 +579,8 @@ $orbittips = [
 ];
 $orbittip = $orbittips[$view] ?? $orbittips['home'];
 
-$shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', [
+$mismatch = portal_gate::consume_modal_context();
+$shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array_merge([
     'data_region' => fellowship_dashboard::DATA_REGION,
     'displayname' => $displayname,
     'firstname' => $firstname,
@@ -543,7 +608,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', [
     'initials' => fellowship_dashboard::initials($USER),
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,
-]);
+], $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";
@@ -557,7 +622,11 @@ echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
 echo '</head>' . "\n";
-echo '<body class="local-launchpad-fellowship">' . "\n";
+$bodyclass = 'local-launchpad-fellowship';
+if (!empty($mismatch['show_portal_mismatch'])) {
+    $bodyclass .= ' lp-portal-mismatch-lock';
+}
+echo '<body class="' . $bodyclass . '">' . "\n";
 echo $shell;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
 echo '</body>' . "\n";

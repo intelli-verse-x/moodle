@@ -39,6 +39,7 @@ final class login_portal {
 
     public const EMPLOYER = 'employer';
     public const FELLOWSHIP = 'fellowship';
+    public const MENTOR = 'mentor';
 
     /**
      * Normalise raw portal query/post value.
@@ -51,6 +52,9 @@ final class login_portal {
         if ($portal === 'employer' || $portal === 'employee') {
             return self::EMPLOYER;
         }
+        if ($portal === 'mentor' || $portal === 'mentors') {
+            return self::MENTOR;
+        }
         return '';
     }
 
@@ -60,19 +64,24 @@ final class login_portal {
     public static function wantsurl_for(string $portal): ?\moodle_url {
         $portal = self::normalise($portal);
         if ($portal === self::EMPLOYER) {
-            return new \moodle_url('/local/launchpad/employee.php');
+            return new \moodle_url(persona_home::EMPLOYEE_PATH);
         }
         if ($portal === self::FELLOWSHIP) {
-            return new \moodle_url('/local/launchpad/fellow.php');
+            return new \moodle_url(persona_home::FELLOW_PATH);
+        }
+        if ($portal === self::MENTOR) {
+            return new \moodle_url(persona_home::MENTOR_PATH);
         }
         return null;
     }
 
     /**
-     * If request carries portal=employer|fellowship, pin SESSION wantsurl to that gate.
+     * If request carries portal=employer|fellowship|mentor, pin SESSION wantsurl to that gate.
      *
      * Safe on non-login pages when the param is absent. When present on login GET/POST,
      * this must run before core_login_get_return_url() consumes wantsurl.
+     * Wrong persona then hits the gated PHP page and sees the access-denied exception
+     * (same pattern for all three portals).
      *
      * @return bool True when wantsurl was set
      */
@@ -99,6 +108,55 @@ final class login_portal {
         }
 
         $SESSION->wantsurl = $target->out(false);
+        return true;
+    }
+
+    /**
+     * Whether a logged-in GET of /login/index.php should skip Moodle's "Log out?" card.
+     *
+     * Browser back after Sign in reloads the login URL; core shows alreadyloggedin.
+     * LaunchPad sends those users to the public landing (/) instead.
+     */
+    public static function should_redirect_logged_in_from_login(
+        bool $loggedin,
+        bool $isguest,
+        string $method,
+        string $script
+    ): bool {
+        if (!$loggedin || $isguest) {
+            return false;
+        }
+        if (strtoupper($method) !== 'GET') {
+            return false;
+        }
+        $script = str_replace('\\', '/', $script);
+        return str_contains($script, '/login/index.php');
+    }
+
+    /**
+     * Redirect already-signed-in users off /login/index.php onto the landing page.
+     *
+     * @return bool True when a redirect was issued
+     */
+    public static function maybe_redirect_logged_in_from_login(): bool {
+        global $SCRIPT;
+
+        if (during_initial_install()) {
+            return false;
+        }
+
+        $method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $script = (string) ($SCRIPT ?? ($_SERVER['SCRIPT_NAME'] ?? ''));
+        if (!self::should_redirect_logged_in_from_login(
+            isloggedin(),
+            isguestuser(),
+            $method,
+            $script
+        )) {
+            return false;
+        }
+
+        redirect(new \moodle_url('/'));
         return true;
     }
 }

@@ -1,0 +1,73 @@
+{{!
+    @template local_launchpad/mentor_queue
+}}
+{{^has_courses}}
+  <div class="lp-empty" role="status">
+    <div class="lp-empty-mark" aria-hidden="true">MN</div>
+    <h2>{{#str}} mentor_nav_queue, local_launchpad {{/str}}</h2>
+    <p>{{empty_courses_message}}</p>
+  </div>
+{{/has_courses}}
+{{#has_courses}}
+  <div class="lp-ach-head">
+    <span class="lp-eyebrow">{{#str}} mentor_nav_review, local_launchpad {{/str}}</span>
+    <h2>{{#str}} mentor_nav_queue, local_launchpad {{/str}}</h2>
+    <p class="lp-muted">{{#str}} mentor_queue_intro, local_launchpad {{/str}}</p>
+  </div>
+
+  <div class="lp-mentor-filters" role="tablist" aria-label="{{#str}} mentor_filter_aria, local_launchpad {{/str}}">
+    {{#filters}}
+      <a class="lp-chip{{#current}} is-on{{/current}}" href="{{url}}" role="tab" aria-selected="{{#current}}true{{/current}}{{^current}}false{{/current}}">
+        {{label}} <span class="lp-muted">{{count}}</span>
+      </a>
+    {{/filters}}
+  </div>
+
+  {{#has_items}}
+    <div class="lp-card lift" style="margin-top:16px; overflow-x:auto">
+      <table class="lp-mentor-table">
+        <thead>
+          <tr>
+            <th>{{#str}} mentor_col_fellow, local_launchpad {{/str}}</th>
+            <th>{{#str}} mentor_col_assign, local_launchpad {{/str}}</th>
+            <th>{{#str}} mentor_col_submitted, local_launchpad {{/str}}</th>
+            <th>{{#str}} mentor_col_state, local_launchpad {{/str}}</th>
+            <th>{{#str}} mentor_col_score, local_launchpad {{/str}}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#items}}
+            <tr>
+              <td><b>{{{fellow_name}}}</b><div class="lp-xs lp-muted">{{{course_name}}}</div></td>
+              <td>{{{assign_name}}}{{#has_attempt}} <span class="lp-xs lp-muted">· {{#str}} fellowship_feedback_attempt, local_launchpad {{/str}} {{attempt}}</span>{{/has_attempt}}</td>
+              <td>{{#submitted_at}}{{submitted_at}}{{/submitted_at}}{{^submitted_at}}—{{/submitted_at}}</td>
+              <td><span class="lp-chip {{chip}}">{{status_label}}</span></td>
+              <td>{{#has_grade}}{{grade_display}}{{/has_grade}}{{^has_grade}}—{{/has_grade}}</td>
+              <td>
+                {{#is_waiting}}
+                  <a class="lp-btn lp-btn-light" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+                {{/is_waiting}}
+                {{^is_waiting}}
+                  {{#is_released}}
+                    <a class="lp-btn lp-btn-light" href="{{url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+                  {{/is_released}}
+                  {{^is_released}}
+                    <button type="button" class="lp-btn lp-btn-light" disabled aria-disabled="true">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</button>
+                  {{/is_released}}
+                {{/is_waiting}}
+              </td>
+            </tr>
+          {{/items}}
+        </tbody>
+      </table>
+    </div>
+  {{/has_items}}
+  {{^has_items}}
+    <div class="lp-empty" role="status" style="margin-top:16px">
+      <div class="lp-empty-mark" aria-hidden="true">··</div>
+      <h2>{{#str}} mentor_queue_empty_title, local_launchpad {{/str}}</h2>
+      <p>{{#str}} mentor_queue_empty_body, local_launchpad {{/str}}</p>
+    </div>
+  {{/has_items}}
+{{/has_courses}}
