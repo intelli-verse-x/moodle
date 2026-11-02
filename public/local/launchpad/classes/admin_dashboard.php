@@ -94,10 +94,11 @@ final class admin_dashboard {
         ] + $visibility + $attention;
     }
 
+    /** Substring that marks unfinished structure-CLI placeholder activities. */
+    public const PLACEHOLDER_MARKER = '[placeholder';
+
     /**
      * Tracks & courses page (HTML a-tracks) — card grid from live Moodle.
-     *
-     * No Course builder yet — card CTA opens the Moodle course.
      *
      * @param \stdClass $user
      * @return array<string, mixed>
@@ -125,6 +126,433 @@ final class admin_dashboard {
             'has_tracks' => $cards !== [],
             'tracks' => $cards,
             'empty_body' => get_string('admin_tracks_empty', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Course builder (HTML builder) — stage panel around Moodle activities.
+     *
+     * @param \stdClass $user
+     * @param int $trackid Selected track course id (0 = first)
+     * @param array{ok?:string,error?:string} $flash
+     * @return array<string, mixed>
+     */
+    public static function builder_context(\stdClass $user, int $trackid = 0, array $flash = []): array {
+        unset($user);
+        $tracks = self::list_track_courses();
+        if ($tracks === []) {
+            return [
+                'eyebrow' => get_string('admin_builder_eyebrow', 'local_launchpad'),
+                'heading' => get_string('admin_builder_heading', 'local_launchpad'),
+                'lead' => get_string('admin_builder_lead', 'local_launchpad'),
+                'has_tracks' => false,
+                'empty_body' => get_string('admin_builder_empty', 'local_launchpad'),
+                'flash_ok' => !empty($flash['ok']),
+                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+                'flash_err' => !empty($flash['error']),
+                'flash_err_body' => (string) ($flash['error'] ?? ''),
+            ];
+        }
+
+        $selected = null;
+        foreach ($tracks as $course) {
+            if ($trackid > 0 && (int) $course->id === $trackid) {
+                $selected = $course;
+                break;
+            }
+        }
+        if ($selected === null) {
+            $selected = $tracks[0];
+            $trackid = (int) $selected->id;
+        }
+
+        $tabs = [];
+        foreach ($tracks as $course) {
+            $label = format_string($course->fullname);
+            // Short tab label: first word / short name feel.
+            $short = preg_split('/\s+/', $label)[0] ?? $label;
+            $tabs[] = [
+                'id' => (int) $course->id,
+                'label' => $short,
+                'title' => $label,
+                'url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'builder',
+                    'trackid' => (int) $course->id,
+                ]))->out(false),
+                'current' => (int) $course->id === $trackid,
+            ];
+        }
+
+        $phases = self::builder_phase_cards($selected);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'builder',
+            'trackid' => $trackid,
+        ]))->out(false);
+        $sesskey = sesskey();
+        $addlabel = get_string('admin_builder_add', 'local_launchpad');
+        $editlabel = get_string('admin_builder_edit', 'local_launchpad');
+        $marklabel = get_string('admin_builder_mark_reviewed', 'local_launchpad');
+        $showlabel = get_string('admin_builder_show_section', 'local_launchpad');
+        $hidelabel = get_string('admin_builder_hide_section', 'local_launchpad');
+        $showblocked = get_string('admin_builder_show_blocked', 'local_launchpad');
+        $noacts = get_string('admin_builder_no_activities', 'local_launchpad');
+        foreach ($phases as &$phase) {
+            $phase['form_action'] = $formaction;
+            $phase['sesskey'] = $sesskey;
+            $phase['trackid'] = $trackid;
+            $phase['add_label'] = $addlabel;
+            $phase['show_label'] = $showlabel;
+            $phase['hide_label'] = $hidelabel;
+            $phase['show_blocked_title'] = $showblocked;
+            $phase['no_acts'] = $noacts;
+            foreach ($phase['activities'] as &$act) {
+                $act['form_action'] = $formaction;
+                $act['sesskey'] = $sesskey;
+                $act['trackid'] = $trackid;
+                $act['edit_label'] = $editlabel;
+                $act['mark_label'] = $marklabel;
+            }
+            unset($act);
+        }
+        unset($phase);
+
+        $teachers = self::teacher_names($trackid);
+        $fellows = self::fellow_count($trackid);
+        $guestoff = !self::guest_enrol_enabled($trackid);
+
+        $pluginbase = (new \moodle_url('/local/launchpad'))->out(false);
+
+        return [
+            'eyebrow' => get_string('admin_builder_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_builder_heading', 'local_launchpad'),
+            'lead' => get_string('admin_builder_lead', 'local_launchpad'),
+            'has_tracks' => true,
+            'track_tabs' => $tabs,
+            'phases' => $phases,
+            'side_title' => format_string($selected->fullname),
+            'side_capstone' => self::capstone_line($selected),
+            'side_teacher_label' => get_string('admin_builder_kv_teacher', 'local_launchpad'),
+            'side_teacher' => $teachers !== []
+                ? implode(', ', $teachers)
+                : get_string('admin_tracks_no_teacher', 'local_launchpad'),
+            'side_enrolled_label' => get_string('admin_builder_kv_enrolled', 'local_launchpad'),
+            'side_enrolled' => (string) $fellows,
+            'side_guest_label' => get_string('admin_builder_kv_guest', 'local_launchpad'),
+            'side_guest' => $guestoff
+                ? get_string('admin_builder_guest_off', 'local_launchpad')
+                : get_string('admin_builder_guest_on', 'local_launchpad'),
+            'tip_prof_url' => $pluginbase . '/assets/img/prof.webp',
+            'tip_body' => get_string('admin_builder_tip', 'local_launchpad'),
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+            'course_url' => (new \moodle_url('/course/view.php', ['id' => $trackid]))->out(false),
+            'open_course_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Four phase cards with activity rows for the builder.
+     *
+     * @param \stdClass $course
+     * @return list<array<string, mixed>>
+     */
+    public static function builder_phase_cards(\stdClass $course): array {
+        global $DB, $CFG;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        $courseid = (int) $course->id;
+        $names = blueprint::phase_sections();
+        $out = [];
+
+        foreach ($names as $sectionnum => $title) {
+            $section = $DB->get_record('course_sections', [
+                'course' => $courseid,
+                'section' => $sectionnum,
+            ]);
+            $sectionvisible = $section && (int) $section->visible === 1;
+            $sectionid = $section ? (int) $section->id : 0;
+            $activities = self::builder_activities_for_section($courseid, $section, $sectionvisible);
+
+            $hasready = false;
+            foreach ($activities as $act) {
+                if (($act['state'] ?? '') !== 'draft') {
+                    $hasready = true;
+                    break;
+                }
+            }
+
+            $canshow = $hasready || $sectionvisible;
+            $count = count($activities);
+            $out[] = [
+                'sectionnum' => $sectionnum,
+                'sectionid' => $sectionid,
+                'n' => (string) $sectionnum,
+                'title' => $title,
+                'shown' => $sectionvisible,
+                'meta' => get_string(
+                    'admin_builder_phase_meta',
+                    'local_launchpad',
+                    (object) [
+                        'count' => $count,
+                        'state' => $sectionvisible
+                            ? get_string('admin_builder_section_shown', 'local_launchpad')
+                            : get_string('admin_builder_section_hidden', 'local_launchpad'),
+                    ]
+                ),
+                'activities' => $activities,
+                'has_activities' => $activities !== [],
+                'can_show' => $canshow,
+                'add_url' => $sectionid > 0
+                    ? (new \moodle_url('/course/section.php', ['id' => $sectionid]))->out(false)
+                    : (new \moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
+                'toggle_show' => !$sectionvisible,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Activity rows for one phase section.
+     *
+     * @param \stdClass|false|null $section
+     * @return list<array<string, mixed>>
+     */
+    public static function builder_activities_for_section(
+        int $courseid,
+        $section,
+        bool $sectionvisible
+    ): array {
+        global $DB;
+
+        if (!$section || empty($section->sequence)) {
+            return [];
+        }
+        $cmids = array_filter(array_map('intval', explode(',', $section->sequence)));
+        if ($cmids === []) {
+            return [];
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($cmids, SQL_PARAMS_NAMED, 'cm');
+        $params['del'] = 0;
+        $params['course'] = $courseid;
+        $sql = "SELECT cm.id, cm.visible, cm.instance, m.name AS modname
+                  FROM {course_modules} cm
+                  JOIN {modules} m ON m.id = cm.module
+                 WHERE cm.id {$insql}
+                   AND cm.course = :course
+                   AND cm.deletioninprogress = :del";
+        $cms = $DB->get_records_sql($sql, $params);
+
+        // Preserve section order.
+        $ordered = [];
+        foreach ($cmids as $cmid) {
+            if (isset($cms[$cmid])) {
+                $ordered[] = $cms[$cmid];
+            }
+        }
+
+        $out = [];
+        foreach ($ordered as $cm) {
+            $modname = (string) $cm->modname;
+            $instancename = '';
+            if ($DB->get_manager()->table_exists($modname)) {
+                $instancename = (string) $DB->get_field($modname, 'name', ['id' => (int) $cm->instance]);
+            }
+            $isdraft = $instancename !== '' && stripos($instancename, self::PLACEHOLDER_MARKER) !== false;
+            if ($isdraft) {
+                $state = 'draft';
+                $statechip = 'line';
+            } else if ($sectionvisible) {
+                $state = 'shown';
+                $statechip = 'ok';
+            } else {
+                $state = 'ready';
+                $statechip = '';
+            }
+
+            $out[] = [
+                'cmid' => (int) $cm->id,
+                'kind' => self::builder_mod_kind($modname),
+                'title' => format_string($instancename !== '' ? $instancename : $modname),
+                'state' => $state,
+                'state_label' => get_string('admin_builder_state_' . $state, 'local_launchpad'),
+                'state_chip' => $statechip,
+                'is_draft' => $isdraft,
+                'edit_url' => (new \moodle_url('/course/modedit.php', [
+                    'update' => (int) $cm->id,
+                    'return' => 1,
+                ]))->out(false),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Short activity kind label for builder rows.
+     */
+    public static function builder_mod_kind(string $modname): string {
+        return match ($modname) {
+            'page' => get_string('admin_builder_kind_page', 'local_launchpad'),
+            'resource' => get_string('admin_builder_kind_file', 'local_launchpad'),
+            'quiz' => get_string('admin_builder_kind_quiz', 'local_launchpad'),
+            'assign' => get_string('admin_builder_kind_assign', 'local_launchpad'),
+            default => ucfirst($modname),
+        };
+    }
+
+    /**
+     * Whether guest enrolment is enabled on the course.
+     */
+    public static function guest_enrol_enabled(int $courseid): bool {
+        global $DB, $CFG;
+
+        if ($courseid <= 0) {
+            return false;
+        }
+        require_once($CFG->libdir . '/enrollib.php');
+        return $DB->record_exists('enrol', [
+            'courseid' => $courseid,
+            'enrol' => 'guest',
+            'status' => ENROL_INSTANCE_ENABLED,
+        ]);
+    }
+
+    /**
+     * Strip placeholder marker from an activity name (Mark reviewed).
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function mark_activity_reviewed(\stdClass $actor, int $trackcourseid, int $cmid): array {
+        global $CFG, $DB;
+
+        unset($actor);
+        if ($trackcourseid <= 0 || $cmid <= 0) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        $context = \context_course::instance($trackcourseid);
+        try {
+            require_capability('moodle/course:manageactivities', $context);
+        } catch (\required_capability_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $cm = $DB->get_record('course_modules', ['id' => $cmid, 'course' => $trackcourseid], '*', IGNORE_MISSING);
+        if (!$cm) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+        $mod = $DB->get_record('modules', ['id' => (int) $cm->module], '*', MUST_EXIST);
+        $modname = (string) $mod->name;
+        if (!$DB->get_manager()->table_exists($modname)) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+        $instance = $DB->get_record($modname, ['id' => (int) $cm->instance], '*', MUST_EXIST);
+        $oldname = (string) ($instance->name ?? '');
+        $newname = trim(preg_replace('/\s*\[[^\]]*placeholder[^\]]*\]\s*/i', ' ', $oldname) ?? $oldname);
+        $newname = trim(preg_replace('/\s+/', ' ', $newname) ?? $newname);
+        if ($newname === '') {
+            $newname = get_string('admin_builder_untitled', 'local_launchpad');
+        }
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        $DB->set_field($modname, 'name', $newname, ['id' => (int) $instance->id]);
+        // Placeholders start hidden; reviewed content should be visible inside its section.
+        if ((int) $cm->visible !== 1) {
+            set_coursemodule_visible($cmid, 1);
+        }
+        rebuild_course_cache($trackcourseid, true);
+
+        return [
+            'ok' => get_string('admin_builder_ok_reviewed', 'local_launchpad', format_string($newname)),
+        ];
+    }
+
+    /**
+     * Show or hide a phase section (never deletes).
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function set_phase_visible(
+        \stdClass $actor,
+        int $trackcourseid,
+        int $sectionnum,
+        bool $show
+    ): array {
+        global $CFG, $DB;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        if ($trackcourseid <= 0 || $sectionnum < 1 || $sectionnum > 4) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        $context = \context_course::instance($trackcourseid);
+        try {
+            require_capability('moodle/course:update', $context);
+        } catch (\required_capability_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $section = $DB->get_record('course_sections', [
+            'course' => $trackcourseid,
+            'section' => $sectionnum,
+        ]);
+        if (!$section) {
+            return ['error' => get_string('admin_builder_err_section', 'local_launchpad')];
+        }
+
+        if ($show) {
+            // Require at least one non-placeholder activity first.
+            $acts = self::builder_activities_for_section(
+                $trackcourseid,
+                $section,
+                (int) $section->visible === 1
+            );
+            $hasready = false;
+            foreach ($acts as $act) {
+                if (($act['state'] ?? '') !== 'draft') {
+                    $hasready = true;
+                    break;
+                }
+            }
+            if (!$hasready) {
+                return ['error' => get_string('admin_builder_show_blocked', 'local_launchpad')];
+            }
+        }
+
+        $modinfo = get_fast_modinfo($trackcourseid);
+        $sectioninfo = $modinfo->get_section_info($sectionnum);
+        if (!$sectioninfo) {
+            return ['error' => get_string('admin_builder_err_section', 'local_launchpad')];
+        }
+        \core_courseformat\formatactions::section($trackcourseid)->set_visibility($sectioninfo, $show);
+
+        $phasename = blueprint::phase_sections()[$sectionnum] ?? (string) $sectionnum;
+        return [
+            'ok' => $show
+                ? get_string('admin_builder_ok_shown', 'local_launchpad', $phasename)
+                : get_string('admin_builder_ok_hidden', 'local_launchpad', $phasename),
         ];
     }
 
@@ -1023,6 +1451,11 @@ final class admin_dashboard {
             'fellows_label' => get_string('admin_tracks_fellows', 'local_launchpad', $fellows),
             'course_url' => (new \moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
             'open_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
+            'builder_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'builder',
+                'trackid' => $courseid,
+            ]))->out(false),
+            'builder_label' => get_string('admin_tracks_open_builder', 'local_launchpad'),
             'assign_teacher_url' => self::assign_teacher_url($courseid)->out(false),
             'assign_teacher_label' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
         ];
@@ -1378,7 +1811,7 @@ final class admin_dashboard {
                  WHERE cm.id {$insql}
                    AND cm.deletioninprogress = :del";
         $cms = $DB->get_records_sql($sql, $params);
-        $marker = '[placeholder';
+        $marker = self::PLACEHOLDER_MARKER;
         foreach ($cms as $cm) {
             $table = $cm->modname;
             if (!$DB->get_manager()->table_exists($table)) {

@@ -2,7 +2,7 @@
     @template local_launchpad/admin_tracks
 
     Admin Tracks and courses — HTML a-tracks card grid from live Moodle.
-    No Course builder yet; Open course goes to Moodle course home.
+    Track cards with Open in builder + Moodle course link.
 }}
 <section class="lp-hero" data-region="local-launchpad-admin-tracks">
   <div class="lp-hero-row">
@@ -55,6 +55,7 @@
           {{^has_teacher}}
             <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{assign_teacher_url}}">{{assign_teacher_label}}</a>
           {{/has_teacher}}
+          <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
           <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}">{{open_label}}</a>
         </div>
       </article>

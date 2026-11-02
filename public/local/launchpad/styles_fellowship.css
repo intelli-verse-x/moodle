@@ -2981,3 +2981,84 @@ body.lp-portal-mismatch-lock {
   .lp-msg-layout.has-thread .lp-msg-inbox { display: none; }
 }
 
+
+/* Admin Course builder */
+.lp-builder-phases { gap: 14px; }
+.lp-bsec-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.lp-bsec-n {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--lp-blue-soft, #eef4ff);
+  color: var(--lp-blue);
+}
+.lp-bsec.is-shown .lp-bsec-n {
+  background: #E3F5E8;
+  color: #1E7A3B;
+}
+.lp-bsec-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-family: var(--lp-head);
+}
+.lp-bsec-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.lp-actlist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.lp-actrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: #fff;
+}
+.lp-kd {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lp-muted);
+  min-width: 52px;
+}
+.lp-act-title {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lp-inline-form {
+  display: inline;
+  margin: 0;
+}
+.lp-btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--lp-blue);
+  box-shadow: none;
+}
+.lp-btn-ghost:hover {
+  background: var(--lp-blue-soft, #eef4ff);
+}

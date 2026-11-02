@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks, Cohorts, People, Mentors, Reviews.
+ * Admin portal — Overview, Tracks, Builder, Cohorts, People, Mentors, Reviews.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -40,7 +40,7 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'cohorts', 'people', 'mentors', 'reviews'];
+$allowedviews = ['home', 'tracks', 'builder', 'cohorts', 'people', 'mentors', 'reviews'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
@@ -50,8 +50,11 @@ if (!in_array($peopletab, ['all', 'fellow', 'mentor', 'admin'], true)) {
     $peopletab = 'all';
 }
 
+$trackid = optional_param('trackid', 0, PARAM_INT);
+
 $flash = [];
-if (($view === 'cohorts' || $view === 'mentors') && data_submitted() && confirm_sesskey()) {
+if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder')
+        && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
     if ($view === 'cohorts' && $action === 'enrol_fellow') {
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
@@ -62,12 +65,22 @@ if (($view === 'cohorts' || $view === 'mentors') && data_submitted() && confirm_
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $flash = admin_dashboard::assign_mentor_by_email($USER, $email, $trackid);
+    } else if ($view === 'builder' && $action === 'mark_reviewed') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        $flash = admin_dashboard::mark_activity_reviewed($USER, $trackid, $cmid);
+    } else if ($view === 'builder' && $action === 'toggle_section') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
+        $show = (bool) optional_param('show', 0, PARAM_BOOL);
+        $flash = admin_dashboard::set_phase_visible($USER, $trackid, $sectionnum, $show);
     }
 }
 
 $urlparams = array_filter([
     'view' => $view !== 'home' ? $view : null,
     'tab' => ($view === 'people' && $peopletab !== 'all') ? $peopletab : null,
+    'trackid' => ($view === 'builder' && $trackid > 0) ? $trackid : null,
 ]);
 
 $context = context_system::instance();
@@ -85,6 +98,10 @@ $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->ou
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::ADMIN_PATH))->out(false);
 $tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+$builderurl = (new moodle_url(persona_home::ADMIN_PATH, array_filter([
+    'view' => 'builder',
+    'trackid' => $trackid > 0 ? $trackid : null,
+])))->out(false);
 $cohortsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
 $peopleurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'people']))->out(false);
 $mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
@@ -119,6 +136,16 @@ $nav = [
                 'key' => 'tracks',
                 'icon_svg' => $icon(
                     '<path d="M4 6h16M4 12h10M4 18h14"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_nav_builder', 'local_launchpad'),
+                'url' => $builderurl,
+                'current' => $view === 'builder',
+                'key' => 'builder',
+                'icon_svg' => $icon(
+                    '<path d="M14 5l5 5-9.5 9.5H5v-4.5L14 5z"/>'
+                    . '<path d="M12 7l5 5"/>'
                 ),
             ],
             [
@@ -178,6 +205,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_tracks',
         admin_dashboard::tracks_context($USER)
+    );
+} else if ($view === 'builder') {
+    $pagetitle = get_string('admin_nav_builder', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_builder',
+        admin_dashboard::builder_context($USER, $trackid, $flash)
     );
 } else if ($view === 'cohorts') {
     $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');
