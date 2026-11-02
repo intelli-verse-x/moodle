@@ -1,0 +1,123 @@
+{{!
+    @template local_launchpad/mentor_review
+
+    Mentor review room — ToBa chrome; grades via Moodle assign save_grade.
+}}
+<nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
+  <a href="{{queue_url}}">{{#str}} mentor_nav_queue, local_launchpad {{/str}}</a>
+  <span aria-hidden="true">/</span>
+  <span aria-current="page">{{{fellow_name}}} · {{{assign_name}}}</span>
+</nav>
+
+<div class="lp-ach-head">
+  <div class="lp-row-sb">
+    <div>
+      <span class="lp-eyebrow">{{#str}} mentor_nav_review, local_launchpad {{/str}}</span>
+      <h2>{{#str}} mentor_review_heading, local_launchpad {{/str}} · {{{fellow_name}}}</h2>
+      <p class="lp-muted">
+        {{{assign_name}}}
+        {{#has_attempt}} · {{#str}} fellowship_feedback_attempt, local_launchpad {{/str}} {{attempt}}{{/has_attempt}}
+        {{#submitted_at}} · {{submitted_at}}{{/submitted_at}}
+      </p>
+    </div>
+    <span class="lp-chip {{status_chip_class}}">{{status_chip}}</span>
+  </div>
+</div>
+
+{{#has_saved}}
+  <div class="lp-review-banner" role="status">{{saved_message}}</div>
+{{/has_saved}}
+{{#has_error}}
+  <div class="lp-review-banner lp-review-banner-err" role="alert">{{error_message}}</div>
+{{/has_error}}
+
+{{^can_submit_review}}
+  <div class="lp-empty" role="status">
+    <div class="lp-empty-mark" aria-hidden="true">··</div>
+    <h2>{{#str}} mentor_review_empty_title, local_launchpad {{/str}}</h2>
+    <p>{{#str}} mentor_review_empty_body, local_launchpad {{/str}}</p>
+    <a class="lp-btn lp-btn-light" href="{{queue_url}}">{{#str}} mentor_nav_queue, local_launchpad {{/str}}</a>
+  </div>
+{{/can_submit_review}}
+
+{{#can_submit_review}}
+  <div class="lp-review-grid">
+    <section class="lp-card lift lp-review-evidence">
+      <h3>{{#str}} mentor_review_evidence, local_launchpad {{/str}}</h3>
+      <p class="lp-xs lp-muted">{{{course_name}}}</p>
+
+      {{#has_files}}
+        <ul class="lp-review-files">
+          {{#files}}
+            <li class="lp-review-file">
+              <span class="lp-review-ext" aria-hidden="true">{{ext}}</span>
+              <div>
+                <b>{{filename}}</b>
+                <div class="lp-xs lp-muted">{{filesize}}</div>
+              </div>
+              <a class="lp-btn lp-btn-light" href="{{url}}" target="_blank" rel="noopener">{{#str}} mentor_review_open_file, local_launchpad {{/str}}</a>
+            </li>
+          {{/files}}
+        </ul>
+      {{/has_files}}
+
+      {{#has_onlinetext}}
+        <div class="lp-review-paper">
+          <span class="lp-xs lp-muted">{{#str}} mentor_review_onlinetext, local_launchpad {{/str}}</span>
+          <div class="lp-sm">{{{onlinetext_html}}}</div>
+        </div>
+      {{/has_onlinetext}}
+
+      {{^has_files}}
+        {{^has_onlinetext}}
+          <p class="lp-muted">{{#str}} mentor_review_no_evidence_body, local_launchpad {{/str}}</p>
+        {{/has_onlinetext}}
+      {{/has_files}}
+    </section>
+
+    <section class="lp-card lift lp-review-form-card">
+      <h3>{{#str}} mentor_review_form_heading, local_launchpad {{/str}}</h3>
+      <p class="lp-sm lp-muted">{{#str}} mentor_review_form_lead, local_launchpad {{/str}}</p>
+
+      <form class="lp-review-form" method="post" action="{{form_action}}">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="view" value="review">
+        <input type="hidden" name="id" value="{{cmid}}">
+        <input type="hidden" name="userid" value="{{fellow_id}}">
+
+        <label class="lp-review-label" for="lp-grade-pct">{{#str}} mentor_review_score_label, local_launchpad {{/str}}</label>
+        <div class="lp-review-score-row">
+          <input class="lp-review-input" id="lp-grade-pct" name="grade_pct" type="number" min="0" max="100" step="1"
+                 value="{{grade_pct}}" required>
+          <span class="lp-muted">/ 100 · {{#str}} mentor_review_pass_bar, local_launchpad {{/str}} {{pass_bar}}</span>
+        </div>
+
+        <label class="lp-review-label" for="lp-comment">{{#str}} mentor_review_comment_label, local_launchpad {{/str}}</label>
+        <textarea class="lp-review-textarea" id="lp-comment" name="comment" rows="6" required
+                  placeholder="{{#str}} mentor_review_comment_placeholder, local_launchpad {{/str}}">{{comment}}</textarea>
+
+        <fieldset class="lp-review-outcome">
+          <legend>{{#str}} mentor_review_outcome_label, local_launchpad {{/str}}</legend>
+          <label class="lp-review-radio">
+            <input type="radio" name="outcome" value="met"{{#outcome_met}} checked{{/outcome_met}}>
+            <span>{{#str}} mentor_review_outcome_met, local_launchpad {{/str}}</span>
+          </label>
+          <label class="lp-review-radio">
+            <input type="radio" name="outcome" value="changes"{{#outcome_changes}} checked{{/outcome_changes}}>
+            <span>{{#str}} mentor_review_outcome_changes, local_launchpad {{/str}}</span>
+          </label>
+        </fieldset>
+
+        <div class="lp-review-actions">
+          <button type="submit" class="lp-btn lp-btn-primary">{{#str}} mentor_review_submit, local_launchpad {{/str}}</button>
+          <a class="lp-btn lp-btn-light" href="{{queue_url}}">{{#str}} mentor_review_back_queue, local_launchpad {{/str}}</a>
+        </div>
+      </form>
+
+      <p class="lp-xs lp-muted" style="margin-top:14px">
+        {{#str}} mentor_review_moodle_note, local_launchpad {{/str}}
+        <a class="lp-link" href="{{moodle_grader_url}}">{{#str}} mentor_review_open_moodle_grader, local_launchpad {{/str}}</a>
+      </p>
+    </section>
+  </div>
+{{/can_submit_review}}

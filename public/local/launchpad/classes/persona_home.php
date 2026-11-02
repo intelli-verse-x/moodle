@@ -32,7 +32,7 @@ namespace local_launchpad;
 final class persona_home {
 
     /**
-     * Moodle path for the mentor home stub.
+     * Moodle path for the mentor dashboard shell.
      */
     public const MENTOR_PATH = '/local/launchpad/mentor.php';
 

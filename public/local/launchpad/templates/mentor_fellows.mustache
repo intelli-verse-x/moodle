@@ -1,0 +1,66 @@
+{{!
+    @template local_launchpad/mentor_fellows
+}}
+{{^has_courses}}
+  <div class="lp-empty" role="status">
+    <div class="lp-empty-mark" aria-hidden="true">MN</div>
+    <h2>{{#str}} mentor_nav_fellows, local_launchpad {{/str}}</h2>
+    <p>{{empty_courses_message}}</p>
+  </div>
+{{/has_courses}}
+{{#has_courses}}
+  <div class="lp-ach-head">
+    <div class="lp-row-sb">
+      <div>
+        <span class="lp-eyebrow">{{#str}} mentor_nav_course, local_launchpad {{/str}}</span>
+        <h2>{{#str}} mentor_nav_fellows, local_launchpad {{/str}}</h2>
+        <p class="lp-muted">{{#str}} mentor_fellows_intro, local_launchpad {{/str}}</p>
+      </div>
+      <a class="lp-btn lp-btn-light" href="{{queue_url}}">{{#str}} mentor_nav_queue, local_launchpad {{/str}}</a>
+    </div>
+  </div>
+
+  {{#has_items}}
+    <p class="lp-sm lp-muted">{{fellow_count_label}}</p>
+    <div class="lp-fellow-grid">
+      {{#items}}
+        <article class="lp-card lift lp-fellow-card">
+          <div class="lp-row-sb">
+            <a class="lp-fellow-who lp-fellow-who-link" href="{{detail_url}}">
+              <div class="lp-av" aria-hidden="true">{{initials}}</div>
+              <div>
+                <b>{{{fellow_name}}}</b>
+                <div class="lp-xs lp-muted">{{{course_name}}}</div>
+              </div>
+            </a>
+            <span class="lp-chip {{chip}}">{{status_label}}</span>
+          </div>
+          <p class="lp-sm lp-muted lp-fellow-progress-label">{{progress_label}}</p>
+          <div class="lp-fellow-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{percent}}" aria-label="{{progress_label}}">
+            <i style="width:{{percent}}%"></i>
+          </div>
+          <div class="lp-row-sb">
+            <span class="lp-xs lp-muted">{{#str}} mentor_col_score, local_launchpad {{/str}}: {{grade_display}}</span>
+            <div class="lp-fellow-actions">
+              {{#has_waiting}}
+                <a class="lp-btn lp-btn-primary" href="{{review_url}}">{{#str}} mentor_cta_grade, local_launchpad {{/str}}</a>
+              {{/has_waiting}}
+              <a class="lp-btn lp-btn-light" href="{{detail_url}}">{{#str}} mentor_fellow_open, local_launchpad {{/str}}</a>
+              {{#can_message}}
+                <a class="lp-link-sm" href="{{message_url}}">{{#str}} mentor_fellow_message, local_launchpad {{/str}}</a>
+              {{/can_message}}
+              <a class="lp-link-sm" href="{{profile_url}}">{{#str}} mentor_fellow_moodle_profile, local_launchpad {{/str}}</a>
+            </div>
+          </div>
+        </article>
+      {{/items}}
+    </div>
+  {{/has_items}}
+  {{^has_items}}
+    <div class="lp-empty" role="status">
+      <div class="lp-empty-mark" aria-hidden="true">··</div>
+      <h2>{{#str}} mentor_fellows_empty_title, local_launchpad {{/str}}</h2>
+      <p>{{#str}} mentor_fellows_empty_body, local_launchpad {{/str}}</p>
+    </div>
+  {{/has_items}}
+{{/has_courses}}

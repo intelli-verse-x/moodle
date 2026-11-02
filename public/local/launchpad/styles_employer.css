@@ -4638,6 +4638,58 @@ a.lp-emp-gate:focus-visible,
   flex-shrink: 0;
 }
 
+/* Wrong-portal mismatch modal (over the user's real home). */
+.lp-portal-mismatch {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.lp-portal-mismatch.is-open { display: flex; }
+.lp-portal-mismatch-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 20, 41, 0.48);
+  backdrop-filter: blur(2px);
+}
+.lp-portal-mismatch-card {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  background: #fff;
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(13, 20, 41, 0.28);
+  padding: 22px 22px 18px;
+}
+.lp-portal-mismatch-card .lp-eyebrow {
+  margin: 0 0 6px;
+  color: var(--lp-blue);
+}
+.lp-portal-mismatch-card h2 {
+  margin: 0 0 10px;
+  font-family: var(--lp-display, Syne, sans-serif);
+  font-size: 1.35rem;
+  line-height: 1.25;
+  color: var(--lp-ink);
+}
+.lp-portal-mismatch-card .lp-sm {
+  margin: 0;
+  color: var(--lp-muted, #5a657a);
+  line-height: 1.5;
+}
+.lp-portal-mismatch-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+body.lp-portal-mismatch-lock {
+  overflow: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lp-reveal {
     opacity: 1;

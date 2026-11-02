@@ -118,7 +118,23 @@
         <dt>{{#str}} fellowship_track_meta_tools, local_launchpad {{/str}}</dt>
         <dd>{{{tools}}}</dd>
         <dt>{{#str}} fellowship_track_meta_mentor, local_launchpad {{/str}}</dt>
-        <dd>{{{mentor}}}</dd>
+        <dd>
+          {{#has_mentors}}
+            <ul class="lp-mentor-contact-list">
+              {{#mentors}}
+                <li class="lp-mentor-contact">
+                  <span>{{{name}}}</span>
+                  {{#can_message}}
+                    <a class="lp-link-sm" href="{{message_url}}">{{#str}} fellowship_message_mentor, local_launchpad {{/str}}</a>
+                  {{/can_message}}
+                </li>
+              {{/mentors}}
+            </ul>
+          {{/has_mentors}}
+          {{^has_mentors}}
+            {{{mentor}}}
+          {{/has_mentors}}
+        </dd>
       </dl>
     </section>
 

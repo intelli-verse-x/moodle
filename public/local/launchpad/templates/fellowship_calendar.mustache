@@ -1,5 +1,7 @@
 {{!
     @template local_launchpad/fellowship_calendar
+
+    LaunchPad calendar: Month | Day | Upcoming + filters + personal/course CRUD.
 }}
 {{#has_crumbs}}
   <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
@@ -10,33 +12,251 @@
   </nav>
 {{/has_crumbs}}
 
+<div class="lp-cal-root"
+  data-lp-cal-root
+  data-personal-ajax="{{personal_ajax_url}}"
+  data-reschedule-ajax="{{reschedule_ajax_url}}"
+  data-sesskey="{{sesskey}}"
+  data-portal="{{portal}}"
+  data-default-scope="{{default_scope}}"
+  data-str-edit-title="{{#str}} fellowship_calendar_edit_event, local_launchpad {{/str}}"
+  data-str-add-title="{{#str}} fellowship_calendar_add_event, local_launchpad {{/str}}"
+  data-str-saved="{{#str}} fellowship_calendar_saved, local_launchpad {{/str}}"
+  data-str-deleted="{{#str}} fellowship_calendar_deleted, local_launchpad {{/str}}"
+  data-str-delete-confirm="{{#str}} fellowship_calendar_delete_confirm, local_launchpad {{/str}}"
+  data-str-network="{{#str}} fellowship_calendar_err_network, local_launchpad {{/str}}"
+  data-str-course-required="{{#str}} fellowship_calendar_err_course, local_launchpad {{/str}}">
 <div class="lp-ach-head">
   <div class="lp-row-sb">
     <div>
-      <span class="lp-eyebrow">{{#str}} fellowship_nav_you, local_launchpad {{/str}}</span>
+      <span class="lp-eyebrow">{{#is_mentor_calendar}}{{#str}} mentor_role_label, local_launchpad {{/str}}{{/is_mentor_calendar}}{{^is_mentor_calendar}}{{#str}} fellowship_nav_you, local_launchpad {{/str}}{{/is_mentor_calendar}}</span>
       <h2>{{#str}} fellowship_nav_calendar, local_launchpad {{/str}}</h2>
-      <p class="lp-muted">{{#str}} fellowship_calendar_intro, local_launchpad {{/str}}</p>
+      <p class="lp-muted">{{#is_mentor_calendar}}{{#str}} mentor_calendar_intro, local_launchpad {{/str}}{{/is_mentor_calendar}}{{^is_mentor_calendar}}{{#str}} fellowship_calendar_intro, local_launchpad {{/str}}{{/is_mentor_calendar}}</p>
     </div>
-    <a class="lp-btn lp-btn-light" href="{{moodle_calendar_url}}">{{#str}} fellowship_calendar_open_moodle, local_launchpad {{/str}}</a>
+    <div class="lp-cal-head-actions">
+      {{#can_add_event}}
+        <button type="button" class="lp-btn lp-btn-primary" data-lp-cal-add>{{#str}} fellowship_calendar_add_event, local_launchpad {{/str}}</button>
+      {{/can_add_event}}
+      <a class="lp-btn lp-btn-light" href="{{export_url}}">{{#str}} fellowship_calendar_export_ical, local_launchpad {{/str}}</a>
+      <a class="lp-btn lp-btn-light" href="{{moodle_calendar_url}}">{{#str}} fellowship_calendar_open_moodle, local_launchpad {{/str}}</a>
+    </div>
   </div>
 </div>
 
-{{#has_items}}
-  <ul class="lp-course-list lp-cal-list">
-    {{#items}}
-      <li>
-        <a href="{{url}}">
-          <b>{{{name}}}</b>
-          <span class="lp-muted">{{when}}{{#course_name}} · {{{course_name}}}{{/course_name}}</span>
-        </a>
-      </li>
-    {{/items}}
-  </ul>
-{{/has_items}}
-{{^has_items}}
-  <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">··</div>
-    <h2>{{#str}} fellowship_calendar_empty_title, local_launchpad {{/str}}</h2>
-    <p>{{#str}} fellowship_calendar_empty_body, local_launchpad {{/str}}</p>
+<p class="lp-cal-flash" data-lp-cal-flash hidden role="status"></p>
+
+<div class="lp-cal-tabs" role="tablist" aria-label="{{#str}} fellowship_calendar_view_aria, local_launchpad {{/str}}">
+  <a class="lp-chip{{#mode_month}} is-on{{/mode_month}}" href="{{month_toggle_url}}" role="tab" aria-selected="{{#mode_month}}true{{/mode_month}}{{^mode_month}}false{{/mode_month}}">
+    {{#str}} fellowship_calendar_tab_month, local_launchpad {{/str}}
+  </a>
+  <a class="lp-chip{{#mode_week}} is-on{{/mode_week}}" href="{{week_toggle_url}}" role="tab" aria-selected="{{#mode_week}}true{{/mode_week}}{{^mode_week}}false{{/mode_week}}">
+    {{#str}} fellowship_calendar_tab_week, local_launchpad {{/str}}
+  </a>
+  <a class="lp-chip{{#mode_day}} is-on{{/mode_day}}" href="{{day_toggle_url}}" role="tab" aria-selected="{{#mode_day}}true{{/mode_day}}{{^mode_day}}false{{/mode_day}}">
+    {{#str}} fellowship_calendar_tab_day, local_launchpad {{/str}}
+  </a>
+  <a class="lp-chip{{#mode_upcoming}} is-on{{/mode_upcoming}}" href="{{upcoming_toggle_url}}" role="tab" aria-selected="{{#mode_upcoming}}true{{/mode_upcoming}}{{^mode_upcoming}}false{{/mode_upcoming}}">
+    {{#str}} fellowship_calendar_tab_upcoming, local_launchpad {{/str}}
+  </a>
+</div>
+
+<label class="lp-cal-filters">
+  <span class="lp-cal-filters-label">{{#str}} fellowship_calendar_filter_aria, local_launchpad {{/str}}</span>
+  <select class="lp-cal-filter-select" data-lp-cal-filter aria-label="{{#str}} fellowship_calendar_filter_aria, local_launchpad {{/str}}">
+    <option value="all" data-url="{{filter_all_url}}"{{#filter_all}} selected{{/filter_all}}>{{#str}} fellowship_calendar_filter_all, local_launchpad {{/str}}</option>
+    <option value="course" data-url="{{filter_course_url}}"{{#filter_course}} selected{{/filter_course}}>{{#str}} fellowship_calendar_filter_course, local_launchpad {{/str}}</option>
+    <option value="personal" data-url="{{filter_personal_url}}"{{#filter_personal}} selected{{/filter_personal}}>{{#str}} fellowship_calendar_filter_personal, local_launchpad {{/str}}</option>
+  </select>
+</label>
+
+{{#mode_month}}
+  {{> local_launchpad/fellowship_calendar_month}}
+{{/mode_month}}
+
+{{#mode_week}}
+  {{> local_launchpad/fellowship_calendar_week}}
+{{/mode_week}}
+
+{{#mode_day}}
+  <div class="lp-cal-dayview" data-lp-cal-dayview>
+    <div class="lp-cal-month-head">
+      <a class="lp-btn lp-btn-light lp-btn-sm" href="{{prev_day_url}}" aria-label="{{#str}} fellowship_calendar_prev_day, local_launchpad {{/str}}">←</a>
+      <h3 class="lp-cal-month-label">{{day_label}}</h3>
+      <a class="lp-btn lp-btn-light lp-btn-sm" href="{{next_day_url}}" aria-label="{{#str}} fellowship_calendar_next_day, local_launchpad {{/str}}">→</a>
+    </div>
+    {{#has_day_items}}
+      <ul class="lp-course-list lp-cal-list">
+        {{#day_items}}
+          <li>
+            <button type="button" class="lp-cal-list-btn"
+              {{> local_launchpad/fellowship_calendar_event_open}}>
+              <b>{{{name}}}</b>
+              <span class="lp-muted">{{when}}{{#when_end}} – {{when_end}}{{/when_end}}{{#course_name}} · {{{course_name}}}{{/course_name}}{{#has_location}} · {{location}}{{/has_location}}</span>
+            </button>
+          </li>
+        {{/day_items}}
+      </ul>
+    {{/has_day_items}}
+    {{^has_day_items}}
+      <div class="lp-empty" role="status">
+        <div class="lp-empty-mark" aria-hidden="true">··</div>
+        <h2>{{#str}} fellowship_calendar_day_empty_title, local_launchpad {{/str}}</h2>
+        <p>{{#str}} fellowship_calendar_day_empty_body, local_launchpad {{/str}}</p>
+      </div>
+    {{/has_day_items}}
   </div>
-{{/has_items}}
+{{/mode_day}}
+
+{{#mode_upcoming}}
+  {{#has_upcoming_items}}
+    <ul class="lp-course-list lp-cal-list" data-lp-cal-upcoming-list data-page-size="{{upcoming_page_size}}">
+      {{#upcoming_items}}
+        <li{{#paged_out}} class="is-paged-out" hidden{{/paged_out}}>
+          <button type="button" class="lp-cal-list-btn"
+            {{> local_launchpad/fellowship_calendar_event_open}}>
+            <b>{{{name}}}</b>
+            <span class="lp-muted">{{when}}{{#course_name}} · {{{course_name}}}{{/course_name}}</span>
+          </button>
+        </li>
+      {{/upcoming_items}}
+    </ul>
+    {{#upcoming_has_more}}
+      <p class="lp-cal-upcoming-more-wrap">
+        <button type="button" class="lp-btn lp-btn-light" data-lp-cal-upcoming-more
+          data-remaining="{{upcoming_more_count}}">
+          {{#str}} fellowship_calendar_show_more_upcoming, local_launchpad, {{upcoming_more_count}} {{/str}}
+        </button>
+      </p>
+    {{/upcoming_has_more}}
+  {{/has_upcoming_items}}
+  {{^has_upcoming_items}}
+    <div class="lp-empty" role="status">
+      <div class="lp-empty-mark" aria-hidden="true">··</div>
+      <h2>{{#str}} fellowship_calendar_empty_title, local_launchpad {{/str}}</h2>
+      <p>{{#str}} fellowship_calendar_empty_body, local_launchpad {{/str}}</p>
+    </div>
+  {{/has_upcoming_items}}
+{{/mode_upcoming}}
+
+<div class="lp-cal-daypanel" data-lp-cal-daypanel hidden>
+  <div class="lp-cal-daypanel-scrim" data-lp-cal-daypanel-close aria-hidden="true"></div>
+  <div class="lp-cal-daypanel-card" role="dialog" aria-modal="true" aria-labelledby="lp-cal-daypanel-title">
+    <p class="lp-eyebrow">{{#str}} fellowship_calendar_day_heading, local_launchpad {{/str}}</p>
+    <h2 id="lp-cal-daypanel-title" data-lp-cal-daypanel-title></h2>
+    <ul class="lp-course-list lp-cal-list" data-lp-cal-daypanel-list></ul>
+    <div class="lp-cal-detail-actions">
+      <button type="button" class="lp-btn lp-btn-light" data-lp-cal-daypanel-close>{{#str}} fellowship_calendar_close, local_launchpad {{/str}}</button>
+    </div>
+  </div>
+</div>
+
+<div class="lp-cal-detail" data-lp-cal-detail hidden>
+  <div class="lp-cal-detail-scrim" data-lp-cal-detail-close aria-hidden="true"></div>
+  <div class="lp-cal-detail-card" role="dialog" aria-modal="true" aria-labelledby="lp-cal-detail-title">
+    <p class="lp-eyebrow" data-lp-cal-detail-course></p>
+    <h2 id="lp-cal-detail-title" data-lp-cal-detail-title></h2>
+    <p class="lp-sm lp-muted" data-lp-cal-detail-when></p>
+    <p class="lp-sm lp-cal-detail-location" data-lp-cal-detail-location hidden></p>
+    <div class="lp-sm lp-cal-detail-html" data-lp-cal-detail-html hidden></div>
+    <p class="lp-xs lp-muted" data-lp-cal-detail-module hidden>{{#str}} fellowship_calendar_module_note, local_launchpad {{/str}}</p>
+    <div class="lp-cal-detail-actions">
+      <button type="button" class="lp-btn lp-btn-light" data-lp-cal-detail-edit hidden>{{#str}} fellowship_calendar_edit, local_launchpad {{/str}}</button>
+      <button type="button" class="lp-btn lp-btn-light" data-lp-cal-detail-close>{{#str}} fellowship_calendar_close, local_launchpad {{/str}}</button>
+    </div>
+  </div>
+</div>
+
+<div class="lp-cal-form" data-lp-cal-form hidden>
+  <div class="lp-cal-form-scrim" data-lp-cal-form-close aria-hidden="true"></div>
+  <form class="lp-cal-form-card" data-lp-cal-form-el novalidate role="dialog" aria-modal="true" aria-labelledby="lp-cal-form-title">
+    <div class="lp-cal-form-scroll">
+      <h2 id="lp-cal-form-title" data-lp-cal-form-title>{{#str}} fellowship_calendar_add_event, local_launchpad {{/str}}</h2>
+      <p class="lp-sm lp-muted" data-lp-cal-form-help>{{#str}} fellowship_calendar_personal_help, local_launchpad {{/str}}</p>
+      <p class="lp-sm lp-muted" data-lp-cal-form-help-course hidden>{{#str}} fellowship_calendar_course_help, local_launchpad {{/str}}</p>
+      <input type="hidden" name="id" value="" data-lp-cal-form-id>
+      {{#has_scope_choice}}
+        <fieldset class="lp-cal-scope" data-lp-cal-form-scope-wrap>
+          <legend class="lp-cal-field"><span>{{#str}} fellowship_calendar_field_scope, local_launchpad {{/str}}</span></legend>
+          <label class="lp-cal-scope-opt"><input type="radio" name="scope" value="personal" data-lp-cal-form-scope checked> {{#str}} fellowship_calendar_scope_personal, local_launchpad {{/str}}</label>
+          <label class="lp-cal-scope-opt"><input type="radio" name="scope" value="course" data-lp-cal-form-scope> {{#str}} fellowship_calendar_scope_course, local_launchpad {{/str}}</label>
+        </fieldset>
+      {{/has_scope_choice}}
+      {{^has_scope_choice}}
+        <input type="hidden" name="scope" value="{{default_scope}}" data-lp-cal-form-scope-fixed>
+      {{/has_scope_choice}}
+      {{#can_add_course}}
+        <label class="lp-cal-field" data-lp-cal-form-course-wrap{{#has_scope_choice}} hidden{{/has_scope_choice}}{{^has_scope_choice}}{{#can_add_personal}} hidden{{/can_add_personal}}{{/has_scope_choice}}>
+          <span>{{#str}} fellowship_calendar_field_course, local_launchpad {{/str}}</span>
+          <select name="courseid" data-lp-cal-form-course>
+            {{#manageable_courses}}
+              <option value="{{id}}">{{name}}</option>
+            {{/manageable_courses}}
+          </select>
+        </label>
+      {{/can_add_course}}
+      <label class="lp-cal-field">
+        <span>{{#str}} fellowship_calendar_field_name, local_launchpad {{/str}}</span>
+        <input type="text" name="name" required maxlength="200" data-lp-cal-form-name>
+      </label>
+      <div class="lp-cal-field-row">
+        <label class="lp-cal-field">
+          <span>{{#str}} fellowship_calendar_field_date, local_launchpad {{/str}}</span>
+          <input type="date" name="date" required data-lp-cal-form-date>
+        </label>
+        <label class="lp-cal-field">
+          <span>{{#str}} fellowship_calendar_field_time, local_launchpad {{/str}}</span>
+          <input type="time" name="time" required data-lp-cal-form-time>
+        </label>
+      </div>
+      <fieldset class="lp-cal-scope" data-lp-cal-form-duration-mode-wrap>
+        <legend class="lp-cal-field"><span>{{#str}} fellowship_calendar_field_duration_mode, local_launchpad {{/str}}</span></legend>
+        <label class="lp-cal-scope-opt"><input type="radio" name="duration_mode" value="none" data-lp-cal-form-duration-mode checked> {{#str}} fellowship_calendar_duration_none, local_launchpad {{/str}}</label>
+        <label class="lp-cal-scope-opt"><input type="radio" name="duration_mode" value="until" data-lp-cal-form-duration-mode> {{#str}} fellowship_calendar_duration_until, local_launchpad {{/str}}</label>
+        <label class="lp-cal-scope-opt"><input type="radio" name="duration_mode" value="minutes" data-lp-cal-form-duration-mode> {{#str}} fellowship_calendar_duration_minutes, local_launchpad {{/str}}</label>
+      </fieldset>
+      <div class="lp-cal-field-row" data-lp-cal-form-until-wrap hidden>
+        <label class="lp-cal-field">
+          <span>{{#str}} fellowship_calendar_field_end_date, local_launchpad {{/str}}</span>
+          <input type="date" name="end_date" data-lp-cal-form-end-date>
+        </label>
+        <label class="lp-cal-field">
+          <span>{{#str}} fellowship_calendar_field_end_time, local_launchpad {{/str}}</span>
+          <input type="time" name="end_time" data-lp-cal-form-end-time>
+        </label>
+      </div>
+      <label class="lp-cal-field" data-lp-cal-form-minutes-wrap hidden>
+        <span>{{#str}} fellowship_calendar_field_duration, local_launchpad {{/str}}</span>
+        <input type="number" name="duration" min="0" step="5" value="0" data-lp-cal-form-duration>
+      </label>
+      <label class="lp-cal-field">
+        <span>{{#str}} fellowship_calendar_field_location, local_launchpad {{/str}}</span>
+        <input type="text" name="location" maxlength="255" data-lp-cal-form-location>
+      </label>
+      <div data-lp-cal-form-repeat-wrap>
+        <label class="lp-cal-field">
+          <span>{{#str}} fellowship_calendar_field_repeat, local_launchpad {{/str}}</span>
+          <select name="repeat_mode" data-lp-cal-form-repeat-mode>
+            <option value="none">{{#str}} fellowship_calendar_repeat_none, local_launchpad {{/str}}</option>
+            <option value="weekly">{{#str}} fellowship_calendar_repeat_weekly, local_launchpad {{/str}}</option>
+          </select>
+        </label>
+        <label class="lp-cal-field" data-lp-cal-form-repeat-count-wrap hidden>
+          <span>{{#str}} fellowship_calendar_field_repeat_count, local_launchpad {{/str}}</span>
+          <input type="number" name="repeats" min="2" max="52" value="4" data-lp-cal-form-repeats>
+          <span class="lp-xs lp-muted">{{#str}} fellowship_calendar_repeat_help, local_launchpad {{/str}}</span>
+        </label>
+      </div>
+      <label class="lp-cal-field">
+        <span>{{#str}} fellowship_calendar_field_description, local_launchpad {{/str}}</span>
+        <textarea name="description" rows="4" maxlength="5000" data-lp-cal-form-description></textarea>
+      </label>
+      <p class="lp-cal-form-error lp-sm" data-lp-cal-form-error hidden role="alert"></p>
+    </div>
+    <div class="lp-cal-form-footer lp-cal-detail-actions">
+      <button type="submit" class="lp-btn lp-btn-primary" data-lp-cal-form-save>{{#str}} fellowship_calendar_save, local_launchpad {{/str}}</button>
+      <button type="button" class="lp-btn lp-btn-light" data-lp-cal-form-delete hidden>{{#str}} fellowship_calendar_delete, local_launchpad {{/str}}</button>
+      <button type="button" class="lp-btn lp-btn-light" data-lp-cal-form-close>{{#str}} fellowship_calendar_cancel, local_launchpad {{/str}}</button>
+    </div>
+  </form>
+</div>
+</div>
