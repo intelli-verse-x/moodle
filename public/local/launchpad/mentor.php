@@ -24,6 +24,12 @@
 
 require(__DIR__ . '/../../config.php');
 
+// New classes from main — load explicitly so a stale Moodle classmap cannot 404 them.
+require_once(__DIR__ . '/classes/portal_gate.php');
+require_once(__DIR__ . '/classes/mentor_dashboard.php');
+require_once(__DIR__ . '/classes/messaging.php');
+require_once(__DIR__ . '/classes/calendar_service.php');
+
 use local_launchpad\account_persona;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
@@ -281,19 +287,7 @@ switch ($view) {
             $calfilter,
             $caltime > 0 ? $caltime : null
         );
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', array_merge($caldata, [
-            'has_crumbs' => true,
-            'crumbs' => [
-                [
-                    'label' => get_string('mentor_nav_home', 'local_launchpad'),
-                    'url' => $homeurl,
-                ],
-                [
-                    'label' => get_string('fellowship_nav_calendar', 'local_launchpad'),
-                    'url' => '',
-                ],
-            ],
-        ]));
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', $caldata);
         break;
 
     case 'review':

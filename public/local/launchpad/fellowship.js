@@ -962,11 +962,14 @@
     }
     shell.querySelectorAll('.lp-journey-progress, .lp-ring-arc').forEach(animateDash);
 
-    // Sidebar XP bar + track weight bars (same pattern as HTML x-xpbar / x-bar).
+    // Sidebar XP bar + quest / weight bars (Employer home parity).
     if (!reduce) {
-        shell.querySelectorAll('.lp-side-xpbar i, .lp-weight-row .lp-bar i').forEach(function (bar) {
+        shell.querySelectorAll('.lp-side-xpbar i, .lp-bar i, .lp-weight-row .lp-bar i').forEach(function (bar) {
             var w = bar.style.width;
-            bar.style.width = '0';
+            if (!w) {
+                return;
+            }
+            bar.style.width = '0%';
             requestAnimationFrame(function () {
                 requestAnimationFrame(function () {
                     bar.style.width = w;

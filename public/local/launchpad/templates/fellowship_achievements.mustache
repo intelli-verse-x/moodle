@@ -1,106 +1,335 @@
 {{!
     @template local_launchpad/fellowship_achievements
+
+    Achievements — Employer badges chrome with Fellowship XP / levels / Moodle-backed badges.
 }}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
-
-<div class="lp-ach-head">
-  <span class="lp-eyebrow">{{#str}} fellowship_achievements_eyebrow, local_launchpad {{/str}}</span>
-  <h2>{{#str}} fellowship_nav_achievements, local_launchpad {{/str}}</h2>
-  <p class="lp-muted">{{#str}} fellowship_achievements_lead, local_launchpad {{/str}}</p>
-</div>
-
-<section class="lp-card lift lp-stack-lg">
-  <div class="lp-card-head">
-    <h3>{{#str}} fellowship_level_path, local_launchpad {{/str}}</h3>
-    <span class="lp-xp-chip lp-xp-chip-static" title="{{#str}} fellowship_xp_title, local_launchpad {{/str}}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l2.2 4.6L19 9l-3.5 3.4.8 5.1L12 15.2 7.7 17.5l.8-5.1L5 9l4.8-1.4L12 3z"/></svg>
-      <b>{{xp_total}}</b> XP
-    </span>
-  </div>
-  <div class="lp-ladder" role="list">
-    {{#ladder}}
-      <div class="lp-ladder-step {{css}}" role="listitem"{{#is_now}} aria-current="true"{{/is_now}}>
-        <span class="lp-lvbadge" style="background:{{badge_color}}">{{mark}}</span>
-        <b>{{name}}</b>
-        <small>{{xp}} XP</small>
+<div class="lp-tools-page lp-reveal" data-region="fellowship-achievements-page" style="--lp-d:0">
+  <section class="lp-card lift lp-stack-lg lp-level-path" data-region="fellowship-level-path">
+    <div class="lp-card-head">
+      <div class="lp-grade-progress-title">
+        <span class="lp-grade-progress-icon" aria-hidden="true">
+          <iconify-icon icon="hugeicons:champion" width="22" height="22"></iconify-icon>
+        </span>
+        <div class="lp-card-copy">
+          <h3>{{strings.level_path}}</h3>
+          <p>{{strings.progress_sub}}</p>
+        </div>
       </div>
-    {{/ladder}}
-  </div>
-  {{#has_next_level}}
-    <div class="lp-ach-next">
-      <div class="lp-row-sb lp-sm">
-        <span>{{#str}} fellowship_level_now, local_launchpad {{/str}} <b>{{level_name}}</b></span>
-        <span>{{xp_to_next}} XP {{#str}} fellowship_xp_to_level, local_launchpad {{/str}} {{next_level_name}}</span>
-      </div>
-      <div class="lp-bar" aria-hidden="true"><i style="width:{{pct_to_next}}%"></i></div>
     </div>
-  {{/has_next_level}}
-  {{^has_next_level}}
-    <p class="lp-sm lp-muted">{{#str}} fellowship_level_top, local_launchpad {{/str}}</p>
-  {{/has_next_level}}
-</section>
 
-<section class="lp-card lift lp-stack-lg">
-  <div class="lp-card-head">
-    <h3>{{#str}} fellowship_badges_heading, local_launchpad {{/str}}</h3>
-    <span class="lp-sm lp-muted">{{badges_earned}} {{#str}} fellowship_badges_of, local_launchpad {{/str}} {{badges_total}} {{#str}} fellowship_badges_earned, local_launchpad {{/str}}</span>
-  </div>
-  <div class="lp-badges">
-    {{#badges}}
-      <div class="lp-bdg {{css}}">
-        <span class="lp-bi" aria-hidden="true">{{display_icon}}</span>
-        <b>{{name}}</b>
-        <small>{{detail}}</small>
+    <div class="lp-level-hero">
+      <div class="lp-level-hero-badge" aria-hidden="true">
+        <span class="lp-level-hero-wreath">
+          <iconify-icon icon="hugeicons:laurel-wreath-01" width="28" height="28"></iconify-icon>
+        </span>
+        <span class="lp-level-hero-hex">
+          <iconify-icon icon="hugeicons:compass" width="36" height="36"></iconify-icon>
+        </span>
+        <span class="lp-level-hero-wreath is-flip">
+          <iconify-icon icon="hugeicons:laurel-wreath-01" width="28" height="28"></iconify-icon>
+        </span>
       </div>
-    {{/badges}}
-  </div>
-</section>
+      <div class="lp-level-hero-copy">
+        <span class="lp-level-hero-tag">{{strings.level_current_tag}}</span>
+        <div class="lp-level-hero-title">
+          <b>{{level_name}}</b>
+          <span class="lp-level-hero-pill">{{strings.level_chip}} {{level_index}}</span>
+        </div>
+        <p class="lp-level-hero-xp">
+          <iconify-icon icon="hugeicons:graduation-scroll" width="18" height="18" aria-hidden="true"></iconify-icon>
+          <span>{{xp_total_label}} {{strings.xp_earned_label}}</span>
+        </p>
+      </div>
+    </div>
 
-<div class="lp-grid-2">
-  <section class="lp-card lift lp-stack">
-    <h3>{{#str}} fellowship_xp_history, local_launchpad {{/str}}</h3>
-    {{#has_xp_log}}
-      <div class="lp-table-wrap">
-        <table class="lp-table">
-          <thead>
-            <tr>
-              <th>{{#str}} fellowship_xp_when, local_launchpad {{/str}}</th>
-              <th>{{#str}} fellowship_xp_what, local_launchpad {{/str}}</th>
-              <th>{{#str}} fellowship_xp_col, local_launchpad {{/str}}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{#xp_log}}
-              <tr>
-                <td class="lp-sm lp-muted">{{at}}</td>
-                <td>{{title}}</td>
-                <td class="lp-num">+{{xp}}</td>
-              </tr>
-            {{/xp_log}}
-          </tbody>
-        </table>
+    <div class="lp-ladder" role="list">
+      {{#ladder}}
+        <div class="lp-ladder-step {{css}}" role="listitem"{{#is_now}} aria-current="true"{{/is_now}}>
+          <span class="lp-lvbadge" style="background:{{badge_color}}" aria-hidden="true">{{mark}}</span>
+          <b>{{name}}</b>
+          <small>{{xp_label}}</small>
+          <span class="lp-ladder-status">
+            <iconify-icon icon="hugeicons:{{status_icon}}" width="14" height="14" aria-hidden="true"></iconify-icon>
+            {{status_label}}
+          </span>
+        </div>
+      {{/ladder}}
+    </div>
+
+    {{#has_next_level}}
+      <div class="lp-level-progress">
+        <span class="lp-level-progress-ico" aria-hidden="true">
+          <iconify-icon icon="hugeicons:target-01" width="20" height="20"></iconify-icon>
+        </span>
+        <div class="lp-level-progress-main">
+          <div class="lp-row-sb lp-sm">
+            <b>{{progress_caption}}</b>
+            <span class="lp-level-progress-pct">{{pct_to_next}}%</span>
+          </div>
+          <div class="lp-bar" aria-hidden="true"><i style="width:{{pct_to_next}}%"></i></div>
+        </div>
       </div>
-    {{/has_xp_log}}
-    {{^has_xp_log}}
-      <p class="lp-muted">{{#str}} fellowship_xp_history_empty, local_launchpad {{/str}}</p>
-      <p class="lp-xs lp-muted">{{#str}} fellowship_xp_provisional_note, local_launchpad {{/str}}</p>
-    {{/has_xp_log}}
-  </section>
-  <section class="lp-card lift lp-stack">
-    <h3>{{#str}} fellowship_xp_how, local_launchpad {{/str}}</h3>
-    {{#xp_rules}}
-      <div class="lp-row-sb lp-sm">
-        <span>{{label}}</span>
-        <b class="lp-num">+{{xp}}</b>
+    {{/has_next_level}}
+    {{^has_next_level}}
+      <div class="lp-level-progress">
+        <span class="lp-level-progress-ico" aria-hidden="true">
+          <iconify-icon icon="hugeicons:champion" width="20" height="20"></iconify-icon>
+        </span>
+        <p class="lp-sm">{{strings.level_top}}</p>
       </div>
-    {{/xp_rules}}
-    <p class="lp-xs lp-muted">{{#str}} fellowship_xp_how_note, local_launchpad {{/str}}</p>
+    {{/has_next_level}}
   </section>
+
+  <section class="lp-card lift lp-stack-lg" data-region="fellowship-badges-tabs">
+    <div class="lp-card-head lp-badges-tabs-head">
+      <div class="lp-grade-progress-title">
+        <span class="lp-grade-progress-icon" aria-hidden="true">
+          <iconify-icon icon="hugeicons:champion" width="22" height="22"></iconify-icon>
+        </span>
+        <div class="lp-card-copy">
+          <h3>{{strings.badges_heading}}</h3>
+          <p>{{badges_earned}} {{strings.badges_of}} {{badges_total}} {{strings.badges_earned}}</p>
+        </div>
+      </div>
+      <div class="lp-tabs lp-tabs-compact" role="tablist" aria-label="{{strings.badges_heading}}">
+        <a class="lp-tab{{#tab_all}} is-on{{/tab_all}}"
+           role="tab"
+           id="lp-fellow-badges-tab-all"
+           href="{{tab_all_url}}"
+           aria-selected="{{#tab_all}}true{{/tab_all}}{{^tab_all}}false{{/tab_all}}"
+           aria-controls="lp-fellow-badges-panel">
+          {{strings.badges_tab_all}}
+          <span class="lp-tab-count">{{badges_total}}</span>
+        </a>
+        <a class="lp-tab{{#tab_earned}} is-on{{/tab_earned}}"
+           role="tab"
+           id="lp-fellow-badges-tab-earned"
+           href="{{tab_earned_url}}"
+           aria-selected="{{#tab_earned}}true{{/tab_earned}}{{^tab_earned}}false{{/tab_earned}}"
+           aria-controls="lp-fellow-badges-panel">
+          {{strings.badges_tab_earned}}
+          <span class="lp-tab-count">{{badges_earned}}</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="lp-badges-progress-row" role="group" aria-label="{{strings.badges_heading}} {{badges_pct}}%">
+      <div class="lp-bar" aria-hidden="true"><i style="width:{{badges_pct}}%"></i></div>
+      <span class="lp-badges-pct"><b>{{badges_pct}}%</b></span>
+    </div>
+
+    <div class="lp-tab-panel"
+         role="tabpanel"
+         id="lp-fellow-badges-panel"
+         aria-labelledby="{{#tab_all}}lp-fellow-badges-tab-all{{/tab_all}}{{#tab_earned}}lp-fellow-badges-tab-earned{{/tab_earned}}">
+      {{#has_items}}
+        <div class="lp-badges">
+          {{#page_items}}
+            <div class="lp-bdg {{css}}">
+              <span class="lp-bi" aria-hidden="true">
+                {{#has_image}}
+                  <img src="{{imageurl}}" alt="" width="48" height="48">
+                {{/has_image}}
+                {{^has_image}}
+                  <iconify-icon icon="hugeicons:{{icon}}" width="28" height="28"></iconify-icon>
+                {{/has_image}}
+              </span>
+              <b>{{name}}</b>
+              <small>{{detail}}</small>
+              <span class="lp-grade-tile-pill{{#earned}} is-earned{{/earned}}">{{status_pill}}</span>
+            </div>
+          {{/page_items}}
+        </div>
+      {{/has_items}}
+      {{^has_items}}
+        <div class="lp-empty lp-empty-inline" role="status">
+          <h2>{{strings.badges_empty_title}}</h2>
+          <p>{{strings.badges_empty_body}}</p>
+          <div class="lp-empty-actions">
+            <a class="lp-btn" href="{{moodle_badges_url}}">{{strings.badges_open_moodle}}</a>
+          </div>
+        </div>
+      {{/has_items}}
+    </div>
+  </section>
+
+  {{#has_side_panels}}
+    <div class="lp-grid-2">
+      <section class="lp-card lift lp-stack">
+        <div class="lp-card-head">
+          <div class="lp-grade-progress-title">
+            <span class="lp-grade-progress-icon" aria-hidden="true">
+              <iconify-icon icon="hugeicons:award-01" width="22" height="22"></iconify-icon>
+            </span>
+            <div class="lp-card-copy">
+              <h3>{{strings.badges_recent_heading}}</h3>
+            </div>
+          </div>
+        </div>
+        {{#has_recent}}
+          <ul class="lp-badge-recent-list">
+            {{#recent_items}}
+              <li>
+                <div class="lp-badge-recent-row">
+                  <span class="lp-badge-recent-img" aria-hidden="true">
+                    {{#has_image}}
+                      <img src="{{imageurl}}" alt="" width="36" height="36">
+                    {{/has_image}}
+                    {{^has_image}}
+                      <iconify-icon icon="hugeicons:{{icon}}" width="22" height="22"></iconify-icon>
+                    {{/has_image}}
+                  </span>
+                  <span class="lp-badge-recent-copy">
+                    <b>{{name}}</b>
+                    <small class="lp-muted">{{detail}}</small>
+                  </span>
+                </div>
+              </li>
+            {{/recent_items}}
+          </ul>
+        {{/has_recent}}
+        {{^has_recent}}
+          <p class="lp-muted">{{strings.badges_recent_empty}}</p>
+        {{/has_recent}}
+      </section>
+      <section class="lp-card lift lp-stack">
+        <div class="lp-card-head">
+          <div class="lp-grade-progress-title">
+            <span class="lp-grade-progress-icon" aria-hidden="true">
+              <iconify-icon icon="hugeicons:target-01" width="22" height="22"></iconify-icon>
+            </span>
+            <div class="lp-card-copy">
+              <h3>{{strings.badges_next_heading}}</h3>
+            </div>
+          </div>
+        </div>
+        {{#has_next_badges}}
+          <ul class="lp-grade-next-list">
+            {{#next_items}}
+              <li class="lp-grade-next-item">
+                <div class="lp-grade-next-link">
+                  <span class="lp-grade-next-icon is-locked-badge" aria-hidden="true">
+                    {{#has_image}}
+                      <img src="{{imageurl}}" alt="" width="28" height="28">
+                    {{/has_image}}
+                    {{^has_image}}
+                      <iconify-icon icon="hugeicons:{{icon}}" width="22" height="22"></iconify-icon>
+                    {{/has_image}}
+                  </span>
+                  <span class="lp-grade-next-copy">
+                    <b>{{name}}</b>
+                    <small class="lp-muted">{{description}}</small>
+                  </span>
+                  <span class="lp-grade-next-lock" aria-hidden="true">
+                    <iconify-icon icon="hugeicons:square-lock-02" width="18" height="18"></iconify-icon>
+                  </span>
+                </div>
+              </li>
+            {{/next_items}}
+          </ul>
+        {{/has_next_badges}}
+        {{^has_next_badges}}
+          <p class="lp-sm">{{strings.badges_next_done}}</p>
+          <a class="lp-btn lp-btn-light" href="{{moodle_badges_url}}">{{strings.badges_open_moodle}}</a>
+        {{/has_next_badges}}
+      </section>
+    </div>
+  {{/has_side_panels}}
+
+  <div class="lp-grid-2">
+    <section class="lp-card lift lp-stack lp-xp-panel lp-xp-history-card">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:flash" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.xp_history}}</h3>
+            <p>{{strings.xp_history_sub}}</p>
+          </div>
+        </div>
+      </div>
+      {{#has_xp_log}}
+        <ul class="lp-xp-history-list">
+          {{#xp_log}}
+            <li class="lp-xp-history-row">
+              <span class="lp-xp-history-icon" aria-hidden="true">
+                <iconify-icon icon="hugeicons:flash" width="18" height="18"></iconify-icon>
+              </span>
+              <span class="lp-xp-history-copy">
+                <b>{{title}}</b>
+                <small class="lp-muted">{{at}}</small>
+              </span>
+              <span class="lp-xp-chip lp-xp-chip-static lp-xp-chip-sm">+{{xp}}</span>
+            </li>
+          {{/xp_log}}
+        </ul>
+      {{/has_xp_log}}
+      {{^has_xp_log}}
+        <div class="lp-xp-empty-state">
+          <div class="lp-xp-empty-art" aria-hidden="true">
+            <img class="lp-xp-empty-img" src="{{xp_empty_art_url}}" alt="" width="560" height="315" decoding="async">
+          </div>
+          <h4>{{strings.xp_empty_title}}</h4>
+          <p class="lp-muted">{{strings.xp_empty_body}}</p>
+          <div class="lp-xp-empty-steps">
+            <div class="lp-xp-empty-step is-lesson">
+              <span class="lp-xp-empty-step-ico" aria-hidden="true">
+                <iconify-icon icon="hugeicons:book-open-01" width="18" height="18"></iconify-icon>
+              </span>
+              <span>{{strings.xp_step_lessons}}</span>
+            </div>
+            <span class="lp-xp-empty-chev" aria-hidden="true">
+              <iconify-icon icon="hugeicons:arrow-right-01" width="16" height="16"></iconify-icon>
+            </span>
+            <div class="lp-xp-empty-step is-quiz">
+              <span class="lp-xp-empty-step-ico" aria-hidden="true">
+                <iconify-icon icon="hugeicons:quiz-05" width="18" height="18"></iconify-icon>
+              </span>
+              <span>{{strings.xp_step_quizzes}}</span>
+            </div>
+            <span class="lp-xp-empty-chev" aria-hidden="true">
+              <iconify-icon icon="hugeicons:arrow-right-01" width="16" height="16"></iconify-icon>
+            </span>
+            <div class="lp-xp-empty-step is-assign">
+              <span class="lp-xp-empty-step-ico" aria-hidden="true">
+                <iconify-icon icon="hugeicons:file-upload" width="18" height="18"></iconify-icon>
+              </span>
+              <span>{{strings.xp_step_assigns}}</span>
+            </div>
+          </div>
+          <a class="lp-btn lp-btn-primary lp-xp-empty-cta" href="{{track_url}}">
+            <iconify-icon icon="hugeicons:graduation-scroll" width="18" height="18" aria-hidden="true"></iconify-icon>
+            {{strings.xp_go_courses}}
+            <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon>
+          </a>
+        </div>
+      {{/has_xp_log}}
+    </section>
+    <section class="lp-card lift lp-stack lp-xp-panel">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:information-circle" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.xp_how}}</h3>
+            <p>{{strings.xp_how_sub}}</p>
+          </div>
+        </div>
+      </div>
+      <ul class="lp-xp-rules-list">
+        {{#xp_rules}}
+          <li class="lp-xp-rule-row">
+            <span class="lp-xp-rule-icon" aria-hidden="true">
+              <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+            </span>
+            <span class="lp-xp-rule-label">{{label}}</span>
+            <span class="lp-xp-chip lp-xp-chip-static lp-xp-chip-sm">+{{xp}}</span>
+          </li>
+        {{/xp_rules}}
+      </ul>
+      <p class="lp-xs lp-muted lp-xp-how-note">{{strings.xp_how_note}}</p>
+    </section>
+  </div>
 </div>

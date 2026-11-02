@@ -2,38 +2,35 @@
     @template local_launchpad/fellowship_completion
 
     Completion — gates ring, requirements table, locked certificate.
+    Tools chrome aligned with Achievements / Employer badges.
 }}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
-
-<div class="lp-ach-head">
-  <div class="lp-row-sb">
-    <div>
-      {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
-      {{^course_name}}<span class="lp-eyebrow">{{#str}} fellowship_nav_record, local_launchpad {{/str}}</span>{{/course_name}}
-      <h2>{{#str}} fellowship_nav_completion, local_launchpad {{/str}}</h2>
-    </div>
-    <span class="lp-chip {{status_chip}}">{{status_label}}</span>
-  </div>
-</div>
-
+<div class="lp-tools-page lp-reveal" data-region="fellowship-completion-page" style="--lp-d:0">
 {{^has_course}}
   <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">LP</div>
-    <h2>{{#str}} fellowship_nav_completion, local_launchpad {{/str}}</h2>
+    <div class="lp-empty-mark" aria-hidden="true">
+      <iconify-icon icon="hugeicons:flag-02" width="26" height="26"></iconify-icon>
+    </div>
+    <h2>{{strings.empty_title}}</h2>
     <p>{{empty_message}}</p>
   </div>
 {{/has_course}}
 
 {{#has_course}}
-  <div class="lp-grid-2">
-    <section class="lp-card lift lp-stack-lg">
+  <div class="lp-grid-2 lp-completion-grid">
+    <section class="lp-card lift lp-stack-lg lp-completion-main">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:flag-02" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.gates_heading}}</h3>
+            <p>{{strings.gates_sub}}</p>
+          </div>
+        </div>
+        <span class="lp-chip {{status_chip}}">{{status_label}}</span>
+      </div>
+
       <div class="lp-completion-hero">
         <div class="lp-ring" style="width:{{ring_size}}px;height:{{ring_size}}px" aria-hidden="true">
           <svg viewBox="0 0 {{ring_size}} {{ring_size}}">
@@ -42,37 +39,51 @@
           </svg>
           <div class="lp-ring-v">
             <b>{{ring_pct}}%</b>
-            <span>{{#str}} fellowship_completion_ring_label, local_launchpad {{/str}}</span>
+            <span>{{strings.ring_label}}</span>
           </div>
         </div>
         <div class="lp-stack">
           <h2 class="lp-completion-gates">{{gates_label}}</h2>
-          <p class="lp-muted lp-sm">{{#str}} fellowship_completion_gates_note, local_launchpad {{/str}}</p>
+          <p class="lp-muted lp-sm">{{gates_note}}</p>
         </div>
       </div>
 
-      <div class="lp-table-wrap">
+      <div class="lp-table-wrap lp-completion-table">
         <table class="lp-table">
           <thead>
             <tr>
-              <th>{{#str}} fellowship_completion_col_req, local_launchpad {{/str}}</th>
-              <th>{{#str}} fellowship_completion_col_weight, local_launchpad {{/str}}</th>
-              <th>{{#str}} fellowship_completion_col_result, local_launchpad {{/str}}</th>
-              <th>{{#str}} fellowship_completion_col_status, local_launchpad {{/str}}</th>
+              <th scope="col">{{strings.col_req}}</th>
+              <th scope="col">{{strings.col_weight}}</th>
+              <th scope="col">{{strings.col_result}}</th>
+              <th scope="col">{{strings.col_status}}</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>{{#str}} fellowship_completion_orientation, local_launchpad {{/str}}</td>
-              <td class="lp-num">—</td>
-              <td class="lp-num">—</td>
-              <td><span class="lp-chip ok">{{#str}} fellowship_completion_orientation_done, local_launchpad {{/str}}</span></td>
+              <td>
+                <span class="lp-completion-req">
+                  <span class="lp-completion-req-ico" aria-hidden="true">
+                    <iconify-icon icon="hugeicons:book-open-01" width="16" height="16"></iconify-icon>
+                  </span>
+                  {{strings.orientation}}
+                </span>
+              </td>
+              <td class="lp-num">{{orientation_weight}}</td>
+              <td class="lp-num">{{orientation_result}}</td>
+              <td><span class="lp-chip {{orientation_chip}}">{{orientation_status}}</span></td>
             </tr>
             {{#phases}}
               <tr>
-                <td>{{name}}</td>
+                <td>
+                  <span class="lp-completion-req">
+                    <span class="lp-completion-req-ico" aria-hidden="true">
+                      <iconify-icon icon="hugeicons:flag-02" width="16" height="16"></iconify-icon>
+                    </span>
+                    {{name}}
+                  </span>
+                </td>
                 <td class="lp-num">{{weight_label}}</td>
-                <td class="lp-num">{{#has_score}}{{score}}{{/has_score}}{{^has_score}}—{{/has_score}}</td>
+                <td class="lp-num">{{result_display}}</td>
                 <td>
                   {{#has_chip_class}}
                     <span class="lp-chip {{chip}}">{{status}}</span>
@@ -83,8 +94,8 @@
                 </td>
               </tr>
             {{/phases}}
-            <tr>
-              <td><b>{{#str}} fellowship_completion_weighted, local_launchpad {{/str}}</b></td>
+            <tr class="lp-completion-total">
+              <td><b>{{strings.weighted}}</b></td>
               <td class="lp-num">100%</td>
               <td class="lp-num">{{weighted_display}}</td>
               <td><span class="lp-chip {{weighted_chip}}">{{weighted_status}}</span></td>
@@ -92,32 +103,56 @@
           </tbody>
         </table>
       </div>
-      <p class="lp-xs lp-muted">{{#str}} fellowship_completion_calc_note, local_launchpad {{/str}}</p>
+      <p class="lp-xs lp-muted">{{strings.calc_note}}</p>
 
       {{#has_outstanding}}
-        <div class="lp-stack">
-          <h3>{{#str}} fellowship_completion_todo, local_launchpad {{/str}}</h3>
-          {{#outstanding}}
-            <div class="lp-todo-row"><span class="lp-chk" aria-hidden="true"></span><span>{{label}}</span></div>
-          {{/outstanding}}
+        <div class="lp-stack lp-completion-todo">
+          <div class="lp-grade-progress-title">
+            <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+              <iconify-icon icon="hugeicons:task-01" width="18" height="18"></iconify-icon>
+            </span>
+            <div class="lp-card-copy">
+              <h3>{{strings.todo}}</h3>
+            </div>
+          </div>
+          <ul class="lp-completion-todo-list">
+            {{#outstanding}}
+              <li class="lp-todo-row">
+                <span class="lp-chk" aria-hidden="true"></span>
+                <span class="lp-todo-copy">{{label}}</span>
+              </li>
+            {{/outstanding}}
+          </ul>
         </div>
       {{/has_outstanding}}
     </section>
 
-    <section class="lp-card lift lp-stack">
-      <h3>{{#str}} fellowship_completion_cert_heading, local_launchpad {{/str}}</h3>
+    <section class="lp-card lift lp-stack lp-completion-cert-card">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:certificate-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.cert_heading}}</h3>
+          </div>
+        </div>
+      </div>
       <div class="lp-cert locked">
-        <span aria-hidden="true">🔒</span>
-        <b>{{#str}} fellowship_completion_cert_title, local_launchpad {{/str}}</b>
-        <small>{{#str}} fellowship_completion_cert_na, local_launchpad {{/str}}</small>
+        <span class="lp-cert-lock" aria-hidden="true">
+          <iconify-icon icon="hugeicons:square-lock-02" width="34" height="34"></iconify-icon>
+        </span>
+        <b>{{strings.cert_title}}</b>
+        <small>{{strings.cert_na}}</small>
       </div>
       <div class="lp-mascot">
         {{#prof_url}}
-          <img src="{{prof_url}}" alt="" style="height:90px">
+          <img src="{{prof_url}}" alt="" width="90" height="90" decoding="async">
         {{/prof_url}}
         <div class="lp-bubble">{{{cert_message}}}</div>
       </div>
-      <p class="lp-xs lp-muted">{{#str}} fellowship_completion_cert_disclaimer, local_launchpad {{/str}}</p>
+      <p class="lp-xs lp-muted">{{strings.cert_disclaimer}}</p>
     </section>
   </div>
 {{/has_course}}
+</div>

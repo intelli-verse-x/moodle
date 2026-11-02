@@ -1406,8 +1406,36 @@ a.lp-bdg {
   transform: rotate(-6deg);
 }
 .lp-ach-next { display: flex; flex-direction: column; gap: 8px; }
-.lp-badges-tabs-head {
-  margin-bottom: 10px;
+.lp-badges-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 16px;
+}
+.lp-badges-progress-row .lp-bar {
+  flex: 1;
+  min-width: 0;
+}
+.lp-badges-pct {
+  flex: none;
+  font-family: var(--lp-head);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--lp-ink, #12161F);
+}
+.lp-tabs-compact {
+  flex: none;
+  flex-shrink: 0;
+  margin: 0;
+}
+.lp-tabs-compact .lp-tab {
+  padding: 8px 12px;
+  text-decoration: none;
+}
+.lp-card-head.lp-badges-tabs-head {
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .lp-tabs {
   display: inline-flex;
@@ -3848,6 +3876,9 @@ a.lp-emp-gate:focus-visible,
   gap: 12px;
   min-width: 0;
 }
+.lp-grade-progress-title:has(.lp-card-copy) {
+  align-items: center;
+}
 .lp-grade-progress-icon {
   flex-shrink: 0;
   width: 42px;
@@ -3857,6 +3888,28 @@ a.lp-emp-gate:focus-visible,
   place-items: center;
   background: var(--lp-blue-soft, #E8F0FF);
   color: var(--lp-blue, #1A4FB8);
+}
+.lp-card-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lp-card-copy h3 {
+  margin: 0;
+  font-family: var(--lp-head);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.01em;
+  color: var(--lp-ink, #0D1429);
+}
+.lp-card-copy p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--lp-muted, #5C667A);
 }
 .lp-grade-hero-body {
   display: flex;
