@@ -394,13 +394,7 @@ final class admin_dashboard {
             $counts[$row['role_key']] = ($counts[$row['role_key']] ?? 0) + 1;
         }
 
-        $filtered = [];
-        foreach ($all as $row) {
-            if ($tab === 'all' || $row['role_key'] === $tab) {
-                $filtered[] = $row;
-            }
-        }
-
+        // Always render the full list; client filters tabs without a reload.
         $tabs = [];
         foreach (['all', 'fellow', 'mentor', 'admin'] as $key) {
             $tabs[] = [
@@ -419,13 +413,14 @@ final class admin_dashboard {
             'eyebrow' => get_string('admin_people_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_people_heading', 'local_launchpad'),
             'lead' => get_string('admin_people_lead', 'local_launchpad'),
+            'initial_tab' => $tab,
             'tabs' => $tabs,
             'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
             'col_email' => get_string('admin_people_col_email', 'local_launchpad'),
             'col_role' => get_string('admin_people_col_role', 'local_launchpad'),
             'col_reach' => get_string('admin_people_col_reach', 'local_launchpad'),
-            'people' => $filtered,
-            'has_people' => $filtered !== [],
+            'people' => $all,
+            'has_people' => $all !== [],
             'empty_body' => get_string('admin_people_empty', 'local_launchpad'),
             'footnote' => get_string('admin_people_footnote', 'local_launchpad'),
         ];

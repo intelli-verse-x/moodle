@@ -1,9 +1,10 @@
 {{!
     @template local_launchpad/admin_people
 
-    Admin People directory — tabs and table from live Moodle roles.
+    Admin People directory — tabs filter client-side (no reload).
     All copy comes from PHP context. Keep this file comment free of Mustache braces.
 }}
+<div data-lp-people data-lp-people-active="{{initial_tab}}">
 <section class="lp-hero" data-region="local-launchpad-admin-people">
   <div class="lp-hero-row">
     <div class="lp-hero-main">
@@ -19,6 +20,7 @@
     <a class="lp-tab{{#current}} is-on{{/current}}"
        role="tab"
        href="{{url}}"
+       data-lp-people-tab="{{key}}"
        aria-selected="{{#current}}true{{/current}}{{^current}}false{{/current}}">
       {{label}}
       <span class="lp-tab-count">{{count}}</span>
@@ -29,7 +31,7 @@
 <div class="lp-card lift" style="margin-top:4px">
   <div class="lp-table-wrap">
     {{#has_people}}
-      <table class="lp-table">
+      <table class="lp-table" data-lp-people-table>
         <thead>
           <tr>
             <th>{{col_name}}</th>
@@ -40,7 +42,7 @@
         </thead>
         <tbody>
           {{#people}}
-            <tr>
+            <tr data-lp-people-role="{{role_key}}">
               <td>
                 <div class="lp-people-name">
                   <span class="lp-av lp-av-sm tone-{{avatar_tone}}" aria-hidden="true">{{initials}}</span>
@@ -62,9 +64,8 @@
         </tbody>
       </table>
     {{/has_people}}
-    {{^has_people}}
-      <p class="lp-muted" style="margin:0">{{empty_body}}</p>
-    {{/has_people}}
+    <p class="lp-muted" data-lp-people-empty style="margin:0{{#has_people}};display:none{{/has_people}}">{{empty_body}}</p>
   </div>
 </div>
 <p class="lp-xs lp-muted" style="margin-top:12px">{{footnote}}</p>
+</div>

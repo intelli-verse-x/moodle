@@ -1527,4 +1527,75 @@
             });
         }
     })();
+
+    // Admin People tabs: filter in-place (no full-page reload).
+    (function peopleTabs() {
+        var root = shell.querySelector('[data-lp-people]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-people-tab]');
+        var rows = root.querySelectorAll('[data-lp-people-role]');
+        var emptyEl = root.querySelector('[data-lp-people-empty]');
+        var table = root.querySelector('[data-lp-people-table]');
+        if (!tabs.length) {
+            return;
+        }
+
+        function applyTab(tab, pushUrl) {
+            var key = tab || 'all';
+            if (key !== 'all' && key !== 'fellow' && key !== 'mentor' && key !== 'admin') {
+                key = 'all';
+            }
+            root.setAttribute('data-lp-people-active', key);
+
+            var visible = 0;
+            rows.forEach(function (row) {
+                var show = key === 'all' || row.getAttribute('data-lp-people-role') === key;
+                row.hidden = !show;
+                if (show) {
+                    visible += 1;
+                }
+            });
+
+            tabs.forEach(function (el) {
+                var on = el.getAttribute('data-lp-people-tab') === key;
+                el.classList.toggle('is-on', on);
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+
+            if (emptyEl) {
+                emptyEl.style.display = visible === 0 ? '' : 'none';
+            }
+            if (table) {
+                table.style.display = visible === 0 ? 'none' : '';
+            }
+
+            if (pushUrl && window.history && window.history.replaceState) {
+                try {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('view', 'people');
+                    if (key === 'all') {
+                        url.searchParams.delete('tab');
+                    } else {
+                        url.searchParams.set('tab', key);
+                    }
+                    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+                } catch (err) {
+                    // Ignore URL sync failures (older browsers / file URLs).
+                }
+            }
+        }
+
+        root.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-people-tab]');
+            if (!tab || !root.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyTab(tab.getAttribute('data-lp-people-tab'), true);
+        });
+
+        applyTab(root.getAttribute('data-lp-people-active') || 'all', false);
+    })();
 })();
