@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview + Tracks & courses (no Course builder yet).
+ * Admin portal — Overview, Tracks & courses, Cohort & enrolment.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -40,9 +40,20 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks'];
+$allowedviews = ['home', 'tracks', 'cohorts'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+
+$flash = [];
+if ($view === 'cohorts' && data_submitted() && confirm_sesskey()) {
+    $action = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($action === 'enrol_fellow') {
+        $email = optional_param('email', '', PARAM_RAW_TRIMMED);
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $alsoorient = (bool) optional_param('also_orient', 0, PARAM_BOOL);
+        $flash = admin_dashboard::enrol_fellow_by_email($USER, $email, $trackid, $alsoorient);
+    }
 }
 
 $context = context_system::instance();
@@ -62,6 +73,7 @@ $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->ou
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::ADMIN_PATH))->out(false);
 $tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+$cohortsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 
 $firstname = format_string($USER->firstname);
@@ -94,6 +106,18 @@ $nav = [
                     '<path d="M4 6h16M4 12h10M4 18h14"/>'
                 ),
             ],
+            [
+                'label' => get_string('admin_nav_cohorts', 'local_launchpad'),
+                'url' => $cohortsurl,
+                'current' => $view === 'cohorts',
+                'key' => 'cohorts',
+                'icon_svg' => $icon(
+                    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>'
+                    . '<circle cx="9" cy="7" r="4"/>'
+                    . '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>'
+                    . '<path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+                ),
+            ],
         ],
     ],
 ];
@@ -103,6 +127,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_tracks',
         admin_dashboard::tracks_context($USER)
+    );
+} else if ($view === 'cohorts') {
+    $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_cohorts',
+        admin_dashboard::cohorts_context($USER, $flash)
     );
 } else {
     $view = 'home';

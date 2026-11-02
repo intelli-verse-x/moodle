@@ -129,6 +129,248 @@ final class admin_dashboard {
     }
 
     /**
+     * Cohort & enrolment page (HTML cohorts).
+     *
+     * @param \stdClass $user
+     * @param array{ok?:string,error?:string} $flash
+     * @return array<string, mixed>
+     */
+    public static function cohorts_context(\stdClass $user, array $flash = []): array {
+        $tracks = self::list_track_courses();
+        $slug = self::primary_cohort_slug($tracks);
+        $totalfellows = 0;
+        $counts = [];
+        $options = [];
+        foreach ($tracks as $course) {
+            $n = self::fellow_count((int) $course->id);
+            $totalfellows += $n;
+            $counts[] = $n;
+            $ready = self::foundations_ready((int) $course->id);
+            $options[] = [
+                'id' => (int) $course->id,
+                'label' => format_string($course->fullname) . ($ready ? '' : ' '
+                    . get_string('admin_cohorts_option_not_ready', 'local_launchpad')),
+                'disabled' => !$ready,
+            ];
+        }
+        $maxfellows = max(1, ...($counts !== [] ? $counts : [1]));
+        $bytrack = [];
+        foreach ($tracks as $i => $course) {
+            $n = $counts[$i];
+            $bytrack[] = [
+                'name' => format_string($course->fullname),
+                'idnumber' => s($course->idnumber),
+                'count' => $n,
+                'pct' => (int) round(($n / $maxfellows) * 100),
+            ];
+        }
+
+        $hasready = false;
+        $selectedset = false;
+        foreach ($options as &$opt) {
+            if (!$selectedset && empty($opt['disabled'])) {
+                $opt['selected'] = true;
+                $selectedset = true;
+                $hasready = true;
+            } else {
+                $opt['selected'] = false;
+                if (empty($opt['disabled'])) {
+                    $hasready = true;
+                }
+            }
+        }
+        unset($opt);
+
+        $startdate = self::earliest_track_startdate($tracks);
+        $selfon = self::any_self_enrolment_enabled($tracks);
+        $orient = $slug !== null ? self::orientation_course_for_slug($slug) : null;
+        $cohortcount = self::distinct_cohort_count($tracks);
+
+        $recent = self::recent_track_enrolments(12);
+
+        $icon = static function (string $paths): string {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+                . $paths . '</svg>';
+        };
+
+        $cohortsub = $slug !== null
+            ? get_string(
+                'admin_cohorts_tile_cohort_sub',
+                'local_launchpad',
+                self::cohort_display_label($slug, $orient)
+            )
+            : get_string('admin_cohorts_tile_cohort_sub_none', 'local_launchpad');
+
+        $tiles = [
+            [
+                'label' => get_string('admin_cohorts_tile_cohort', 'local_launchpad'),
+                'value' => (string) $cohortcount,
+                'sub' => $cohortsub,
+                'icon_svg' => $icon(
+                    '<circle cx="9" cy="8" r="3.5"/>'
+                    . '<path d="M2 20c1-4 4-6 7-6s6 2 7 6"/>'
+                    . '<path d="M16 4.5a3.5 3.5 0 010 7M22 20c-.6-2.6-2-4.4-4-5.3"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_cohorts_tile_start', 'local_launchpad'),
+                'value' => $startdate > 0
+                    ? userdate($startdate, get_string('strftimedatefullshort', 'langconfig'))
+                    : get_string('admin_cohorts_tile_start_tbc', 'local_launchpad'),
+                'sub' => get_string('admin_cohorts_tile_start_sub', 'local_launchpad'),
+                'icon_svg' => $icon(
+                    '<rect x="3" y="5" width="18" height="16" rx="2"/>'
+                    . '<path d="M3 10h18M8 3v4M16 3v4"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_cohorts_tile_enrolled', 'local_launchpad'),
+                'value' => (string) $totalfellows,
+                'sub' => get_string('admin_cohorts_tile_enrolled_sub', 'local_launchpad'),
+                'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),
+            ],
+            [
+                'label' => get_string('admin_cohorts_tile_self', 'local_launchpad'),
+                'value' => $selfon
+                    ? get_string('admin_cohorts_tile_self_on', 'local_launchpad')
+                    : get_string('admin_cohorts_tile_self_off', 'local_launchpad'),
+                'sub' => $selfon
+                    ? get_string('admin_cohorts_tile_self_sub_on', 'local_launchpad')
+                    : get_string('admin_cohorts_tile_self_sub_off', 'local_launchpad'),
+                'icon_svg' => $icon('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'),
+            ],
+        ];
+
+        return [
+            'eyebrow' => get_string('admin_cohorts_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_cohorts_heading', 'local_launchpad'),
+            'lead' => get_string('admin_cohorts_lead', 'local_launchpad'),
+            'tiles' => $tiles,
+            'form_title' => get_string('admin_cohorts_form_title', 'local_launchpad'),
+            'email_label' => get_string('admin_cohorts_email_label', 'local_launchpad'),
+            'email_placeholder' => get_string('admin_cohorts_email_placeholder', 'local_launchpad'),
+            'track_label' => get_string('admin_cohorts_track_label', 'local_launchpad'),
+            'orient_label' => get_string('admin_cohorts_orient_label', 'local_launchpad'),
+            'orient_available' => $orient !== null,
+            'orient_checked' => $orient !== null,
+            'orient_missing' => $orient === null && $slug !== null,
+            'orient_missing_body' => get_string('admin_cohorts_orient_missing', 'local_launchpad'),
+            'submit_label' => get_string('admin_cohorts_submit', 'local_launchpad'),
+            'has_track_options' => $options !== [],
+            'has_ready_track' => $hasready,
+            'no_ready_body' => get_string('admin_cohorts_no_ready', 'local_launchpad'),
+            'track_options' => $options,
+            'bytrack_title' => get_string('admin_cohorts_bytrack_title', 'local_launchpad'),
+            'bytrack' => $bytrack,
+            'has_bytrack' => $bytrack !== [],
+            'tip_body' => get_string('admin_cohorts_tip', 'local_launchpad'),
+            'tip_prof_url' => (new \moodle_url('/local/launchpad/assets/img/prof.webp'))->out(false),
+            'recent_title' => get_string('admin_cohorts_recent_title', 'local_launchpad'),
+            'recent_empty' => get_string('admin_cohorts_recent_empty', 'local_launchpad'),
+            'col_fellow' => get_string('admin_cohorts_col_fellow', 'local_launchpad'),
+            'col_track' => get_string('admin_cohorts_col_track', 'local_launchpad'),
+            'col_role' => get_string('admin_cohorts_col_role', 'local_launchpad'),
+            'col_when' => get_string('admin_cohorts_col_when', 'local_launchpad'),
+            'role_student' => get_string('admin_cohorts_role_student', 'local_launchpad'),
+            'recent' => $recent,
+            'has_recent' => $recent !== [],
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+            'form_action' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false),
+            'sesskey' => sesskey(),
+        ];
+    }
+
+    /**
+     * Enrol an existing user (by email) on a track; optionally Shared orientation.
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function enrol_fellow_by_email(
+        \stdClass $actor,
+        string $email,
+        int $trackcourseid,
+        bool $alsoorientation
+    ): array {
+        global $CFG, $DB;
+
+        $email = trim($email);
+        if ($email === '' || strpos($email, '@') === false) {
+            return ['error' => get_string('admin_cohorts_err_email', 'local_launchpad')];
+        }
+        if ($trackcourseid <= 0) {
+            return ['error' => get_string('admin_cohorts_err_track', 'local_launchpad')];
+        }
+
+        $user = $DB->get_record_select(
+            'user',
+            'deleted = 0 AND mnethostid = :mnet AND ' . $DB->sql_equal('email', ':email', false, false),
+            [
+                'mnet' => $CFG->mnet_localhost_id,
+                'email' => $email,
+            ]
+        );
+        if (!$user) {
+            return ['error' => get_string('admin_cohorts_err_nouser', 'local_launchpad', s($email))];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_cohorts_err_not_track', 'local_launchpad')];
+        }
+        if (!self::foundations_ready($trackcourseid)) {
+            return ['error' => get_string('admin_cohorts_no_ready', 'local_launchpad')];
+        }
+
+        try {
+            $result = account_provision::enrol_fellow($actor, (int) $user->id, $trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $parts = [
+            get_string(
+                $result['status'] === 'already_enrolled'
+                    ? 'admin_cohorts_ok_already'
+                    : 'admin_cohorts_ok_enrolled',
+                'local_launchpad',
+                (object) [
+                    'name' => fullname($user),
+                    'track' => format_string($course->fullname),
+                ]
+            ),
+        ];
+
+        if ($alsoorientation) {
+            $slug = self::cohort_slug_from_track_idnumber((string) $course->idnumber);
+            $orient = $slug !== null ? self::orientation_course_for_slug($slug) : null;
+            if ($orient) {
+                try {
+                    $ores = account_provision::enrol_fellow($actor, (int) $user->id, (int) $orient->id);
+                    $parts[] = get_string(
+                        $ores['status'] === 'already_enrolled'
+                            ? 'admin_cohorts_ok_orient_already'
+                            : 'admin_cohorts_ok_orient',
+                        'local_launchpad'
+                    );
+                } catch (account_provision_exception $e) {
+                    $parts[] = get_string('admin_cohorts_err_orient', 'local_launchpad', $e->getMessage());
+                }
+            } else {
+                $parts[] = get_string('admin_cohorts_orient_missing', 'local_launchpad');
+            }
+        }
+
+        return ['ok' => implode(' ', $parts)];
+    }
+
+    /**
      * One track card for the Tracks & courses grid.
      *
      * @param \stdClass $course id, fullname, shortname, idnumber, visible, summary?
@@ -190,7 +432,7 @@ final class admin_dashboard {
             'orient' => $DB->sql_like_escape(self::ORIENT_IDNUMBER_PREFIX) . '%',
             'site' => SITEID,
         ];
-        $sql = "SELECT id, fullname, shortname, idnumber, visible, summary
+        $sql = "SELECT id, fullname, shortname, idnumber, visible, summary, startdate
                   FROM {course}
                  WHERE id <> :site
                    AND {$like}
@@ -611,5 +853,181 @@ final class admin_dashboard {
             $summary = \core_text::substr($summary, 0, 117) . '…';
         }
         return get_string('admin_tracks_capstone', 'local_launchpad', $summary);
+    }
+
+    /**
+     * Cohort slug from track idnumber (lp-ai-pilot → pilot).
+     */
+    public static function cohort_slug_from_track_idnumber(string $idnumber): ?string {
+        $idnumber = strtolower(trim($idnumber));
+        if (preg_match('/^lp-(?:ai|fullstack|pm|marketing|startup)-(.+)$/', $idnumber, $m)) {
+            return $m[1] !== '' ? $m[1] : null;
+        }
+        return null;
+    }
+
+    /**
+     * Most common cohort slug among track courses.
+     *
+     * @param list<\stdClass> $tracks
+     */
+    public static function primary_cohort_slug(array $tracks): ?string {
+        $votes = [];
+        foreach ($tracks as $course) {
+            $slug = self::cohort_slug_from_track_idnumber((string) ($course->idnumber ?? ''));
+            if ($slug !== null) {
+                $votes[$slug] = ($votes[$slug] ?? 0) + 1;
+            }
+        }
+        if ($votes === []) {
+            return null;
+        }
+        arsort($votes);
+        return (string) array_key_first($votes);
+    }
+
+    /**
+     * Distinct cohort slug count among track courses.
+     *
+     * @param list<\stdClass> $tracks
+     */
+    public static function distinct_cohort_count(array $tracks): int {
+        $seen = [];
+        foreach ($tracks as $course) {
+            $slug = self::cohort_slug_from_track_idnumber((string) ($course->idnumber ?? ''));
+            if ($slug !== null) {
+                $seen[$slug] = true;
+            }
+        }
+        return count($seen);
+    }
+
+    /**
+     * Human cohort label for tile subtitle (from orientation name or slug).
+     */
+    public static function cohort_display_label(string $slug, ?\stdClass $orient = null): string {
+        if ($orient !== null) {
+            $name = format_string($orient->fullname);
+            // "LaunchPad Orientation — Cohort Pilot" → "Pilot".
+            if (preg_match('/cohort\s+(.+)$/i', $name, $m)) {
+                return trim($m[1]);
+            }
+        }
+        $slug = strtolower(trim($slug));
+        $slug = str_replace(['-', '_'], ' ', $slug);
+        return $slug !== '' ? \core_text::strtotitle($slug) : $slug;
+    }
+
+    /**
+     * Orientation course for a cohort slug (lp-orient-{slug}).
+     */
+    public static function orientation_course_for_slug(string $slug): ?\stdClass {
+        global $DB;
+
+        $slug = strtolower(trim($slug));
+        if ($slug === '') {
+            return null;
+        }
+        $course = $DB->get_record('course', [
+            'idnumber' => self::ORIENT_IDNUMBER_PREFIX . $slug,
+        ]);
+        return $course ?: null;
+    }
+
+    /**
+     * Earliest non-zero course startdate among tracks.
+     *
+     * @param list<\stdClass> $tracks
+     */
+    public static function earliest_track_startdate(array $tracks): int {
+        $min = 0;
+        foreach ($tracks as $course) {
+            $ts = (int) ($course->startdate ?? 0);
+            if ($ts > 0 && ($min === 0 || $ts < $min)) {
+                $min = $ts;
+            }
+        }
+        return $min;
+    }
+
+    /**
+     * Whether any track has an enabled self-enrolment instance.
+     *
+     * @param list<\stdClass> $tracks
+     */
+    public static function any_self_enrolment_enabled(array $tracks): bool {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $ids = [];
+        foreach ($tracks as $course) {
+            $ids[] = (int) $course->id;
+        }
+        $ids = array_values(array_filter($ids));
+        if ($ids === []) {
+            return false;
+        }
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        $params['estatus'] = ENROL_INSTANCE_ENABLED;
+        $sql = "SELECT COUNT(1)
+                  FROM {enrol} e
+                 WHERE e.enrol = 'self'
+                   AND e.status = :estatus
+                   AND e.courseid {$insql}";
+        return ((int) $DB->count_records_sql($sql, $params)) > 0;
+    }
+
+    /**
+     * Recent student enrolments on track courses (newest first).
+     *
+     * @return list<array{fellow:string,email:string,track:string,when:string}>
+     */
+    public static function recent_track_enrolments(int $limit = 12): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $tracks = self::list_track_courses();
+        $ids = array_map(static fn($c) => (int) $c->id, $tracks);
+        $ids = array_values(array_filter($ids));
+        if ($ids === []) {
+            return [];
+        }
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        $params += [
+            'ctxlevel' => CONTEXT_COURSE,
+            'arch' => 'student',
+            'uestatus' => ENROL_USER_ACTIVE,
+            'estatus' => ENROL_INSTANCE_ENABLED,
+        ];
+        $limit = max(1, min(50, $limit));
+        $sql = "SELECT ue.id, ue.timecreated, u.id AS userid, u.firstname, u.lastname,
+                       u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename,
+                       u.email, c.fullname AS coursefullname
+                  FROM {user_enrolments} ue
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                  JOIN {course} c ON c.id = e.courseid
+                  JOIN {user} u ON u.id = ue.userid AND u.deleted = 0
+                  JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = :ctxlevel
+                  JOIN {role_assignments} ra ON ra.contextid = ctx.id AND ra.userid = u.id
+                  JOIN {role} r ON r.id = ra.roleid AND r.archetype = :arch
+                 WHERE ue.status = :uestatus
+                   AND e.status = :estatus
+                   AND c.id {$insql}
+              ORDER BY ue.timecreated DESC, ue.id DESC";
+        $rows = $DB->get_records_sql($sql, $params, 0, $limit);
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'fellow' => fullname($row),
+                'email' => s($row->email),
+                'track' => format_string($row->coursefullname),
+                'when' => !empty($row->timecreated)
+                    ? userdate((int) $row->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
+                    : '—',
+            ];
+        }
+        return $out;
     }
 }

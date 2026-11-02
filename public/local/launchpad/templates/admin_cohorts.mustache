@@ -1,0 +1,139 @@
+{{!
+    @template local_launchpad/admin_cohorts
+
+    Admin Cohort and enrolment — tiles, enrol form, by-track bars, recent table.
+    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-cohorts">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+    </div>
+  </div>
+</section>
+
+{{#flash_ok}}
+  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+{{/flash_ok}}
+{{#flash_err}}
+  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+{{/flash_err}}
+
+<div class="lp-atiles" role="list" style="margin-top:16px">
+  {{#tiles}}
+    <div class="lp-atile" role="listitem">
+      <span class="lp-atile-ico" aria-hidden="true">{{{icon_svg}}}</span>
+      <span class="lp-atile-label">{{label}}</span>
+      <b class="lp-atile-value">{{value}}</b>
+      <span class="lp-atile-sub">{{sub}}</span>
+    </div>
+  {{/tiles}}
+</div>
+
+<div class="lp-grid-2" style="margin-top:16px">
+  <section class="lp-card lift lp-stack-lg">
+    <div class="lp-card-head">
+      <h3>{{form_title}}</h3>
+    </div>
+    {{^has_ready_track}}
+      <p class="lp-muted">{{no_ready_body}}</p>
+    {{/has_ready_track}}
+    {{#has_ready_track}}
+      <form method="post" action="{{form_action}}" class="lp-stack lp-enrol-form">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="action" value="enrol_fellow">
+        <div class="lp-field-row">
+          <label class="lp-field">
+            <span>{{email_label}}</span>
+            <input type="email" name="email" required autocomplete="email" placeholder="{{email_placeholder}}">
+          </label>
+          <label class="lp-field">
+            <span>{{track_label}}</span>
+            <select name="trackid" required>
+              {{#track_options}}
+                <option value="{{id}}"{{#selected}} selected{{/selected}}{{#disabled}} disabled{{/disabled}}>{{label}}</option>
+              {{/track_options}}
+            </select>
+          </label>
+        </div>
+        {{#orient_available}}
+          <label class="lp-check-row">
+            <input type="checkbox" name="also_orient" value="1"{{#orient_checked}} checked{{/orient_checked}}>
+            <span>{{orient_label}}</span>
+          </label>
+        {{/orient_available}}
+        {{#orient_missing}}
+          <p class="lp-sm lp-muted">{{orient_missing_body}}</p>
+        {{/orient_missing}}
+        <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{submit_label}}</button>
+      </form>
+    {{/has_ready_track}}
+
+    <div class="lp-table-wrap" style="margin-top:8px">
+      <p class="lp-eyebrow">{{recent_title}}</p>
+      {{#has_recent}}
+        <table class="lp-table">
+          <thead>
+            <tr>
+              <th>{{col_fellow}}</th>
+              <th>{{col_track}}</th>
+              <th>{{col_role}}</th>
+              <th>{{col_when}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#recent}}
+              <tr>
+                <td>
+                  <b>{{fellow}}</b>
+                  <div class="lp-xs lp-muted">{{email}}</div>
+                </td>
+                <td>{{track}}</td>
+                <td>{{role_student}}</td>
+                <td>{{when}}</td>
+              </tr>
+            {{/recent}}
+          </tbody>
+        </table>
+      {{/has_recent}}
+      {{^has_recent}}
+        <p class="lp-muted lp-sm">{{recent_empty}}</p>
+      {{/has_recent}}
+    </div>
+  </section>
+
+  <div class="lp-stack-lg">
+    <section class="lp-card lift lp-stack">
+      <div class="lp-card-head">
+        <h3>{{bytrack_title}}</h3>
+      </div>
+      {{#has_bytrack}}
+        {{#bytrack}}
+          <div class="lp-bytrack-row">
+            <div class="lp-bytrack-meta">
+              <span>{{name}}</span>
+              <b>{{count}}</b>
+            </div>
+            <div class="lp-bar lp-bar-thin" aria-hidden="true"><i style="width:{{pct}}%"></i></div>
+            <span class="lp-xs lp-muted">{{idnumber}}</span>
+          </div>
+        {{/bytrack}}
+      {{/has_bytrack}}
+      {{^has_bytrack}}
+        <p class="lp-muted lp-sm">{{recent_empty}}</p>
+      {{/has_bytrack}}
+    </section>
+    <section class="lp-card soft">
+      <div class="lp-mascot">
+        {{#tip_prof_url}}
+          <img src="{{tip_prof_url}}" alt="" style="height:90px">
+        {{/tip_prof_url}}
+        <div class="lp-bubble">
+          <p class="lp-sm" style="margin:0">{{tip_body}}</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

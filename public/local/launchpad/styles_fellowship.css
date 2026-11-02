@@ -557,6 +557,162 @@ body.local-launchpad-mentor {
 .lp-phdots i.on {
   background: var(--lp-blue);
 }
+
+/* Admin Cohort & enrolment tiles (HTML x-tile). */
+.lp-atiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.lp-atile {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--lp-line);
+  border-radius: 18px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  min-width: 0;
+  box-shadow: var(--lp-shadow-soft, 0 8px 24px rgba(13, 36, 97, .06));
+  transition: transform .25s, box-shadow .25s;
+}
+.lp-atile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(13, 36, 97, .1);
+}
+.lp-atile-ico {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--lp-blue-soft);
+  color: var(--lp-blue);
+  display: grid;
+  place-items: center;
+}
+.lp-atile-ico svg {
+  width: 19px;
+  height: 19px;
+}
+.lp-atile-label {
+  color: var(--lp-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding-right: 44px;
+}
+.lp-atile-value {
+  display: block;
+  margin: 0;
+  font-family: var(--lp-head);
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--lp-navy);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  padding-right: 44px;
+  overflow-wrap: anywhere;
+}
+.lp-atile-sub {
+  color: var(--lp-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  padding-right: 8px;
+}
+@media (max-width: 1100px) {
+  .lp-atiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .lp-atiles { grid-template-columns: 1fr; }
+}
+
+/* Admin Cohort & enrolment. */
+.lp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--lp-ink);
+  min-width: 0;
+}
+.lp-field input,
+.lp-field select {
+  font: inherit;
+  font-weight: 400;
+  color: var(--lp-ink);
+  padding: 10px 12px;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: #fff;
+  width: 100%;
+  max-width: 100%;
+}
+.lp-field input:focus,
+.lp-field select:focus {
+  outline: 2px solid var(--lp-blue);
+  outline-offset: 1px;
+}
+.lp-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.lp-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lp-ink);
+}
+.lp-check-row input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.lp-enrol-form { max-width: 40rem; }
+.lp-bytrack-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lp-bytrack-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.lp-bytrack-meta b {
+  font-family: var(--lp-head);
+  font-size: 16px;
+  color: var(--lp-navy);
+}
+.lp-flash {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 14px;
+}
+.lp-flash.is-ok {
+  background: #E3F5E8;
+  color: #1E7A3B;
+}
+.lp-flash.is-err {
+  background: #FDECEC;
+  color: #B42318;
+}
+@media (max-width: 720px) {
+  .lp-field-row { grid-template-columns: 1fr; }
+}
 @media (max-width: 1100px) {
   .lp-stats.lp-stats-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
