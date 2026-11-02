@@ -890,7 +890,7 @@ final class admin_dashboard {
     }
 
     /**
-     * Assign mentor (editingteacher) by email on a track course.
+     * Assign mentor as non-editing teacher (Moodle shortname teacher) by email.
      *
      * @return array{ok:string}|array{error:string}
      */
@@ -931,7 +931,13 @@ final class admin_dashboard {
         }
 
         try {
-            $result = account_provision::assign_mentor($actor, (int) $user->id, $trackcourseid);
+            // Admin UI always assigns non-editing teacher (shortname teacher).
+            $result = account_provision::assign_mentor(
+                $actor,
+                (int) $user->id,
+                $trackcourseid,
+                'teacher'
+            );
         } catch (account_provision_exception $e) {
             return ['error' => $e->getMessage()];
         }
