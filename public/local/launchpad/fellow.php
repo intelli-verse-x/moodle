@@ -291,8 +291,16 @@ switch ($view) {
         $activityctx = activity_portal::export($USER, $cmid, ['courseurl' => $trackurl]);
         $act = $activityctx['activity'] ?? [];
         $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
+        $modtype = (string) ($act['modtype'] ?? '');
+        $showjudging = in_array($modtype, ['assign', 'quiz'], true);
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_activity', [
-            'activity' => $act,
+            'activity' => array_merge($act, [
+                'show_judging' => $showjudging,
+                'judging_title' => get_string('fellowship_judging_title', 'local_launchpad'),
+                'judging_body' => $modtype === 'assign'
+                    ? get_string('fellowship_judging_body', 'local_launchpad')
+                    : get_string('fellowship_judging_short', 'local_launchpad'),
+            ]),
             'home_url' => $homeurl,
             'strings' => [
                 'navhome' => get_string('fellowship_nav_home', 'local_launchpad'),

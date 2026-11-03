@@ -33,6 +33,13 @@
           {{/needsengine}}
         </div>
 
+        {{#show_judging}}
+          <aside class="lp-judge-note" aria-label="{{judging_title}}">
+            <b>{{judging_title}}</b>
+            <p>{{judging_body}}</p>
+          </aside>
+        {{/show_judging}}
+
         {{#hasintro}}
           <div class="lp-activity-intro">{{{introhtml}}}</div>
         {{/hasintro}}

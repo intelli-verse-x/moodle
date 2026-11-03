@@ -1363,6 +1363,32 @@ body.local-launchpad-mentor {
   font-size: 13.5px;
   line-height: 1.45;
 }
+.lp-judge-note {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  max-width: 720px;
+  border-radius: 12px;
+  border: 1px solid #D9E6FF;
+  background: #F5F8FF;
+}
+.lp-judge-note b {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0D1429;
+  margin: 0 0 4px;
+}
+.lp-judge-note p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #5C667A;
+}
+.lp-activity-page .lp-judge-note {
+  margin-top: 4px;
+  width: 100%;
+  max-width: 520px;
+}
 
 .lp-completion-hero {
   display: flex;
