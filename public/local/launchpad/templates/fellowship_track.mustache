@@ -71,17 +71,9 @@
                         <span class="lp-act-k">{{modname_display}}</span>
                         <a class="lp-act-t" href="{{url}}">{{{name}}}</a>
                       </div>
-                      {{#tracked}}
-                        {{#complete}}
-                          <span class="lp-chip ok">{{#str}} fellowship_complete, local_launchpad {{/str}}</span>
-                        {{/complete}}
-                        {{^complete}}
-                          <span class="lp-chip">{{#str}} fellowship_incomplete, local_launchpad {{/str}}</span>
-                        {{/complete}}
-                      {{/tracked}}
-                      {{^tracked}}
-                        <span class="lp-chip line">{{#str}} fellowship_not_tracked, local_launchpad {{/str}}</span>
-                      {{/tracked}}
+                      {{#show_status}}
+                        <span class="lp-chip{{#status_chip}} {{status_chip}}{{/status_chip}}">{{status_label}}</span>
+                      {{/show_status}}
                     </li>
                   {{/activities}}
                 </ul>
