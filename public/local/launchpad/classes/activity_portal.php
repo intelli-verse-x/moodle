@@ -368,11 +368,9 @@ final class activity_portal {
         }
         $path = strtok($path, '?') ?: $path;
 
-        // Fellows: wrap page/url/resource + quiz/assign landing. Employees: page/url/resource only.
-        $modpattern = $isfellow
-            ? '#/mod/(page|url|resource|quiz|assign)/view\.php$#'
-            : '#/mod/(page|url|resource)/view\.php$#';
-        if (!preg_match($modpattern, $path)) {
+        // Wrap page/url/resource only. Quiz/assign stay on Moodle when opened from
+        // "Continue in Moodle" (track still lands on the fellow interstitial first).
+        if (!preg_match('#/mod/(page|url|resource)/view\.php$#', $path)) {
             return;
         }
 
