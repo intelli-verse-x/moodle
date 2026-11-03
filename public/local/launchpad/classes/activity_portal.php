@@ -291,13 +291,19 @@ final class activity_portal {
         // Placeholder only when there is nothing to show.
         $isplaceholder = !$hasbody && !$hasfiles && !$hasexternal && !$hasembed && !$hasvideo;
 
+        // E7: structured lesson layout for page activities (text works without video).
+        $islesson = ($modname === 'page' && !$isplaceholder);
+        $lesson = $islesson
+            ? self::build_lesson_layout($bodyhtml, $introhtml, $hasintro, $course, $cm, (int) $user->id, $courseurl)
+            : self::empty_lesson_layout();
+
         return [
             'is_activity' => true,
             'is_home' => false,
             'is_courses' => false,
             'is_course' => false,
             'pagetitle' => format_string($title),
-            'activity' => [
+            'activity' => array_merge([
                 'cmid' => (int) $cm->id,
                 'name' => format_string($title),
                 // Plain strings — Mustache {{ }} escapes; do not pre-s().
@@ -319,12 +325,13 @@ final class activity_portal {
                 'tracked' => $tracked,
                 'complete' => $complete,
                 'bodyhtml' => $bodyhtml,
-                'hasbody' => $hasbody && !$isplaceholder,
+                // When lesson layout is on, body is shown in sections — avoid double dump.
+                'hasbody' => $hasbody && !$isplaceholder && !$islesson,
                 'callouttext' => $callouttext,
                 'hascallout' => $isplaceholder && $callouttext !== '',
                 'isplaceholder' => $isplaceholder,
                 'introhtml' => $introhtml,
-                'hasintro' => $hasintro && !$isplaceholder,
+                'hasintro' => $hasintro && !$isplaceholder && !$islesson,
                 'externalurl' => $externalurl,
                 'hasexternal' => $hasexternal,
                 'embedhtml' => $embedhtml,
@@ -335,8 +342,241 @@ final class activity_portal {
                 'hasfiles' => $hasfiles && !$hasvideo, // When playing video, don't duplicate as a file list.
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
-            ],
+                'is_lesson' => $islesson,
+            ], $lesson),
         ];
+    }
+
+    /**
+     * Empty lesson context (non-page / placeholder).
+     *
+     * @return array<string,mixed>
+     */
+    public static function empty_lesson_layout(): array {
+        return [
+            'lesson_structured' => false,
+            'lesson_objective_html' => '',
+            'lesson_has_objective' => false,
+            'lesson_explain_html' => '',
+            'lesson_has_explain' => false,
+            'lesson_example_html' => '',
+            'lesson_has_example' => false,
+            'lesson_exercise_html' => '',
+            'lesson_has_exercise' => false,
+            'lesson_has_next' => false,
+            'lesson_next_name' => '',
+            'lesson_next_url' => '',
+            'lesson_next_mod' => '',
+        ];
+    }
+
+    /**
+     * Build E7 lesson sections + next activity for a page CM.
+     *
+     * @return array<string,mixed>
+     */
+    public static function build_lesson_layout(
+        string $bodyhtml,
+        string $introhtml,
+        bool $hasintro,
+        \stdClass $course,
+        \cm_info $cm,
+        int $userid,
+        string $courseurl
+    ): array {
+        $parsed = self::parse_lesson_sections($bodyhtml);
+        $objective = $parsed['objective_html'];
+        $explain = $parsed['explain_html'];
+        $example = $parsed['example_html'];
+        $exercise = $parsed['exercise_html'];
+        $structured = $parsed['structured'];
+
+        // Unstructured pages: intro → objective, body → explanation (still show section chrome).
+        if (!$structured) {
+            if ($hasintro && trim(strip_tags($introhtml)) !== '') {
+                $objective = $introhtml;
+            }
+            if ($explain === '' && trim(strip_tags($bodyhtml)) !== '') {
+                $explain = $bodyhtml;
+            }
+        }
+
+        $next = self::next_activity_after($cm, $course, $userid);
+
+        return [
+            'lesson_structured' => $structured,
+            'lesson_objective_html' => $objective,
+            'lesson_has_objective' => trim(strip_tags($objective)) !== '',
+            'lesson_explain_html' => $explain,
+            'lesson_has_explain' => trim(strip_tags($explain)) !== '',
+            'lesson_example_html' => $example,
+            'lesson_has_example' => trim(strip_tags($example)) !== '',
+            'lesson_exercise_html' => $exercise,
+            'lesson_has_exercise' => trim(strip_tags($exercise)) !== '',
+            'lesson_has_next' => $next !== null,
+            'lesson_next_name' => $next['name'] ?? '',
+            'lesson_next_url' => $next['url'] ?? '',
+            'lesson_next_mod' => $next['modname'] ?? '',
+            'lesson_track_label' => format_string($course->fullname),
+            'lesson_phase_label' => format_string(get_section_name($course, (int) $cm->sectionnum)),
+            'lesson_back_url' => $courseurl,
+        ];
+    }
+
+    /**
+     * Split page HTML into Objective / Explanation / Example / Exercise.
+     *
+     * Prefers `[LP-OBJECTIVE]` markers; falls back to h2/h3 headings with those words.
+     *
+     * @return array{structured:bool,objective_html:string,explain_html:string,example_html:string,exercise_html:string}
+     */
+    public static function parse_lesson_sections(string $html): array {
+        $empty = [
+            'structured' => false,
+            'objective_html' => '',
+            'explain_html' => '',
+            'example_html' => '',
+            'exercise_html' => '',
+        ];
+        $html = trim($html);
+        if ($html === '') {
+            return $empty;
+        }
+
+        $marker = self::split_lesson_by_markers($html);
+        if ($marker['structured']) {
+            return $marker;
+        }
+
+        $byheading = self::split_lesson_by_headings($html);
+        if ($byheading['structured']) {
+            return $byheading;
+        }
+
+        return $empty;
+    }
+
+    /**
+     * @return array{structured:bool,objective_html:string,explain_html:string,example_html:string,exercise_html:string}
+     */
+    private static function split_lesson_by_markers(string $html): array {
+        $map = [
+            'OBJECTIVE' => 'objective_html',
+            'EXPLAIN' => 'explain_html',
+            'EXAMPLE' => 'example_html',
+            'EXERCISE' => 'exercise_html',
+        ];
+        $out = [
+            'structured' => false,
+            'objective_html' => '',
+            'explain_html' => '',
+            'example_html' => '',
+            'exercise_html' => '',
+        ];
+        if (!preg_match('/\[LP-(OBJECTIVE|EXPLAIN|EXAMPLE|EXERCISE)\]/i', $html)) {
+            return $out;
+        }
+        $parts = preg_split('/\[LP-(OBJECTIVE|EXPLAIN|EXAMPLE|EXERCISE)\]/i', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if ($parts === false || count($parts) < 3) {
+            return $out;
+        }
+        // parts: [preamble, LABEL, content, LABEL, content, ...]
+        for ($i = 1; $i < count($parts) - 1; $i += 2) {
+            $label = strtoupper(trim($parts[$i]));
+            $chunk = trim($parts[$i + 1] ?? '');
+            if (!isset($map[$label]) || $chunk === '') {
+                continue;
+            }
+            $out[$map[$label]] = self::cleanup_lesson_chunk($chunk);
+            $out['structured'] = true;
+        }
+        return $out;
+    }
+
+    /**
+     * @return array{structured:bool,objective_html:string,explain_html:string,example_html:string,exercise_html:string}
+     */
+    private static function split_lesson_by_headings(string $html): array {
+        $out = [
+            'structured' => false,
+            'objective_html' => '',
+            'explain_html' => '',
+            'example_html' => '',
+            'exercise_html' => '',
+        ];
+        if (!preg_match_all('/<(h[23])\b[^>]*>(.*?)<\/\1>/is', $html, $matches, PREG_OFFSET_CAPTURE)) {
+            return $out;
+        }
+        $n = count($matches[0]);
+        if ($n < 1) {
+            return $out;
+        }
+        for ($i = 0; $i < $n; $i++) {
+            $headingplain = strtolower(trim(html_entity_decode(strip_tags($matches[2][$i][0]), ENT_QUOTES | ENT_HTML5)));
+            $start = $matches[0][$i][1] + strlen($matches[0][$i][0]);
+            $end = ($i + 1 < $n) ? $matches[0][$i + 1][1] : strlen($html);
+            $chunk = self::cleanup_lesson_chunk(substr($html, $start, $end - $start));
+            if ($chunk === '') {
+                continue;
+            }
+            $key = null;
+            if (str_contains($headingplain, 'objective') || str_contains($headingplain, 'learning goal')) {
+                $key = 'objective_html';
+            } else if (str_contains($headingplain, 'example')) {
+                $key = 'example_html';
+            } else if (str_contains($headingplain, 'exercise') || str_contains($headingplain, 'try it')
+                    || str_contains($headingplain, 'practice')) {
+                $key = 'exercise_html';
+            } else if (str_contains($headingplain, 'explain') || str_contains($headingplain, 'lesson')
+                    || str_contains($headingplain, 'overview') || str_contains($headingplain, 'content')) {
+                $key = 'explain_html';
+            }
+            if ($key === null) {
+                continue;
+            }
+            $out[$key] = $chunk;
+            $out['structured'] = true;
+        }
+        return $out;
+    }
+
+    private static function cleanup_lesson_chunk(string $chunk): string {
+        $chunk = trim($chunk);
+        // Drop leftover empty wrappers from marker splits.
+        $chunk = preg_replace('/^(<\/p>|<br\s*\/?>)+/i', '', $chunk) ?? $chunk;
+        $chunk = preg_replace('/^(<p>\s*<\/p>\s*)+/i', '', $chunk) ?? $chunk;
+        return trim($chunk);
+    }
+
+    /**
+     * Next visible activity after this CM on the course (fellow shell URL).
+     *
+     * @return array{cmid:int,name:string,url:string,modname:string}|null
+     */
+    public static function next_activity_after(\cm_info $cm, \stdClass $course, int $userid): ?array {
+        $modinfo = get_fast_modinfo($course, $userid);
+        $found = false;
+        foreach ($modinfo->get_cms() as $other) {
+            if (!$other->uservisible || $other->deletioninprogress) {
+                continue;
+            }
+            // Skip site news / orphan labels if any.
+            if ($other->modname === 'label') {
+                continue;
+            }
+            if ($found) {
+                return [
+                    'cmid' => (int) $other->id,
+                    'name' => $other->get_formatted_name(),
+                    'url' => self::fellow_url((int) $other->id),
+                    'modname' => (string) $other->modname,
+                ];
+            }
+            if ((int) $other->id === (int) $cm->id) {
+                $found = true;
+            }
+        }
+        return null;
     }
 
     /**

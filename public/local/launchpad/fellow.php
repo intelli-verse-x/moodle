@@ -311,6 +311,13 @@ switch ($view) {
                 'activityempty' => get_string('fellowship_activity_empty', 'local_launchpad'),
                 'contentcomingsoon' => get_string('fellowship_activity_coming_soon', 'local_launchpad'),
                 'activityenginehelp' => get_string('fellowship_activity_engine_help', 'local_launchpad'),
+                'lessonobjective' => get_string('fellowship_lesson_objective', 'local_launchpad'),
+                'lessonexplain' => get_string('fellowship_lesson_explain', 'local_launchpad'),
+                'lessonexample' => get_string('fellowship_lesson_example', 'local_launchpad'),
+                'lessonexercise' => get_string('fellowship_lesson_exercise', 'local_launchpad'),
+                'lessonmissing' => get_string('fellowship_lesson_missing', 'local_launchpad'),
+                'lessonnext' => get_string('fellowship_lesson_next', 'local_launchpad'),
+                'lessonnextlabel' => get_string('fellowship_lesson_next_label', 'local_launchpad'),
             ],
         ]);
         break;

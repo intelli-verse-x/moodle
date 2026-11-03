@@ -3327,6 +3327,51 @@ body.lp-portal-mismatch-lock {
   height: auto;
   border-radius: 10px;
 }
+.lp-lesson-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--lp-muted, #667085);
+}
+.lp-lesson-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 18px 0 8px;
+  max-width: 60ch;
+}
+.lp-lesson-block {
+  padding: 14px 16px;
+  border: 1px solid var(--lp-line, #e6eaf2);
+  border-radius: 14px;
+  background: #fff;
+}
+.lp-lesson-block-title {
+  margin: 0 0 8px;
+  font-family: var(--lp-head);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lp-navy, #0b1f3a);
+}
+.lp-lesson-block-body {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--lp-ink);
+}
+.lp-lesson-block-body :first-child { margin-top: 0; }
+.lp-lesson-block-body :last-child { margin-bottom: 0; }
+.lp-lesson-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 4px;
+}
 .lp-activity-callout {
   display: flex;
   gap: 12px;

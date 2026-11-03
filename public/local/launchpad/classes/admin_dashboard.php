@@ -1008,7 +1008,8 @@ final class admin_dashboard {
 
         switch ($modname) {
             case 'page':
-                $moduleinfo->content = '<p>' . get_string('admin_manage_new_page_body', 'local_launchpad') . '</p>';
+                // Structured lesson template (E7 markers) — edit sections in Settings.
+                $moduleinfo->content = get_string('admin_manage_new_page_body', 'local_launchpad');
                 $moduleinfo->contentformat = FORMAT_HTML;
                 $moduleinfo->display = RESOURCELIB_DISPLAY_OPEN;
                 $moduleinfo->printintro = 0;

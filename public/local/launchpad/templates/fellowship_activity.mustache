@@ -26,11 +26,26 @@
           <p class="lp-activity-sub">{{title_sub}}</p>
         {{/hastitlesub}}
 
+        {{#is_lesson}}
+          <p class="lp-lesson-meta">
+            <span>{{lesson_track_label}}</span>
+            {{#hassection}}
+              <span aria-hidden="true">·</span>
+              <span>{{lesson_phase_label}}</span>
+            {{/hassection}}
+          </p>
+        {{/is_lesson}}
+
         <div class="lp-activity-head-actions">
           <a class="lp-btn lp-btn-light lp-activity-back" href="{{courseurl}}">{{strings.backtotrack}}</a>
           {{#needsengine}}
             <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
           {{/needsengine}}
+          {{#is_lesson}}
+            {{#lesson_has_next}}
+              <a class="lp-btn lp-btn-solid" href="{{lesson_next_url}}">{{strings.lessonnext}}: {{lesson_next_name}}</a>
+            {{/lesson_has_next}}
+          {{/is_lesson}}
         </div>
 
         {{#show_judging}}
@@ -45,6 +60,53 @@
         {{/hasintro}}
 
         {{#isinportal}}
+          {{#is_lesson}}
+            <div class="lp-lesson-layout" data-region="lesson-layout">
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonobjective}}</h3>
+                {{#lesson_has_objective}}
+                  <div class="lp-lesson-block-body">{{{lesson_objective_html}}}</div>
+                {{/lesson_has_objective}}
+                {{^lesson_has_objective}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_objective}}
+              </section>
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonexplain}}</h3>
+                {{#lesson_has_explain}}
+                  <div class="lp-lesson-block-body">{{{lesson_explain_html}}}</div>
+                {{/lesson_has_explain}}
+                {{^lesson_has_explain}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_explain}}
+              </section>
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonexample}}</h3>
+                {{#lesson_has_example}}
+                  <div class="lp-lesson-block-body">{{{lesson_example_html}}}</div>
+                {{/lesson_has_example}}
+                {{^lesson_has_example}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_example}}
+              </section>
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonexercise}}</h3>
+                {{#lesson_has_exercise}}
+                  <div class="lp-lesson-block-body">{{{lesson_exercise_html}}}</div>
+                {{/lesson_has_exercise}}
+                {{^lesson_has_exercise}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_exercise}}
+              </section>
+              {{#lesson_has_next}}
+                <div class="lp-lesson-next">
+                  <span class="lp-xs lp-muted">{{strings.lessonnextlabel}}</span>
+                  <a class="lp-btn lp-btn-solid" href="{{lesson_next_url}}">{{lesson_next_name}}</a>
+                </div>
+              {{/lesson_has_next}}
+            </div>
+          {{/is_lesson}}
+
           {{#hasbody}}
             <div class="lp-activity-body">{{{bodyhtml}}}</div>
           {{/hasbody}}
