@@ -3148,6 +3148,17 @@ body.lp-portal-mismatch-lock {
   outline: 2px solid rgba(37, 99, 235, 0.25);
   border-color: #2563eb;
 }
+.lp-activity .lp-field-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--lp-ink);
+  font-weight: 600;
+}
+.lp-activity .lp-field-check input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
 
 /* Fellow activity consume (LaunchPad shell over Moodle CM) */
 .lp-activity-page {

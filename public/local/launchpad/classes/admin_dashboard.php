@@ -528,12 +528,13 @@ final class admin_dashboard {
         string $modname,
         string $name = ''
     ): array {
-        global $CFG, $USER;
+        global $CFG, $DB, $USER;
 
         unset($actor);
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->dirroot . '/course/modlib.php');
         require_once($CFG->libdir . '/resourcelib.php');
+        require_once($CFG->libdir . '/completionlib.php');
         if ($modname === 'quiz') {
             require_once($CFG->dirroot . '/mod/quiz/locallib.php');
         }
@@ -566,6 +567,13 @@ final class admin_dashboard {
         $name = trim($name);
         if ($name === '') {
             $name = get_string('admin_manage_default_name_' . $modname, 'local_launchpad');
+        }
+
+        // Completion rules need the course flag on.
+        if (empty($course->enablecompletion)) {
+            $DB->set_field('course', 'enablecompletion', 1, ['id' => $trackcourseid]);
+            $course->enablecompletion = 1;
+            rebuild_course_cache($trackcourseid, true);
         }
 
         $moduleinfo = self::build_new_moduleinfo($course, $sectionnum, $modname, $name);
@@ -667,6 +675,7 @@ final class admin_dashboard {
         unset($user);
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->dirroot . '/course/modlib.php');
+        require_once($CFG->libdir . '/completionlib.php');
 
         $manageurl = (new \moodle_url(persona_home::ADMIN_PATH, array_filter([
             'view' => 'manage',
@@ -774,10 +783,13 @@ final class admin_dashboard {
             'intro' => $intro,
             'content' => $content,
             'grade' => $grade,
+            'track_completion' => ((int) $cm->completion !== COMPLETION_TRACKING_NONE),
             'name_label' => get_string('admin_activity_name', 'local_launchpad'),
             'intro_label' => get_string('admin_activity_intro', 'local_launchpad'),
             'content_label' => get_string('admin_activity_content', 'local_launchpad'),
             'grade_label' => get_string('admin_activity_grade', 'local_launchpad'),
+            'track_completion_label' => get_string('admin_activity_track_completion', 'local_launchpad'),
+            'track_completion_hint' => get_string('admin_activity_track_completion_hint', 'local_launchpad'),
             'file_hint' => get_string('admin_activity_file_hint', 'local_launchpad'),
             'quiz_hint' => get_string('admin_activity_quiz_hint', 'local_launchpad'),
             'assign_hint' => get_string('admin_activity_assign_hint', 'local_launchpad'),
@@ -818,12 +830,14 @@ final class admin_dashboard {
         string $name,
         string $intro,
         string $content = '',
-        ?float $grade = null
+        ?float $grade = null,
+        ?bool $trackcompletion = null
     ): array {
         global $CFG, $DB;
 
         unset($actor);
         require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/completionlib.php');
 
         if ($trackcourseid <= 0 || $cmid <= 0) {
             return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
@@ -887,6 +901,12 @@ final class admin_dashboard {
 
         try {
             $DB->update_record($modname, $update);
+            if ($trackcompletion !== null) {
+                if ($trackcompletion && empty($course->enablecompletion)) {
+                    $DB->set_field('course', 'enablecompletion', 1, ['id' => $trackcourseid]);
+                }
+                self::set_cm_completion_tracking($cm, $modname, $trackcompletion);
+            }
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
@@ -895,6 +915,60 @@ final class admin_dashboard {
         return [
             'ok' => get_string('admin_activity_ok_saved', 'local_launchpad', format_string($name)),
         ];
+    }
+
+    /**
+     * Apply LaunchPad default completion rules (or clear them) on a course module.
+     */
+    public static function set_cm_completion_tracking(
+        \stdClass $cm,
+        string $modname,
+        bool $enable
+    ): void {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $cmid = (int) $cm->id;
+        $instanceid = (int) $cm->instance;
+
+        if (!$enable) {
+            $DB->update_record('course_modules', (object) [
+                'id' => $cmid,
+                'completion' => COMPLETION_TRACKING_NONE,
+                'completionview' => COMPLETION_VIEW_NOT_REQUIRED,
+                'completionexpected' => 0,
+                'completiongradeitemnumber' => null,
+                'completionpassgrade' => 0,
+            ]);
+            if ($modname === 'assign') {
+                $DB->set_field('assign', 'completionsubmit', 0, ['id' => $instanceid]);
+            } else if ($modname === 'quiz') {
+                $DB->set_field('quiz', 'completionminattempts', 0, ['id' => $instanceid]);
+                $DB->set_field('quiz', 'completionattemptsexhausted', 0, ['id' => $instanceid]);
+            }
+            return;
+        }
+
+        $cmupdate = (object) [
+            'id' => $cmid,
+            'completion' => COMPLETION_TRACKING_AUTOMATIC,
+            'completionview' => COMPLETION_VIEW_NOT_REQUIRED,
+            'completionexpected' => 0,
+            'completiongradeitemnumber' => null,
+            'completionpassgrade' => 0,
+        ];
+
+        if (in_array($modname, ['page', 'resource', 'url'], true)) {
+            $cmupdate->completionview = COMPLETION_VIEW_REQUIRED;
+        } else if ($modname === 'assign') {
+            $DB->set_field('assign', 'completionsubmit', 1, ['id' => $instanceid]);
+        } else if ($modname === 'quiz') {
+            $cmupdate->completiongradeitemnumber = 0;
+            $DB->set_field('quiz', 'completionminattempts', 1, ['id' => $instanceid]);
+        }
+
+        $DB->update_record('course_modules', $cmupdate);
     }
 
     /**
@@ -909,6 +983,7 @@ final class admin_dashboard {
         global $CFG;
 
         require_once($CFG->libdir . '/resourcelib.php');
+        require_once($CFG->libdir . '/completionlib.php');
 
         $moduleinfo = new \stdClass();
         $moduleinfo->modulename = $modname;
@@ -924,7 +999,12 @@ final class admin_dashboard {
             'format' => FORMAT_HTML,
             'itemid' => 0,
         ];
-        $moduleinfo->completion = COMPLETION_TRACKING_NONE;
+        // Default: track completion (LaunchPad Course builder).
+        $moduleinfo->completion = COMPLETION_TRACKING_AUTOMATIC;
+        $moduleinfo->completionview = COMPLETION_VIEW_NOT_REQUIRED;
+        $moduleinfo->completionexpected = 0;
+        $moduleinfo->completionpassgrade = 0;
+        $moduleinfo->completiongradeitemnumber = null;
 
         switch ($modname) {
             case 'page':
@@ -933,15 +1013,22 @@ final class admin_dashboard {
                 $moduleinfo->display = RESOURCELIB_DISPLAY_OPEN;
                 $moduleinfo->printintro = 0;
                 $moduleinfo->printlastmodified = 0;
+                $moduleinfo->completionview = COMPLETION_VIEW_REQUIRED;
+                break;
+            case 'url':
+                $moduleinfo->externalurl = '';
+                $moduleinfo->display = RESOURCELIB_DISPLAY_NEW;
+                $moduleinfo->completionview = COMPLETION_VIEW_REQUIRED;
                 break;
             case 'resource':
-                // Empty file resource — upload in Settings (phase 3) / Moodle for now.
+                // Empty file resource — upload in Settings / Advanced Moodle for now.
                 $moduleinfo->display = RESOURCELIB_DISPLAY_AUTO;
                 $moduleinfo->showsize = 0;
                 $moduleinfo->showtype = 0;
                 $moduleinfo->showdate = 0;
                 $moduleinfo->filterfiles = 0;
                 $moduleinfo->files = file_get_unused_draft_itemid();
+                $moduleinfo->completionview = COMPLETION_VIEW_REQUIRED;
                 break;
             case 'quiz':
                 require_once($CFG->dirroot . '/mod/quiz/locallib.php');
@@ -980,7 +1067,9 @@ final class admin_dashboard {
                 $moduleinfo->showuserpicture = 0;
                 $moduleinfo->showblocks = 0;
                 $moduleinfo->completionattemptsexhausted = 0;
-                $moduleinfo->completionminattempts = 0;
+                $moduleinfo->completionminattempts = 1;
+                $moduleinfo->completionusegrade = 1;
+                $moduleinfo->completiongradeitemnumber = 0;
                 $moduleinfo->allowofflineattempts = 0;
                 break;
             case 'assign':
@@ -1013,6 +1102,7 @@ final class admin_dashboard {
                 $moduleinfo->assignsubmission_file_enabled = 1;
                 $moduleinfo->assignsubmission_file_maxfiles = 20;
                 $moduleinfo->assignsubmission_file_maxsizebytes = 0;
+                $moduleinfo->completionsubmit = 1;
                 break;
             default:
                 throw new \coding_exception('Unsupported module: ' . $modname);

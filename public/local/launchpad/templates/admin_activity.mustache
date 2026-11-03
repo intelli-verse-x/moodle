@@ -82,6 +82,14 @@
           </label>
         {{/has_grade}}
 
+        <label class="lp-field lp-field-check">
+          <span class="lp-field-check-row">
+            <input type="checkbox" name="trackcompletion" value="1"{{#track_completion}} checked{{/track_completion}}>
+            <span>{{track_completion_label}}</span>
+          </span>
+          <span class="lp-sm lp-muted">{{track_completion_hint}}</span>
+        </label>
+
         <div class="lp-row-sb" style="margin-top:4px">
           <button type="submit" class="lp-btn lp-btn-solid">{{save_label}}</button>
           <a class="lp-btn lp-btn-light" href="{{manage_url}}">{{back_label}}</a>

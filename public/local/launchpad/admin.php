@@ -109,6 +109,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $content = optional_param('content', '', PARAM_RAW);
         $gradeparam = optional_param('grade', null, PARAM_RAW_TRIMMED);
         $grade = ($gradeparam === null || $gradeparam === '') ? null : (float) $gradeparam;
+        $trackcompletion = (bool) optional_param('trackcompletion', 0, PARAM_BOOL);
         $flash = admin_dashboard::save_activity_settings(
             $USER,
             $trackid,
@@ -116,7 +117,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $name,
             $intro,
             $content,
-            $grade
+            $grade,
+            $trackcompletion
         );
     }
 }
