@@ -3062,3 +3062,41 @@ body.lp-portal-mismatch-lock {
 .lp-btn-ghost:hover {
   background: var(--lp-blue-soft, #eef4ff);
 }
+
+/* Admin phase manage */
+.lp-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--lp-muted);
+  margin: 0 0 4px;
+}
+.lp-crumbs a {
+  color: var(--lp-blue);
+  text-decoration: none;
+  font-weight: 600;
+}
+.lp-crumbs a:hover { text-decoration: underline; }
+.lp-manage-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.lp-manage-chooser {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px dashed var(--lp-line);
+  border-radius: 12px;
+  background: var(--lp-blue-soft, #eef4ff);
+}
+.lp-manage-add-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.lp-manage.is-editing .lp-actrow {
+  border-color: #c5d4f5;
+}

@@ -1,0 +1,107 @@
+{{!
+    @template local_launchpad/admin_manage
+
+    Admin phase manage — LaunchPad shell over Moodle section activities.
+    Edit mode toggles manage controls client-side. Keep comments free of Mustache braces.
+}}
+<div class="lp-manage" data-lp-manage data-region="local-launchpad-admin-manage">
+  <nav class="lp-crumbs" aria-label="Breadcrumb">
+    <a href="{{builder_url}}">{{builder_label}}</a>
+    <span aria-hidden="true">/</span>
+    <span>{{track_tab_label}}</span>
+    <span aria-hidden="true">/</span>
+    <span>{{heading}}</span>
+  </nav>
+
+  <section class="lp-hero" style="margin-top:8px">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+        <p class="lp-sm lp-muted" style="margin:0">{{track_name}} · {{section_state}}</p>
+      </div>
+      <div class="lp-manage-toolbar">
+        <button type="button"
+                class="lp-btn lp-btn-light lp-btn-sm"
+                data-lp-manage-edit-toggle
+                data-label-off="{{edit_mode_off_label}}"
+                data-label-on="{{edit_mode_on_label}}"
+                aria-pressed="false">
+          {{edit_mode_off_label}}
+        </button>
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{back_label}}</a>
+      </div>
+    </div>
+  </section>
+
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
+
+  {{^has_course}}
+    <p class="lp-muted" style="margin-top:16px">{{empty_body}}</p>
+    <p style="margin-top:12px"><a class="lp-btn lp-btn-solid" href="{{builder_url}}">{{builder_label}}</a></p>
+  {{/has_course}}
+
+  {{#has_course}}
+    <div class="lp-tabs lp-tabs-block" role="tablist" aria-label="{{eyebrow}}" style="margin-top:16px">
+      {{#phase_links}}
+        <a class="lp-tab{{#current}} is-on{{/current}}"
+           href="{{url}}"
+           role="tab"
+           aria-selected="{{#current}}true{{/current}}{{^current}}false{{/current}}">
+          {{title}}
+        </a>
+      {{/phase_links}}
+    </div>
+
+    <div class="lp-card lift" style="margin-top:16px">
+      <div class="lp-row-sb" style="margin-bottom:12px">
+        <h3 style="margin:0">{{heading}}</h3>
+        <div class="lp-manage-edit-only" hidden>
+          <button type="button" class="lp-btn lp-btn-solid lp-btn-sm" data-lp-manage-add-open>{{add_label}}</button>
+        </div>
+      </div>
+
+      <div class="lp-manage-chooser" data-lp-manage-chooser hidden>
+        <p class="lp-sm" style="margin:0 0 8px"><b>{{add_chooser_title}}</b></p>
+        <div class="lp-manage-add-grid">
+          {{#add_types}}
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{url}}">{{label}}</a>
+          {{/add_types}}
+        </div>
+      </div>
+
+      {{#has_activities}}
+        <div class="lp-actlist">
+          {{#activities}}
+            <div class="lp-actrow" id="cm-{{cmid}}">
+              <span class="lp-kd">{{kind}}</span>
+              <span class="lp-act-title">{{title}}</span>
+              <span class="lp-chip {{state_chip}}">{{state_label}}</span>
+              <div class="lp-manage-edit-only" hidden>
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{settings_url}}">{{settings_label}}</a>
+                {{#is_draft}}
+                  <form method="post" action="{{form_action}}" class="lp-inline-form">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="mark_reviewed">
+                    <input type="hidden" name="trackid" value="{{trackid}}">
+                    <input type="hidden" name="cmid" value="{{cmid}}">
+                    <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
+                  </form>
+                {{/is_draft}}
+              </div>
+            </div>
+          {{/activities}}
+        </div>
+      {{/has_activities}}
+      {{^has_activities}}
+        <p class="lp-muted lp-sm" style="margin:0">{{empty_acts}}</p>
+      {{/has_activities}}
+    </div>
+  {{/has_course}}
+</div>

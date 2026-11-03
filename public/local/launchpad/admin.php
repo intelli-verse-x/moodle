@@ -40,7 +40,7 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'builder', 'cohorts', 'people', 'mentors', 'reviews'];
+$allowedviews = ['home', 'tracks', 'builder', 'manage', 'cohorts', 'people', 'mentors', 'reviews'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
@@ -51,9 +51,10 @@ if (!in_array($peopletab, ['all', 'fellow', 'mentor', 'admin'], true)) {
 }
 
 $trackid = optional_param('trackid', 0, PARAM_INT);
+$sectionnum = optional_param('section', 0, PARAM_INT);
 
 $flash = [];
-if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder')
+if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
     if ($view === 'cohorts' && $action === 'enrol_fellow') {
@@ -65,7 +66,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder')
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $flash = admin_dashboard::assign_mentor_by_email($USER, $email, $trackid);
-    } else if ($view === 'builder' && $action === 'mark_reviewed') {
+    } else if (($view === 'builder' || $view === 'manage') && $action === 'mark_reviewed') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
         $flash = admin_dashboard::mark_activity_reviewed($USER, $trackid, $cmid);
@@ -80,7 +81,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder')
 $urlparams = array_filter([
     'view' => $view !== 'home' ? $view : null,
     'tab' => ($view === 'people' && $peopletab !== 'all') ? $peopletab : null,
-    'trackid' => ($view === 'builder' && $trackid > 0) ? $trackid : null,
+    'trackid' => (($view === 'builder' || $view === 'manage') && $trackid > 0) ? $trackid : null,
+    'section' => ($view === 'manage' && $sectionnum > 0) ? $sectionnum : null,
 ]);
 
 $context = context_system::instance();
@@ -211,6 +213,22 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_builder',
         admin_dashboard::builder_context($USER, $trackid, $flash)
+    );
+} else if ($view === 'manage') {
+    $pagetitle = get_string('admin_manage_heading', 'local_launchpad');
+    // Keep Course builder nav highlighted while managing a phase.
+    foreach ($nav as &$navgroup) {
+        foreach ($navgroup['items'] as &$navitem) {
+            if (($navitem['key'] ?? '') === 'builder') {
+                $navitem['current'] = true;
+            }
+        }
+        unset($navitem);
+    }
+    unset($navgroup);
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_manage',
+        admin_dashboard::manage_context($USER, $trackid, $sectionnum, $flash)
     );
 } else if ($view === 'cohorts') {
     $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');

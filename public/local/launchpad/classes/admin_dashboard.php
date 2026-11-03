@@ -221,14 +221,18 @@ final class admin_dashboard {
                     $act['form_action'] = $formaction;
                     $act['sesskey'] = $sesskey;
                     $act['trackid'] = $cid;
-                    $act['edit_label'] = $editlabel;
-                    $act['mark_label'] = $marklabel;
+                $act['edit_label'] = $editlabel;
+                $act['mark_label'] = $marklabel;
+                // Prefer LaunchPad manage deep-link when present.
+                if (empty($act['manage_url'])) {
+                    $act['manage_url'] = $act['edit_url'];
                 }
-                unset($act);
             }
-            unset($phase);
+            unset($act);
+        }
+        unset($phase);
 
-            $teachers = self::teacher_names($cid);
+        $teachers = self::teacher_names($cid);
             $panels[] = [
                 'id' => $cid,
                 'current' => $current,
@@ -345,14 +349,164 @@ final class admin_dashboard {
                 'activities' => $activities,
                 'has_activities' => $activities !== [],
                 'can_show' => $canshow,
-                'add_url' => $sectionid > 0
-                    ? (new \moodle_url('/course/section.php', ['id' => $sectionid]))->out(false)
-                    : (new \moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
+                // LaunchPad manage UI (phase 1+) — not stock Moodle section.php.
+                'add_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'manage',
+                    'trackid' => $courseid,
+                    'section' => $sectionnum,
+                ]))->out(false),
+                'manage_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'manage',
+                    'trackid' => $courseid,
+                    'section' => $sectionnum,
+                ]))->out(false),
                 'toggle_show' => !$sectionvisible,
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * One phase manage screen in the admin shell (LaunchPad chrome, Moodle data).
+     *
+     * @param \stdClass $user
+     * @param array{ok?:string,error?:string} $flash
+     * @return array<string, mixed>
+     */
+    public static function manage_context(
+        \stdClass $user,
+        int $trackid,
+        int $sectionnum,
+        array $flash = []
+    ): array {
+        unset($user);
+        $tracks = self::list_track_courses();
+        $course = null;
+        foreach ($tracks as $c) {
+            if ((int) $c->id === $trackid) {
+                $course = $c;
+                break;
+            }
+        }
+        if ($course === null && $tracks !== []) {
+            $course = $tracks[0];
+            $trackid = (int) $course->id;
+        }
+        if ($course === null) {
+            return [
+                'has_course' => false,
+                'empty_body' => get_string('admin_builder_empty', 'local_launchpad'),
+                'builder_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false),
+                'builder_label' => get_string('admin_nav_builder', 'local_launchpad'),
+                'flash_ok' => !empty($flash['ok']),
+                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+                'flash_err' => !empty($flash['error']),
+                'flash_err_body' => (string) ($flash['error'] ?? ''),
+            ];
+        }
+
+        $phases = blueprint::phase_sections();
+        if ($sectionnum < 1 || $sectionnum > 4 || !isset($phases[$sectionnum])) {
+            $sectionnum = 1;
+        }
+        $phasetitle = $phases[$sectionnum];
+        $section = null;
+        global $DB;
+        $section = $DB->get_record('course_sections', [
+            'course' => $trackid,
+            'section' => $sectionnum,
+        ]);
+        $sectionvisible = $section && (int) $section->visible === 1;
+        $activities = self::builder_activities_for_section($trackid, $section, $sectionvisible);
+
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'manage',
+            'trackid' => $trackid,
+            'section' => $sectionnum,
+        ]))->out(false);
+        $sesskey = sesskey();
+        $editlabel = get_string('admin_manage_settings', 'local_launchpad');
+        $marklabel = get_string('admin_builder_mark_reviewed', 'local_launchpad');
+        foreach ($activities as &$act) {
+            $act['form_action'] = $formaction;
+            $act['sesskey'] = $sesskey;
+            $act['trackid'] = $trackid;
+            $act['sectionnum'] = $sectionnum;
+            $act['settings_label'] = $editlabel;
+            $act['mark_label'] = $marklabel;
+            // Settings still Moodle modedit until phase 3.
+            $act['settings_url'] = $act['edit_url'];
+            $act['open_label'] = get_string('admin_manage_open', 'local_launchpad');
+        }
+        unset($act);
+
+        $addtypes = [];
+        foreach (['page', 'resource', 'quiz', 'assign'] as $mod) {
+            $addtypes[] = [
+                'mod' => $mod,
+                'label' => self::builder_mod_kind($mod),
+                // Phase 1: Moodle add form; phase 2 creates in-shell.
+                'url' => (new \moodle_url('/course/modedit.php', [
+                    'add' => $mod,
+                    'type' => '',
+                    'course' => $trackid,
+                    'section' => $sectionnum,
+                    'return' => 0,
+                ]))->out(false),
+            ];
+        }
+
+        $phaselinks = [];
+        foreach ($phases as $num => $title) {
+            $phaselinks[] = [
+                'sectionnum' => $num,
+                'title' => $title,
+                'current' => $num === $sectionnum,
+                'url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'manage',
+                    'trackid' => $trackid,
+                    'section' => $num,
+                ]))->out(false),
+            ];
+        }
+
+        return [
+            'has_course' => true,
+            'eyebrow' => get_string('admin_manage_eyebrow', 'local_launchpad'),
+            'heading' => $phasetitle,
+            'lead' => get_string('admin_manage_lead', 'local_launchpad'),
+            'track_name' => format_string($course->fullname),
+            'track_tab_label' => self::builder_track_tab_label($course),
+            'section_state' => $sectionvisible
+                ? get_string('admin_builder_section_shown', 'local_launchpad')
+                : get_string('admin_builder_section_hidden', 'local_launchpad'),
+            'section_shown' => $sectionvisible,
+            'activities' => $activities,
+            'has_activities' => $activities !== [],
+            'empty_acts' => get_string('admin_builder_no_activities', 'local_launchpad'),
+            'phase_links' => $phaselinks,
+            'add_types' => $addtypes,
+            'add_label' => get_string('admin_builder_add', 'local_launchpad'),
+            'add_chooser_title' => get_string('admin_manage_add_chooser', 'local_launchpad'),
+            'edit_mode_label' => get_string('admin_manage_edit_mode', 'local_launchpad'),
+            'edit_mode_on_label' => get_string('admin_manage_edit_on', 'local_launchpad'),
+            'edit_mode_off_label' => get_string('admin_manage_edit_off', 'local_launchpad'),
+            'builder_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'builder',
+                'trackid' => $trackid,
+            ]))->out(false),
+            'builder_label' => get_string('admin_nav_builder', 'local_launchpad'),
+            'back_label' => get_string('admin_manage_back', 'local_launchpad'),
+            'form_action' => $formaction,
+            'sesskey' => $sesskey,
+            'trackid' => $trackid,
+            'sectionnum' => $sectionnum,
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+        ];
     }
 
     /**
@@ -395,6 +549,7 @@ final class admin_dashboard {
             }
         }
 
+        $sectionnum = (int) ($section->section ?? 0);
         $out = [];
         foreach ($ordered as $cm) {
             $modname = (string) $cm->modname;
@@ -414,16 +569,23 @@ final class admin_dashboard {
                 $statechip = '';
             }
 
+            $cmid = (int) $cm->id;
             $out[] = [
-                'cmid' => (int) $cm->id,
+                'cmid' => $cmid,
+                'modname' => $modname,
                 'kind' => self::builder_mod_kind($modname),
                 'title' => format_string($instancename !== '' ? $instancename : $modname),
                 'state' => $state,
                 'state_label' => get_string('admin_builder_state_' . $state, 'local_launchpad'),
                 'state_chip' => $statechip,
                 'is_draft' => $isdraft,
+                'manage_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'manage',
+                    'trackid' => $courseid,
+                    'section' => max(1, $sectionnum),
+                ]))->out(false) . '#cm-' . $cmid,
                 'edit_url' => (new \moodle_url('/course/modedit.php', [
-                    'update' => (int) $cm->id,
+                    'update' => $cmid,
                     'return' => 1,
                 ]))->out(false),
             ];

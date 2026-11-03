@@ -1652,4 +1652,48 @@
 
         applyTrack(root.getAttribute('data-lp-builder-active') || tabs[0].getAttribute('data-lp-builder-tab'), false);
     })();
+
+    // Admin phase manage: Edit mode toggle + add chooser.
+    (function manageEditMode() {
+        var root = shell.querySelector('[data-lp-manage]');
+        if (!root) {
+            return;
+        }
+        var toggle = root.querySelector('[data-lp-manage-edit-toggle]');
+        var chooser = root.querySelector('[data-lp-manage-chooser]');
+        var addOpen = root.querySelector('[data-lp-manage-add-open]');
+        var editOnly = root.querySelectorAll('.lp-manage-edit-only');
+
+        function setEdit(on) {
+            root.classList.toggle('is-editing', on);
+            if (toggle) {
+                toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+                toggle.classList.toggle('lp-btn-solid', on);
+                toggle.classList.toggle('lp-btn-light', !on);
+                var onLabel = toggle.getAttribute('data-label-on');
+                var offLabel = toggle.getAttribute('data-label-off');
+                if (onLabel && offLabel) {
+                    toggle.textContent = on ? onLabel : offLabel;
+                }
+            }
+            editOnly.forEach(function (el) {
+                el.hidden = !on;
+            });
+            if (!on && chooser) {
+                chooser.hidden = true;
+            }
+        }
+
+        if (toggle) {
+            toggle.addEventListener('click', function () {
+                setEdit(!root.classList.contains('is-editing'));
+            });
+        }
+        if (addOpen && chooser) {
+            addOpen.addEventListener('click', function () {
+                chooser.hidden = !chooser.hidden;
+            });
+        }
+        setEdit(false);
+    })();
 })();
