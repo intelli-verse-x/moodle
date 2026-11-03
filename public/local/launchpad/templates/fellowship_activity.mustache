@@ -1,0 +1,89 @@
+{{!
+    @template local_launchpad/fellowship_activity
+
+    Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource in-shell;
+    quiz/assign open Moodle engine from CTA).
+}}
+{{#activity}}
+  <div class="lp-activity-page" data-region="fellowship-activity">
+    <nav class="lp-crumbs" aria-label="Breadcrumb">
+      <a href="{{home_url}}">{{strings.navhome}}</a>
+      <span aria-hidden="true">/</span>
+      <a href="{{courseurl}}">{{strings.navtrack}}</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{title_main}}</span>
+    </nav>
+
+    <article class="lp-activity-hero">
+      <div class="lp-activity-hero-copy">
+        <div class="lp-activity-badges">
+          <span class="lp-activity-badge is-type">{{modname}}</span>
+          <span class="lp-activity-badge is-status is-{{statustone}}">{{status}}</span>
+        </div>
+
+        <h2 class="lp-activity-title">{{title_main}}</h2>
+        {{#hastitlesub}}
+          <p class="lp-activity-sub">{{title_sub}}</p>
+        {{/hastitlesub}}
+
+        <div class="lp-activity-head-actions">
+          <a class="lp-btn lp-btn-light lp-activity-back" href="{{courseurl}}">{{strings.backtotrack}}</a>
+          {{#needsengine}}
+            <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
+          {{/needsengine}}
+        </div>
+
+        {{#hasintro}}
+          <div class="lp-activity-intro">{{{introhtml}}}</div>
+        {{/hasintro}}
+
+        {{#isinportal}}
+          {{#hasbody}}
+            <div class="lp-activity-body">{{{bodyhtml}}}</div>
+          {{/hasbody}}
+
+          {{#isplaceholder}}
+            <div class="lp-activity-callout" role="status">
+              <div class="lp-activity-callout-text">
+                <b>{{strings.contentcomingsoon}}</b>
+                <p>{{strings.activityempty}}</p>
+              </div>
+            </div>
+          {{/isplaceholder}}
+
+          {{#hasexternal}}
+            <div class="lp-activity-external">
+              <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                {{strings.openlink}}
+              </a>
+              <p class="lp-muted lp-sm">{{externalurl}}</p>
+            </div>
+          {{/hasexternal}}
+
+          {{#hasfiles}}
+            <ul class="lp-activity-files">
+              {{#files}}
+                <li>
+                  <a class="lp-activity-file" href="{{url}}">
+                    <span>{{filename}}</span>
+                    <span class="lp-muted lp-sm">{{size}}</span>
+                  </a>
+                </li>
+              {{/files}}
+            </ul>
+          {{/hasfiles}}
+        {{/isinportal}}
+
+        {{#needsengine}}
+          <div class="lp-activity-callout" role="status">
+            <div class="lp-activity-callout-text">
+              <b>{{strings.openactivity}}</b>
+              <p>{{strings.activityenginehelp}}</p>
+              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
+            </div>
+          </div>
+        {{/needsengine}}
+      </div>
+    </article>
+  </div>
+{{/activity}}

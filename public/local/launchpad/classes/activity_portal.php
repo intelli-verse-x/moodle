@@ -19,10 +19,11 @@ namespace local_launchpad;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Employer portal activity viewer — Moodle CM data in LaunchPad UI.
+ * LaunchPad activity viewer — Moodle CM data in portal shells.
  *
- * Page / URL / resource render inside the portal shell. Interactive modules
+ * Page / URL / resource render inside the shell. Interactive modules
  * (quiz, assign, …) keep Moodle engines but open from this consistent chrome.
+ * Used by Employer (`activity.php`) and Fellowship (`fellow.php?view=activity`).
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -30,14 +31,24 @@ defined('MOODLE_INTERNAL') || die();
  */
 final class activity_portal {
 
-    /** Mods rendered fully inside the Employer shell. */
+    /** Mods rendered fully inside the portal shell. */
     private const PORTAL_RENDER = ['page', 'url', 'resource'];
 
     /**
-     * Portal activity URL for a course module (Employer shell).
+     * Employer portal activity URL for a course module.
      */
     public static function url(int $cmid): string {
         return (new \moodle_url('/local/launchpad/activity.php', ['id' => $cmid]))->out(false);
+    }
+
+    /**
+     * Fellowship portal activity URL for a course module.
+     */
+    public static function fellow_url(int $cmid): string {
+        return (new \moodle_url(persona_home::FELLOW_PATH, [
+            'view' => 'activity',
+            'cmid' => $cmid,
+        ]))->out(false);
     }
 
     /**
@@ -48,13 +59,13 @@ final class activity_portal {
     }
 
     /**
-     * Rewrite a workspace activity row URL to the portal activity page.
+     * Rewrite a workspace activity row URL to the Employer portal activity page.
      *
      * @param array<string,mixed> $activity
      * @return array<string,mixed>
      */
     public static function rewrite_row(array $activity): array {
-        $cmid = (int) ($activity['id'] ?? 0);
+        $cmid = (int) ($activity['id'] ?? $activity['cmid'] ?? 0);
         if ($cmid > 0) {
             $activity['url'] = self::url($cmid);
             $activity['portal'] = true;
@@ -63,13 +74,29 @@ final class activity_portal {
     }
 
     /**
-     * Build Mustache context for one CM inside the Employer shell.
+     * Rewrite a Fellowship track/home activity row to the fellow activity shell.
+     *
+     * @param array<string,mixed> $activity
+     * @return array<string,mixed>
+     */
+    public static function rewrite_fellow_row(array $activity): array {
+        $cmid = (int) ($activity['cmid'] ?? $activity['id'] ?? 0);
+        if ($cmid > 0) {
+            $activity['url'] = self::fellow_url($cmid);
+            $activity['portal'] = true;
+        }
+        return $activity;
+    }
+
+    /**
+     * Build Mustache context for one CM inside a LaunchPad shell.
      *
      * @param \stdClass $user
      * @param int $cmid
+     * @param array{courseurl?:string} $options Optional courseurl override (fellow track vs employee course).
      * @return array<string,mixed>
      */
-    public static function export(\stdClass $user, int $cmid): array {
+    public static function export(\stdClass $user, int $cmid, array $options = []): array {
         global $CFG, $DB;
 
         require_once($CFG->libdir . '/completionlib.php');
@@ -87,10 +114,14 @@ final class activity_portal {
 
         $modname = $cm->modname;
         $context = \context_module::instance($cm->id);
-        $courseurl = (new \moodle_url('/local/launchpad/employee.php', [
-            'view' => 'course',
-            'id' => (int) $course->id,
-        ]))->out(false);
+        if (!empty($options['courseurl'])) {
+            $courseurl = (string) $options['courseurl'];
+        } else {
+            $courseurl = (new \moodle_url('/local/launchpad/employee.php', [
+                'view' => 'course',
+                'id' => (int) $course->id,
+            ]))->out(false);
+        }
         $moodleurl = $cm->url
             ? $cm->url->out(false)
             : (new \moodle_url('/mod/' . $modname . '/view.php', ['id' => $cm->id]))->out(false);
@@ -232,9 +263,8 @@ final class activity_portal {
         }
 
         $hasbody = trim(strip_tags($bodyhtml)) !== '';
-        $isplaceholder = $titlesub !== ''
-            || ($callouttext !== '' && stripos($callouttext, 'placeholder') !== false)
-            || !$hasbody;
+        // Placeholder only when there is nothing to show (no body / files / link).
+        $isplaceholder = !$hasbody && !$hasfiles && !$hasexternal;
 
         return [
             'is_activity' => true,
@@ -296,10 +326,11 @@ final class activity_portal {
     }
 
     /**
-     * Redirect Employer learners from stock mod/page (and friends) into the portal.
+     * Redirect Employer / Fellowship learners from stock mod views into LaunchPad.
      *
      * Site admins are excluded so Course builder / Moodle edit stays on native
-     * mod pages (not the Employer activity shell).
+     * mod pages. Fellows also get quiz/assign interstitial in the fellow shell;
+     * attempt/submit still use Moodle engines from the CTA.
      */
     public static function maybe_redirect_from_mod(): void {
         global $PAGE, $USER;
@@ -316,7 +347,11 @@ final class activity_portal {
         if (!isloggedin() || isguestuser() || is_siteadmin()) {
             return;
         }
-        if (!account_persona::is_employee((int) $USER->id)) {
+
+        $userid = (int) $USER->id;
+        $isemployee = account_persona::is_employee($userid);
+        $isfellow = account_persona::is_fellowship($userid);
+        if (!$isemployee && !$isfellow) {
             return;
         }
 
@@ -332,7 +367,12 @@ final class activity_portal {
             $path = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
         }
         $path = strtok($path, '?') ?: $path;
-        if (!preg_match('#/mod/(page|url|resource)/view\.php$#', $path)) {
+
+        // Fellows: wrap page/url/resource + quiz/assign landing. Employees: page/url/resource only.
+        $modpattern = $isfellow
+            ? '#/mod/(page|url|resource|quiz|assign)/view\.php$#'
+            : '#/mod/(page|url|resource)/view\.php$#';
+        if (!preg_match($modpattern, $path)) {
             return;
         }
 
@@ -358,6 +398,13 @@ final class activity_portal {
         $idnumber = (string) ($course->idnumber ?? '');
         if (!str_starts_with($idnumber, account_persona::COURSE_IDNUMBER_PREFIX)) {
             return;
+        }
+
+        if ($isfellow) {
+            redirect(new \moodle_url(persona_home::FELLOW_PATH, [
+                'view' => 'activity',
+                'cmid' => $cmid,
+            ]));
         }
 
         redirect(new \moodle_url('/local/launchpad/activity.php', ['id' => $cmid]));

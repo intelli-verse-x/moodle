@@ -144,6 +144,8 @@ final class fellowship_dashboard {
                     'complete' => $iscomplete,
                     'icon_class' => self::mod_icon_class($cm->modname),
                 ];
+                // Open in Fellowship activity shell (page/file in-shell; quiz/assign CTA → Moodle).
+                $item = activity_portal::rewrite_fellow_row($item);
                 $activities[] = $item;
 
                 if ($next === null && (!$tracked || !$iscomplete)) {
@@ -1649,7 +1651,7 @@ final class fellowship_dashboard {
                 $assigncount++;
                 $instanceid = (int) $cm->instance;
                 $name = $cm->get_formatted_name();
-                $url = (new \moodle_url('/mod/assign/view.php', ['id' => $cm->id]))->out(false);
+                $url = activity_portal::fellow_url((int) $cm->id);
 
                 $latest = $DB->get_record('assign_submission', [
                     'assignment' => $instanceid,

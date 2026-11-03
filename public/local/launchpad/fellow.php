@@ -24,6 +24,7 @@
 
 require(__DIR__ . '/../../config.php');
 
+use local_launchpad\activity_portal;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\messaging;
@@ -43,8 +44,15 @@ $view = optional_param('view', 'home', PARAM_ALPHA);
 // On messages, id is the other user — never a course (avoids fellowship_course_denied).
 $messageuserid = 0;
 $courseid = 0;
+$cmid = optional_param('cmid', 0, PARAM_INT);
 if ($view === 'messages') {
     $messageuserid = optional_param('id', 0, PARAM_INT);
+} else if ($view === 'activity' && $cmid > 0) {
+    // Resolve course from the CM so track nav / access checks stay coherent.
+    $cmforcourse = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+    if ($cmforcourse) {
+        $courseid = (int) $cmforcourse->course;
+    }
 } else {
     $courseid = optional_param('id', 0, PARAM_INT);
 }
@@ -76,7 +84,8 @@ $PAGE->set_url(new moodle_url(persona_home::FELLOW_PATH, array_filter([
     'view' => $view !== 'home' ? $view : null,
     'id' => $view === 'messages'
         ? ($messageuserid > 0 ? $messageuserid : null)
-        : ($courseid > 0 ? $courseid : null),
+        : (($view !== 'activity' && $courseid > 0) ? $courseid : null),
+    'cmid' => ($view === 'activity' && $cmid > 0) ? $cmid : null,
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('fellowship_area_title', 'local_launchpad'));
@@ -117,7 +126,7 @@ $nav = [
             [
                 'label' => get_string('fellowship_nav_track', 'local_launchpad'),
                 'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
-                'current' => $view === 'track',
+                'current' => ($view === 'track' || $view === 'activity'),
                 'key' => 'track',
                 'icon_svg' => $icon('<path d="M4 6h16M4 12h10M4 18h13"/><circle cx="18" cy="12" r="2"/><circle cx="19" cy="18" r="2"/>'),
             ],
@@ -270,6 +279,34 @@ $content = '';
 $pagetitle = get_string('fellowship_area_heading', 'local_launchpad');
 
 switch ($view) {
+    case 'activity':
+        $pagetitle = get_string('fellowship_activity_eyebrow', 'local_launchpad');
+        if ($cmid <= 0) {
+            redirect(new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']));
+        }
+        $trackurl = (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'track',
+            'id' => $courseid > 0 ? $courseid : null,
+        ])))->out(false);
+        $activityctx = activity_portal::export($USER, $cmid, ['courseurl' => $trackurl]);
+        $act = $activityctx['activity'] ?? [];
+        $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_activity', [
+            'activity' => $act,
+            'home_url' => $homeurl,
+            'strings' => [
+                'navhome' => get_string('fellowship_nav_home', 'local_launchpad'),
+                'navtrack' => get_string('fellowship_nav_track', 'local_launchpad'),
+                'backtotrack' => get_string('fellowship_activity_back', 'local_launchpad'),
+                'openactivity' => get_string('fellowship_activity_open', 'local_launchpad'),
+                'openlink' => get_string('fellowship_activity_open_link', 'local_launchpad'),
+                'activityempty' => get_string('fellowship_activity_empty', 'local_launchpad'),
+                'contentcomingsoon' => get_string('fellowship_activity_coming_soon', 'local_launchpad'),
+                'activityenginehelp' => get_string('fellowship_activity_engine_help', 'local_launchpad'),
+            ],
+        ]);
+        break;
+
     case 'track':
         $pagetitle = get_string('fellowship_nav_track', 'local_launchpad');
         if ($selected === null) {
