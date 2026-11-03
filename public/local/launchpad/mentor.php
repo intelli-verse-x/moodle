@@ -53,6 +53,18 @@ $fellowid = optional_param('userid', 0, PARAM_INT);
 $courseid = optional_param('course', 0, PARAM_INT);
 $saved = optional_param('saved', '', PARAM_ALPHA);
 $err = optional_param('err', '', PARAM_ALPHANUMEXT);
+$messageconvid = 0;
+$messagetab = 'all';
+if ($view === 'messages') {
+    $messageconvid = optional_param('convid', 0, PARAM_INT);
+    $messagetab = optional_param('mtab', 'all', PARAM_ALPHA);
+    if (!in_array($messagetab, ['all', 'starred', 'private', 'group'], true)) {
+        $messagetab = 'all';
+    }
+    if ($messageconvid < 0) {
+        $messageconvid = 0;
+    }
+}
 
 $courses = persona_home::list_mentor_courses($userid);
 
@@ -60,7 +72,15 @@ $courses = persona_home::list_mentor_courses($userid);
 if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
     $toid = required_param('id', PARAM_INT);
     $msgaction = optional_param('msgaction', 'send', PARAM_ALPHA);
-    $redirect = new moodle_url(persona_home::MENTOR_PATH, ['view' => 'messages', 'id' => $toid]);
+    $posttab = optional_param('mtab', 'all', PARAM_ALPHA);
+    if (!in_array($posttab, ['all', 'starred', 'private', 'group'], true)) {
+        $posttab = 'all';
+    }
+    $redirect = new moodle_url(persona_home::MENTOR_PATH, array_filter([
+        'view' => 'messages',
+        'id' => $toid,
+        'mtab' => $posttab !== 'all' ? $posttab : null,
+    ]));
     if ($msgaction === 'delete') {
         $messageids = optional_param_array('messageids', [], PARAM_INT);
         $result = messaging::delete_messages($userid, $messageids);
@@ -179,7 +199,9 @@ $nav = [
                 'icon_svg' => $icon('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
             ],
             [
-                'label' => get_string('fellowship_messages', 'local_launchpad'),
+                'label' => get_string_manager()->string_exists('fellowship_nav_messages', 'local_launchpad')
+                    ? get_string('fellowship_nav_messages', 'local_launchpad')
+                    : 'Messages',
                 'url' => $messagesurl,
                 'current' => $view === 'messages',
                 'key' => 'messages',
@@ -240,30 +262,13 @@ switch ($view) {
         break;
 
     case 'messages':
-        $pagetitle = get_string('fellowship_messages_heading', 'local_launchpad');
+        $pagetitle = messaging::messages_label(0);
         $otherid = $cmid > 0 ? $cmid : null;
-        $msgdata = messaging::page_context($userid, 'mentor', $otherid);
-        $msgcrumbs = [
-            [
-                'label' => get_string('mentor_nav_home', 'local_launchpad'),
-                'url' => $homeurl,
-            ],
-            [
-                'label' => get_string('fellowship_messages', 'local_launchpad'),
-                'url' => !empty($msgdata['has_thread']) ? messaging::messages_url(null, 'mentor') : '',
-            ],
-        ];
+        $msgdata = messaging::page_context($userid, 'mentor', $otherid, $messagetab, $messageconvid);
         if (!empty($msgdata['has_thread']) && !empty($msgdata['other_name'])) {
             $pagetitle = (string) $msgdata['other_name'];
-            $msgcrumbs[] = [
-                'label' => (string) $msgdata['other_name'],
-                'url' => '',
-            ];
         }
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', array_merge($msgdata, [
-            'has_crumbs' => true,
-            'crumbs' => $msgcrumbs,
-        ]));
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', $msgdata);
         break;
 
     case 'calendar':

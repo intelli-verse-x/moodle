@@ -1095,7 +1095,7 @@
         }
 
         function buildBubble(msg) {
-            var el = document.createElement('div');
+            var el = document.createElement('article');
             var selectable = !!(msg.can_delete && canDelete);
             el.className = 'lp-msg-bubble is-mine' + (selectable ? ' is-selectable' : '');
             el.setAttribute('data-lp-msg-bubble', '');
@@ -1114,8 +1114,8 @@
             text.textContent = msg.text || '';
             el.appendChild(text);
             if (msg.when) {
-                var when = document.createElement('div');
-                when.className = 'lp-xs lp-muted';
+                var when = document.createElement('time');
+                when.className = 'lp-msg-bubble-when';
                 when.textContent = msg.when;
                 el.appendChild(when);
             }

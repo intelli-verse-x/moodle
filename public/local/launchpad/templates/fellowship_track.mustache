@@ -32,7 +32,7 @@
     {{#has_next}}
       {{#next}}
         <p class="lp-course-hero-next">
-          <span class="lp-muted">{{#str}} fellowship_next_activity, local_launchpad {{/str}}</span>
+          <span class="lp-muted">{{next_label}}</span>
           <a class="lp-link" href="{{url}}">{{{name}}}</a>
         </p>
       {{/next}}
@@ -41,7 +41,7 @@
       {{#has_next}}
         {{#next}}
           <a class="lp-btn lp-btn-solid" href="{{url}}">
-            {{#str}} fellowship_cta_resume, local_launchpad {{/str}}
+            {{cta_label}}
             <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon>
           </a>
         {{/next}}
@@ -62,10 +62,15 @@
 
 {{#journey.has_gates}}
   <section class="lp-card lift lp-journey-card lp-home-block">
-    <div class="lp-card-head lp-card-head-stack">
-      <div>
-        <h3 class="lp-journey-title">{{#str}} fellowship_your_journey, local_launchpad {{/str}}</h3>
-        <p class="lp-card-sub">{{#str}} fellowship_journey_help_short, local_launchpad {{/str}}</p>
+    <div class="lp-card-head">
+      <div class="lp-grade-progress-title">
+        <span class="lp-grade-progress-icon" aria-hidden="true">
+          <iconify-icon icon="hugeicons:route-01" width="22" height="22"></iconify-icon>
+        </span>
+        <div class="lp-card-copy">
+          <h3>{{#str}} fellowship_your_journey, local_launchpad {{/str}}</h3>
+          <p>{{#str}} fellowship_journey_help_short, local_launchpad {{/str}}</p>
+        </div>
       </div>
     </div>
     {{> local_launchpad/fellowship_journey}}
@@ -74,10 +79,17 @@
 
 <div class="lp-grid-2 lp-track-grid">
   <div class="lp-stack">
-    <section class="lp-course-outline" aria-label="{{#str}} fellowship_track_phases_heading, local_launchpad {{/str}}">
-      <div class="lp-phases-head">
-        <h3>{{#str}} fellowship_track_phases_heading, local_launchpad {{/str}}</h3>
-        <p class="lp-phases-lead">{{#str}} fellowship_track_phases_help, local_launchpad {{/str}}</p>
+    <section class="lp-card lift lp-home-block lp-course-outline" aria-label="{{#str}} fellowship_track_phases_heading, local_launchpad {{/str}}">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:layers-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{#str}} fellowship_track_phases_heading, local_launchpad {{/str}}</h3>
+            <p>{{#str}} fellowship_track_phases_help, local_launchpad {{/str}}</p>
+          </div>
+        </div>
       </div>
       {{#has_track_phases}}
         <ol class="lp-outline">
@@ -160,66 +172,80 @@
   </div>
 
   <aside class="lp-stack lp-stack-lg lp-track-aside">
-    <section class="lp-card lift lp-home-block lp-stack">
-      <div class="lp-card-head lp-card-head-stack">
-        <div>
-          <h3>{{#str}} fellowship_track_capstone, local_launchpad {{/str}}</h3>
-          <p class="lp-card-sub">{{#str}} fellowship_track_capstone_help, local_launchpad {{/str}}</p>
+    <section class="lp-card lift lp-home-block lp-theme-panel">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:note-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{#str}} fellowship_track_meta_heading, local_launchpad {{/str}}</h3>
+            <p>{{#str}} fellowship_track_meta_help, local_launchpad {{/str}}</p>
+          </div>
         </div>
       </div>
-      <p class="lp-sm">{{{capstone_body}}}</p>
-    </section>
-
-    <section class="lp-card lift lp-home-block">
-      <div class="lp-card-head lp-card-head-stack">
-        <div>
-          <h3>{{#str}} fellowship_track_meta_heading, local_launchpad {{/str}}</h3>
+      <dl class="lp-theme-kv">
+        <div class="lp-theme-kv-row">
+          <dt>{{#str}} fellowship_track_meta_prereq, local_launchpad {{/str}}</dt>
+          <dd>{{{prerequisite}}}</dd>
         </div>
-      </div>
-      <dl class="lp-kv">
-        <dt>{{#str}} fellowship_track_meta_prereq, local_launchpad {{/str}}</dt>
-        <dd>{{{prerequisite}}}</dd>
-        <dt>{{#str}} fellowship_track_meta_device, local_launchpad {{/str}}</dt>
-        <dd>{{{device}}}</dd>
-        <dt>{{#str}} fellowship_track_meta_tools, local_launchpad {{/str}}</dt>
-        <dd>{{{tools}}}</dd>
-        <dt>{{#str}} fellowship_track_meta_mentor, local_launchpad {{/str}}</dt>
-        <dd>
-          {{#has_mentors}}
-            <ul class="lp-mentor-contact-list">
-              {{#mentors}}
-                <li class="lp-mentor-contact">
-                  <span>{{{name}}}</span>
-                  {{#can_message}}
-                    <a class="lp-link-sm" href="{{message_url}}">{{#str}} fellowship_message_mentor, local_launchpad {{/str}}</a>
-                  {{/can_message}}
-                </li>
-              {{/mentors}}
-            </ul>
-          {{/has_mentors}}
-          {{^has_mentors}}
-            {{{mentor}}}
-          {{/has_mentors}}
-        </dd>
+        <div class="lp-theme-kv-row">
+          <dt>{{#str}} fellowship_track_meta_device, local_launchpad {{/str}}</dt>
+          <dd>{{{device}}}</dd>
+        </div>
+        <div class="lp-theme-kv-row">
+          <dt>{{#str}} fellowship_track_meta_tools, local_launchpad {{/str}}</dt>
+          <dd>{{{tools}}}</dd>
+        </div>
+        <div class="lp-theme-kv-row">
+          <dt>{{#str}} fellowship_track_meta_mentor, local_launchpad {{/str}}</dt>
+          <dd>
+            {{#has_mentors}}
+              <ul class="lp-mentor-contact-list">
+                {{#mentors}}
+                  <li class="lp-mentor-contact">
+                    <span>{{{name}}}</span>
+                    {{#can_message}}
+                      <a class="lp-link-sm" href="{{message_url}}">{{#str}} fellowship_message_mentor, local_launchpad {{/str}}</a>
+                    {{/can_message}}
+                  </li>
+                {{/mentors}}
+              </ul>
+            {{/has_mentors}}
+            {{^has_mentors}}
+              {{{mentor}}}
+            {{/has_mentors}}
+          </dd>
+        </div>
       </dl>
     </section>
 
-    <section class="lp-card lift lp-home-block lp-stack">
-      <div class="lp-card-head lp-card-head-stack">
-        <div>
-          <h3>{{#str}} fellowship_track_how_completion, local_launchpad {{/str}}</h3>
-          <p class="lp-card-sub">{{#str}} fellowship_track_how_completion_lead, local_launchpad {{/str}}</p>
+    <section class="lp-card lift lp-home-block lp-stack lp-theme-panel">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:target-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{#str}} fellowship_track_how_completion, local_launchpad {{/str}}</h3>
+            <p>{{#str}} fellowship_track_how_completion_lead, local_launchpad {{/str}}</p>
+          </div>
         </div>
       </div>
-      {{#weight_rows}}
-        <div class="lp-weight-row">
-          <div class="lp-row-sb lp-sm">
-            <span>{{name}}</span>
-            <b class="lp-num">{{weight_label}}</b>
+      <div class="lp-theme-weight-list">
+        {{#weight_rows}}
+          <div class="lp-theme-weight-row">
+            <span class="lp-phase-ico tone-{{icon_tone}}" aria-hidden="true">
+              <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+            </span>
+            <div class="lp-theme-weight-main">
+              <span class="lp-theme-weight-name">{{name}}</span>
+              <div class="lp-bar" aria-hidden="true"><i style="width:{{bar_pct}}%"></i></div>
+            </div>
+            <span class="lp-theme-pct">{{weight_label}}</span>
           </div>
-          <div class="lp-bar lp-bar-thin" aria-hidden="true"><i style="width:{{bar_pct}}%"></i></div>
-        </div>
-      {{/weight_rows}}
+        {{/weight_rows}}
+      </div>
     </section>
   </aside>
 </div>

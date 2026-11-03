@@ -21,10 +21,12 @@
         </div>
       </div>
       <div class="lp-topbar-actions">
-        <a class="lp-xp-chip" href="{{achievements_url}}" title="{{#str}} fellowship_xp_title, local_launchpad {{/str}}">
-          <iconify-icon icon="hugeicons:star" width="16" height="16" aria-hidden="true"></iconify-icon>
-          <b>{{xp_total}}</b> <span>XP</span>
-        </a>
+        {{#has_courses}}
+          <a class="lp-xp-chip" href="{{achievements_url}}" title="{{#str}} fellowship_xp_title, local_launchpad {{/str}}">
+            <iconify-icon icon="hugeicons:star" width="16" height="16" aria-hidden="true"></iconify-icon>
+            <b>{{xp_total}}</b> <span>XP</span>
+          </a>
+        {{/has_courses}}
         <a class="lp-iconbtn" href="{{notifications_url}}" aria-label="{{notifications_label}}">
           <iconify-icon icon="hugeicons:notification-01" width="18" height="18" aria-hidden="true"></iconify-icon>
           {{#has_unread_notifications}}

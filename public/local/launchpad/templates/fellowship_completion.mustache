@@ -1,8 +1,7 @@
 {{!
     @template local_launchpad/fellowship_completion
 
-    Completion — gates ring, requirements table, locked certificate.
-    Tools chrome aligned with Achievements / Employer badges.
+    Completion — Capstone hero + stats + requirements workspace + certificate.
 }}
 <div class="lp-tools-page lp-reveal" data-region="fellowship-completion-page" style="--lp-d:0">
 {{^has_course}}
@@ -12,27 +11,36 @@
     </div>
     <h2>{{strings.empty_title}}</h2>
     <p>{{empty_message}}</p>
+    {{#track_url}}
+      <a class="lp-btn lp-btn-primary" href="{{track_url}}">{{strings.go_track}}</a>
+    {{/track_url}}
   </div>
 {{/has_course}}
 
 {{#has_course}}
-  <div class="lp-grid-2 lp-completion-grid">
-    <section class="lp-card lift lp-stack-lg lp-completion-main">
-      <div class="lp-card-head">
-        <div class="lp-grade-progress-title">
+  <div class="lp-comp-system">
+    <section class="lp-card lift lp-theme-hero lp-comp-overview">
+      <div class="lp-theme-hero-main">
+        <div class="lp-theme-hero-title-row">
           <span class="lp-grade-progress-icon" aria-hidden="true">
             <iconify-icon icon="hugeicons:flag-02" width="22" height="22"></iconify-icon>
           </span>
           <div class="lp-card-copy">
-            <h3>{{strings.gates_heading}}</h3>
+            <div class="lp-theme-hero-heading">
+              <h3>{{strings.gates_heading}}</h3>
+              <span class="lp-chip {{status_chip}}">{{status_label}}</span>
+            </div>
             <p>{{strings.gates_sub}}</p>
           </div>
         </div>
-        <span class="lp-chip {{status_chip}}">{{status_label}}</span>
+        <p class="lp-sm lp-theme-hero-body">{{strings.gates_lead}}</p>
+        <div class="lp-comp-hero-summary">
+          <h2 class="lp-completion-gates">{{gates_label}}</h2>
+          <p class="lp-muted lp-sm">{{gates_note}}</p>
+        </div>
       </div>
-
-      <div class="lp-completion-hero">
-        <div class="lp-ring" style="width:{{ring_size}}px;height:{{ring_size}}px" aria-hidden="true">
+      <div class="lp-theme-hero-art lp-comp-ring-art" aria-hidden="true">
+        <div class="lp-ring" style="width:{{ring_size}}px;height:{{ring_size}}px">
           <svg viewBox="0 0 {{ring_size}} {{ring_size}}">
             <circle cx="{{ring_cx}}" cy="{{ring_cy}}" r="{{ring_radius}}" fill="none" stroke="var(--lp-blue-soft)" stroke-width="10"/>
             <circle class="lp-ring-arc" cx="{{ring_cx}}" cy="{{ring_cy}}" r="{{ring_radius}}" fill="none" stroke="var(--lp-blue)" stroke-width="10" stroke-linecap="round" stroke-dasharray="{{ring_circ}}" stroke-dashoffset="{{ring_circ}}" data-to="{{ring_dashoffset}}" transform="rotate(-90 {{ring_cx}} {{ring_cy}})"/>
@@ -42,72 +50,109 @@
             <span>{{strings.ring_label}}</span>
           </div>
         </div>
-        <div class="lp-stack">
-          <h2 class="lp-completion-gates">{{gates_label}}</h2>
-          <p class="lp-muted lp-sm">{{gates_note}}</p>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-comp-stats">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:analytics-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.stats_heading}}</h3>
+          </div>
+        </div>
+      </div>
+      <dl class="lp-theme-kv lp-comp-stats-kv">
+        <div class="lp-theme-kv-row{{#all_met}} is-hot{{/all_met}}">
+          <dt>{{strings.stat_gates}}</dt>
+          <dd><b class="lp-num">{{gates_met}}</b><span class="lp-comp-stat-of">/ {{gates_total}}</span></dd>
+        </div>
+        <div class="lp-theme-kv-row{{#orientation_done}} is-hot{{/orientation_done}}">
+          <dt>{{strings.stat_orientation}}</dt>
+          <dd><span class="lp-chip {{orientation_chip}}">{{orientation_status}}</span></dd>
+        </div>
+        <div class="lp-theme-kv-row">
+          <dt>{{strings.stat_weighted}}</dt>
+          <dd>
+            <b class="lp-num">{{weighted_display}}</b>
+            <span class="lp-chip {{weighted_chip}}">{{weighted_status}}</span>
+          </dd>
+        </div>
+      </dl>
+    </section>
+  </div>
+
+  <div class="lp-comp-layout">
+    <section class="lp-card lift lp-comp-workspace">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:task-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.req_heading}}</h3>
+            <p>{{strings.calc_note}}</p>
+          </div>
         </div>
       </div>
 
-      <div class="lp-table-wrap lp-completion-table">
-        <table class="lp-table">
-          <thead>
-            <tr>
-              <th scope="col">{{strings.col_req}}</th>
-              <th scope="col">{{strings.col_weight}}</th>
-              <th scope="col">{{strings.col_result}}</th>
-              <th scope="col">{{strings.col_status}}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>
-                <span class="lp-completion-req">
-                  <span class="lp-completion-req-ico" aria-hidden="true">
-                    <iconify-icon icon="hugeicons:book-open-01" width="16" height="16"></iconify-icon>
-                  </span>
-                  {{strings.orientation}}
-                </span>
-              </td>
-              <td class="lp-num">{{orientation_weight}}</td>
-              <td class="lp-num">{{orientation_result}}</td>
-              <td><span class="lp-chip {{orientation_chip}}">{{orientation_status}}</span></td>
-            </tr>
-            {{#phases}}
-              <tr>
-                <td>
-                  <span class="lp-completion-req">
-                    <span class="lp-completion-req-ico" aria-hidden="true">
-                      <iconify-icon icon="hugeicons:flag-02" width="16" height="16"></iconify-icon>
-                    </span>
-                    {{name}}
-                  </span>
-                </td>
-                <td class="lp-num">{{weight_label}}</td>
-                <td class="lp-num">{{result_display}}</td>
-                <td>
-                  {{#has_chip_class}}
-                    <span class="lp-chip {{chip}}">{{status}}</span>
-                  {{/has_chip_class}}
-                  {{^has_chip_class}}
-                    <span class="lp-chip">{{status}}</span>
-                  {{/has_chip_class}}
-                </td>
-              </tr>
-            {{/phases}}
-            <tr class="lp-completion-total">
-              <td><b>{{strings.weighted}}</b></td>
-              <td class="lp-num">100%</td>
-              <td class="lp-num">{{weighted_display}}</td>
-              <td><span class="lp-chip {{weighted_chip}}">{{weighted_status}}</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="lp-xs lp-muted">{{strings.calc_note}}</p>
+      <ul class="lp-comp-req-list">
+        <li class="lp-comp-req-row">
+          <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+            <iconify-icon icon="hugeicons:book-open-01" width="18" height="18"></iconify-icon>
+          </span>
+          <div class="lp-comp-req-main">
+            <span class="lp-comp-req-name">{{strings.orientation}}</span>
+            <div class="lp-comp-req-meta">
+              <span>{{strings.col_weight}}: {{orientation_weight}}</span>
+              <span>{{strings.col_result}}: {{orientation_result}}</span>
+            </div>
+          </div>
+          <span class="lp-chip {{orientation_chip}}">{{orientation_status}}</span>
+        </li>
+        {{#phases}}
+          <li class="lp-comp-req-row{{#is_met}} is-met{{/is_met}}">
+            <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+              <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+            </span>
+            <div class="lp-comp-req-main">
+              <span class="lp-comp-req-name">{{name}}</span>
+              {{#show_bar}}
+                <div class="lp-bar" aria-hidden="true"><i style="width:{{bar_pct}}%"></i></div>
+              {{/show_bar}}
+              <div class="lp-comp-req-meta">
+                <span>{{strings.col_weight}}: {{weight_label}}</span>
+                <span>{{strings.col_result}}: {{result_display}}</span>
+              </div>
+            </div>
+            {{#has_chip_class}}
+              <span class="lp-chip {{chip}}">{{status}}</span>
+            {{/has_chip_class}}
+            {{^has_chip_class}}
+              <span class="lp-chip">{{status}}</span>
+            {{/has_chip_class}}
+          </li>
+        {{/phases}}
+        <li class="lp-comp-req-row is-total">
+          <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+            <iconify-icon icon="hugeicons:chart-histogram" width="18" height="18"></iconify-icon>
+          </span>
+          <div class="lp-comp-req-main">
+            <span class="lp-comp-req-name">{{strings.weighted}}</span>
+            <div class="lp-comp-req-meta">
+              <span>{{strings.col_weight}}: 100%</span>
+              <span>{{strings.col_result}}: {{weighted_display}}</span>
+            </div>
+          </div>
+          <span class="lp-chip {{weighted_chip}}">{{weighted_status}}</span>
+        </li>
+      </ul>
 
       {{#has_outstanding}}
-        <div class="lp-stack lp-completion-todo">
-          <div class="lp-grade-progress-title">
+        <div class="lp-comp-todo">
+          <div class="lp-theme-hero-title-row">
             <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
               <iconify-icon icon="hugeicons:task-01" width="18" height="18"></iconify-icon>
             </span>
@@ -118,7 +163,9 @@
           <ul class="lp-completion-todo-list">
             {{#outstanding}}
               <li class="lp-todo-row">
-                <span class="lp-chk" aria-hidden="true"></span>
+                <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+                  <iconify-icon icon="hugeicons:{{icon}}" width="16" height="16"></iconify-icon>
+                </span>
                 <span class="lp-todo-copy">{{label}}</span>
               </li>
             {{/outstanding}}
@@ -127,9 +174,9 @@
       {{/has_outstanding}}
     </section>
 
-    <section class="lp-card lift lp-stack lp-completion-cert-card">
-      <div class="lp-card-head">
-        <div class="lp-grade-progress-title">
+    <section class="lp-card lift lp-theme-panel lp-comp-cert">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
           <span class="lp-grade-progress-icon" aria-hidden="true">
             <iconify-icon icon="hugeicons:certificate-01" width="22" height="22"></iconify-icon>
           </span>

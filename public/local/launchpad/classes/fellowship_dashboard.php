@@ -136,7 +136,7 @@ final class fellowship_dashboard {
 
                 $item = [
                     'cmid' => (int) $cm->id,
-                    'name' => $cm->get_formatted_name(),
+                    'name' => self::display_label($cm->get_formatted_name()),
                     'modname' => $cm->modname,
                     'modname_display' => get_string('modulename', 'mod_' . $cm->modname),
                     'url' => $url,
@@ -167,7 +167,7 @@ final class fellowship_dashboard {
             }
 
             $sections[] = [
-                'name' => $secname,
+                'name' => self::display_label($secname),
                 'sectionnum' => (int) $section->section,
                 'activities' => $activities,
                 'has_activities' => true,
@@ -301,6 +301,12 @@ final class fellowship_dashboard {
             $iscurrent = false;
             $islock = true;
             $mark = '🔒';
+            $section = $bysection[$num] ?? null;
+            $hasmoodlesection = $section !== null;
+            // Prefer live Moodle section titles when the course has that section.
+            $moodlename = trim((string) ($section['name'] ?? ''));
+            $displayname = $moodlename !== '' ? $moodlename : $meta['name'];
+            $displayshort = $moodlename !== '' ? $moodlename : $meta['short'];
             if ($isdone) {
                 $status = 'done';
                 $isdoneflag = true;
@@ -313,11 +319,24 @@ final class fellowship_dashboard {
                 $mark = (string) ($i + 1);
                 $foundcurrent = true;
             }
-            $statustext = $phasestatus[$num] ?? ($isdone ? 'Met' : ($iscurrent ? 'In progress' : 'Not released'));
+            if ($phasestatus !== null && isset($phasestatus[$num])) {
+                $statustext = $phasestatus[$num];
+            } else if ($isdone) {
+                $statustext = 'Met';
+            } else if ($iscurrent) {
+                $statustext = 'In progress';
+            } else if (!$hasmoodlesection) {
+                $statustext = get_string('fellowship_journey_section_missing', 'local_launchpad');
+            } else {
+                $statustext = 'Not released';
+            }
             $weight = (int) ($weights[$num] ?? 0);
             $gates[] = [
-                'name' => $meta['name'],
-                'short' => $meta['short'],
+                'name' => $displayname,
+                'short' => $displayshort,
+                'spine_name' => $meta['name'],
+                'spine_short' => $meta['short'],
+                'has_moodle_section' => $hasmoodlesection,
                 'sectionnum' => $num,
                 'status' => $status,
                 'is_done' => $isdoneflag,
@@ -575,6 +594,36 @@ final class fellowship_dashboard {
 
         $journey = self::journey_from_outline($outline, false, $statusmap);
 
+        $met = 0;
+        foreach ($phases as $phase) {
+            if (!empty($phase['is_met'])) {
+                $met++;
+            }
+        }
+        $gatestotal = count($phases);
+        $allmet = $gatestotal > 0 && $met === $gatestotal;
+
+        $strings = [
+            'journey_heading' => self::str('fellowship_your_journey', null, 'Your journey'),
+            'journey_sub' => self::str(
+                'fellowship_journey_help_short',
+                null,
+                'Your Fellowship learning journey'
+            ),
+            'gates_heading' => self::str('fellowship_nav_phases', null, 'Phase progress'),
+            'gates_sub' => self::str(
+                'fellowship_phases_lead',
+                null,
+                'Each phase passes only after a released review at 70/100 or above.'
+            ),
+            'note' => self::str(
+                'fellowship_phases_note',
+                null,
+                'A missing or unreviewed grade stays pending. A high capstone mark can’t make up for a phase that hasn’t passed.'
+            ),
+            'empty_title' => self::str('fellowship_no_courses_heading', null, 'No LaunchPad course yet'),
+        ];
+
         return [
             'has_course' => $course !== null,
             'course_name' => $course ? format_string($course->fullname) : '',
@@ -583,6 +632,24 @@ final class fellowship_dashboard {
             'has_phases' => $phases !== [],
             'journey' => $journey,
             'outline' => $outline,
+            'gates_met' => $met,
+            'gates_total' => $gatestotal,
+            'gates_label' => get_string_manager()->string_exists('fellowship_completion_gates', 'local_launchpad')
+                ? get_string('fellowship_completion_gates', 'local_launchpad', [
+                    'met' => $met,
+                    'total' => $gatestotal,
+                ])
+                : ($met . ' of ' . $gatestotal . ' gates passed'),
+            'status_chip' => $allmet ? 'ok' : 'line',
+            'status_label' => $allmet
+                ? self::str('fellowship_completion_met', null, 'Requirements met')
+                : self::str('fellowship_completion_outstanding', null, 'Requirements outstanding'),
+            'empty_message' => self::str(
+                'fellowship_no_courses',
+                null,
+                'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.'
+            ),
+            'strings' => $strings,
         ];
     }
 
@@ -664,11 +731,14 @@ final class fellowship_dashboard {
         $weights = [];
         $maxw = max(1, max(self::phase_weights()));
         foreach (self::phase_weights() as $num => $weight) {
+            $iconmeta = $phaseicons[$num] ?? ['icon' => 'book-open-01', 'tone' => 'blue'];
             $weights[] = [
                 'name' => blueprint::phase_sections()[$num] ?? ('Phase ' . $num),
                 'weight' => $weight,
                 'weight_label' => $weight . '%',
                 'bar_pct' => (int) round(($weight / $maxw) * 100),
+                'icon' => $iconmeta['icon'],
+                'icon_tone' => $iconmeta['tone'],
             ];
         }
 
@@ -703,12 +773,26 @@ final class fellowship_dashboard {
 
         $firstanchor = $trackphases !== [] ? (string) ($trackphases[0]['anchor'] ?? '') : '';
 
+        $started = ($haspercent && (int) $percent > 0) || $completed > 0;
+        $ctalabel = $started
+            ? get_string('fellowship_cta_resume', 'local_launchpad')
+            : get_string('fellowship_cta_start', 'local_launchpad');
+        $nextlabel = $started
+            ? get_string('fellowship_next_activity', 'local_launchpad')
+            : get_string('fellowship_next_activity_start', 'local_launchpad');
+        if (is_array($next)) {
+            $next['next_label'] = $nextlabel;
+            $next['cta_label'] = $ctalabel;
+        }
+
+        $lead = $hasrealsummary
+            ? self::display_label($summary)
+            : get_string('fellowship_track_lead_default', 'local_launchpad');
+
         return [
-            'course_name' => format_string($course->fullname),
+            'course_name' => self::display_label(format_string($course->fullname)),
             'course_idnumber' => s($course->idnumber),
-            'course_lead' => $hasrealsummary
-                ? $summary
-                : get_string('fellowship_track_lead_default', 'local_launchpad'),
+            'course_lead' => $lead,
             'course_badge' => get_string('fellowship_track_badge', 'local_launchpad'),
             'course_status' => $coursestatus,
             'course_statustype' => $coursestatustype,
@@ -719,6 +803,8 @@ final class fellowship_dashboard {
             'has_first_section' => $firstanchor !== '',
             'next' => $next,
             'has_next' => is_array($next),
+            'next_label' => $nextlabel,
+            'cta_label' => $ctalabel,
             'capstone_body' => get_string('fellowship_track_capstone_body', 'local_launchpad'),
             'prerequisite' => get_string('fellowship_track_prerequisite', 'local_launchpad'),
             'device' => get_string('fellowship_track_device', 'local_launchpad'),
@@ -738,6 +824,22 @@ final class fellowship_dashboard {
             'activitytotal' => $trackable,
             'hasprogress' => $haspercent || $trackable > 0,
         ];
+    }
+
+    /**
+     * Learner-facing label: plain text, no curriculum placeholders, soft punctuation.
+     */
+    public static function display_label(string $value): string {
+        $text = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = trim(strip_tags($text));
+        // Blueprint activities ship as "Name [placeholder — content pending]".
+        $text = preg_replace('/\s*\[[^\]]*placeholder[^\]]*\]\s*$/iu', '', $text) ?? $text;
+        $text = preg_replace('/\s*\[[^\]]*content pending[^\]]*\]\s*$/iu', '', $text) ?? $text;
+        $text = trim($text);
+        // Soften em/en dashes used in seeded LaunchPad course titles.
+        $text = str_replace(["\u{2014}", "\u{2013}"], ' · ', $text);
+        $text = preg_replace('/\s+·\s+/u', ' · ', $text) ?? $text;
+        return trim($text, " \t\n\r\0\x0B·");
     }
 
     /**
@@ -823,15 +925,28 @@ final class fellowship_dashboard {
         $outstanding = [];
         $allscored = $phases !== [];
         $weightsum = 0.0;
+        $phaseicons = [
+            1 => 'book-open-01',
+            2 => 'task-01',
+            3 => 'layers-01',
+            4 => 'award-01',
+        ];
+        $n = 0;
 
         foreach ($phases as &$phase) {
+            $n++;
             $phase['result_display'] = !empty($phase['has_score']) ? (string) (int) $phase['score'] : '—';
+            $phase['icon'] = $phaseicons[$n] ?? 'flag-02';
+            $phase['bar_pct'] = !empty($phase['has_score'])
+                ? max(0, min(100, (int) round((float) $phase['score'])))
+                : 0;
+            $phase['show_bar'] = !empty($phase['has_score']);
             if (!empty($phase['is_met'])) {
                 $met++;
             } else {
                 $outstanding[] = [
                     'label' => $phase['name'] . ': ' . \core_text::strtolower((string) $phase['status']),
-                    'icon' => 'flag-02',
+                    'icon' => $phase['icon'],
                 ];
             }
             if (empty($phase['has_score'])) {
@@ -870,7 +985,17 @@ final class fellowship_dashboard {
                 null,
                 'Phase reviews must reach 70/100. Practice quizzes carry no weight.'
             ),
+            'gates_lead' => self::str(
+                'fellowship_completion_gates_lead',
+                null,
+                'Track how each gate and Shared orientation stand against the published criteria.'
+            ),
             'ring_label' => self::str('fellowship_completion_ring_label', null, 'gates passed'),
+            'stats_heading' => self::str('fellowship_completion_stats_heading', null, 'At a glance'),
+            'stat_gates' => self::str('fellowship_completion_stat_gates', null, 'Gates'),
+            'stat_orientation' => self::str('fellowship_completion_stat_orientation', null, 'Orientation'),
+            'stat_weighted' => self::str('fellowship_completion_stat_weighted', null, 'Weighted'),
+            'req_heading' => self::str('fellowship_completion_req_heading', null, 'Requirements'),
             'col_req' => self::str('fellowship_completion_col_req', null, 'Requirement'),
             'col_weight' => self::str('fellowship_completion_col_weight', null, 'Weight'),
             'col_result' => self::str('fellowship_completion_col_result', null, 'Result'),
@@ -1743,15 +1868,18 @@ final class fellowship_dashboard {
         $currentshort = $currentgate;
         $currentsection = 0;
         foreach ($journey['gates'] ?? [] as $gate) {
+            // Ring caption stays compact (spine short); full Moodle section name is for cards/KPIs.
+            $gateshort = (string) ($gate['spine_short'] ?? $gate['short'] ?? $gate['name'] ?? $currentgate);
+            $gatename = (string) ($gate['name'] ?? $gateshort);
             if (!empty($gate['is_current'])) {
-                $currentgate = (string) ($gate['name'] ?? $currentgate);
-                $currentshort = (string) ($gate['short'] ?? $currentgate);
+                $currentgate = $gatename;
+                $currentshort = $gateshort;
                 $currentsection = (int) ($gate['sectionnum'] ?? 0);
                 break;
             }
             if (!empty($gate['is_done'])) {
-                $currentgate = (string) ($gate['name'] ?? $currentgate);
-                $currentshort = (string) ($gate['short'] ?? $currentgate);
+                $currentgate = $gatename;
+                $currentshort = $gateshort;
                 $currentsection = (int) ($gate['sectionnum'] ?? 0);
             }
         }
@@ -1829,7 +1957,7 @@ final class fellowship_dashboard {
         $badgesearned = (int) ($live['badges_earned'] ?? count($earned));
         $badgestotal = count($badges);
 
-        $requiredvalue = '—';
+        $requiredvalue = get_string('fellowship_stat_required_na', 'local_launchpad');
         if ($hascoursepercent) {
             $requiredvalue = $completed . '/' . $trackable;
         } else if ($gatetrackable > 0) {
@@ -1874,19 +2002,30 @@ final class fellowship_dashboard {
             $sec = (int) ($gate['sectionnum'] ?? 0);
             $step = (string) ($gate['status'] ?? 'lock');
             $count = $seccounts[$sec] ?? 0;
+            $hasmoodlesection = !empty($gate['has_moodle_section']) || isset($seccounts[$sec]);
+            if ($count > 0) {
+                $activitymeta = get_string('fellowship_activities_count', 'local_launchpad', $count);
+            } else if (!$hasmoodlesection && empty($gate['is_current'])) {
+                $activitymeta = get_string('fellowship_journey_section_missing', 'local_launchpad');
+            } else {
+                $activitymeta = '';
+            }
             $gatelegend[] = array_merge($gate, [
                 'step' => $step,
                 'activity_count' => $count,
-                'activity_meta' => $count > 0
-                    ? get_string('fellowship_activities_count', 'local_launchpad', $count)
-                    : '',
-                'has_activity_meta' => $count > 0 && empty($gate['is_current']),
+                'activity_meta' => $activitymeta,
+                'has_activity_meta' => $activitymeta !== '' && empty($gate['is_current']),
                 'legend_icon' => self::section_legend_icon($step),
             ]);
         }
 
         $phasesurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
         $trackurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false);
+        $hasscoped = $scoped !== [];
+        $hasgates = $gatelegend !== [];
+        $badgesvalue = $badgestotal > 0
+            ? $badgesearned . '/' . $badgestotal
+            : (string) $badgesearned;
 
         return [
             // Always render the hero ring for enrolled fellows (0% is honest).
@@ -1904,7 +2043,7 @@ final class fellowship_dashboard {
             'ring_cy' => $size / 2,
             'ring_circ' => round($circ, 2),
             'ring_dashoffset' => number_format($dashoffset, 2, '.', ''),
-            'stat_badges_value' => $badgesearned . '/' . $badgestotal,
+            'stat_badges_value' => $badgesvalue,
             'stat_required_value' => $requiredvalue,
             'stat_gate_value' => $currentgate,
             'has_stats' => true,
@@ -1913,18 +2052,20 @@ final class fellowship_dashboard {
                     'url' => $achievementsurl,
                     'icon' => 'champion',
                     'tone' => 'blue',
-                    'value' => (string) $badgesearned,
+                    'value' => $badgesvalue,
                     'label' => get_string('fellowship_stat_badges', 'local_launchpad'),
                 ],
                 [
-                    'url' => '#fellowship-scoped',
+                    // Prefer in-page scoped list; fall back to Track when that block is absent.
+                    'url' => $hasscoped ? '#fellowship-scoped' : $trackurl,
                     'icon' => 'checkmark-circle-02',
                     'tone' => 'violet',
                     'value' => $requiredvalue,
                     'label' => get_string('fellowship_stat_required', 'local_launchpad'),
                 ],
                 [
-                    'url' => '#fellowship-journey',
+                    // Prefer journey card; fall back to Phase progress when gates are absent.
+                    'url' => $hasgates ? '#fellowship-journey' : $phasesurl,
                     'icon' => 'flag-01',
                     'tone' => 'green',
                     'value' => $currentgate,
@@ -1933,11 +2074,11 @@ final class fellowship_dashboard {
                 ],
             ],
             'scoped_activities' => $scoped,
-            'has_scoped_activities' => $scoped !== [],
+            'has_scoped_activities' => $hasscoped,
             'scoped_section_name' => $scopedname,
             'scoped_section_help' => get_string('fellowship_scoped_help', 'local_launchpad'),
             'gate_legend' => $gatelegend,
-            'has_gate_legend' => $gatelegend !== [],
+            'has_gate_legend' => $hasgates,
             'recent_badges' => $recent,
             'has_recent_badges' => $recent !== [],
             'achievements_url' => $achievementsurl,
@@ -1946,7 +2087,19 @@ final class fellowship_dashboard {
             'foundations_activities' => $foundations,
             'has_foundations_activities' => $foundations !== [],
             'progresspct' => $ringpct,
+            'all_tracked_done' => $alldone,
         ];
+    }
+
+    /**
+     * Moodle course overview image URL when an image is uploaded (empty string otherwise).
+     *
+     * @param \stdClass $course
+     * @return string
+     */
+    public static function course_image_url(\stdClass $course): string {
+        $image = \core_course\external\course_summary_exporter::get_course_image($course);
+        return is_string($image) && $image !== '' ? $image : '';
     }
 
     /**
@@ -2104,40 +2257,124 @@ final class fellowship_dashboard {
      * Portfolio = assign evidence from enrolled tracks (submissions + grades), not invented files.
      *
      * @param list<\stdClass> $courses
-     * @return array{items: list<array>, has_items: bool}
+     * @return array{
+     *   items: list<array>,
+     *   has_items: bool,
+     *   count_submitted: int,
+     *   count_reviewed: int,
+     *   count_awaiting: int,
+     *   count_open: int,
+     *   has_attention: bool
+     * }
      */
     public static function list_portfolio_evidence(int $userid, array $courses): array {
         $feedback = self::list_assignment_feedback($userid, $courses);
-        $items = [];
+        $attention = [];
+        $pending = [];
+        $reviewed = [];
+        $open = [];
+
         foreach ($feedback['items'] ?? [] as $row) {
+            $status = (string) ($row['status'] ?? 'not_submitted');
             $when = (string) ($row['graded_at'] ?? '');
-            if ($when === '') {
+            $whenlabel = '';
+            if ($when !== '') {
+                $whenlabel = self::str('fellowship_portfolio_when_graded', $when, 'Graded {$a}');
+            } else {
                 $when = (string) ($row['submitted_at'] ?? '');
+                if ($when !== '') {
+                    $whenlabel = self::str('fellowship_portfolio_when_submitted', $when, 'Submitted {$a}');
+                }
             }
-            $items[] = [
+            $attempt = (int) ($row['attempt'] ?? 0);
+            $icon = match ($status) {
+                'pending' => 'time-04',
+                'changes' => 'alert-02',
+                'reviewed' => 'checkmark-circle-02',
+                default => 'file-02',
+            };
+            $item = [
+                'cmid' => (int) ($row['cmid'] ?? 0),
                 'name' => $row['name'],
                 'course_name' => $row['course_name'] ?? '',
+                'status_key' => $status,
                 'status' => $row['status_label'] ?? '',
                 'chip' => $row['chip'] ?? 'line',
+                'icon' => $icon,
+                'summary' => $row['summary'] ?? '',
                 'when' => $when,
+                'when_label' => $whenlabel,
+                'has_when' => $whenlabel !== '',
                 'url' => $row['url'],
                 'has_comment' => !empty($row['has_comment']),
+                'has_grade' => !empty($row['has_grade']),
+                'grade_display' => $row['grade_display'] ?? '',
+                'has_attempt' => $attempt > 0,
+                'attempt' => $attempt,
+                'attempt_label' => $attempt > 0
+                    ? self::str('fellowship_portfolio_attempt', (string) $attempt, 'Attempt {$a}')
+                    : '',
+                'needs_attention' => !empty($row['needs_attention']),
+                'cta_label' => $row['cta_label'] ?? '',
+                'is_pending' => $status === 'pending',
+                'is_reviewed' => $status === 'reviewed',
+                'is_changes' => $status === 'changes',
+                'is_open' => $status === 'not_submitted',
             ];
+
+            if (!empty($item['needs_attention'])) {
+                $attention[] = $item;
+            } else if ($status === 'pending') {
+                $pending[] = $item;
+            } else if ($status === 'reviewed' || $status === 'changes') {
+                $reviewed[] = $item;
+            } else {
+                $open[] = $item;
+            }
         }
+
+        $items = array_values(array_merge($attention, $pending, $reviewed, $open));
+        $countreviewed = 0;
+        $countsubmitted = 0;
+        $countopen = 0;
+        $countawaiting = 0;
+        foreach ($items as $item) {
+            $key = (string) ($item['status_key'] ?? '');
+            if ($key === 'not_submitted') {
+                $countopen++;
+                continue;
+            }
+            $countsubmitted++;
+            if ($key === 'pending') {
+                $countawaiting++;
+            } else if ($key === 'reviewed' || $key === 'changes') {
+                $countreviewed++;
+            }
+        }
+
         return [
             'items' => $items,
             'has_items' => $items !== [],
+            'count_submitted' => $countsubmitted,
+            'count_reviewed' => $countreviewed,
+            'count_awaiting' => $countawaiting,
+            'count_open' => $countopen,
+            'has_attention' => $attention !== [],
+            'has_submitted' => $countsubmitted > 0,
         ];
     }
 
     /**
-     * Resolve a lang string with a hard fallback (never emit Moodle [[missing]] markers).
+     * Resolve a Moodle lang key with a hard fallback (never emit [[missing]] markers).
+     *
+     * Production: prefer lang/en/local_launchpad.php via get_string; fallback only when
+     * the string cache is stale or the key is not installed yet.
      *
      * @param string $identifier
      * @param mixed $a
      * @param string $fallback
      */
-    private static function str(string $identifier, $a = null, string $fallback = ''): string {
+    public static function str(string $identifier, $a = null, string $fallback = ''): string {
         if (get_string_manager()->string_exists($identifier, 'local_launchpad')) {
             $out = get_string($identifier, 'local_launchpad', $a);
             if (is_string($out) && $out !== '' && strpos($out, '[[') === false) {
