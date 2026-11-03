@@ -40,7 +40,7 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'builder', 'manage', 'cohorts', 'people', 'mentors', 'reviews'];
+$allowedviews = ['home', 'tracks', 'builder', 'manage', 'activity', 'cohorts', 'people', 'mentors', 'reviews'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
@@ -52,9 +52,15 @@ if (!in_array($peopletab, ['all', 'fellow', 'mentor', 'admin'], true)) {
 
 $trackid = optional_param('trackid', 0, PARAM_INT);
 $sectionnum = optional_param('section', 0, PARAM_INT);
+$cmid = optional_param('cmid', 0, PARAM_INT);
 
 $flash = [];
-if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage')
+if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
+    $flash = $SESSION->lp_admin_flash;
+    unset($SESSION->lp_admin_flash);
+}
+
+if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage' || $view === 'activity')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
     if ($view === 'cohorts' && $action === 'enrol_fellow') {
@@ -81,19 +87,46 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $mod = optional_param('mod', '', PARAM_ALPHA);
         $name = optional_param('name', '', PARAM_TEXT);
         $flash = admin_dashboard::create_phase_activity($USER, $trackid, $sectionnum, $mod, $name);
+        // Phase 4: land in LaunchPad settings after create.
+        if (!empty($flash['ok']) && !empty($flash['cmid'])) {
+            $SESSION->lp_admin_flash = $flash;
+            redirect(new moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'activity',
+                'trackid' => $trackid,
+                'cmid' => (int) $flash['cmid'],
+            ]));
+        }
     } else if ($view === 'manage' && $action === 'toggle_cm') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
         $show = (bool) optional_param('show', 0, PARAM_BOOL);
         $flash = admin_dashboard::set_activity_visible($USER, $trackid, $cmid, $show);
+    } else if ($view === 'activity' && $action === 'save_activity') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        $name = optional_param('name', '', PARAM_TEXT);
+        $intro = optional_param('intro', '', PARAM_RAW);
+        $content = optional_param('content', '', PARAM_RAW);
+        $gradeparam = optional_param('grade', null, PARAM_RAW_TRIMMED);
+        $grade = ($gradeparam === null || $gradeparam === '') ? null : (float) $gradeparam;
+        $flash = admin_dashboard::save_activity_settings(
+            $USER,
+            $trackid,
+            $cmid,
+            $name,
+            $intro,
+            $content,
+            $grade
+        );
     }
 }
 
 $urlparams = array_filter([
     'view' => $view !== 'home' ? $view : null,
     'tab' => ($view === 'people' && $peopletab !== 'all') ? $peopletab : null,
-    'trackid' => (($view === 'builder' || $view === 'manage') && $trackid > 0) ? $trackid : null,
+    'trackid' => (($view === 'builder' || $view === 'manage' || $view === 'activity') && $trackid > 0) ? $trackid : null,
     'section' => ($view === 'manage' && $sectionnum > 0) ? $sectionnum : null,
+    'cmid' => ($view === 'activity' && $cmid > 0) ? $cmid : null,
 ]);
 
 $context = context_system::instance();
@@ -240,6 +273,21 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_manage',
         admin_dashboard::manage_context($USER, $trackid, $sectionnum, $flash)
+    );
+} else if ($view === 'activity') {
+    $pagetitle = get_string('admin_activity_eyebrow', 'local_launchpad');
+    foreach ($nav as &$navgroup) {
+        foreach ($navgroup['items'] as &$navitem) {
+            if (($navitem['key'] ?? '') === 'builder') {
+                $navitem['current'] = true;
+            }
+        }
+        unset($navitem);
+    }
+    unset($navgroup);
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_activity',
+        admin_dashboard::activity_settings_context($USER, $trackid, $cmid, $flash)
     );
 } else if ($view === 'cohorts') {
     $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');

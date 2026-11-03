@@ -1,0 +1,92 @@
+{{!
+    @template local_launchpad/admin_activity
+
+    Slim activity settings in the admin shell (page / file / quiz / assign).
+}}
+<div class="lp-activity" data-region="local-launchpad-admin-activity">
+  <nav class="lp-crumbs" aria-label="Breadcrumb">
+    <a href="{{manage_url}}">{{back_label}}</a>
+    <span aria-hidden="true">/</span>
+    <span>{{heading}}</span>
+  </nav>
+
+  <section class="lp-hero" style="margin-top:8px">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+        <p class="lp-sm lp-muted" style="margin:0"><span class="lp-kd">{{kind}}</span></p>
+      </div>
+      <div class="lp-manage-toolbar">
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{manage_url}}">{{back_label}}</a>
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{advanced_url}}">{{advanced_label}}</a>
+      </div>
+    </div>
+  </section>
+
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
+
+  {{^has_activity}}
+    <p class="lp-muted" style="margin-top:16px">{{empty_body}}</p>
+    <p style="margin-top:12px"><a class="lp-btn lp-btn-solid" href="{{manage_url}}">{{back_label}}</a></p>
+  {{/has_activity}}
+
+  {{#has_activity}}
+    <div class="lp-card lift" style="margin-top:16px">
+      <form method="post" action="{{form_action}}" class="lp-stack" style="gap:14px">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="action" value="save_activity">
+        <input type="hidden" name="trackid" value="{{trackid}}">
+        <input type="hidden" name="cmid" value="{{cmid}}">
+
+        <label class="lp-field">
+          <span>{{name_label}}</span>
+          <input type="text" name="name" maxlength="255" value="{{name}}" required autocomplete="off">
+        </label>
+
+        <label class="lp-field">
+          <span>{{intro_label}}</span>
+          <textarea name="intro" rows="3">{{intro}}</textarea>
+        </label>
+
+        {{#is_page}}
+          <label class="lp-field">
+            <span>{{content_label}}</span>
+            <textarea name="content" rows="10">{{content}}</textarea>
+          </label>
+        {{/is_page}}
+
+        {{#is_resource}}
+          <p class="lp-sm lp-muted" style="margin:0">{{file_hint}}</p>
+          <p style="margin:0"><a class="lp-btn lp-btn-light lp-btn-sm" href="{{advanced_url}}">{{advanced_label}}</a></p>
+        {{/is_resource}}
+
+        {{#is_quiz}}
+          <p class="lp-sm lp-muted" style="margin:0">{{quiz_hint}}</p>
+        {{/is_quiz}}
+
+        {{#is_assign}}
+          <p class="lp-sm lp-muted" style="margin:0">{{assign_hint}}</p>
+        {{/is_assign}}
+
+        {{#has_grade}}
+          <label class="lp-field">
+            <span>{{grade_label}}</span>
+            <input type="number" name="grade" min="0" step="0.01" value="{{grade}}">
+          </label>
+        {{/has_grade}}
+
+        <div class="lp-row-sb" style="margin-top:4px">
+          <button type="submit" class="lp-btn lp-btn-solid">{{save_label}}</button>
+          <a class="lp-btn lp-btn-light" href="{{manage_url}}">{{back_label}}</a>
+        </div>
+      </form>
+    </div>
+  {{/has_activity}}
+</div>

@@ -441,8 +441,11 @@ final class admin_dashboard {
             $act['hide_label'] = $hidelabel;
             $act['show_cm_label'] = $showcmlabel;
             $act['hidden_badge'] = $hiddenbadge;
-            // Settings still Moodle modedit until phase 3.
-            $act['settings_url'] = $act['edit_url'];
+            $act['settings_url'] = (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'activity',
+                'trackid' => $trackid,
+                'cmid' => (int) $act['cmid'],
+            ]))->out(false);
             $act['open_label'] = get_string('admin_manage_open', 'local_launchpad');
         }
         unset($act);
@@ -644,6 +647,253 @@ final class admin_dashboard {
             'ok' => $show
                 ? get_string('admin_manage_ok_cm_shown', 'local_launchpad', $title)
                 : get_string('admin_manage_ok_cm_hidden', 'local_launchpad', $title),
+        ];
+    }
+
+    /**
+     * Slim activity settings screen in the admin shell.
+     *
+     * @param array{ok?:string,error?:string} $flash
+     * @return array<string, mixed>
+     */
+    public static function activity_settings_context(
+        \stdClass $user,
+        int $trackid,
+        int $cmid,
+        array $flash = []
+    ): array {
+        global $CFG, $DB;
+
+        unset($user);
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->dirroot . '/course/modlib.php');
+
+        $manageurl = (new \moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'manage',
+            'trackid' => $trackid > 0 ? $trackid : null,
+        ])))->out(false);
+
+        if ($trackid <= 0 || $cmid <= 0) {
+            return [
+                'has_activity' => false,
+                'empty_body' => get_string('admin_builder_err_params', 'local_launchpad'),
+                'manage_url' => $manageurl,
+                'back_label' => get_string('admin_activity_back', 'local_launchpad'),
+                'flash_ok' => !empty($flash['ok']),
+                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+                'flash_err' => !empty($flash['error']),
+                'flash_err_body' => (string) ($flash['error'] ?? ''),
+            ];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackid);
+        } catch (account_provision_exception $e) {
+            return [
+                'has_activity' => false,
+                'empty_body' => $e->getMessage(),
+                'manage_url' => $manageurl,
+                'back_label' => get_string('admin_activity_back', 'local_launchpad'),
+                'flash_ok' => false,
+                'flash_ok_body' => '',
+                'flash_err' => true,
+                'flash_err_body' => $e->getMessage(),
+            ];
+        }
+
+        $cm = get_coursemodule_from_id('', $cmid, $trackid, false, IGNORE_MISSING);
+        if (!$cm) {
+            return [
+                'has_activity' => false,
+                'empty_body' => get_string('admin_builder_err_cm', 'local_launchpad'),
+                'manage_url' => $manageurl,
+                'back_label' => get_string('admin_activity_back', 'local_launchpad'),
+                'flash_ok' => !empty($flash['ok']),
+                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+                'flash_err' => !empty($flash['error']),
+                'flash_err_body' => (string) ($flash['error'] ?? ''),
+            ];
+        }
+
+        $sectionnum = 1;
+        $section = $DB->get_record('course_sections', ['id' => (int) $cm->section], 'section');
+        if ($section) {
+            $sectionnum = max(1, (int) $section->section);
+        }
+        $manageurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'manage',
+            'trackid' => $trackid,
+            'section' => $sectionnum,
+        ]))->out(false);
+
+        $modname = (string) $cm->modname;
+        $allowed = ['page', 'resource', 'quiz', 'assign'];
+        if (!in_array($modname, $allowed, true)) {
+            return [
+                'has_activity' => false,
+                'empty_body' => get_string('admin_manage_err_mod', 'local_launchpad'),
+                'manage_url' => $manageurl,
+                'back_label' => get_string('admin_activity_back', 'local_launchpad'),
+                'flash_ok' => false,
+                'flash_ok_body' => '',
+                'flash_err' => true,
+                'flash_err_body' => get_string('admin_manage_err_mod', 'local_launchpad'),
+            ];
+        }
+
+        $instance = $DB->get_record($modname, ['id' => (int) $cm->instance], '*', MUST_EXIST);
+        $intro = '';
+        if (property_exists($instance, 'intro')) {
+            $intro = html_to_text((string) ($instance->intro ?? ''), 0, false);
+        }
+        $content = '';
+        if ($modname === 'page') {
+            $content = (string) ($instance->content ?? '');
+            // Keep simple HTML for textarea editing.
+            $content = trim($content);
+        }
+
+        $grade = '';
+        if (property_exists($instance, 'grade') && $instance->grade !== null) {
+            $grade = (string) (float) $instance->grade;
+        }
+
+        return [
+            'has_activity' => true,
+            'eyebrow' => get_string('admin_activity_eyebrow', 'local_launchpad'),
+            'heading' => format_string((string) $instance->name),
+            'lead' => get_string('admin_activity_lead', 'local_launchpad', self::builder_mod_kind($modname)),
+            'kind' => self::builder_mod_kind($modname),
+            'modname' => $modname,
+            'is_page' => $modname === 'page',
+            'is_resource' => $modname === 'resource',
+            'is_quiz' => $modname === 'quiz',
+            'is_assign' => $modname === 'assign',
+            'has_grade' => $modname === 'quiz' || $modname === 'assign',
+            'name' => (string) $instance->name,
+            'intro' => $intro,
+            'content' => $content,
+            'grade' => $grade,
+            'name_label' => get_string('admin_activity_name', 'local_launchpad'),
+            'intro_label' => get_string('admin_activity_intro', 'local_launchpad'),
+            'content_label' => get_string('admin_activity_content', 'local_launchpad'),
+            'grade_label' => get_string('admin_activity_grade', 'local_launchpad'),
+            'file_hint' => get_string('admin_activity_file_hint', 'local_launchpad'),
+            'quiz_hint' => get_string('admin_activity_quiz_hint', 'local_launchpad'),
+            'assign_hint' => get_string('admin_activity_assign_hint', 'local_launchpad'),
+            'save_label' => get_string('admin_activity_save', 'local_launchpad'),
+            'advanced_url' => (new \moodle_url('/course/modedit.php', [
+                'update' => $cmid,
+                'return' => 1,
+            ]))->out(false),
+            'advanced_label' => get_string('admin_activity_advanced', 'local_launchpad'),
+            'manage_url' => $manageurl,
+            'back_label' => get_string('admin_activity_back', 'local_launchpad'),
+            'form_action' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'activity',
+                'trackid' => $trackid,
+                'cmid' => $cmid,
+            ]))->out(false),
+            'sesskey' => sesskey(),
+            'trackid' => $trackid,
+            'cmid' => $cmid,
+            'sectionnum' => $sectionnum,
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+        ];
+    }
+
+    /**
+     * Save slim activity settings (name / intro / page content / grade).
+     * Uses direct instance updates so we skip Moodle editor draft plumbing.
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function save_activity_settings(
+        \stdClass $actor,
+        int $trackcourseid,
+        int $cmid,
+        string $name,
+        string $intro,
+        string $content = '',
+        ?float $grade = null
+    ): array {
+        global $CFG, $DB;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        if ($trackcourseid <= 0 || $cmid <= 0) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        $cm = get_coursemodule_from_id('', $cmid, $trackcourseid, false, IGNORE_MISSING);
+        if (!$cm) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+        $modname = (string) $cm->modname;
+        if (!in_array($modname, ['page', 'resource', 'quiz', 'assign'], true)) {
+            return ['error' => get_string('admin_manage_err_mod', 'local_launchpad')];
+        }
+
+        $context = \context_course::instance($trackcourseid);
+        try {
+            require_capability('moodle/course:manageactivities', $context);
+        } catch (\required_capability_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $name = trim($name);
+        if ($name === '') {
+            return ['error' => get_string('admin_activity_err_name', 'local_launchpad')];
+        }
+
+        $instance = $DB->get_record($modname, ['id' => (int) $cm->instance], '*', IGNORE_MISSING);
+        if (!$instance) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+
+        $introhtml = trim($intro) === ''
+            ? ''
+            : purify_html(nl2br(s($intro)));
+
+        $update = (object) [
+            'id' => (int) $instance->id,
+            'name' => $name,
+            'timemodified' => time(),
+        ];
+        if (property_exists($instance, 'intro')) {
+            $update->intro = $introhtml;
+            $update->introformat = FORMAT_HTML;
+        }
+        if ($modname === 'page') {
+            $update->content = purify_html($content);
+            $update->contentformat = FORMAT_HTML;
+        }
+        if (($modname === 'quiz' || $modname === 'assign') && $grade !== null
+                && property_exists($instance, 'grade')) {
+            $update->grade = max(0, $grade);
+        }
+
+        try {
+            $DB->update_record($modname, $update);
+            rebuild_course_cache($trackcourseid, true);
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        return [
+            'ok' => get_string('admin_activity_ok_saved', 'local_launchpad', format_string($name)),
         ];
     }
 
