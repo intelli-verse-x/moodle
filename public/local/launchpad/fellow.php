@@ -223,6 +223,20 @@ if ($courseid > 0) {
 } else if (count($courses) === 1) {
     $selected = $courses[0];
     $courseid = (int) $selected->id;
+} else if (count($courses) > 1) {
+    // Prefer a track course over Shared orientation when no ?id= is given.
+    foreach ($courses as $c) {
+        $idn = strtolower(trim((string) ($c->idnumber ?? '')));
+        if ($idn !== '' && !str_starts_with($idn, 'lp-orient-')) {
+            $selected = $c;
+            $courseid = (int) $c->id;
+            break;
+        }
+    }
+    if ($selected === null) {
+        $selected = $courses[0];
+        $courseid = (int) $selected->id;
+    }
 }
 
 $outline = null;
