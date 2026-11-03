@@ -233,7 +233,8 @@ final class activity_portal {
                         'content',
                         $file->get_itemid(),
                         $file->get_filepath(),
-                        $file->get_filename()
+                        $file->get_filename(),
+                        true // Force download to the computer (not open-in-tab for text).
                     )->out(false),
                     'size' => display_size($file->get_filesize()),
                 ];
