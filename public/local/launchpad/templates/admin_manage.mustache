@@ -69,22 +69,55 @@
 
       <div class="lp-manage-chooser" data-lp-manage-chooser hidden>
         <p class="lp-sm" style="margin:0 0 8px"><b>{{add_chooser_title}}</b></p>
-        <div class="lp-manage-add-grid">
-          {{#add_types}}
-            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{url}}">{{label}}</a>
-          {{/add_types}}
-        </div>
+        <form method="post" action="{{form_action}}" class="lp-stack" style="gap:10px">
+          <input type="hidden" name="sesskey" value="{{sesskey}}">
+          <input type="hidden" name="action" value="add_activity">
+          <input type="hidden" name="trackid" value="{{trackid}}">
+          <input type="hidden" name="sectionnum" value="{{sectionnum}}">
+          <label class="lp-field">
+            <span>{{add_name_label}}</span>
+            <input type="text" name="name" maxlength="255" placeholder="{{add_name_placeholder}}" autocomplete="off">
+          </label>
+          <div class="lp-manage-add-grid">
+            {{#add_types}}
+              <button type="submit" class="lp-btn lp-btn-light lp-btn-sm" name="mod" value="{{mod}}">{{label}}</button>
+            {{/add_types}}
+          </div>
+        </form>
       </div>
 
       {{#has_activities}}
         <div class="lp-actlist">
           {{#activities}}
-            <div class="lp-actrow" id="cm-{{cmid}}">
+            <div class="lp-actrow{{#cm_hidden}} is-cm-hidden{{/cm_hidden}}" id="cm-{{cmid}}">
               <span class="lp-kd">{{kind}}</span>
               <span class="lp-act-title">{{title}}</span>
               <span class="lp-chip {{state_chip}}">{{state_label}}</span>
+              {{#cm_hidden}}
+                <span class="lp-chip line">{{hidden_badge}}</span>
+              {{/cm_hidden}}
               <div class="lp-manage-edit-only" hidden>
                 <a class="lp-btn lp-btn-light lp-btn-sm" href="{{settings_url}}">{{settings_label}}</a>
+                {{#cm_visible}}
+                  <form method="post" action="{{form_action}}" class="lp-inline-form">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="toggle_cm">
+                    <input type="hidden" name="trackid" value="{{trackid}}">
+                    <input type="hidden" name="cmid" value="{{cmid}}">
+                    <input type="hidden" name="show" value="0">
+                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
+                  </form>
+                {{/cm_visible}}
+                {{#cm_hidden}}
+                  <form method="post" action="{{form_action}}" class="lp-inline-form">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="toggle_cm">
+                    <input type="hidden" name="trackid" value="{{trackid}}">
+                    <input type="hidden" name="cmid" value="{{cmid}}">
+                    <input type="hidden" name="show" value="1">
+                    <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_cm_label}}</button>
+                  </form>
+                {{/cm_hidden}}
                 {{#is_draft}}
                   <form method="post" action="{{form_action}}" class="lp-inline-form">
                     <input type="hidden" name="sesskey" value="{{sesskey}}">

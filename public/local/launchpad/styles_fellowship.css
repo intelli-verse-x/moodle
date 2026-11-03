@@ -3100,3 +3100,23 @@ body.lp-portal-mismatch-lock {
 .lp-manage.is-editing .lp-actrow {
   border-color: #c5d4f5;
 }
+
+.lp-actrow.is-cm-hidden {
+  opacity: 0.72;
+  background: #f6f7fb;
+}
+.lp-manage .lp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--lp-muted);
+}
+.lp-manage .lp-field input {
+  font: inherit;
+  color: var(--lp-ink);
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #fff;
+}

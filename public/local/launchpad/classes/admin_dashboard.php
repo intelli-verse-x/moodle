@@ -428,6 +428,9 @@ final class admin_dashboard {
         $sesskey = sesskey();
         $editlabel = get_string('admin_manage_settings', 'local_launchpad');
         $marklabel = get_string('admin_builder_mark_reviewed', 'local_launchpad');
+        $hidelabel = get_string('admin_manage_hide_activity', 'local_launchpad');
+        $showcmlabel = get_string('admin_manage_show_activity', 'local_launchpad');
+        $hiddenbadge = get_string('admin_manage_hidden_badge', 'local_launchpad');
         foreach ($activities as &$act) {
             $act['form_action'] = $formaction;
             $act['sesskey'] = $sesskey;
@@ -435,6 +438,9 @@ final class admin_dashboard {
             $act['sectionnum'] = $sectionnum;
             $act['settings_label'] = $editlabel;
             $act['mark_label'] = $marklabel;
+            $act['hide_label'] = $hidelabel;
+            $act['show_cm_label'] = $showcmlabel;
+            $act['hidden_badge'] = $hiddenbadge;
             // Settings still Moodle modedit until phase 3.
             $act['settings_url'] = $act['edit_url'];
             $act['open_label'] = get_string('admin_manage_open', 'local_launchpad');
@@ -446,14 +452,10 @@ final class admin_dashboard {
             $addtypes[] = [
                 'mod' => $mod,
                 'label' => self::builder_mod_kind($mod),
-                // Phase 1: Moodle add form; phase 2 creates in-shell.
-                'url' => (new \moodle_url('/course/modedit.php', [
-                    'add' => $mod,
-                    'type' => '',
-                    'course' => $trackid,
-                    'section' => $sectionnum,
-                    'return' => 0,
-                ]))->out(false),
+                'form_action' => $formaction,
+                'sesskey' => $sesskey,
+                'trackid' => $trackid,
+                'sectionnum' => $sectionnum,
             ];
         }
 
@@ -489,6 +491,8 @@ final class admin_dashboard {
             'add_types' => $addtypes,
             'add_label' => get_string('admin_builder_add', 'local_launchpad'),
             'add_chooser_title' => get_string('admin_manage_add_chooser', 'local_launchpad'),
+            'add_name_label' => get_string('admin_manage_add_name', 'local_launchpad'),
+            'add_name_placeholder' => get_string('admin_manage_add_name_placeholder', 'local_launchpad'),
             'edit_mode_label' => get_string('admin_manage_edit_mode', 'local_launchpad'),
             'edit_mode_on_label' => get_string('admin_manage_edit_on', 'local_launchpad'),
             'edit_mode_off_label' => get_string('admin_manage_edit_off', 'local_launchpad'),
@@ -507,6 +511,264 @@ final class admin_dashboard {
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
         ];
+    }
+
+    /**
+     * Create a Page / File / Quiz / Assign in a track phase (Moodle create_module).
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function create_phase_activity(
+        \stdClass $actor,
+        int $trackcourseid,
+        int $sectionnum,
+        string $modname,
+        string $name = ''
+    ): array {
+        global $CFG, $USER;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->dirroot . '/course/modlib.php');
+        require_once($CFG->libdir . '/resourcelib.php');
+        if ($modname === 'quiz') {
+            require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+        }
+
+        $modname = strtolower(trim($modname));
+        $allowed = ['page', 'resource', 'quiz', 'assign'];
+        if (!in_array($modname, $allowed, true)) {
+            return ['error' => get_string('admin_manage_err_mod', 'local_launchpad')];
+        }
+        if ($trackcourseid <= 0 || $sectionnum < 1 || $sectionnum > 4) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        $context = \context_course::instance($trackcourseid);
+        try {
+            require_capability('moodle/course:manageactivities', $context);
+        } catch (\required_capability_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $name = trim($name);
+        if ($name === '') {
+            $name = get_string('admin_manage_default_name_' . $modname, 'local_launchpad');
+        }
+
+        $moduleinfo = self::build_new_moduleinfo($course, $sectionnum, $modname, $name);
+        try {
+            // create_module uses $USER for capability checks.
+            $created = create_module($moduleinfo);
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $createdname = format_string($name);
+        return [
+            'ok' => get_string('admin_manage_ok_created', 'local_launchpad', (object) [
+                'name' => $createdname,
+                'kind' => self::builder_mod_kind($modname),
+            ]),
+            'cmid' => (int) ($created->coursemodule ?? 0),
+        ];
+    }
+
+    /**
+     * Hide or show one activity (course module) on a track.
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function set_activity_visible(
+        \stdClass $actor,
+        int $trackcourseid,
+        int $cmid,
+        bool $show
+    ): array {
+        global $CFG, $DB;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        if ($trackcourseid <= 0 || $cmid <= 0) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        $context = \context_course::instance($trackcourseid);
+        try {
+            require_capability('moodle/course:activityvisibility', $context);
+        } catch (\required_capability_exception $e) {
+            // Fall back to manageactivities (site admins / editing teachers).
+            try {
+                require_capability('moodle/course:manageactivities', $context);
+            } catch (\required_capability_exception $e2) {
+                return ['error' => $e2->getMessage()];
+            }
+        }
+
+        $cm = $DB->get_record('course_modules', ['id' => $cmid, 'course' => $trackcourseid], '*', IGNORE_MISSING);
+        if (!$cm) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+
+        set_coursemodule_visible($cmid, $show ? 1 : 0);
+        rebuild_course_cache($trackcourseid, true);
+
+        $mod = $DB->get_record('modules', ['id' => (int) $cm->module], '*', MUST_EXIST);
+        $title = (string) $mod->name;
+        if ($DB->get_manager()->table_exists($mod->name)) {
+            $n = $DB->get_field($mod->name, 'name', ['id' => (int) $cm->instance]);
+            if ($n) {
+                $title = format_string((string) $n);
+            }
+        }
+
+        return [
+            'ok' => $show
+                ? get_string('admin_manage_ok_cm_shown', 'local_launchpad', $title)
+                : get_string('admin_manage_ok_cm_hidden', 'local_launchpad', $title),
+        ];
+    }
+
+    /**
+     * Minimal moduleinfo for create_module (LaunchPad-allowed types).
+     */
+    public static function build_new_moduleinfo(
+        \stdClass $course,
+        int $sectionnum,
+        string $modname,
+        string $name
+    ): \stdClass {
+        global $CFG;
+
+        require_once($CFG->libdir . '/resourcelib.php');
+
+        $moduleinfo = new \stdClass();
+        $moduleinfo->modulename = $modname;
+        $moduleinfo->course = (int) $course->id;
+        $moduleinfo->section = $sectionnum;
+        // Start visible inside section; section visibility still gates fellows.
+        $moduleinfo->visible = 1;
+        $moduleinfo->visibleoncoursepage = 1;
+        $moduleinfo->cmidnumber = '';
+        $moduleinfo->name = $name;
+        $moduleinfo->introeditor = [
+            'text' => '<p>' . get_string('admin_manage_new_intro', 'local_launchpad') . '</p>',
+            'format' => FORMAT_HTML,
+            'itemid' => 0,
+        ];
+        $moduleinfo->completion = COMPLETION_TRACKING_NONE;
+
+        switch ($modname) {
+            case 'page':
+                $moduleinfo->content = '<p>' . get_string('admin_manage_new_page_body', 'local_launchpad') . '</p>';
+                $moduleinfo->contentformat = FORMAT_HTML;
+                $moduleinfo->display = RESOURCELIB_DISPLAY_OPEN;
+                $moduleinfo->printintro = 0;
+                $moduleinfo->printlastmodified = 0;
+                break;
+            case 'resource':
+                // Empty file resource — upload in Settings (phase 3) / Moodle for now.
+                $moduleinfo->display = RESOURCELIB_DISPLAY_AUTO;
+                $moduleinfo->showsize = 0;
+                $moduleinfo->showtype = 0;
+                $moduleinfo->showdate = 0;
+                $moduleinfo->filterfiles = 0;
+                $moduleinfo->files = file_get_unused_draft_itemid();
+                break;
+            case 'quiz':
+                require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+                $moduleinfo->timeopen = 0;
+                $moduleinfo->timeclose = 0;
+                $moduleinfo->timelimit = 0;
+                $moduleinfo->overduehandling = 'autosubmit';
+                $moduleinfo->graceperiod = 0;
+                $moduleinfo->preferredbehaviour = 'deferredfeedback';
+                $moduleinfo->canredoquestions = 0;
+                $moduleinfo->attempts = 0;
+                $moduleinfo->attemptonlast = 0;
+                $moduleinfo->grademethod = QUIZ_GRADEHIGHEST;
+                $moduleinfo->decimalpoints = 2;
+                $moduleinfo->questiondecimalpoints = -1;
+                $moduleinfo->reviewattempt = 0;
+                $moduleinfo->reviewcorrectness = 0;
+                $moduleinfo->reviewmaxmarks = 0;
+                $moduleinfo->reviewmarks = 0;
+                $moduleinfo->reviewspecificfeedback = 0;
+                $moduleinfo->reviewgeneralfeedback = 0;
+                $moduleinfo->reviewrightanswer = 0;
+                $moduleinfo->reviewoverallfeedback = 0;
+                $moduleinfo->questionsperpage = 1;
+                $moduleinfo->navmethod = 'free';
+                $moduleinfo->shuffleanswers = 1;
+                $moduleinfo->sumgrades = 0;
+                $moduleinfo->grade = 100;
+                $moduleinfo->timecreated = time();
+                $moduleinfo->timemodified = time();
+                $moduleinfo->quizpassword = '';
+                $moduleinfo->subnet = '';
+                $moduleinfo->browsersecurity = '-';
+                $moduleinfo->delay1 = 0;
+                $moduleinfo->delay2 = 0;
+                $moduleinfo->showuserpicture = 0;
+                $moduleinfo->showblocks = 0;
+                $moduleinfo->completionattemptsexhausted = 0;
+                $moduleinfo->completionminattempts = 0;
+                $moduleinfo->allowofflineattempts = 0;
+                break;
+            case 'assign':
+                $moduleinfo->alwaysshowdescription = 1;
+                $moduleinfo->submissiondrafts = 1;
+                $moduleinfo->requiresubmissionstatement = 0;
+                $moduleinfo->sendnotifications = 0;
+                $moduleinfo->sendlatenotifications = 0;
+                $moduleinfo->sendstudentnotifications = 1;
+                $moduleinfo->duedate = 0;
+                $moduleinfo->cutoffdate = 0;
+                $moduleinfo->gradingduedate = 0;
+                $moduleinfo->allowsubmissionsfromdate = 0;
+                $moduleinfo->grade = 100;
+                $moduleinfo->teamsubmission = 0;
+                $moduleinfo->requireallteammemberssubmit = 0;
+                $moduleinfo->teamsubmissiongroupingid = 0;
+                $moduleinfo->blindmarking = 0;
+                $moduleinfo->hidegrader = 0;
+                $moduleinfo->attemptreopenmethod = 'untilpass';
+                $moduleinfo->maxattempts = 1;
+                $moduleinfo->markingworkflow = 0;
+                $moduleinfo->markingallocation = 0;
+                $moduleinfo->markinganonymous = 0;
+                $moduleinfo->preventsubmissionnotingroup = 0;
+                $moduleinfo->timelimit = 0;
+                $moduleinfo->submissionattachments = 0;
+                $moduleinfo->gradepenalty = 0;
+                $moduleinfo->assignsubmission_onlinetext_enabled = 1;
+                $moduleinfo->assignsubmission_file_enabled = 1;
+                $moduleinfo->assignsubmission_file_maxfiles = 20;
+                $moduleinfo->assignsubmission_file_maxsizebytes = 0;
+                break;
+            default:
+                throw new \coding_exception('Unsupported module: ' . $modname);
+        }
+
+        return $moduleinfo;
     }
 
     /**
@@ -570,6 +832,7 @@ final class admin_dashboard {
             }
 
             $cmid = (int) $cm->id;
+            $cmvisible = (int) $cm->visible === 1;
             $out[] = [
                 'cmid' => $cmid,
                 'modname' => $modname,
@@ -579,6 +842,8 @@ final class admin_dashboard {
                 'state_label' => get_string('admin_builder_state_' . $state, 'local_launchpad'),
                 'state_chip' => $statechip,
                 'is_draft' => $isdraft,
+                'cm_visible' => $cmvisible,
+                'cm_hidden' => !$cmvisible,
                 'manage_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
                     'view' => 'manage',
                     'trackid' => $courseid,

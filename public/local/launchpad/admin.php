@@ -75,6 +75,17 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
         $show = (bool) optional_param('show', 0, PARAM_BOOL);
         $flash = admin_dashboard::set_phase_visible($USER, $trackid, $sectionnum, $show);
+    } else if ($view === 'manage' && $action === 'add_activity') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
+        $mod = optional_param('mod', '', PARAM_ALPHA);
+        $name = optional_param('name', '', PARAM_TEXT);
+        $flash = admin_dashboard::create_phase_activity($USER, $trackid, $sectionnum, $mod, $name);
+    } else if ($view === 'manage' && $action === 'toggle_cm') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        $show = (bool) optional_param('show', 0, PARAM_BOOL);
+        $flash = admin_dashboard::set_activity_visible($USER, $trackid, $cmid, $show);
     }
 }
 
