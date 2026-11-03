@@ -662,6 +662,13 @@ $string['fellowship_messages_err_delete'] = 'Could not delete the selected messa
 $string['fellowship_messages_err_delete_none'] = 'Select at least one message to delete.';
 $string['fellowship_messages_select_hint'] = 'Tap a message to select and delete';
 $string['fellowship_messages_emoji'] = 'Emoji';
+$string['messageprovider:mentor_message_ping'] = 'LaunchPad mentor message email ping';
+$string['mentor_email_ping_subject'] = 'New LaunchPad message from {$a}';
+$string['mentor_email_ping_body'] = '{$a->fromname} sent you a message on LaunchPad:
+
+{$a->preview}
+
+Open the conversation: {$a->link}';
 $string['mentor_fellow_message'] = 'Message';
 $string['fellowship_your_journey'] = 'Your journey';
 $string['fellowship_open_track'] = 'Open track';

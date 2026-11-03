@@ -588,6 +588,12 @@ final class messaging {
             $when = !empty($sent->timecreated)
                 ? userdate((int) $sent->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
                 : '';
+
+            // E16: fellow → mentor also gets an email ping (soft-fail; no SMTP required locally).
+            if ($portal === 'fellow') {
+                self::maybe_email_mentor_ping($fromid, $toid, $clean);
+            }
+
             return [
                 'ok' => true,
                 'error' => null,
@@ -605,6 +611,71 @@ final class messaging {
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_save', 'local_launchpad'),
             ];
+        }
+    }
+
+    /**
+     * Whether a fellow→mentor LaunchPad email ping should fire (not peer chat).
+     */
+    public static function should_email_mentor_ping(int $fromid, int $toid): bool {
+        if ($fromid <= 0 || $toid <= 0 || $fromid === $toid) {
+            return false;
+        }
+        if (!account_persona::is_fellowship($fromid) || !account_persona::is_mentor($toid)) {
+            return false;
+        }
+        foreach (self::shared_launchpad_courseids($fromid, $toid) as $courseid) {
+            if (account_persona::is_fellowship($fromid, $courseid)
+                    && account_persona::is_mentor($toid, $courseid)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Email the mentor about a new LaunchPad message. Soft-fail always.
+     *
+     * @return bool True when Moodle accepted the mail attempt (incl. noemailever divert).
+     */
+    public static function maybe_email_mentor_ping(int $fromid, int $toid, string $preview): bool {
+        global $CFG;
+
+        if (!self::should_email_mentor_ping($fromid, $toid)) {
+            return false;
+        }
+
+        try {
+            require_once($CFG->libdir . '/moodlelib.php');
+            $from = \core_user::get_user($fromid, '*', IGNORE_MISSING);
+            $to = \core_user::get_user($toid, '*', IGNORE_MISSING);
+            if (!$from || !$to || trim((string) ($to->email ?? '')) === '') {
+                return false;
+            }
+
+            $preview = trim($preview);
+            if (\core_text::strlen($preview) > 160) {
+                $preview = \core_text::substr($preview, 0, 157) . '…';
+            }
+            $link = self::messages_url($fromid, 'mentor');
+            $subject = get_string('mentor_email_ping_subject', 'local_launchpad', fullname($from));
+            $body = get_string('mentor_email_ping_body', 'local_launchpad', (object) [
+                'fromname' => fullname($from),
+                'preview' => $preview,
+                'link' => $link,
+            ]);
+            $html = nl2br(s($body));
+
+            // Direct email so prefs cannot swallow the mam-required ping.
+            return (bool) email_to_user(
+                $to,
+                \core_user::get_noreply_user(),
+                $subject,
+                $body,
+                $html
+            );
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 
