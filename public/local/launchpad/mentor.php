@@ -60,7 +60,7 @@ if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
         $result = messaging::delete_messages($userid, $messageids);
     } else {
         $body = required_param('message', PARAM_RAW_TRIMMED);
-        $result = messaging::send($userid, $toid, $body);
+        $result = messaging::send($userid, $toid, $body, 'mentor');
     }
     if (!$result['ok']) {
         redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);

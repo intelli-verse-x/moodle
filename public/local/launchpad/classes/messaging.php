@@ -65,8 +65,11 @@ final class messaging {
 
     /**
      * Whether $fromid may open a private message to $toid.
+     *
+     * @param string $portal fellow|mentor|any — fellow portal also requires a LaunchPad
+     *        classmate or mentor relationship (not site-wide strangers).
      */
-    public static function can_message(int $fromid, int $toid): bool {
+    public static function can_message(int $fromid, int $toid, string $portal = 'any'): bool {
         global $CFG;
 
         if ($fromid <= 0 || $toid <= 0 || $fromid === $toid) {
@@ -79,10 +82,169 @@ final class messaging {
             return false;
         }
         try {
-            return \core_message\api::can_send_message($toid, $fromid);
+            if (!\core_message\api::can_send_message($toid, $fromid)) {
+                return false;
+            }
         } catch (\Throwable $e) {
             return false;
         }
+
+        if ($portal === 'fellow') {
+            return self::is_launchpad_message_peer($fromid, $toid);
+        }
+        return true;
+    }
+
+    /**
+     * Fellow may message: mentors on a shared lp-* course, or classmates (student) on a shared lp-* course.
+     */
+    public static function is_launchpad_message_peer(int $fromid, int $toid): bool {
+        if ($fromid <= 0 || $toid <= 0 || $fromid === $toid) {
+            return false;
+        }
+        // Mentors of the fellow's LaunchPad courses.
+        if (account_persona::is_mentor($toid)) {
+            foreach (self::shared_launchpad_courseids($fromid, $toid) as $courseid) {
+                if (account_persona::is_mentor($toid, $courseid)
+                        && account_persona::is_fellowship($fromid, $courseid)) {
+                    return true;
+                }
+            }
+        }
+        // Classmates: both students on at least one shared LaunchPad course.
+        foreach (self::shared_launchpad_courseids($fromid, $toid) as $courseid) {
+            if (account_persona::is_fellowship($fromid, $courseid)
+                    && account_persona::is_fellowship($toid, $courseid)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Shared LaunchPad (lp-*) course ids between two users.
+     *
+     * @return list<int>
+     */
+    public static function shared_launchpad_courseids(int $userid, int $otherid): array {
+        global $CFG;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $shared = enrol_get_shared_courses($userid, $otherid, true);
+        if (empty($shared)) {
+            return [];
+        }
+        $ids = [];
+        foreach ($shared as $course) {
+            $idnumber = (string) ($course->idnumber ?? '');
+            if ($idnumber !== '' && str_starts_with($idnumber, account_persona::COURSE_IDNUMBER_PREFIX)) {
+                $ids[] = (int) $course->id;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * Classmates (student role) on the viewer's LaunchPad courses — for Messages picker.
+     *
+     * @return list<array{id:int,name:string,initials:string,course_label:string,url:string,can_message:bool}>
+     */
+    public static function list_classmates(int $userid, string $portal = 'fellow'): array {
+        global $CFG;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        if ($userid <= 0 || empty($CFG->messaging)) {
+            return [];
+        }
+
+        $courses = fellowship_dashboard::list_courses($userid);
+        if ($courses === []) {
+            return [];
+        }
+
+        $byid = [];
+        foreach ($courses as $course) {
+            $context = \context_course::instance((int) $course->id);
+            $students = get_enrolled_users(
+                $context,
+                'mod/assign:submit',
+                0,
+                'u.id,u.firstname,u.lastname,u.firstnamephonetic,u.lastnamephonetic,u.middlename,u.alternatename',
+                'u.lastname ASC, u.firstname ASC'
+            );
+            $courselabel = format_string($course->fullname);
+            foreach ($students as $student) {
+                $sid = (int) $student->id;
+                if ($sid === $userid) {
+                    continue;
+                }
+                // Mentors sometimes hold submit; skip teacher archetypes.
+                if (account_persona::is_mentor($sid, (int) $course->id)) {
+                    continue;
+                }
+                if (!account_persona::is_fellowship($sid, (int) $course->id)) {
+                    continue;
+                }
+                if (!isset($byid[$sid])) {
+                    $byid[$sid] = [
+                        'id' => $sid,
+                        'name' => fullname($student),
+                        'initials' => fellowship_dashboard::initials($student),
+                        'course_label' => $courselabel,
+                        'url' => self::messages_url($sid, $portal),
+                        'can_message' => self::can_message($userid, $sid, $portal),
+                        'role_label' => get_string('fellowship_messages_role_classmate', 'local_launchpad'),
+                    ];
+                }
+            }
+        }
+
+        $out = array_values($byid);
+        usort($out, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        return $out;
+    }
+
+    /**
+     * Mentors on the viewer's LaunchPad courses — Messages picker (alongside classmates).
+     *
+     * @return list<array>
+     */
+    public static function list_course_mentors_for_messages(int $userid, string $portal = 'fellow'): array {
+        if ($userid <= 0) {
+            return [];
+        }
+        $byid = [];
+        foreach (fellowship_dashboard::list_courses($userid) as $course) {
+            foreach (fellowship_dashboard::course_mentors($course, $userid) as $mentor) {
+                $mid = (int) $mentor['id'];
+                if (isset($byid[$mid])) {
+                    continue;
+                }
+                $byid[$mid] = [
+                    'id' => $mid,
+                    'name' => (string) $mentor['name'],
+                    'initials' => fellowship_dashboard::initials(
+                        (object) ['firstname' => $mentor['name'], 'lastname' => '']
+                    ),
+                    'course_label' => format_string($course->fullname),
+                    'url' => self::messages_url($mid, $portal),
+                    'can_message' => !empty($mentor['can_message'])
+                        || self::can_message($userid, $mid, $portal),
+                    'role_label' => get_string('fellowship_messages_role_mentor', 'local_launchpad'),
+                ];
+                // Prefer real initials from user record.
+                $u = \core_user::get_user($mid, 'id,firstname,lastname', IGNORE_MISSING);
+                if ($u) {
+                    $byid[$mid]['initials'] = fellowship_dashboard::initials($u);
+                    $byid[$mid]['name'] = fullname($u);
+                }
+            }
+        }
+        $out = array_values($byid);
+        usort($out, static fn(array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        return $out;
     }
 
     /**
@@ -171,6 +333,11 @@ final class messaging {
             'can_delete_messages' => false,
             'conversations' => [],
             'has_conversations' => false,
+            'classmates' => [],
+            'has_classmates' => false,
+            'mentors' => [],
+            'has_mentors' => false,
+            'has_people' => false,
             'messages' => [],
             'has_messages' => false,
             'form_action' => $inboxurl,
@@ -179,6 +346,7 @@ final class messaging {
             'portal' => $portal,
             'other_id' => $otherid ?: 0,
             'is_mentor' => $portal === 'mentor',
+            'is_fellow_portal' => $portal === 'fellow',
         ];
 
         if (!$messagingon) {
@@ -188,11 +356,19 @@ final class messaging {
         $ctx['conversations'] = self::list_conversations($userid, $portal);
         $ctx['has_conversations'] = $ctx['conversations'] !== [];
 
+        if ($portal === 'fellow') {
+            $ctx['classmates'] = self::list_classmates($userid, $portal);
+            $ctx['has_classmates'] = $ctx['classmates'] !== [];
+            $ctx['mentors'] = self::list_course_mentors_for_messages($userid, $portal);
+            $ctx['has_mentors'] = $ctx['mentors'] !== [];
+            $ctx['has_people'] = $ctx['has_classmates'] || $ctx['has_mentors'];
+        }
+
         if ($otherid === null || $otherid <= 0) {
             return $ctx;
         }
 
-        if (!self::can_message($userid, $otherid)) {
+        if (!self::can_message($userid, $otherid, $portal)) {
             $ctx['thread_denied'] = true;
             $ctx['other_name'] = get_string('fellowship_messages_unavailable', 'local_launchpad');
             return $ctx;
@@ -351,7 +527,7 @@ final class messaging {
      *
      * @return array{ok:bool,error:?string,message?:array}
      */
-    public static function send(int $fromid, int $toid, string $text): array {
+    public static function send(int $fromid, int $toid, string $text, string $portal = 'any'): array {
         $text = trim($text);
         if ($text === '') {
             return [
@@ -359,7 +535,10 @@ final class messaging {
                 'error' => get_string('fellowship_messages_err_empty', 'local_launchpad'),
             ];
         }
-        if (!self::can_message($fromid, $toid)) {
+        if ($portal !== 'mentor' && $portal !== 'fellow') {
+            $portal = 'any';
+        }
+        if (!self::can_message($fromid, $toid, $portal)) {
             return [
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
@@ -454,6 +633,14 @@ final class messaging {
             }
             $unread = (int) ($conv->unreadcount ?? 0);
             $otheruser = \core_user::get_user($otherid, 'id,firstname,lastname', IGNORE_MISSING);
+            $rolelabel = '';
+            if ($portal === 'fellow' && $otherid > 0) {
+                if (account_persona::is_mentor($otherid)) {
+                    $rolelabel = get_string('fellowship_messages_role_mentor', 'local_launchpad');
+                } else if (self::is_launchpad_message_peer($userid, $otherid)) {
+                    $rolelabel = get_string('fellowship_messages_role_classmate', 'local_launchpad');
+                }
+            }
             $out[] = [
                 'other_id' => $otherid,
                 'other_name' => (string) ($other->fullname ?? ($otheruser ? fullname($otheruser) : '')),
@@ -465,6 +652,8 @@ final class messaging {
                 'has_unread' => $unread > 0,
                 'is_unread' => empty($conv->isread),
                 'url' => self::messages_url($otherid, $portal),
+                'role_label' => $rolelabel,
+                'has_role_label' => $rolelabel !== '',
             ];
         }
         return $out;

@@ -867,7 +867,7 @@ final class fellowship_dashboard {
             $out[] = [
                 'id' => $mentorid,
                 'name' => fullname($user),
-                'can_message' => $viewerid > 0 && messaging::can_message($viewerid, $mentorid),
+                'can_message' => $viewerid > 0 && messaging::can_message($viewerid, $mentorid, 'fellow'),
                 'message_url' => messaging::messages_url($mentorid, 'fellow'),
             ];
         }

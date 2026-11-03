@@ -17,7 +17,7 @@
     <div>
       <span class="lp-eyebrow">{{#str}} fellowship_messages, local_launchpad {{/str}}</span>
       <h2>{{#has_thread}}{{{other_name}}}{{/has_thread}}{{^has_thread}}{{#str}} fellowship_messages_heading, local_launchpad {{/str}}{{/has_thread}}</h2>
-      <p class="lp-muted">{{#str}} fellowship_messages_intro, local_launchpad {{/str}}</p>
+      <p class="lp-muted">{{#is_fellow_portal}}{{#str}} fellowship_messages_intro_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{#str}} fellowship_messages_intro, local_launchpad {{/str}}{{/is_fellow_portal}}</p>
     </div>
     <a class="lp-btn lp-btn-light" href="{{moodle_messages_url}}">{{#str}} fellowship_messages_open_moodle, local_launchpad {{/str}}</a>
   </div>
@@ -41,6 +41,7 @@
     data-can-delete="{{#can_delete_messages}}1{{/can_delete_messages}}{{^can_delete_messages}}0{{/can_delete_messages}}">
     <aside class="lp-msg-inbox" aria-label="{{#str}} fellowship_messages_inbox, local_launchpad {{/str}}">
       {{#has_conversations}}
+        <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_inbox, local_launchpad {{/str}}</h3>
         <ul class="lp-msg-list">
           {{#conversations}}
             <li>
@@ -48,6 +49,7 @@
                 <span class="lp-av lp-av-sm" aria-hidden="true">{{other_initials}}</span>
                 <span class="lp-msg-row-body">
                   <b>{{{other_name}}}</b>
+                  {{#has_role_label}}<span class="lp-msg-role">{{role_label}}</span>{{/has_role_label}}
                   <span class="lp-xs lp-muted">{{preview}}</span>
                 </span>
                 {{#has_unread}}
@@ -61,6 +63,61 @@
       {{^has_conversations}}
         <p class="lp-sm lp-muted lp-msg-empty">{{#str}} fellowship_messages_inbox_empty, local_launchpad {{/str}}</p>
       {{/has_conversations}}
+
+      {{#is_fellow_portal}}
+        {{#has_classmates}}
+          <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_classmates, local_launchpad {{/str}}</h3>
+          <ul class="lp-msg-list lp-msg-people">
+            {{#classmates}}
+              <li>
+                {{#can_message}}
+                  <a class="lp-msg-row" href="{{url}}">
+                    <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                    <span class="lp-msg-row-body">
+                      <b>{{{name}}}</b>
+                      <span class="lp-msg-role">{{role_label}}</span>
+                      <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                    </span>
+                  </a>
+                {{/can_message}}
+                {{^can_message}}
+                  <div class="lp-msg-row is-disabled" title="{{#str}} fellowship_messages_err_permission, local_launchpad {{/str}}">
+                    <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                    <span class="lp-msg-row-body">
+                      <b>{{{name}}}</b>
+                      <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                    </span>
+                  </div>
+                {{/can_message}}
+              </li>
+            {{/classmates}}
+          </ul>
+        {{/has_classmates}}
+        {{#has_mentors}}
+          <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_mentors, local_launchpad {{/str}}</h3>
+          <ul class="lp-msg-list lp-msg-people">
+            {{#mentors}}
+              <li>
+                {{#can_message}}
+                  <a class="lp-msg-row" href="{{url}}">
+                    <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                    <span class="lp-msg-row-body">
+                      <b>{{{name}}}</b>
+                      <span class="lp-msg-role">{{role_label}}</span>
+                      <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                    </span>
+                  </a>
+                {{/can_message}}
+              </li>
+            {{/mentors}}
+          </ul>
+        {{/has_mentors}}
+        {{^has_people}}
+          {{^has_conversations}}
+            <p class="lp-sm lp-muted lp-msg-empty">{{#str}} fellowship_messages_people_empty, local_launchpad {{/str}}</p>
+          {{/has_conversations}}
+        {{/has_people}}
+      {{/is_fellow_portal}}
     </aside>
 
     <section class="lp-msg-thread" aria-label="{{#str}} fellowship_messages_thread, local_launchpad {{/str}}">
@@ -169,7 +226,7 @@
           <div class="lp-empty lp-msg-pick" role="status">
             <div class="lp-empty-mark" aria-hidden="true">··</div>
             <h2>{{#str}} fellowship_messages_pick_title, local_launchpad {{/str}}</h2>
-            <p>{{#str}} fellowship_messages_pick_body, local_launchpad {{/str}}</p>
+            <p>{{#is_fellow_portal}}{{#str}} fellowship_messages_pick_body_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{#str}} fellowship_messages_pick_body, local_launchpad {{/str}}{{/is_fellow_portal}}</p>
           </div>
         {{/has_thread}}
       {{/thread_denied}}
