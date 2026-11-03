@@ -356,6 +356,9 @@ final class calendar_service_test extends \advanced_testcase {
         $this->assertTrue($mins['ok']);
         $this->assertSame(45 * 60, $mins['timeduration']);
 
+        $minszero = calendar_service::timeduration_from_form('minutes', $start, 0, '', '');
+        $this->assertFalse($minszero['ok']);
+
         $until = calendar_service::timeduration_from_form('until', $start, 0, '2026-10-01', '10:30');
         $this->assertTrue($until['ok']);
         $this->assertSame(90 * 60, $until['timeduration']);

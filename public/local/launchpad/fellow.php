@@ -339,16 +339,7 @@ switch ($view) {
     case 'news':
         $pagetitle = $lpstr('fellowship_nav_news', null, 'Announcements');
         $newsdata = fellowship_dashboard::list_announcements($userid, $courses);
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_news', array_merge($newsdata, [
-            'has_crumbs' => true,
-            'crumbs' => [
-                $crumbhome,
-                [
-                    'label' => $lpstr('fellowship_nav_news', null, 'Announcements'),
-                    'url' => '',
-                ],
-            ],
-        ]));
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_news', $newsdata);
         break;
 
     case 'messages':

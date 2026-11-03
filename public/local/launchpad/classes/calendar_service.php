@@ -302,10 +302,17 @@ final class calendar_service {
             return ['ok' => true, 'error' => null, 'timeduration' => 0];
         }
         if ($mode === 'minutes') {
+            if ($durationminutes < 1) {
+                return [
+                    'ok' => false,
+                    'error' => get_string('fellowship_calendar_err_minutes', 'local_launchpad'),
+                    'timeduration' => 0,
+                ];
+            }
             return [
                 'ok' => true,
                 'error' => null,
-                'timeduration' => max(0, $durationminutes) * 60,
+                'timeduration' => $durationminutes * 60,
             ];
         }
         if ($mode === 'until') {

@@ -46,6 +46,8 @@ final class fellowship_dashboard {
 
         require_once($CFG->libdir . '/enrollib.php');
 
+        // Match Moodle student access: hidden courses (visible=0) show "unavailable"
+        // on /course/view.php even when the user is enrolled — do not list them here.
         $sql = "SELECT DISTINCT c.id, c.fullname, c.shortname, c.idnumber, c.summary, c.summaryformat
                   FROM {user_enrolments} ue
                   JOIN {enrol} e ON e.id = ue.enrolid
@@ -56,6 +58,7 @@ final class fellowship_dashboard {
                  WHERE ue.userid = :userid
                    AND ue.status = :uestatus
                    AND e.status = :estatus
+                   AND c.visible = 1
                    AND " . $DB->sql_like('c.idnumber', ':idn', false) . "
               ORDER BY c.fullname ASC";
 
@@ -922,7 +925,6 @@ final class fellowship_dashboard {
         $base = self::phase_progress_for_user($userid, $courses, $selected);
         $phases = $base['phases'] ?? [];
         $met = 0;
-        $outstanding = [];
         $allscored = $phases !== [];
         $weightsum = 0.0;
         $phaseicons = [
@@ -943,11 +945,6 @@ final class fellowship_dashboard {
             $phase['show_bar'] = !empty($phase['has_score']);
             if (!empty($phase['is_met'])) {
                 $met++;
-            } else {
-                $outstanding[] = [
-                    'label' => $phase['name'] . ': ' . \core_text::strtolower((string) $phase['status']),
-                    'icon' => $phase['icon'],
-                ];
             }
             if (empty($phase['has_score'])) {
                 $allscored = false;
@@ -958,12 +955,6 @@ final class fellowship_dashboard {
         unset($phase);
 
         $orientation = self::orientation_status_for_user($userid, $courses);
-        if (empty($orientation['done'])) {
-            array_unshift($outstanding, [
-                'label' => $orientation['todo_label'],
-                'icon' => 'book-open-01',
-            ]);
-        }
 
         $allmet = $phases !== [] && $met === count($phases);
         $gates = max(1, count($phases));
@@ -1005,7 +996,6 @@ final class fellowship_dashboard {
                 null,
                 'Calculated only when every phase has a released review. Practice quizzes carry no weight.'
             ),
-            'todo' => self::str('fellowship_completion_todo', null, 'Still to do'),
             'cert_heading' => self::str('fellowship_completion_cert_heading', null, 'Certificate'),
             'cert_title' => self::str('fellowship_completion_cert_title', null, 'Completion certificate'),
             'cert_na' => self::str('fellowship_completion_cert_na', null, 'Not available yet'),
@@ -1048,8 +1038,6 @@ final class fellowship_dashboard {
             'orientation_weight' => '—',
             'orientation_result' => '—',
             'phases' => $phases,
-            'has_outstanding' => $outstanding !== [],
-            'outstanding' => $outstanding,
             'has_weighted' => $allscored,
             'weighted_display' => $allscored ? (string) (int) round($weightsum) : '—',
             'weighted_chip' => $allscored ? ($weightsum >= 70 ? 'ok' : 'warn') : 'line',
@@ -1078,10 +1066,9 @@ final class fellowship_dashboard {
      * Shared orientation row for Completion — from enrolled lp-orient-* course.
      *
      * @param list<\stdClass> $courses
-     * @return array{done:bool,chip:string,status:string,gates_note:string,todo_label:string}
+     * @return array{done:bool,chip:string,status:string,gates_note:string}
      */
     private static function orientation_status_for_user(int $userid, array $courses): array {
-        $orientlabel = self::str('fellowship_completion_orientation', null, 'Shared orientation');
         $donelabel = self::str('fellowship_completion_orientation_done', null, 'Complete');
         $pendinglabel = self::str('fellowship_completion_orientation_pending', null, 'Pending');
         $progresslabel = self::str('fellowship_completion_orientation_progress', null, 'In progress');
@@ -1094,11 +1081,6 @@ final class fellowship_dashboard {
             'fellowship_completion_gates_note_open',
             null,
             'Shared orientation still open. Every gate must reach 70.'
-        );
-        $todolabel = self::str(
-            'fellowship_completion_orientation_todo',
-            null,
-            'Shared orientation: still to complete'
         );
 
         $orientation = null;
@@ -1116,7 +1098,6 @@ final class fellowship_dashboard {
                 'chip' => 'line',
                 'status' => $pendinglabel,
                 'gates_note' => $noteopen,
-                'todo_label' => $todolabel,
             ];
         }
 
@@ -1133,7 +1114,6 @@ final class fellowship_dashboard {
                     'chip' => 'ok',
                     'status' => $donelabel,
                     'gates_note' => $notedone,
-                    'todo_label' => $orientlabel . ': ' . \core_text::strtolower($donelabel),
                 ];
             }
             return [
@@ -1141,7 +1121,6 @@ final class fellowship_dashboard {
                 'chip' => 'line',
                 'status' => $completed > 0 ? $progresslabel : $pendinglabel,
                 'gates_note' => $noteopen,
-                'todo_label' => $todolabel,
             ];
         }
 
@@ -1151,7 +1130,6 @@ final class fellowship_dashboard {
                 'chip' => 'ok',
                 'status' => $donelabel,
                 'gates_note' => $notedone,
-                'todo_label' => $orientlabel . ': ' . \core_text::strtolower($donelabel),
             ];
         }
 
@@ -1161,7 +1139,6 @@ final class fellowship_dashboard {
             'chip' => 'line',
             'status' => $pendinglabel,
             'gates_note' => $noteopen,
-            'todo_label' => $todolabel,
         ];
     }
 
@@ -2178,14 +2155,23 @@ final class fellowship_dashboard {
      * Course news-forum posts for enrolled lp-* courses (newest first).
      *
      * @param list<\stdClass> $courses
-     * @return array{items: list<array>, has_items: bool, moodle_news_url: string}
+     * @return array{
+     *   items: list<array>,
+     *   has_items: bool,
+     *   has_posts: bool,
+     *   count_posts: int,
+     *   count_courses: int,
+     *   moodle_news_url: string,
+     *   has_moodle_news: bool
+     * }
      */
     public static function list_announcements(int $userid, array $courses): array {
         global $DB;
 
         // Read-only: never call forum_get_course_forum() — it creates a news forum if missing.
         $items = [];
-        $firstforumurl = (new \moodle_url('/my/'))->out(false);
+        $firstforumurl = '';
+        $ctalabel = self::str('fellowship_news_open', null, 'Open');
 
         foreach ($courses as $course) {
             $modinfo = get_fast_modinfo($course, $userid);
@@ -2199,7 +2185,7 @@ final class fellowship_dashboard {
                 }
 
                 $forumurl = (new \moodle_url('/mod/forum/view.php', ['id' => $cm->id]))->out(false);
-                if ($firstforumurl === (new \moodle_url('/my/'))->out(false)) {
+                if ($firstforumurl === '') {
                     $firstforumurl = $forumurl;
                 }
 
@@ -2215,6 +2201,7 @@ final class fellowship_dashboard {
                         continue;
                     }
                     $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
+                    $authorname = $author ? fullname($author) : '';
                     $items[] = [
                         'id' => (int) $discussion->id,
                         'subject' => format_string($discussion->name),
@@ -2223,11 +2210,14 @@ final class fellowship_dashboard {
                             (int) $post->messageformat,
                             ['context' => \context_module::instance((int) $cm->id), 'para' => false]
                         ), 180),
-                        'author' => $author ? fullname($author) : '',
+                        'author' => $authorname,
+                        'has_author' => $authorname !== '',
                         'when' => userdate((int) $discussion->timemodified, get_string('strftimedatetimeshort', 'langconfig')),
                         'timemodified' => (int) $discussion->timemodified,
                         'url' => (new \moodle_url('/mod/forum/discuss.php', ['d' => $discussion->id]))->out(false),
                         'course_name' => format_string($course->fullname),
+                        'cta_label' => $ctalabel,
+                        'icon' => 'news',
                     ];
                 }
             }
@@ -2236,10 +2226,25 @@ final class fellowship_dashboard {
         usort($items, static fn(array $a, array $b): int => ($b['timemodified'] <=> $a['timemodified']));
         $items = array_slice($items, 0, 15);
 
+        $coursenames = [];
+        foreach ($items as $item) {
+            $name = (string) ($item['course_name'] ?? '');
+            if ($name !== '') {
+                $coursenames[$name] = true;
+            }
+        }
+
+        $hasitems = $items !== [];
+        $hasmoodlenews = $firstforumurl !== '';
+
         return [
             'items' => $items,
-            'has_items' => $items !== [],
+            'has_items' => $hasitems,
+            'has_posts' => $hasitems,
+            'count_posts' => count($items),
+            'count_courses' => count($coursenames),
             'moodle_news_url' => $firstforumurl,
+            'has_moodle_news' => $hasmoodlenews,
         ];
     }
 

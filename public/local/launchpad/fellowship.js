@@ -163,6 +163,92 @@
         });
         syncDurationModeUi(mode);
     }
+    function addOneHourToTime(timeStr) {
+        var m = /^(\d{1,2}):(\d{2})/.exec(String(timeStr || ''));
+        if (!m) {
+            return '10:00';
+        }
+        var h = parseInt(m[1], 10) + 1;
+        var min = m[2];
+        if (h > 23) {
+            h = 23;
+        }
+        return String(h).padStart(2, '0') + ':' + min;
+    }
+    function ensureUntilDefaults() {
+        if (!calForm) {
+            return;
+        }
+        var dateEl = calForm.querySelector('[data-lp-cal-form-date]');
+        var timeEl = calForm.querySelector('[data-lp-cal-form-time]');
+        var endDateEl = calForm.querySelector('[data-lp-cal-form-end-date]');
+        var endTimeEl = calForm.querySelector('[data-lp-cal-form-end-time]');
+        if (endDateEl && !endDateEl.value && dateEl && dateEl.value) {
+            endDateEl.value = dateEl.value;
+        }
+        if (endTimeEl && !endTimeEl.value) {
+            endTimeEl.value = addOneHourToTime(timeEl ? timeEl.value : '09:00');
+        }
+    }
+    function syncMinutesCustomUi(isCustom) {
+        if (!calForm) {
+            return;
+        }
+        var customWrap = calForm.querySelector('[data-lp-cal-form-minutes-custom]');
+        if (!customWrap) {
+            return;
+        }
+        if (isCustom) {
+            customWrap.removeAttribute('hidden');
+        } else {
+            customWrap.setAttribute('hidden', 'hidden');
+        }
+    }
+    function setMinutesSelectValue(minutes, preferCustom) {
+        var root = calForm ? calForm.querySelector('[data-lp-select-minutes]') : null;
+        if (!root) {
+            return;
+        }
+        var presets = {15: 1, 30: 1, 45: 1, 60: 1, 90: 1, 120: 1};
+        var n = parseInt(String(minutes || '0'), 10);
+        if (isNaN(n) || n < 1) {
+            n = 60;
+        }
+        var value = (preferCustom || !presets[n]) ? 'custom' : String(n);
+        setLpSelectValue(root, value);
+        var hidden = root.querySelector('[data-lp-select-input]');
+        var customInput = calForm.querySelector('[data-lp-cal-form-duration-custom]');
+        if (value === 'custom') {
+            if (customInput) {
+                customInput.value = String(n);
+            }
+            if (hidden) {
+                hidden.value = String(n);
+            }
+            syncMinutesCustomUi(true);
+        } else {
+            if (hidden) {
+                hidden.value = value;
+            }
+            syncMinutesCustomUi(false);
+        }
+    }
+    function getDurationMinutes() {
+        if (!calForm) {
+            return 0;
+        }
+        var mode = getDurationMode();
+        if (mode !== 'minutes') {
+            return 0;
+        }
+        var customWrap = calForm.querySelector('[data-lp-cal-form-minutes-custom]');
+        var customInput = calForm.querySelector('[data-lp-cal-form-duration-custom]');
+        if (customWrap && !customWrap.hasAttribute('hidden') && customInput) {
+            return parseInt(customInput.value || '0', 10) || 0;
+        }
+        var durEl = calForm.querySelector('[data-lp-cal-form-duration]');
+        return parseInt(durEl ? durEl.value : '0', 10) || 0;
+    }
     function syncDurationModeUi(mode) {
         if (!calForm) {
             return;
@@ -172,6 +258,7 @@
         if (untilWrap) {
             if (mode === 'until') {
                 untilWrap.removeAttribute('hidden');
+                ensureUntilDefaults();
             } else {
                 untilWrap.setAttribute('hidden', 'hidden');
             }
@@ -189,7 +276,7 @@
             return;
         }
         var wrap = calForm.querySelector('[data-lp-cal-form-repeat-wrap]');
-        var modeEl = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
+        var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
         var countWrap = calForm.querySelector('[data-lp-cal-form-repeat-count-wrap]');
         if (!wrap) {
             return;
@@ -199,7 +286,7 @@
             return;
         }
         wrap.removeAttribute('hidden');
-        var weekly = modeEl && modeEl.value === 'weekly';
+        var weekly = !!(repeatEl && repeatEl.checked);
         if (countWrap) {
             if (weekly) {
                 countWrap.removeAttribute('hidden');
@@ -212,8 +299,8 @@
         if (!calForm) {
             return 1;
         }
-        var modeEl = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
-        if (!modeEl || modeEl.value !== 'weekly') {
+        var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
+        if (!repeatEl || !repeatEl.checked) {
             return 1;
         }
         var countEl = calForm.querySelector('[data-lp-cal-form-repeats]');
@@ -222,6 +309,171 @@
             return 1;
         }
         return Math.min(52, n);
+    }
+    function closeAllLpSelects(except) {
+        if (!calForm) {
+            return;
+        }
+        calForm.querySelectorAll('[data-lp-select]').forEach(function (root) {
+            if (except && root === except) {
+                return;
+            }
+            closeLpSelect(root);
+        });
+    }
+    function closeLpSelect(root) {
+        if (!root) {
+            return;
+        }
+        var menu = root.querySelector('[data-lp-select-menu]');
+        var trigger = root.querySelector('[data-lp-select-trigger]');
+        root.classList.remove('is-open');
+        if (menu) {
+            menu.setAttribute('hidden', 'hidden');
+        }
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+    }
+    function openLpSelect(root) {
+        if (!root) {
+            return;
+        }
+        closeAllLpSelects(root);
+        var menu = root.querySelector('[data-lp-select-menu]');
+        var trigger = root.querySelector('[data-lp-select-trigger]');
+        root.classList.add('is-open');
+        if (menu) {
+            menu.removeAttribute('hidden');
+        }
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'true');
+        }
+        var selected = root.querySelector('[data-lp-select-option].is-selected')
+            || root.querySelector('[data-lp-select-option]');
+        if (selected) {
+            selected.focus();
+        }
+    }
+    function setLpSelectValue(root, value) {
+        if (!root) {
+            return;
+        }
+        var options = root.querySelectorAll('[data-lp-select-option]');
+        var labelEl = root.querySelector('[data-lp-select-label]');
+        var input = root.querySelector('[data-lp-select-input]');
+        var matched = null;
+        options.forEach(function (opt) {
+            var on = opt.getAttribute('data-value') === String(value);
+            opt.classList.toggle('is-selected', on);
+            if (on) {
+                opt.setAttribute('aria-selected', 'true');
+                matched = opt;
+            } else {
+                opt.removeAttribute('aria-selected');
+            }
+        });
+        if (!matched && options.length) {
+            matched = options[0];
+            matched.classList.add('is-selected');
+            matched.setAttribute('aria-selected', 'true');
+            value = matched.getAttribute('data-value');
+        }
+        if (labelEl && matched) {
+            labelEl.textContent = (matched.textContent || '').replace(/\s+/g, ' ').trim();
+        }
+        if (input) {
+            if (input.tagName === 'SELECT') {
+                input.value = String(value);
+            } else if (String(value) !== 'custom') {
+                input.value = String(value);
+            }
+        }
+        if (root.hasAttribute('data-lp-select-minutes')) {
+            syncMinutesCustomUi(String(value) === 'custom');
+        }
+    }
+    function syncLpSelectFromInput(root) {
+        if (!root) {
+            return;
+        }
+        var input = root.querySelector('[data-lp-select-input]');
+        if (!input) {
+            return;
+        }
+        setLpSelectValue(root, input.value || '');
+    }
+    function initLpSelects() {
+        if (!calForm) {
+            return;
+        }
+        calForm.querySelectorAll('[data-lp-select]').forEach(function (root) {
+            if (root.getAttribute('data-lp-select-ready') === '1') {
+                syncLpSelectFromInput(root);
+                return;
+            }
+            root.setAttribute('data-lp-select-ready', '1');
+            var trigger = root.querySelector('[data-lp-select-trigger]');
+            var menu = root.querySelector('[data-lp-select-menu]');
+            if (trigger) {
+                trigger.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (root.classList.contains('is-open')) {
+                        closeLpSelect(root);
+                    } else {
+                        openLpSelect(root);
+                    }
+                });
+            }
+            if (menu) {
+                menu.addEventListener('click', function (e) {
+                    var opt = e.target.closest('[data-lp-select-option]');
+                    if (!opt || !menu.contains(opt)) {
+                        return;
+                    }
+                    var value = opt.getAttribute('data-value') || '';
+                    setLpSelectValue(root, value);
+                    if (root.hasAttribute('data-lp-select-minutes') && value === 'custom') {
+                        var customInput = calForm.querySelector('[data-lp-cal-form-duration-custom]');
+                        var hidden = root.querySelector('[data-lp-select-input]');
+                        if (customInput && hidden) {
+                            hidden.value = customInput.value || '60';
+                        }
+                    }
+                    closeLpSelect(root);
+                    if (trigger) {
+                        trigger.focus();
+                    }
+                });
+                menu.addEventListener('keydown', function (e) {
+                    var options = Array.prototype.slice.call(menu.querySelectorAll('[data-lp-select-option]'));
+                    if (!options.length) {
+                        return;
+                    }
+                    var current = document.activeElement;
+                    var idx = options.indexOf(current);
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        options[Math.min(options.length - 1, Math.max(0, idx) + 1)].focus();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        options[Math.max(0, (idx < 0 ? 0 : idx) - 1)].focus();
+                    } else if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (current && current.hasAttribute('data-lp-select-option')) {
+                            current.click();
+                        }
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        closeLpSelect(root);
+                        if (trigger) {
+                            trigger.focus();
+                        }
+                    }
+                });
+            }
+            syncLpSelectFromInput(root);
+        });
     }
 
     function anyCalOverlayOpen() {
@@ -283,6 +535,7 @@
         if (!calForm) {
             return;
         }
+        closeAllLpSelects(null);
         calForm.classList.remove('is-open');
         calForm.setAttribute('hidden', 'hidden');
         if (!anyCalOverlayOpen()) {
@@ -420,9 +673,6 @@
             if (timeEl) {
                 timeEl.value = sourceBtn.getAttribute('data-time') || '';
             }
-            if (durEl) {
-                durEl.value = sourceBtn.getAttribute('data-duration') || '0';
-            }
             if (endDateEl) {
                 endDateEl.value = sourceBtn.getAttribute('data-end-date') || '';
             }
@@ -440,16 +690,27 @@
                 durMode = (parseInt(sourceBtn.getAttribute('data-duration') || '0', 10) > 0) ? 'until' : 'none';
             }
             setDurationMode(durMode);
+            if (durMode === 'minutes') {
+                setMinutesSelectValue(sourceBtn.getAttribute('data-duration') || '60', false);
+            }
             var editScope = sourceBtn.getAttribute('data-scope') === 'course' ? 'course' : 'personal';
             setCalScope(editScope, true);
             if (courseEl && editScope === 'course') {
                 courseEl.value = sourceBtn.getAttribute('data-courseid') || courseEl.value;
                 courseEl.disabled = false;
+                var courseSelect = calForm.querySelector('[data-lp-select-course]');
+                if (courseSelect) {
+                    setLpSelectValue(courseSelect, courseEl.value);
+                }
             }
             if (delBtn) {
                 delBtn.removeAttribute('hidden');
             }
             syncRepeatUi(false);
+            var moreEl = calForm.querySelector('[data-lp-cal-form-more]');
+            if (moreEl && ((locEl && locEl.value) || (descEl && descEl.value))) {
+                moreEl.open = true;
+            }
         } else {
             calFormEl.reset();
             if (titleEl) {
@@ -475,26 +736,37 @@
                 endDateEl.value = presetDate;
             }
             setDurationMode('none');
-            var repeatMode = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
-            if (repeatMode) {
-                repeatMode.value = 'none';
+            setMinutesSelectValue(60, false);
+            var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
+            if (repeatEl) {
+                repeatEl.checked = false;
             }
             var repeatCount = calForm.querySelector('[data-lp-cal-form-repeats]');
             if (repeatCount) {
-                repeatCount.value = '4';
+                repeatCount.value = '1';
             }
             syncRepeatUi(true);
+            var moreCreate = calForm.querySelector('[data-lp-cal-form-more]');
+            if (moreCreate) {
+                moreCreate.open = false;
+            }
             var defaultScope = (calRoot && calRoot.getAttribute('data-default-scope') === 'course')
                 ? 'course'
                 : 'personal';
             setCalScope(defaultScope, false);
             if (courseEl) {
                 courseEl.disabled = false;
+                var courseSelectCreate = calForm.querySelector('[data-lp-select-course]');
+                if (courseSelectCreate) {
+                    syncLpSelectFromInput(courseSelectCreate);
+                }
             }
             if (delBtn) {
                 delBtn.setAttribute('hidden', 'hidden');
             }
         }
+        initLpSelects();
+        closeAllLpSelects(null);
         calForm.classList.add('is-open');
         calForm.removeAttribute('hidden');
         document.body.classList.add('lp-cal-detail-lock');
@@ -636,13 +908,44 @@
                 syncDurationModeUi(getDurationMode());
             });
         });
-        var repeatModeEl = calForm.querySelector('[data-lp-cal-form-repeat-mode]');
-        if (repeatModeEl) {
-            repeatModeEl.addEventListener('change', function () {
+        var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
+        if (repeatEl) {
+            repeatEl.addEventListener('change', function () {
                 var idEl = calForm.querySelector('[data-lp-cal-form-id]');
                 syncRepeatUi(!(idEl && idEl.value));
             });
         }
+        var minutesCustomInput = calForm.querySelector('[data-lp-cal-form-duration-custom]');
+        if (minutesCustomInput) {
+            minutesCustomInput.addEventListener('input', function () {
+                var hidden = calForm.querySelector('[data-lp-select-minutes] [data-lp-select-input]');
+                if (hidden) {
+                    hidden.value = minutesCustomInput.value || '0';
+                }
+            });
+        }
+        initLpSelects();
+        document.addEventListener('click', function (e) {
+            if (!calForm || !calForm.classList.contains('is-open')) {
+                return;
+            }
+            if (e.target.closest('[data-lp-select]')) {
+                return;
+            }
+            closeAllLpSelects(null);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (!calForm || !calForm.classList.contains('is-open')) {
+                return;
+            }
+            if (e.key === 'Escape') {
+                var openSelect = calForm.querySelector('[data-lp-select].is-open');
+                if (openSelect) {
+                    e.preventDefault();
+                    closeLpSelect(openSelect);
+                }
+            }
+        });
         var delBtn = calForm.querySelector('[data-lp-cal-form-delete]');
         if (delBtn) {
             delBtn.addEventListener('click', function () {
@@ -700,7 +1003,7 @@
                     date: dateEl ? dateEl.value : '',
                     time: timeEl ? timeEl.value : '',
                     duration_mode: getDurationMode(),
-                    duration: durEl ? durEl.value : '0',
+                    duration: String(getDurationMinutes()),
                     end_date: endDateField ? endDateField.value : '',
                     end_time: endTimeField ? endTimeField.value : '',
                     location: locField ? locField.value : '',
