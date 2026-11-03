@@ -163,6 +163,7 @@ final class activity_portal {
         $isinportal = self::is_portal_renderable($modname);
         $needsengine = !$isinportal;
         $callouttext = '';
+        $assignbrief = self::empty_assign_brief();
 
         if ($modname === 'page') {
             require_capability('mod/page:view', $context);
@@ -264,6 +265,12 @@ final class activity_portal {
                 ];
             }
             $hasfiles = $files !== [];
+        } else if ($modname === 'assign') {
+            // E9: LaunchPad brief chrome; draft/submit stay in Moodle.
+            require_capability('mod/assign:view', $context);
+            $needsengine = true;
+            $isinportal = false;
+            $assignbrief = self::build_assign_brief($cm, $course, $context, (int) $user->id);
         } else {
             // Interactive Moodle engines — keep completion for the native mod view.
             $needsengine = true;
@@ -343,8 +350,198 @@ final class activity_portal {
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
                 'is_lesson' => $islesson,
-            ], $lesson),
+            ], $lesson, $assignbrief),
         ];
+    }
+
+    /**
+     * Empty assign brief context (non-assign activities).
+     *
+     * @return array<string,mixed>
+     */
+    public static function empty_assign_brief(): array {
+        return [
+            'is_assign' => false,
+            'assign_brief_html' => '',
+            'assign_has_brief' => false,
+            'assign_deliverable' => '',
+            'assign_has_deliverable' => false,
+            'assign_criteria_html' => '',
+            'assign_has_criteria' => false,
+            'assign_formats' => '',
+            'assign_has_formats' => false,
+            'assign_deadline' => '',
+            'assign_has_deadline' => false,
+            'assign_opens' => '',
+            'assign_has_opens' => false,
+            'assign_grade_max' => '',
+            'assign_has_grade' => false,
+            'assign_pass_bar' => '70',
+            'assign_sub_status' => '',
+            'assign_sub_status_key' => '',
+            'assign_has_sub_status' => false,
+            'assign_track_label' => '',
+            'assign_phase_label' => '',
+        ];
+    }
+
+    /**
+     * Fellow-facing assignment brief for LaunchPad chrome (submit stays in Moodle).
+     *
+     * @return array<string,mixed>
+     */
+    public static function build_assign_brief(
+        \cm_info $cm,
+        \stdClass $course,
+        \context_module $context,
+        int $userid
+    ): array {
+        global $CFG;
+
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
+
+        $assign = new \assign($context, $cm, $course);
+        $instance = $assign->get_instance();
+
+        $introhtml = '';
+        if (!empty($instance->intro)) {
+            $introhtml = format_module_intro('assign', $instance, $cm->id);
+        }
+        $parts = self::parse_assign_intro_sections($introhtml !== '' ? (string) $instance->intro : '');
+        // Prefer formatted intro as brief when no markers; re-format marker chunks.
+        $briefhtml = $parts['brief_html'];
+        $criteriahtml = $parts['criteria_html'];
+        $deliverable = $parts['deliverable'];
+        $formatoverride = $parts['formats'];
+
+        if ($briefhtml === '' && $introhtml !== '') {
+            $briefhtml = $introhtml;
+        } else if ($briefhtml !== '') {
+            $briefhtml = format_text($briefhtml, FORMAT_HTML, ['context' => $context, 'para' => true]);
+        }
+        if ($criteriahtml !== '') {
+            $criteriahtml = format_text($criteriahtml, FORMAT_HTML, ['context' => $context, 'para' => true]);
+        } else {
+            // Always show judging baseline when content did not publish criteria.
+            $criteriahtml = format_text(
+                get_string('fellowship_assign_criteria_default', 'local_launchpad'),
+                FORMAT_MOODLE,
+                ['context' => $context, 'para' => true]
+            );
+        }
+        if ($deliverable === '') {
+            $deliverable = get_string('fellowship_assign_deliverable_default', 'local_launchpad');
+        }
+
+        $formats = [];
+        if ($formatoverride !== '') {
+            $formats[] = $formatoverride;
+        } else {
+            foreach (['onlinetext' => 'fellowship_assign_format_onlinetext',
+                'file' => 'fellowship_assign_format_file'] as $plugin => $str) {
+                $p = $assign->get_submission_plugin_by_type($plugin);
+                if ($p && $p->is_enabled()) {
+                    $formats[] = get_string($str, 'local_launchpad');
+                }
+            }
+        }
+        $formatslabel = $formats !== [] ? implode(' · ', $formats)
+            : get_string('fellowship_assign_format_unknown', 'local_launchpad');
+
+        $duedate = (int) ($instance->duedate ?? 0);
+        $opendate = (int) ($instance->allowsubmissionsfromdate ?? 0);
+        $grademax = (float) ($instance->grade ?? 0);
+
+        $submission = $assign->get_user_submission($userid, false);
+        $substatus = $submission ? (string) $submission->status : '';
+        $statuskey = 'none';
+        if ($substatus === 'submitted') {
+            $statuskey = 'submitted';
+        } else if ($substatus === 'draft') {
+            $statuskey = 'draft';
+        } else if ($substatus === 'reopened') {
+            $statuskey = 'reopened';
+        } else if ($substatus === 'new' || $substatus === '') {
+            $statuskey = 'none';
+        }
+        $statuslabel = get_string('fellowship_assign_status_' . $statuskey, 'local_launchpad');
+
+        $sectionname = '';
+        if ((int) $cm->sectionnum > 0) {
+            $sectionname = get_section_name($course, (int) $cm->sectionnum);
+        }
+
+        return [
+            'is_assign' => true,
+            'assign_brief_html' => $briefhtml,
+            'assign_has_brief' => trim(strip_tags($briefhtml)) !== '',
+            'assign_deliverable' => $deliverable,
+            'assign_has_deliverable' => $deliverable !== '',
+            'assign_criteria_html' => $criteriahtml,
+            'assign_has_criteria' => trim(strip_tags($criteriahtml)) !== '',
+            'assign_formats' => $formatslabel,
+            'assign_has_formats' => $formatslabel !== '',
+            'assign_deadline' => $duedate > 0
+                ? userdate($duedate, get_string('strftimedatetimeshort', 'langconfig'))
+                : get_string('fellowship_assign_deadline_none', 'local_launchpad'),
+            'assign_has_deadline' => true,
+            'assign_deadline_set' => $duedate > 0,
+            'assign_opens' => $opendate > 0
+                ? userdate($opendate, get_string('strftimedatetimeshort', 'langconfig'))
+                : '',
+            'assign_has_opens' => $opendate > 0,
+            'assign_grade_max' => $grademax > 0 ? format_float($grademax, 0) : '',
+            'assign_has_grade' => $grademax > 0,
+            'assign_pass_bar' => '70',
+            'assign_sub_status' => $statuslabel,
+            'assign_sub_status_key' => $statuskey,
+            'assign_has_sub_status' => true,
+            'assign_track_label' => format_string($course->fullname),
+            'assign_phase_label' => format_string($sectionname),
+            'assign_has_phase' => $sectionname !== '',
+        ];
+    }
+
+    /**
+     * Optional structured assign intro markers.
+     *
+     * @return array{brief_html:string,deliverable:string,criteria_html:string,formats:string}
+     */
+    public static function parse_assign_intro_sections(string $raw): array {
+        $out = [
+            'brief_html' => '',
+            'deliverable' => '',
+            'criteria_html' => '',
+            'formats' => '',
+        ];
+        $raw = trim($raw);
+        if ($raw === '' || !preg_match('/\[LP-(BRIEF|DELIVERABLE|CRITERIA|FORMAT)\]/i', $raw)) {
+            return $out;
+        }
+        $map = [
+            'BRIEF' => 'brief_html',
+            'DELIVERABLE' => 'deliverable',
+            'CRITERIA' => 'criteria_html',
+            'FORMAT' => 'formats',
+        ];
+        $parts = preg_split('/\[LP-(BRIEF|DELIVERABLE|CRITERIA|FORMAT)\]/i', $raw, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if ($parts === false || count($parts) < 3) {
+            return $out;
+        }
+        for ($i = 1; $i < count($parts) - 1; $i += 2) {
+            $label = strtoupper(trim($parts[$i]));
+            $chunk = trim($parts[$i + 1] ?? '');
+            if (!isset($map[$label]) || $chunk === '') {
+                continue;
+            }
+            $key = $map[$label];
+            if ($key === 'deliverable' || $key === 'formats') {
+                $out[$key] = trim(html_entity_decode(strip_tags($chunk), ENT_QUOTES | ENT_HTML5));
+            } else {
+                $out[$key] = self::cleanup_lesson_chunk($chunk);
+            }
+        }
+        return $out;
     }
 
     /**

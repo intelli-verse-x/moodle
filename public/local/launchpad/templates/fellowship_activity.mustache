@@ -163,12 +163,79 @@
           {{/hasfiles}}
         {{/isinportal}}
 
+        {{#is_assign}}
+          <div class="lp-assign-layout" data-region="assign-brief">
+            <p class="lp-lesson-meta">
+              <span>{{assign_track_label}}</span>
+              {{#assign_has_phase}}
+                <span aria-hidden="true">·</span>
+                <span>{{assign_phase_label}}</span>
+              {{/assign_has_phase}}
+            </p>
+
+            <section class="lp-lesson-block">
+              <h3 class="lp-lesson-block-title">{{strings.assignbrief}}</h3>
+              {{#assign_has_brief}}
+                <div class="lp-lesson-block-body">{{{assign_brief_html}}}</div>
+              {{/assign_has_brief}}
+              {{^assign_has_brief}}
+                <p class="lp-muted lp-sm">{{strings.assignbriefmissing}}</p>
+              {{/assign_has_brief}}
+            </section>
+
+            {{#assign_has_deliverable}}
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.assigndeliverable}}</h3>
+                <p class="lp-lesson-block-body">{{assign_deliverable}}</p>
+              </section>
+            {{/assign_has_deliverable}}
+
+            {{#assign_has_criteria}}
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.assigncriteria}}</h3>
+                <div class="lp-lesson-block-body">{{{assign_criteria_html}}}</div>
+              </section>
+            {{/assign_has_criteria}}
+
+            <dl class="lp-assign-meta">
+              {{#assign_has_formats}}
+                <div>
+                  <dt>{{strings.assignformats}}</dt>
+                  <dd>{{assign_formats}}</dd>
+                </div>
+              {{/assign_has_formats}}
+              <div>
+                <dt>{{strings.assigndeadline}}</dt>
+                <dd{{^assign_deadline_set}} class="lp-muted"{{/assign_deadline_set}}>{{assign_deadline}}</dd>
+              </div>
+              {{#assign_has_opens}}
+                <div>
+                  <dt>{{strings.assignopens}}</dt>
+                  <dd>{{assign_opens}}</dd>
+                </div>
+              {{/assign_has_opens}}
+              {{#assign_has_grade}}
+                <div>
+                  <dt>{{strings.assigngrade}}</dt>
+                  <dd>{{assign_grade_max}} · {{strings.assignpassbar}} {{assign_pass_bar}}</dd>
+                </div>
+              {{/assign_has_grade}}
+              {{#assign_has_sub_status}}
+                <div>
+                  <dt>{{strings.assignstatus}}</dt>
+                  <dd><span class="lp-chip {{#assign_sub_status_key}}is-{{assign_sub_status_key}}{{/assign_sub_status_key}}">{{assign_sub_status}}</span></dd>
+                </div>
+              {{/assign_has_sub_status}}
+            </dl>
+          </div>
+        {{/is_assign}}
+
         {{#needsengine}}
           <div class="lp-activity-callout" role="status">
             <div class="lp-activity-callout-text">
-              <b>{{strings.openactivity}}</b>
-              <p>{{strings.activityenginehelp}}</p>
-              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
+              <b>{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}</b>
+              <p>{{#is_assign}}{{strings.assignenginehelp}}{{/is_assign}}{{^is_assign}}{{strings.activityenginehelp}}{{/is_assign}}</p>
+              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}</a>
             </div>
           </div>
         {{/needsengine}}

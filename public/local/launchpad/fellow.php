@@ -318,6 +318,18 @@ switch ($view) {
                 'lessonmissing' => get_string('fellowship_lesson_missing', 'local_launchpad'),
                 'lessonnext' => get_string('fellowship_lesson_next', 'local_launchpad'),
                 'lessonnextlabel' => get_string('fellowship_lesson_next_label', 'local_launchpad'),
+                'assignbrief' => get_string('fellowship_assign_brief', 'local_launchpad'),
+                'assignbriefmissing' => get_string('fellowship_assign_brief_missing', 'local_launchpad'),
+                'assigndeliverable' => get_string('fellowship_assign_deliverable', 'local_launchpad'),
+                'assigncriteria' => get_string('fellowship_assign_criteria', 'local_launchpad'),
+                'assignformats' => get_string('fellowship_assign_formats', 'local_launchpad'),
+                'assigndeadline' => get_string('fellowship_assign_deadline', 'local_launchpad'),
+                'assignopens' => get_string('fellowship_assign_opens', 'local_launchpad'),
+                'assigngrade' => get_string('fellowship_assign_grade', 'local_launchpad'),
+                'assignpassbar' => get_string('fellowship_assign_pass_bar', 'local_launchpad'),
+                'assignstatus' => get_string('fellowship_assign_status', 'local_launchpad'),
+                'assigncontinue' => get_string('fellowship_assign_continue', 'local_launchpad'),
+                'assignenginehelp' => get_string('fellowship_assign_engine_help', 'local_launchpad'),
             ],
         ]);
         break;

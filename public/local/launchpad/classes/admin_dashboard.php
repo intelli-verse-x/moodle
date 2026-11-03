@@ -1074,6 +1074,11 @@ final class admin_dashboard {
                 $moduleinfo->allowofflineattempts = 0;
                 break;
             case 'assign':
+                $moduleinfo->introeditor = [
+                    'text' => get_string('admin_manage_new_assign_intro', 'local_launchpad'),
+                    'format' => FORMAT_HTML,
+                    'itemid' => 0,
+                ];
                 $moduleinfo->alwaysshowdescription = 1;
                 $moduleinfo->submissiondrafts = 1;
                 $moduleinfo->requiresubmissionstatement = 0;
