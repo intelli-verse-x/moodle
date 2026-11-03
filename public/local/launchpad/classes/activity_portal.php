@@ -156,6 +156,8 @@ final class activity_portal {
         $hasexternal = false;
         $embedhtml = '';
         $hasembed = false;
+        $videourl = '';
+        $hasvideo = false;
         $files = [];
         $hasfiles = false;
         $isinportal = self::is_portal_renderable($modname);
@@ -229,18 +231,36 @@ final class activity_portal {
                 if ($file->is_directory()) {
                     continue;
                 }
+                $mimetype = (string) $file->get_mimetype();
+                $isvideo = str_starts_with($mimetype, 'video/');
+                $streamurl = \moodle_url::make_pluginfile_url(
+                    $context->id,
+                    'mod_resource',
+                    'content',
+                    $file->get_itemid(),
+                    $file->get_filepath(),
+                    $file->get_filename(),
+                    false
+                )->out(false);
+                $downloadurl = \moodle_url::make_pluginfile_url(
+                    $context->id,
+                    'mod_resource',
+                    'content',
+                    $file->get_itemid(),
+                    $file->get_filepath(),
+                    $file->get_filename(),
+                    true
+                )->out(false);
+                // First video file plays in-shell (Udemy-style showcase player).
+                if ($isvideo && !$hasvideo) {
+                    $hasvideo = true;
+                    $videourl = $streamurl;
+                }
                 $files[] = [
                     'filename' => $file->get_filename(),
-                    'url' => \moodle_url::make_pluginfile_url(
-                        $context->id,
-                        'mod_resource',
-                        'content',
-                        $file->get_itemid(),
-                        $file->get_filepath(),
-                        $file->get_filename(),
-                        true // Force download to the computer (not open-in-tab for text).
-                    )->out(false),
+                    'url' => $downloadurl,
                     'size' => display_size($file->get_filesize()),
+                    'isvideo' => $isvideo,
                 ];
             }
             $hasfiles = $files !== [];
@@ -268,8 +288,8 @@ final class activity_portal {
         }
 
         $hasbody = trim(strip_tags($bodyhtml)) !== '';
-        // Placeholder only when there is nothing to show (no body / files / link / embed).
-        $isplaceholder = !$hasbody && !$hasfiles && !$hasexternal && !$hasembed;
+        // Placeholder only when there is nothing to show.
+        $isplaceholder = !$hasbody && !$hasfiles && !$hasexternal && !$hasembed && !$hasvideo;
 
         return [
             'is_activity' => true,
@@ -309,8 +329,10 @@ final class activity_portal {
                 'hasexternal' => $hasexternal,
                 'embedhtml' => $embedhtml,
                 'hasembed' => $hasembed,
+                'videourl' => $videourl,
+                'hasvideo' => $hasvideo,
                 'files' => $files,
-                'hasfiles' => $hasfiles,
+                'hasfiles' => $hasfiles && !$hasvideo, // When playing video, don't duplicate as a file list.
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
             ],

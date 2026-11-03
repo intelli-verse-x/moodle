@@ -72,6 +72,14 @@
             </div>
           {{/isplaceholder}}
 
+          {{#hasvideo}}
+            <div class="lp-activity-player">
+              <video controls playsinline preload="metadata" controlslist="nodownload">
+                <source src="{{videourl}}" type="video/mp4">
+              </video>
+            </div>
+          {{/hasvideo}}
+
           {{#hasembed}}
             <div class="lp-activity-embed">{{{embedhtml}}}</div>
           {{/hasembed}}

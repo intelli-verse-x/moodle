@@ -3298,6 +3298,22 @@ body.lp-portal-mismatch-lock {
   width: 100%;
   max-width: 720px;
 }
+.lp-activity-player {
+  width: 100%;
+  max-width: 720px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0D1429;
+  border: 1px solid var(--lp-line);
+}
+.lp-activity-player video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(70vh, 480px);
+  background: #000;
+  vertical-align: middle;
+}
 .lp-activity-video {
   position: relative;
   width: 100%;

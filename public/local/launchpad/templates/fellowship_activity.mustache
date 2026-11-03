@@ -51,6 +51,15 @@
             </div>
           {{/isplaceholder}}
 
+          {{#hasvideo}}
+            <div class="lp-activity-player">
+              <video controls playsinline preload="metadata" controlslist="nodownload">
+                <source src="{{videourl}}" type="video/mp4">
+                Your browser does not support HTML5 video.
+              </video>
+            </div>
+          {{/hasvideo}}
+
           {{#hasembed}}
             <div class="lp-activity-embed">{{{embedhtml}}}</div>
           {{/hasembed}}
