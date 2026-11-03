@@ -111,8 +111,13 @@ final class messaging {
                 }
             }
         }
-        // Classmates: both students on at least one shared LaunchPad course.
+        // Classmates: both students on at least one shared LaunchPad *track* (not orientation).
         foreach (self::shared_launchpad_courseids($fromid, $toid) as $courseid) {
+            $course = get_course($courseid);
+            $idn = (string) ($course->idnumber ?? '');
+            if (!admin_dashboard::is_track_idnumber($idn)) {
+                continue;
+            }
             if (account_persona::is_fellowship($fromid, $courseid)
                     && account_persona::is_fellowship($toid, $courseid)) {
                 return true;
@@ -166,6 +171,11 @@ final class messaging {
 
         $byid = [];
         foreach ($courses as $course) {
+            // Orientation (lp-orient-*) is shared onboarding — skip smoke/test classmates there.
+            $idnumber = (string) ($course->idnumber ?? '');
+            if ($idnumber !== '' && str_starts_with($idnumber, admin_dashboard::ORIENT_IDNUMBER_PREFIX)) {
+                continue;
+            }
             $context = \context_course::instance((int) $course->id);
             $students = get_enrolled_users(
                 $context,
@@ -217,6 +227,10 @@ final class messaging {
         }
         $byid = [];
         foreach (fellowship_dashboard::list_courses($userid) as $course) {
+            $idnumber = (string) ($course->idnumber ?? '');
+            if ($idnumber !== '' && str_starts_with($idnumber, admin_dashboard::ORIENT_IDNUMBER_PREFIX)) {
+                continue;
+            }
             foreach (fellowship_dashboard::course_mentors($course, $userid) as $mentor) {
                 $mid = (int) $mentor['id'];
                 if (isset($byid[$mid])) {
