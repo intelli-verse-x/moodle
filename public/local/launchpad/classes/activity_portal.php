@@ -154,6 +154,8 @@ final class activity_portal {
         $hasintro = false;
         $externalurl = '';
         $hasexternal = false;
+        $embedhtml = '';
+        $hasembed = false;
         $files = [];
         $hasfiles = false;
         $isinportal = self::is_portal_renderable($modname);
@@ -195,12 +197,14 @@ final class activity_portal {
             } else {
                 $completion->set_module_viewed($cm);
             }
-            // Only expose http(s) destinations in the Employer shell.
+            // Only expose http(s) destinations in the portal shell.
             $rawurl = clean_param((string) ($urlmod->externalurl ?? ''), PARAM_URL);
             $scheme = $rawurl !== '' ? strtolower((string) (parse_url($rawurl, PHP_URL_SCHEME) ?? '')) : '';
             if ($rawurl !== '' && in_array($scheme, ['http', 'https'], true)) {
                 $externalurl = $rawurl;
                 $hasexternal = true;
+                $embedhtml = self::video_embed_html($rawurl);
+                $hasembed = $embedhtml !== '';
             }
             if (!empty($urlmod->intro)) {
                 $introhtml = format_module_intro('url', $urlmod, $cm->id);
@@ -264,8 +268,8 @@ final class activity_portal {
         }
 
         $hasbody = trim(strip_tags($bodyhtml)) !== '';
-        // Placeholder only when there is nothing to show (no body / files / link).
-        $isplaceholder = !$hasbody && !$hasfiles && !$hasexternal;
+        // Placeholder only when there is nothing to show (no body / files / link / embed).
+        $isplaceholder = !$hasbody && !$hasfiles && !$hasexternal && !$hasembed;
 
         return [
             'is_activity' => true,
@@ -303,12 +307,60 @@ final class activity_portal {
                 'hasintro' => $hasintro && !$isplaceholder,
                 'externalurl' => $externalurl,
                 'hasexternal' => $hasexternal,
+                'embedhtml' => $embedhtml,
+                'hasembed' => $hasembed,
                 'files' => $files,
                 'hasfiles' => $hasfiles,
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
             ],
         ];
+    }
+
+    /**
+     * In-shell YouTube / Vimeo player HTML for showcase (not watch-% completion).
+     */
+    private static function video_embed_html(string $url): string {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        $query = (string) (parse_url($url, PHP_URL_QUERY) ?? '');
+        $src = '';
+
+        if (str_contains($host, 'youtu.be')) {
+            $id = trim($path, '/');
+            if ($id !== '' && preg_match('/^[A-Za-z0-9_-]{6,}$/', $id)) {
+                $src = 'https://www.youtube-nocookie.com/embed/' . rawurlencode($id);
+            }
+        } else if (str_contains($host, 'youtube.com')) {
+            $id = '';
+            if (preg_match('#/(?:embed|shorts)/([A-Za-z0-9_-]{6,})#', $path, $m)) {
+                $id = $m[1];
+            } else {
+                parse_str($query, $params);
+                $id = (string) ($params['v'] ?? '');
+            }
+            if ($id !== '' && preg_match('/^[A-Za-z0-9_-]{6,}$/', $id)) {
+                $src = 'https://www.youtube-nocookie.com/embed/' . rawurlencode($id);
+            }
+        } else if (str_contains($host, 'vimeo.com')) {
+            if (preg_match('#/(\d+)#', $path, $m)) {
+                $src = 'https://player.vimeo.com/video/' . $m[1];
+            }
+        }
+
+        if ($src === '') {
+            return '';
+        }
+        // Trusted embed hosts only — built above, not from raw user HTML.
+        return '<div class="lp-activity-video">'
+            . '<iframe src="' . s($src) . '" title="Video" '
+            . 'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" '
+            . 'allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+            . '</div>';
     }
 
     /**

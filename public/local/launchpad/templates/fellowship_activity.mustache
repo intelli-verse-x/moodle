@@ -51,11 +51,22 @@
             </div>
           {{/isplaceholder}}
 
+          {{#hasembed}}
+            <div class="lp-activity-embed">{{{embedhtml}}}</div>
+          {{/hasembed}}
+
           {{#hasexternal}}
             <div class="lp-activity-external">
-              <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
-                {{strings.openlink}}
-              </a>
+              {{^hasembed}}
+                <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                </a>
+              {{/hasembed}}
+              {{#hasembed}}
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                </a>
+              {{/hasembed}}
               <p class="lp-muted lp-sm">{{externalurl}}</p>
             </div>
           {{/hasexternal}}

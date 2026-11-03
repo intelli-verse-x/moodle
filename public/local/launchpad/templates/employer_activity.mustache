@@ -72,12 +72,24 @@
             </div>
           {{/isplaceholder}}
 
+          {{#hasembed}}
+            <div class="lp-activity-embed">{{{embedhtml}}}</div>
+          {{/hasembed}}
+
           {{#hasexternal}}
             <div class="lp-activity-external">
-              <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
-                {{strings.openlink}}
-                <iconify-icon icon="hugeicons:link-square-02" width="16" height="16" aria-hidden="true"></iconify-icon>
-              </a>
+              {{^hasembed}}
+                <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                  <iconify-icon icon="hugeicons:link-square-02" width="16" height="16" aria-hidden="true"></iconify-icon>
+                </a>
+              {{/hasembed}}
+              {{#hasembed}}
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                  <iconify-icon icon="hugeicons:link-square-02" width="16" height="16" aria-hidden="true"></iconify-icon>
+                </a>
+              {{/hasembed}}
               <p class="lp-muted lp-sm">{{externalurl}}</p>
             </div>
           {{/hasexternal}}
