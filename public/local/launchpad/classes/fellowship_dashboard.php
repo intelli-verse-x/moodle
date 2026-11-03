@@ -1839,6 +1839,7 @@ final class fellowship_dashboard {
                 }
 
                 $commenttext = '';
+                $nextsteptext = '';
                 $gradedat = 0;
                 $gradepct = null;
                 $gradestr = '';
@@ -1863,11 +1864,16 @@ final class fellowship_dashboard {
                     ]);
                     if ($fc && trim((string) $fc->commenttext) !== '') {
                         $hasgrade = true; // Comment released counts as feedback even if mark pending.
-                        $commenttext = format_text(
-                            $fc->commenttext,
-                            (int) $fc->commentformat,
-                            ['context' => \context_module::instance($cm->id), 'para' => false]
-                        );
+                        $parts = mentor_dashboard::unpack_review_comment((string) $fc->commenttext);
+                        $nextsteptext = $parts['next_step'];
+                        $body = $parts['comment'] !== '' ? $parts['comment'] : '';
+                        if ($body !== '') {
+                            $commenttext = format_text(
+                                $body,
+                                (int) $fc->commentformat,
+                                ['context' => \context_module::instance($cm->id), 'para' => false]
+                            );
+                        }
                     }
                 }
 
@@ -1882,12 +1888,17 @@ final class fellowship_dashboard {
                         if (!empty($gg->dategraded)) {
                             $gradedat = max($gradedat, (int) $gg->dategraded);
                         }
-                        if ($commenttext === '' && !empty($gg->feedback)) {
-                            $commenttext = format_text(
-                                $gg->feedback,
-                                (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
-                                ['context' => \context_module::instance($cm->id), 'para' => false]
-                            );
+                        if ($commenttext === '' && $nextsteptext === '' && !empty($gg->feedback)) {
+                            $parts = mentor_dashboard::unpack_review_comment((string) $gg->feedback);
+                            $nextsteptext = $parts['next_step'];
+                            $body = $parts['comment'] !== '' ? $parts['comment'] : '';
+                            if ($body !== '') {
+                                $commenttext = format_text(
+                                    $body,
+                                    (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
+                                    ['context' => \context_module::instance($cm->id), 'para' => false]
+                                );
+                            }
                         }
                     }
                 }
@@ -1969,6 +1980,8 @@ final class fellowship_dashboard {
                     'summary' => $summary,
                     'has_grade' => $hasgrade && $gradestr !== '',
                     'grade_display' => $gradestr,
+                    'has_next_step' => $nextsteptext !== '',
+                    'next_step' => $nextsteptext,
                     'has_comment' => $commenttext !== '',
                     'comment_html' => $commenttext,
                     'has_attempt' => $attempt > 0,

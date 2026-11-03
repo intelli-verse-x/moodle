@@ -73,8 +73,9 @@ if ($view === 'review' && $cmid > 0 && $fellowid > 0 && data_submitted() && conf
     $gradepct = required_param('grade_pct', PARAM_RAW_TRIMMED);
     $comment = required_param('comment', PARAM_RAW_TRIMMED);
     $outcome = optional_param('outcome', 'met', PARAM_ALPHA);
+    $nextstep = optional_param('nextstep', '', PARAM_RAW_TRIMMED);
     try {
-        $result = mentor_dashboard::save_review($userid, $cmid, $fellowid, $gradepct, $comment, $outcome);
+        $result = mentor_dashboard::save_review($userid, $cmid, $fellowid, $gradepct, $comment, $outcome, $nextstep);
         redirect(new moodle_url(persona_home::MENTOR_PATH, [
             'view' => 'review',
             'id' => $cmid,
@@ -90,6 +91,7 @@ if ($view === 'review' && $cmid > 0 && $fellowid > 0 && data_submitted() && conf
             'err' => $e->errorcode,
             'grade_pct' => $gradepct,
             'outcome' => $outcome,
+            'nextstep' => $nextstep,
         ]), $e->getMessage(), null, \core\output\notification::NOTIFY_ERROR);
     }
 }
@@ -317,6 +319,10 @@ switch ($view) {
             // Existing score below pass bar → default to Changes.
             $reviewdata['outcome_met'] = false;
             $reviewdata['outcome_changes'] = true;
+        }
+        $postednext = optional_param('nextstep', '', PARAM_RAW_TRIMMED);
+        if ($postednext !== '') {
+            $reviewdata['next_step'] = $postednext;
         }
         $reviewdata['has_saved'] = ($saved === 'released' || $saved === 'changes');
         $reviewdata['saved_message'] = match ($saved) {

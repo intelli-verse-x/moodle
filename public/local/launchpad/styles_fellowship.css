@@ -1522,6 +1522,30 @@ body.local-launchpad-mentor {
   font-size: 28px;
   color: var(--lp-navy);
 }
+.lp-feedback-nextstep {
+  margin: 6px 0 12px;
+  padding: 14px 16px;
+  border: 1px solid #F5DFAE;
+  border-radius: 14px;
+  background: #FFF8E8;
+}
+.lp-feedback-nextstep-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #8A6A12;
+  margin-bottom: 4px;
+}
+.lp-feedback-nextstep-text {
+  margin: 0;
+  font-family: var(--lp-head);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--lp-navy);
+}
 .lp-quote {
   margin: 8px 0 14px;
   padding: 14px 16px;
@@ -2607,6 +2631,8 @@ body.local-launchpad-mentor .lp-xp-chip { display: none; }
   background: #fff;
 }
 .lp-review-input { max-width: 120px; }
+.lp-review-input-wide { max-width: none; }
+.lp-review-nextstep { margin-top: 4px; }
 .lp-review-textarea { resize: vertical; min-height: 120px; }
 .lp-review-outcome {
   border: 0;
