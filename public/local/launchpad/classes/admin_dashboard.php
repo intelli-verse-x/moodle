@@ -435,10 +435,8 @@ final class admin_dashboard {
         $deleteconfirm = get_string('admin_manage_delete_confirm', 'local_launchpad');
         $duplicatelabel = get_string('admin_manage_duplicate', 'local_launchpad');
         $renamelabel = get_string('admin_manage_rename', 'local_launchpad');
-        $moveuplabel = get_string('admin_manage_move_up', 'local_launchpad');
-        $movedownlabel = get_string('admin_manage_move_down', 'local_launchpad');
-        $actcount = count($activities);
-        foreach ($activities as $idx => &$act) {
+        $draghandlelabel = get_string('admin_manage_drag_handle', 'local_launchpad');
+        foreach ($activities as &$act) {
             $act['form_action'] = $formaction;
             $act['sesskey'] = $sesskey;
             $act['trackid'] = $trackid;
@@ -452,10 +450,7 @@ final class admin_dashboard {
             $act['delete_confirm'] = $deleteconfirm;
             $act['duplicate_label'] = $duplicatelabel;
             $act['rename_label'] = $renamelabel;
-            $act['move_up_label'] = $moveuplabel;
-            $act['move_down_label'] = $movedownlabel;
-            $act['can_move_up'] = $idx > 0;
-            $act['can_move_down'] = $idx < ($actcount - 1);
+            $act['drag_handle_label'] = $draghandlelabel;
             $act['settings_url'] = (new \moodle_url(persona_home::ADMIN_PATH, [
                 'view' => 'activity',
                 'trackid' => $trackid,
@@ -524,6 +519,9 @@ final class admin_dashboard {
             'sesskey' => $sesskey,
             'trackid' => $trackid,
             'sectionnum' => $sectionnum,
+            'reorder_hint' => get_string('admin_manage_reorder_hint', 'local_launchpad'),
+            'save_order_label' => get_string('admin_manage_save_order', 'local_launchpad'),
+            'cancel_order_label' => get_string('admin_manage_cancel_order', 'local_launchpad'),
             'flash_ok' => !empty($flash['ok']),
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
@@ -764,67 +762,92 @@ final class admin_dashboard {
     }
 
     /**
-     * Move an activity up or down within its phase section.
+     * Save a full activity order for a phase section (from Manage drag + Save).
      *
-     * @param string $direction up|down
+     * @param int[] $orderedcmids Desired cmids top→bottom; must match the section's current set.
      * @return array{ok:string}|array{error:string}
      */
-    public static function move_activity(
+    public static function reorder_section_activities(
         \stdClass $actor,
         int $trackcourseid,
-        int $cmid,
-        string $direction
+        int $sectionnum,
+        array $orderedcmids
     ): array {
         global $CFG, $DB;
 
         unset($actor);
         require_once($CFG->dirroot . '/course/lib.php');
 
-        $direction = strtolower(trim($direction));
-        if ($direction !== 'up' && $direction !== 'down') {
-            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        if ($trackcourseid <= 0 || $sectionnum < 1 || $sectionnum > 4) {
+            return ['error' => get_string('admin_manage_err_reorder_params', 'local_launchpad')];
         }
 
-        $gate = self::require_track_activity($trackcourseid, $cmid, true);
-        if (isset($gate['error'])) {
-            return $gate;
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
         }
-        ['course' => $course, 'cm' => $cm] = $gate;
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
 
-        $section = $DB->get_record('course_sections', ['id' => (int) $cm->section], '*', IGNORE_MISSING);
-        if (!$section || empty($section->sequence)) {
+        $context = \context_course::instance($trackcourseid);
+        try {
+            require_capability('moodle/course:manageactivities', $context);
+        } catch (\required_capability_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $orderedcmids = array_values(array_filter(array_map('intval', $orderedcmids)));
+        if ($orderedcmids === []) {
+            return ['error' => get_string('admin_manage_err_reorder_empty', 'local_launchpad')];
+        }
+        if (count($orderedcmids) !== count(array_unique($orderedcmids))) {
+            return ['error' => get_string('admin_manage_err_reorder_params', 'local_launchpad')];
+        }
+
+        $section = $DB->get_record('course_sections', [
+            'course' => $trackcourseid,
+            'section' => $sectionnum,
+        ], '*', IGNORE_MISSING);
+        if (!$section || (string) $section->sequence === '') {
             return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
         }
-        $cmids = array_values(array_filter(array_map('intval', explode(',', $section->sequence))));
-        $index = array_search($cmid, $cmids, true);
-        if ($index === false) {
-            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+
+        // Same membership as the Manage list (skip missing / deletion-in-progress cms).
+        $listed = self::builder_activities_for_section($trackcourseid, $section, true);
+        $current = array_map(static fn(array $a): int => (int) $a['cmid'], $listed);
+        $currentsorted = $current;
+        $orderedsorted = $orderedcmids;
+        sort($currentsorted);
+        sort($orderedsorted);
+        if ($currentsorted !== $orderedsorted) {
+            return ['error' => get_string('admin_manage_err_reorder_stale', 'local_launchpad')];
+        }
+        if ($current === $orderedcmids) {
+            return ['ok' => get_string('admin_manage_ok_order_saved', 'local_launchpad')];
+        }
+
+        foreach ($orderedcmids as $cmid) {
+            $cm = get_coursemodule_from_id('', $cmid, $trackcourseid, false, IGNORE_MISSING);
+            if (!$cm || (int) $cm->section !== (int) $section->id) {
+                return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+            }
         }
 
         $actions = \core_courseformat\formatactions::cm($course);
         try {
-            if ($direction === 'up') {
-                if ($index <= 0) {
-                    return ['ok' => get_string('admin_manage_ok_cm_moved', 'local_launchpad', format_string($cm->name))];
-                }
-                $beforeid = $cmids[$index - 1];
-                $actions->move_before($cmid, $beforeid);
-            } else {
-                if ($index >= count($cmids) - 1) {
-                    return ['ok' => get_string('admin_manage_ok_cm_moved', 'local_launchpad', format_string($cm->name))];
-                }
-                $nextid = $cmids[$index + 1];
-                // Moving next before current pushes current down one slot.
-                $actions->move_before($nextid, $cmid);
+            $last = $orderedcmids[count($orderedcmids) - 1];
+            $actions->move_end_section($last, (int) $section->id);
+            for ($i = count($orderedcmids) - 2; $i >= 0; $i--) {
+                $actions->move_before($orderedcmids[$i], $orderedcmids[$i + 1]);
             }
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
         }
 
-        return [
-            'ok' => get_string('admin_manage_ok_cm_moved', 'local_launchpad', format_string($cm->name)),
-        ];
+        return ['ok' => get_string('admin_manage_ok_order_saved', 'local_launchpad')];
     }
 
     /**

@@ -105,11 +105,18 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
         $flash = admin_dashboard::duplicate_activity($USER, $trackid, $cmid);
-    } else if ($view === 'manage' && $action === 'move_cm') {
+    } else if ($view === 'manage' && $action === 'reorder_cm') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
-        $cmid = optional_param('cmid', 0, PARAM_INT);
-        $direction = optional_param('direction', '', PARAM_ALPHA);
-        $flash = admin_dashboard::move_activity($USER, $trackid, $cmid, $direction);
+        $sectionnum = optional_param('section', $sectionnum, PARAM_INT);
+        $cmorder = optional_param_array('cmorder', [], PARAM_INT);
+        // Fallback if browsers/JS post a single csv field instead of cmorder[].
+        if ($cmorder === []) {
+            $csv = optional_param('cmordercsv', '', PARAM_SEQUENCE);
+            if ($csv !== '') {
+                $cmorder = array_map('intval', explode(',', $csv));
+            }
+        }
+        $flash = admin_dashboard::reorder_section_activities($USER, $trackid, $sectionnum, $cmorder);
     } else if ($view === 'manage' && $action === 'rename_cm') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);

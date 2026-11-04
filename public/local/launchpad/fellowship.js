@@ -1959,7 +1959,7 @@
         applyTrack(root.getAttribute('data-lp-builder-active') || tabs[0].getAttribute('data-lp-builder-tab'), false);
     })();
 
-    // Admin phase manage: Edit mode toggle + add chooser.
+    // Admin phase manage: Edit mode toggle + add chooser + drag reorder (Save/Cancel).
     (function manageEditMode() {
         var root = shell.querySelector('[data-lp-manage]');
         if (!root) {
@@ -1969,8 +1969,103 @@
         var chooser = root.querySelector('[data-lp-manage-chooser]');
         var addOpen = root.querySelector('[data-lp-manage-add-open]');
         var editOnly = root.querySelectorAll('.lp-manage-edit-only');
+        var actlist = root.querySelector('[data-lp-manage-actlist]');
+        var reorderForm = root.querySelector('[data-lp-manage-reorder]');
+        var reorderInputs = reorderForm ? reorderForm.querySelector('[data-lp-reorder-inputs]') : null;
+        var reorderCsv = reorderForm ? reorderForm.querySelector('[data-lp-reorder-csv]') : null;
+        var saveBtn = root.querySelector('[data-lp-reorder-save]');
+        var cancelBtn = root.querySelector('[data-lp-reorder-cancel]');
+        var dragCmid = 0;
+        var dropRow = null;
+        var dropAfter = false;
+        var savedOrder = [];
+
+        function rowByCmid(cmid) {
+            return actlist ? actlist.querySelector('[data-lp-manage-row][data-cmid="' + cmid + '"]') : null;
+        }
+
+        function currentOrder() {
+            if (!actlist) {
+                return [];
+            }
+            return Array.prototype.map.call(actlist.querySelectorAll('[data-lp-manage-row]'), function (row) {
+                return row.getAttribute('data-cmid') || '';
+            }).filter(Boolean);
+        }
+
+        function writeOrderFields(order) {
+            if (reorderCsv) {
+                reorderCsv.value = order.join(',');
+            }
+            if (!reorderInputs) {
+                return;
+            }
+            reorderInputs.innerHTML = '';
+            order.forEach(function (cmid) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'cmorder[]';
+                input.value = cmid;
+                reorderInputs.appendChild(input);
+            });
+        }
+
+        function ordersEqual(a, b) {
+            if (a.length !== b.length) {
+                return false;
+            }
+            for (var i = 0; i < a.length; i++) {
+                if (String(a[i]) !== String(b[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function setDirty(dirty) {
+            root.classList.toggle('is-reorder-dirty', dirty);
+            if (saveBtn) {
+                saveBtn.disabled = !dirty;
+            }
+            if (cancelBtn) {
+                cancelBtn.disabled = !dirty;
+            }
+        }
+
+        function syncDirty() {
+            var order = currentOrder();
+            writeOrderFields(order);
+            setDirty(!ordersEqual(order, savedOrder));
+        }
+
+        function restoreOrder() {
+            if (!actlist || !savedOrder.length) {
+                return;
+            }
+            savedOrder.forEach(function (cmid) {
+                var row = rowByCmid(cmid);
+                if (row) {
+                    actlist.appendChild(row);
+                }
+            });
+            setDirty(false);
+        }
+
+        function clearDropMarks() {
+            if (!actlist) {
+                return;
+            }
+            actlist.querySelectorAll('.lp-actrow.is-drop-before, .lp-actrow.is-drop-after').forEach(function (row) {
+                row.classList.remove('is-drop-before', 'is-drop-after');
+            });
+            dropRow = null;
+            dropAfter = false;
+        }
 
         function setEdit(on) {
+            if (!on && root.classList.contains('is-reorder-dirty')) {
+                restoreOrder();
+            }
             root.classList.toggle('is-editing', on);
             if (toggle) {
                 toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -1988,6 +2083,13 @@
             if (!on && chooser) {
                 chooser.hidden = true;
             }
+            if (!on) {
+                clearDropMarks();
+                dragCmid = 0;
+            } else {
+                savedOrder = currentOrder();
+                setDirty(false);
+            }
         }
 
         if (toggle) {
@@ -2000,6 +2102,113 @@
                 chooser.hidden = !chooser.hidden;
             });
         }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                restoreOrder();
+                clearDropMarks();
+            });
+        }
+        if (reorderForm) {
+            reorderForm.addEventListener('submit', function (e) {
+                if (!root.classList.contains('is-reorder-dirty')) {
+                    e.preventDefault();
+                    return;
+                }
+                writeOrderFields(currentOrder());
+            });
+        }
+
+        if (actlist) {
+            actlist.addEventListener('dragstart', function (e) {
+                if (!root.classList.contains('is-editing')) {
+                    return;
+                }
+                var handle = e.target.closest('[data-lp-manage-drag]');
+                if (!handle) {
+                    e.preventDefault();
+                    return;
+                }
+                var row = handle.closest('[data-lp-manage-row]');
+                if (!row) {
+                    e.preventDefault();
+                    return;
+                }
+                dragCmid = parseInt(row.getAttribute('data-cmid') || '0', 10) || 0;
+                row.classList.add('is-dragging');
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(dragCmid));
+                    try {
+                        e.dataTransfer.setDragImage(row, 16, 16);
+                    } catch (err) {
+                        // Some browsers reject setDragImage; ignore.
+                    }
+                }
+            });
+
+            actlist.addEventListener('dragend', function () {
+                var dragging = actlist.querySelector('.lp-actrow.is-dragging');
+                if (dragging) {
+                    dragging.classList.remove('is-dragging');
+                }
+                clearDropMarks();
+                dragCmid = 0;
+            });
+
+            actlist.addEventListener('dragover', function (e) {
+                if (!dragCmid || !root.classList.contains('is-editing')) {
+                    return;
+                }
+                var row = e.target.closest('[data-lp-manage-row]');
+                if (!row || parseInt(row.getAttribute('data-cmid') || '0', 10) === dragCmid) {
+                    return;
+                }
+                e.preventDefault();
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = 'move';
+                }
+                var rect = row.getBoundingClientRect();
+                var after = (e.clientY - rect.top) > (rect.height / 2);
+                clearDropMarks();
+                row.classList.add(after ? 'is-drop-after' : 'is-drop-before');
+                dropRow = row;
+                dropAfter = after;
+            });
+
+            actlist.addEventListener('dragleave', function (e) {
+                var row = e.target.closest('[data-lp-manage-row]');
+                if (!row || row.contains(e.relatedTarget)) {
+                    return;
+                }
+                row.classList.remove('is-drop-before', 'is-drop-after');
+            });
+
+            actlist.addEventListener('drop', function (e) {
+                if (!dragCmid || !root.classList.contains('is-editing')) {
+                    return;
+                }
+                e.preventDefault();
+                var target = dropRow || e.target.closest('[data-lp-manage-row]');
+                var after = dropRow ? dropAfter : false;
+                clearDropMarks();
+                var dragged = rowByCmid(dragCmid);
+                if (!target || !dragged || target === dragged) {
+                    return;
+                }
+                if (after) {
+                    if (target.nextSibling) {
+                        actlist.insertBefore(dragged, target.nextSibling);
+                    } else {
+                        actlist.appendChild(dragged);
+                    }
+                } else {
+                    actlist.insertBefore(dragged, target);
+                }
+                syncDirty();
+            });
+        }
+
+        savedOrder = currentOrder();
         setEdit(false);
     })();
 

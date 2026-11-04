@@ -87,9 +87,31 @@
       </div>
 
       {{#has_activities}}
-        <div class="lp-actlist">
+        <form method="post" action="{{form_action}}" class="lp-manage-reorder-form" data-lp-manage-reorder>
+          <input type="hidden" name="sesskey" value="{{sesskey}}">
+          <input type="hidden" name="action" value="reorder_cm">
+          <input type="hidden" name="trackid" value="{{trackid}}">
+          <input type="hidden" name="section" value="{{sectionnum}}">
+          <input type="hidden" name="cmordercsv" value="" data-lp-reorder-csv>
+          <div class="lp-manage-edit-only lp-manage-reorder-bar" hidden data-lp-reorder-bar>
+            <p class="lp-sm lp-muted lp-manage-reorder-hint">{{reorder_hint}}</p>
+            <div class="lp-manage-reorder-actions">
+              <button type="button" class="lp-btn lp-btn-light lp-btn-sm" data-lp-reorder-cancel disabled>{{cancel_order_label}}</button>
+              <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm" data-lp-reorder-save disabled>{{save_order_label}}</button>
+            </div>
+          </div>
+          <div data-lp-reorder-inputs></div>
+        </form>
+        <div class="lp-actlist" data-lp-manage-actlist>
           {{#activities}}
-            <div class="lp-actrow{{#cm_hidden}} is-cm-hidden{{/cm_hidden}}" id="cm-{{cmid}}">
+            <div class="lp-actrow{{#cm_hidden}} is-cm-hidden{{/cm_hidden}}" id="cm-{{cmid}}" data-lp-manage-row data-cmid="{{cmid}}">
+              <button type="button"
+                      class="lp-manage-drag lp-manage-edit-only"
+                      hidden
+                      draggable="true"
+                      data-lp-manage-drag
+                      title="{{drag_handle_label}}"
+                      aria-label="{{drag_handle_label}}">⋮⋮</button>
               <span class="lp-kd">{{kind}}</span>
               <span class="lp-act-title">{{title}}</span>
               <span class="lp-chip {{state_chip}}">{{state_label}}</span>
@@ -101,26 +123,6 @@
               {{/cm_hidden}}
               <div class="lp-manage-edit-only" hidden>
                 <div class="lp-manage-row-actions">
-                  {{#can_move_up}}
-                    <form method="post" action="{{form_action}}" class="lp-inline-form">
-                      <input type="hidden" name="sesskey" value="{{sesskey}}">
-                      <input type="hidden" name="action" value="move_cm">
-                      <input type="hidden" name="trackid" value="{{trackid}}">
-                      <input type="hidden" name="cmid" value="{{cmid}}">
-                      <input type="hidden" name="direction" value="up">
-                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm" title="{{move_up_label}}">↑</button>
-                    </form>
-                  {{/can_move_up}}
-                  {{#can_move_down}}
-                    <form method="post" action="{{form_action}}" class="lp-inline-form">
-                      <input type="hidden" name="sesskey" value="{{sesskey}}">
-                      <input type="hidden" name="action" value="move_cm">
-                      <input type="hidden" name="trackid" value="{{trackid}}">
-                      <input type="hidden" name="cmid" value="{{cmid}}">
-                      <input type="hidden" name="direction" value="down">
-                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm" title="{{move_down_label}}">↓</button>
-                    </form>
-                  {{/can_move_down}}
                   <a class="lp-btn lp-btn-light lp-btn-sm" href="{{settings_url}}">{{settings_label}}</a>
                   <form method="post" action="{{form_action}}" class="lp-inline-form">
                     <input type="hidden" name="sesskey" value="{{sesskey}}">
