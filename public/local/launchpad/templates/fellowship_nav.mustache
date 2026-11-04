@@ -33,16 +33,8 @@
   {{/nav_groups}}
 
   <div class="lp-side-foot">
-    <a class="lp-me" href="{{profile_url}}" title="{{#str}} fellowship_nav_account, local_launchpad {{/str}}" aria-label="{{#str}} fellowship_nav_account, local_launchpad {{/str}}">
-      <div class="lp-av" aria-hidden="true">{{initials}}</div>
-      <div class="lp-me-text">
-        <b>{{{displayname}}}</b>
-        <span>{{role_label}}</span>
-      </div>
-    </a>
-    <a class="lp-nav lp-nav-out" href="{{logout_url}}">
-      <iconify-icon icon="hugeicons:logout-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-      <span>{{#str}} fellowship_nav_signout, local_launchpad {{/str}}</span>
-    </a>
+    {{#profile_menu_side}}
+      {{> local_launchpad/profile_menu }}
+    {{/profile_menu_side}}
   </div>
 </nav>

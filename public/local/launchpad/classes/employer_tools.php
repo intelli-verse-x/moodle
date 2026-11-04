@@ -1012,23 +1012,72 @@ final class employer_tools {
     }
 
     /**
-     * Notifications — Moodle popup notifications; manage in Moodle.
+     * Notifications — Moodle popup notifications in Employer shell.
+     *
+     * Overview: employee.php?view=notifications
+     * Filter:   &ntab=all|unread
+     * Detail:   &notifid={id} (marks read via core_message API)
      *
      * @param int $userid
      * @param array<string,string> $urls
+     * @param string $ntab
+     * @param int $notifid
+     * @param bool $notifdone flash: mark-all succeeded
+     * @param string $notiferr flash: action error code
      * @return array<string,mixed>
      */
-    public static function notifications_page(int $userid, array $urls): array {
+    public static function notifications_page(
+        int $userid,
+        array $urls,
+        string $ntab = 'all',
+        int $notifid = 0,
+        bool $notifdone = false,
+        string $notiferr = ''
+    ): array {
+        $ntab = in_array($ntab, ['all', 'unread'], true) ? $ntab : 'all';
+        $notifid = max(0, $notifid);
+
         $moodleurl = (string) ($urls['moodle_notifications']
             ?? (new \moodle_url('/message/output/popup/notifications.php'))->out(false));
+        $prefsurl = (string) ($urls['moodle_notification_prefs']
+            ?? (new \moodle_url('/message/notificationpreferences.php'))->out(false));
+
+        $taburls = [];
+        foreach (['all', 'unread'] as $key) {
+            $params = ['view' => 'notifications', 'ntab' => $key];
+            if ($notifid > 0) {
+                $params['notifid'] = $notifid;
+            }
+            $taburls[$key] = (new \moodle_url('/local/launchpad/employee.php', $params))->out(false);
+        }
+
+        $flash = self::notifications_flash($notifdone, $notiferr);
+        $actionurl = (new \moodle_url('/local/launchpad/employee_action.php'))->out(false);
+
         $empty = array_merge([
             'page_items' => [],
             'has_items' => false,
+            'notification_count' => 0,
+            'unread_count' => 0,
+            'has_unread' => false,
             'moodle_url' => $moodleurl,
+            'prefs_url' => $prefsurl,
+            'ntab_all' => $ntab === 'all',
+            'ntab_unread' => $ntab === 'unread',
+            'tab_all_url' => $taburls['all'],
+            'tab_unread_url' => $taburls['unread'],
+            'has_selected' => false,
+            'selected' => null,
+            'can_mark_all' => false,
+            'action_url' => $actionurl,
+            'sesskey' => sesskey(),
+            'ntab' => $ntab,
+            'has_flash' => $flash !== null,
+            'flash' => $flash,
             'page_intro' => self::str(
                 'employer_notifications_intro',
                 null,
-                'Recent Moodle notifications. Open Moodle to manage or mark them as read.'
+                'Course and site alerts from Moodle. Open one to read it, or mark all as read.'
             ),
         ], self::crumbs([
             ['label' => self::str('employer_nav_notifications', null, 'Notifications'), 'url' => ''],
@@ -1039,41 +1088,2298 @@ final class employer_tools {
         }
 
         try {
-            $records = \message_popup\api::get_popup_notifications($userid, 'DESC', 25, 0);
-            $items = [];
-            foreach ($records as $n) {
-                $subject = trim(self::plain_text((string) ($n->subject ?? '')));
-                if ($subject === '') {
-                    $subject = self::plain_text(strip_tags((string) ($n->smallmessage ?? '')));
+            $unreadcount = (int) \message_popup\api::count_unread_popup_notifications($userid);
+            $records = \message_popup\api::get_popup_notifications($userid, 'DESC', 50, 0);
+
+            // Opening a notification marks it read — Moodle popup behaviour.
+            if ($notifid > 0) {
+                $selectedrecord = self::find_popup_notification($userid, $notifid, $records);
+                if ($selectedrecord !== null && empty($selectedrecord->timeread)) {
+                    try {
+                        \core_message\api::mark_notification_as_read($selectedrecord);
+                        $selectedrecord->timeread = time();
+                        if ($unreadcount > 0) {
+                            $unreadcount--;
+                        }
+                        foreach ($records as $idx => $rec) {
+                            if ((int) ($rec->id ?? 0) === $notifid) {
+                                $records[$idx]->timeread = $selectedrecord->timeread;
+                                break;
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        debugging('employer_tools notifications mark read: ' . $e->getMessage(), DEBUG_DEVELOPER);
+                    }
                 }
-                if ($subject === '') {
-                    $subject = self::str('employer_notifications_untitled', null, 'Notification');
-                }
-                $contexturl = trim((string) ($n->contexturl ?? ''));
-                $url = $contexturl !== '' ? $contexturl : $moodleurl;
-                $isunread = empty($n->timeread);
-                $items[] = [
-                    'id' => (int) ($n->id ?? 0),
-                    'name' => $subject,
-                    'when' => !empty($n->timecreated)
-                        ? userdate((int) $n->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
-                        : '',
-                    'unread' => $isunread,
-                    'unread_label' => $isunread
-                        ? self::str('employer_notifications_unread_chip', null, 'Unread')
-                        : '',
-                    'css' => $isunread ? 'is-unread' : '',
-                    'url' => $url,
-                ];
             }
+
+            $allitems = [];
+            $selected = null;
+            foreach ($records as $n) {
+                $row = self::format_notification_row($n, $ntab, $notifid, $moodleurl);
+                if ($row === null) {
+                    continue;
+                }
+                $allitems[] = $row;
+                if (!empty($row['is_selected'])) {
+                    $selected = self::format_notification_detail($n, $moodleurl, $ntab);
+                }
+            }
+
+            // Selected id may fall outside the first page — still show detail.
+            if ($selected === null && $notifid > 0) {
+                $extra = self::find_popup_notification($userid, $notifid, $records);
+                if ($extra !== null) {
+                    $selected = self::format_notification_detail($extra, $moodleurl, $ntab);
+                    // Ensure it appears in the list when filtering allows.
+                    $extrarow = self::format_notification_row($extra, $ntab, $notifid, $moodleurl);
+                    if ($extrarow !== null) {
+                        array_unshift($allitems, $extrarow);
+                    }
+                }
+            }
+
+            $items = [];
+            foreach ($allitems as $row) {
+                if ($ntab === 'unread' && empty($row['unread'])) {
+                    continue;
+                }
+                $items[] = $row;
+            }
+
+            $total = count($records);
+
             return array_merge($empty, [
                 'page_items' => $items,
                 'has_items' => $items !== [],
+                'notification_count' => $total,
+                'unread_count' => $unreadcount,
+                'has_unread' => $unreadcount > 0,
+                'can_mark_all' => $unreadcount > 0,
+                'has_selected' => $selected !== null,
+                'selected' => $selected,
             ]);
         } catch (\Throwable $e) {
             debugging('employer_tools notifications: ' . $e->getMessage(), DEBUG_DEVELOPER);
             return $empty;
         }
+    }
+
+    /**
+     * Load a popup notification owned by the user (list hit or DB).
+     *
+     * @param int $userid
+     * @param int $notifid
+     * @param list<\stdClass> $records
+     * @return \stdClass|null
+     */
+    private static function find_popup_notification(int $userid, int $notifid, array $records): ?\stdClass {
+        global $DB;
+
+        if ($notifid <= 0 || $userid <= 0) {
+            return null;
+        }
+        foreach ($records as $n) {
+            if ((int) ($n->id ?? 0) === $notifid) {
+                return $n;
+            }
+        }
+        try {
+            $sql = "SELECT n.id, n.useridfrom, n.useridto,
+                           n.subject, n.fullmessage, n.fullmessageformat,
+                           n.fullmessagehtml, n.smallmessage, n.contexturl,
+                           n.contexturlname, n.timecreated, n.component,
+                           n.eventtype, n.timeread, n.customdata
+                      FROM {notifications} n
+                     WHERE n.id = ?
+                       AND n.useridto = ?
+                       AND n.id IN (SELECT notificationid FROM {message_popup_notifications})";
+            $rec = $DB->get_record_sql($sql, [$notifid, $userid]);
+            return $rec ?: null;
+        } catch (\Throwable $e) {
+            debugging('employer_tools find notification: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return null;
+        }
+    }
+
+    /**
+     * Inbox row for one Moodle popup notification.
+     *
+     * @param \stdClass $n
+     * @param string $ntab
+     * @param int $selectedid
+     * @param string $moodleurl
+     * @return array<string,mixed>|null
+     */
+    private static function format_notification_row(
+        \stdClass $n,
+        string $ntab,
+        int $selectedid,
+        string $moodleurl
+    ): ?array {
+        $id = (int) ($n->id ?? 0);
+        if ($id <= 0) {
+            return null;
+        }
+
+        $subject = self::notification_subject($n);
+        $preview = self::plain_text((string) ($n->smallmessage ?? ''));
+        if ($preview === '' || $preview === $subject) {
+            $preview = self::plain_text(strip_tags((string) ($n->fullmessage ?? '')));
+        }
+        if (\core_text::strlen($preview) > 120) {
+            $preview = \core_text::substr($preview, 0, 117) . '…';
+        }
+
+        $isunread = empty($n->timeread);
+        $when = !empty($n->timecreated)
+            ? self::message_when_label((int) $n->timecreated)
+            : '';
+        $type = self::notification_type_label($n);
+
+        $listurl = (new \moodle_url('/local/launchpad/employee.php', array_filter([
+            'view' => 'notifications',
+            'ntab' => $ntab !== 'all' ? $ntab : null,
+            'notifid' => $id,
+        ])))->out(false);
+
+        return [
+            'id' => $id,
+            'name' => $subject,
+            'preview' => $preview,
+            'has_preview' => $preview !== '',
+            'when' => $when,
+            'has_when' => $when !== '',
+            'type_label' => $type,
+            'has_type' => $type !== '',
+            'unread' => $isunread,
+            'unread_label' => $isunread
+                ? self::str('employer_notifications_unread_chip', null, 'Unread')
+                : '',
+            'is_selected' => $id === $selectedid,
+            'css' => trim(($isunread ? 'is-unread' : '') . ($id === $selectedid ? ' is-selected' : '')),
+            'url' => $listurl,
+            'moodle_url' => $moodleurl,
+        ];
+    }
+
+    /**
+     * Detail pane for one Moodle popup notification.
+     *
+     * @param \stdClass $n
+     * @param string $moodleurl
+     * @param string $ntab
+     * @return array<string,mixed>
+     */
+    private static function format_notification_detail(\stdClass $n, string $moodleurl, string $ntab): array {
+        $id = (int) ($n->id ?? 0);
+        $subject = self::notification_subject($n);
+        $contexturl = trim((string) ($n->contexturl ?? ''));
+        $contextname = trim(self::plain_text((string) ($n->contexturlname ?? '')));
+        if ($contextname === '') {
+            $contextname = self::str('employer_notifications_open_related', null, 'Open related');
+        }
+
+        $bodyhtml = '';
+        $html = trim((string) ($n->fullmessagehtml ?? ''));
+        if ($html !== '') {
+            $bodyhtml = format_text($html, FORMAT_HTML, ['filter' => false, 'para' => false]);
+        } else {
+            $format = (int) ($n->fullmessageformat ?? FORMAT_MOODLE);
+            $bodyhtml = format_text((string) ($n->fullmessage ?? ''), $format, ['filter' => false]);
+        }
+        if (trim(strip_tags($bodyhtml)) === '') {
+            $small = self::plain_text((string) ($n->smallmessage ?? ''));
+            $bodyhtml = $small !== '' ? s($small) : s(self::str(
+                'employer_notifications_no_body',
+                null,
+                'No additional detail for this notification.'
+            ));
+        }
+
+        $when = !empty($n->timecreated)
+            ? userdate((int) $n->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
+            : '';
+        $type = self::notification_type_label($n);
+        $isunread = empty($n->timeread);
+
+        return [
+            'id' => $id,
+            'name' => $subject,
+            'body_html' => $bodyhtml,
+            'when' => $when,
+            'has_when' => $when !== '',
+            'type_label' => $type,
+            'has_type' => $type !== '',
+            'unread' => $isunread,
+            'has_context' => $contexturl !== '',
+            'context_url' => $contexturl,
+            'context_label' => $contextname,
+            'moodle_url' => (new \moodle_url('/message/output/popup/notifications.php', [
+                'notificationid' => $id,
+            ]))->out(false),
+            'ntab' => $ntab,
+            'back_url' => (new \moodle_url('/local/launchpad/employee.php', array_filter([
+                'view' => 'notifications',
+                'ntab' => $ntab !== 'all' ? $ntab : null,
+            ])))->out(false),
+        ];
+    }
+
+    /**
+     * @param \stdClass $n
+     * @return string
+     */
+    private static function notification_subject(\stdClass $n): string {
+        $subject = trim(self::plain_text((string) ($n->subject ?? '')));
+        if ($subject === '') {
+            $subject = self::plain_text(strip_tags((string) ($n->smallmessage ?? '')));
+        }
+        if ($subject === '') {
+            $subject = self::str('employer_notifications_untitled', null, 'Notification');
+        }
+        return $subject;
+    }
+
+    /**
+     * Human label from Moodle component / eventtype when available.
+     *
+     * @param \stdClass $n
+     * @return string
+     */
+    private static function notification_type_label(\stdClass $n): string {
+        $component = trim((string) ($n->component ?? ''));
+        if ($component === '') {
+            return self::str('employer_notifications_type_site', null, 'Site');
+        }
+        try {
+            if (get_string_manager()->string_exists('pluginname', $component)) {
+                $name = get_string('pluginname', $component);
+                if (is_string($name) && $name !== '' && strpos($name, '[[') === false) {
+                    return $name;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fall through to component short name.
+        }
+        $short = preg_replace('/^(mod_|local_|block_|tool_)/', '', $component);
+        return $short !== '' ? ucwords(str_replace('_', ' ', (string) $short)) : $component;
+    }
+
+    /**
+     * @param bool $done
+     * @param string $err
+     * @return array{ok:bool,text:string}|null
+     */
+    private static function notifications_flash(bool $done, string $err): ?array {
+        if ($done) {
+            return [
+                'ok' => true,
+                'text' => self::str(
+                    'employer_notifications_mark_all_ok',
+                    null,
+                    'All notifications marked as read.'
+                ),
+            ];
+        }
+        if ($err === '') {
+            return null;
+        }
+        $map = [
+            'denied' => self::str(
+                'employer_notifications_action_denied',
+                null,
+                'That notification could not be updated.'
+            ),
+            'failed' => self::str(
+                'employer_notifications_action_failed',
+                null,
+                'Moodle could not update notifications. Try again.'
+            ),
+        ];
+        return [
+            'ok' => false,
+            'text' => $map[$err] ?? $map['failed'],
+        ];
+    }
+
+    /**
+     * Mustache string bag for employer_profile (shells merge under `strings`).
+     *
+     * @return array<string,string>
+     */
+    public static function profile_strings(): array {
+        return [
+            'profile_intro' => self::str(
+                'employer_profile_intro',
+                null,
+                'Your Moodle account details, editable profile fields, and preference links.'
+            ),
+            'profile_tabs_aria' => self::str('employer_profile_tabs_aria', null, 'Profile sections'),
+            'profile_tab_overview' => self::str('employer_profile_tab_overview', null, 'Overview'),
+            'profile_tab_edit' => self::str('employer_profile_tab_edit', null, 'Edit'),
+            'profile_tab_preferences' => self::str('employer_profile_tab_preferences', null, 'Preferences'),
+            'profile_edit_cta' => self::str('employer_profile_edit_cta', null, 'Edit profile'),
+            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor in Moodle'),
+            'profile_edit_external' => self::str('employer_profile_edit_external', null, 'Edit in identity provider'),
+            'profile_open_moodle' => self::str('employer_profile_open_moodle', null, 'Open public profile'),
+            'profile_empty_title' => self::str('employer_profile_empty_title', null, 'No profile details yet'),
+            'profile_empty_body' => self::str(
+                'employer_profile_empty_body',
+                null,
+                'Add your city, contact details, or bio so mentors and peers can find you.'
+            ),
+            'profile_edit_heading' => self::str('employer_profile_edit_heading', null, 'Edit profile'),
+            'profile_edit_help' => self::str(
+                'employer_profile_edit_help',
+                null,
+                'Changes save to your Moodle user account. Locked fields are controlled by your login method.'
+            ),
+            'profile_edit_note' => self::str(
+                'employer_profile_edit_note',
+                null,
+                'Picture upload and advanced custom fields open in Moodle’s full profile editor.'
+            ),
+            'profile_custom_heading' => self::str('employer_profile_custom_heading', null, 'Additional fields'),
+            'profile_save' => self::str('employer_profile_save', null, 'Save profile'),
+            'profile_cancel' => self::str('employer_profile_cancel', null, 'Cancel'),
+            'profile_edit_unavailable_title' => self::str(
+                'employer_profile_edit_unavailable_title',
+                null,
+                'Edit this profile in Moodle'
+            ),
+            'profile_edit_unavailable_body' => self::str(
+                'employer_profile_edit_unavailable_body',
+                null,
+                'Your account settings require Moodle’s profile editor (or an external identity provider).'
+            ),
+            'profile_prefs_lead' => self::str(
+                'employer_profile_prefs_lead',
+                null,
+                'Account, communication, and system preferences — edited here when possible, or opened in Moodle for heavy tools.'
+            ),
+            'native_tools_note' => self::str(
+                'employer_native_tools_note',
+                null,
+                'Full grades, messaging, calendar editing, and notification settings stay in Moodle.'
+            ),
+            'pref_back' => self::str('employer_pref_back', null, 'Back to preferences'),
+            'pref_save' => self::str('employer_pref_save', null, 'Save preferences'),
+            'pref_cancel' => self::str('employer_pref_cancel', null, 'Cancel'),
+            'pref_open_moodle' => self::str('employer_pref_open_moodle', null, 'Open in Moodle'),
+            'pref_open_portal_edit' => self::str('employer_pref_open_portal_edit', null, 'Edit in LaunchPad'),
+            'pref_advanced_moodle' => self::str('employer_pref_advanced_moodle', null, 'Advanced in Moodle'),
+        ];
+    }
+
+    /**
+     * Collect profile POST fields for save_profile().
+     *
+     * @return array<string,mixed>
+     */
+    public static function profile_post_payload(): array {
+        $fieldmap = [
+            'firstname' => PARAM_TEXT,
+            'lastname' => PARAM_TEXT,
+            'email' => PARAM_RAW,
+            'city' => PARAM_TEXT,
+            'country' => PARAM_ALPHANUMEXT,
+            'phone1' => PARAM_TEXT,
+            'phone2' => PARAM_TEXT,
+            'institution' => PARAM_TEXT,
+            'department' => PARAM_TEXT,
+            'idnumber' => PARAM_TEXT,
+            'address' => PARAM_TEXT,
+            'description' => PARAM_RAW,
+            'timezone' => PARAM_TEXT,
+            'lang' => PARAM_LANG,
+            'interests' => PARAM_TEXT,
+        ];
+        $payload = [];
+        foreach ($fieldmap as $key => $type) {
+            if (array_key_exists($key, $_POST)) {
+                $payload[$key] = optional_param($key, '', $type);
+            }
+        }
+        foreach ($_POST as $key => $val) {
+            if (is_string($key) && strpos($key, 'profile_field_') === 0) {
+                $payload[$key] = clean_param($val, PARAM_TEXT);
+            }
+        }
+        return $payload;
+    }
+
+    /**
+     * Profile — Moodle user record + preferences hub (Employer / Fellowship shells).
+     *
+     * @param \stdClass $user
+     * @param array<string,string> $urls
+     * @param string $ptab overview|edit|preferences
+     * @param bool $profilesaved
+     * @param string $profileerr
+     * @param string $portalpath shell script path for tab URLs
+     * @param string $actionpath POST handler path
+     * @param string $pref preference subpage key
+     * @param bool $prefsaved
+     * @param string $preferr
+     * @return array<string,mixed>
+     */
+    public static function profile_page(
+        \stdClass $user,
+        array $urls,
+        string $ptab = 'overview',
+        bool $profilesaved = false,
+        string $profileerr = '',
+        string $portalpath = '/local/launchpad/employee.php',
+        string $actionpath = '/local/launchpad/employee_action.php',
+        string $pref = '',
+        bool $prefsaved = false,
+        string $preferr = ''
+    ): array {
+        global $CFG, $PAGE;
+
+        require_once($CFG->dirroot . '/user/lib.php');
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+        require_once($CFG->dirroot . '/user/editlib.php');
+
+        $ptab = in_array($ptab, ['overview', 'edit', 'preferences'], true) ? $ptab : 'overview';
+        $userid = (int) ($user->id ?? 0);
+        if ($portalpath === '') {
+            $portalpath = '/local/launchpad/employee.php';
+        }
+        if ($actionpath === '') {
+            $actionpath = '/local/launchpad/employee_action.php';
+        }
+        if ($pref === 'hub') {
+            $pref = '';
+        }
+        $allowedprefs = self::preference_whitelist();
+        if ($pref !== '' && !in_array($pref, $allowedprefs, true)) {
+            $pref = '';
+        }
+        if ($ptab !== 'preferences') {
+            $pref = '';
+        }
+
+        // Always load a fresh DB record so Overview/Edit reflect Moodle saves immediately.
+        if ($userid > 0) {
+            try {
+                $fresh = \core_user::get_user($userid, '*', MUST_EXIST);
+                profile_load_data($fresh);
+                $user = $fresh;
+            } catch (\Throwable $e) {
+                debugging('employer_tools profile_page reload: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            }
+        }
+
+        $moodleprofile = (string) ($urls['moodle_profile']
+            ?? (new \moodle_url('/user/profile.php', ['id' => $userid]))->out(false));
+        $moodleedit = (string) ($urls['moodle_profile_edit']
+            ?? (new \moodle_url('/user/edit.php', ['id' => $userid, 'returnto' => 'profile']))->out(false));
+        $moodleprefs = (string) ($urls['preferences']
+            ?? (new \moodle_url('/user/preferences.php'))->out(false));
+
+        $taburls = [];
+        foreach (['overview', 'edit', 'preferences'] as $key) {
+            $taburls[$key] = (new \moodle_url($portalpath, [
+                'view' => 'profile',
+                'ptab' => $key,
+            ]))->out(false);
+        }
+
+        $flash = self::profile_flash($profilesaved, $profileerr);
+        $fullname = fullname($user);
+        $email = trim((string) ($user->email ?? ''));
+        $canedit = false;
+        $editexternal = '';
+        try {
+            if ($userid > 0 && !isguestuser($user)) {
+                $authplugin = get_auth_plugin($user->auth);
+                $canedit = $authplugin->can_edit_profile()
+                    && has_capability('moodle/user:editownprofile', \context_system::instance());
+                if ($canedit) {
+                    $ext = $authplugin->edit_profile_url();
+                    if ($ext) {
+                        $editexternal = $ext->out(false);
+                        // External IdP owns the form — keep LaunchPad edit as read-only + link.
+                        $canedit = false;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            debugging('employer_tools profile can_edit: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+
+        $pictureurl = '';
+        try {
+            $userpicture = new \user_picture($user);
+            $userpicture->size = 1;
+            $pictureurl = $userpicture->get_url($PAGE)->out(false);
+        } catch (\Throwable $e) {
+            debugging('employer_tools profile picture: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+
+        $sections = self::profile_display_sections($user);
+        $form = self::profile_edit_form($user);
+        $preflinks = self::profile_preference_links($userid, $portalpath);
+
+        $ctx = array_merge([
+            'page_intro' => self::str(
+                'employer_profile_intro',
+                null,
+                'Your Moodle account details, editable profile fields, and preference links.'
+            ),
+            'moodle_url' => $moodleprofile,
+            'moodle_edit_url' => $moodleedit,
+            'moodle_prefs_url' => $moodleprefs,
+            'edit_external_url' => $editexternal,
+            'has_edit_external' => $editexternal !== '',
+            'can_edit' => $canedit,
+            'ptab_overview' => $ptab === 'overview',
+            'ptab_edit' => $ptab === 'edit',
+            'ptab_preferences' => $ptab === 'preferences',
+            'tab_overview_url' => $taburls['overview'],
+            'tab_edit_url' => $canedit ? $taburls['edit'] : ($editexternal !== '' ? $editexternal : $moodleedit),
+            'tab_preferences_url' => $taburls['preferences'],
+            'displayname' => $fullname,
+            'email' => $email,
+            'has_email' => $email !== '',
+            'username' => (string) ($user->username ?? ''),
+            'picture_url' => $pictureurl,
+            'has_picture' => $pictureurl !== '',
+            'initials' => self::conversation_initials($fullname),
+            'sections' => $sections,
+            'has_sections' => $sections !== [],
+            'form' => $form,
+            'action_url' => (new \moodle_url($actionpath))->out(false),
+            'sesskey' => sesskey(),
+            'preference_groups' => $preflinks,
+            'has_preference_groups' => $preflinks !== [],
+            'has_flash' => $flash !== null,
+            'flash' => $flash,
+            'has_pref_detail' => false,
+            'pref_hub_url' => $taburls['preferences'],
+        ], self::crumbs([
+            ['label' => self::str('employer_nav_profile', null, 'Profile'), 'url' => ''],
+        ]));
+
+        if ($ptab === 'preferences' && $pref !== '') {
+            $ctx = array_merge($ctx, self::preference_page(
+                $user,
+                $pref,
+                $urls,
+                $portalpath,
+                $actionpath,
+                $prefsaved,
+                $preferr
+            ));
+        }
+
+        return $ctx;
+    }
+
+    /**
+     * Save editable profile fields via Moodle core APIs.
+     *
+     * @param \stdClass $user current user
+     * @param array<string,mixed> $raw POST fields
+     * @return string '' on success, else error code
+     */
+    public static function save_profile(\stdClass $user, array $raw): string {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/user/lib.php');
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+        require_once($CFG->dirroot . '/user/editlib.php');
+
+        if (isguestuser($user) || empty($user->id)) {
+            return 'denied';
+        }
+        if (!has_capability('moodle/user:editownprofile', \context_system::instance())) {
+            return 'denied';
+        }
+
+        try {
+            $authplugin = get_auth_plugin($user->auth);
+            if (!$authplugin->can_edit_profile()) {
+                return 'denied';
+            }
+            if ($authplugin->edit_profile_url()) {
+                return 'denied';
+            }
+        } catch (\Throwable $e) {
+            return 'failed';
+        }
+
+        $usernew = clone $user;
+        $editable = [
+            'firstname', 'lastname', 'email', 'city', 'country', 'phone1', 'phone2',
+            'institution', 'department', 'idnumber', 'address', 'description',
+            'timezone', 'lang',
+        ];
+        foreach ($editable as $field) {
+            if (!array_key_exists($field, $raw)) {
+                continue;
+            }
+            if (self::profile_field_is_locked($user, $field)) {
+                continue;
+            }
+            $type = \core_user::get_property_type($field);
+            $value = clean_param((string) $raw[$field], $type ?: PARAM_TEXT);
+            if ($field === 'email') {
+                $value = trim(\core_text::strtolower($value));
+                if ($value === '' || !validate_email($value)) {
+                    return 'email';
+                }
+                // Duplicate check (other users).
+                $dup = $DB->get_record('user', ['email' => $value, 'mnethostid' => $CFG->mnet_localhost_id], 'id,deleted');
+                if ($dup && (int) $dup->id !== (int) $user->id && empty($dup->deleted)) {
+                    return 'emaildup';
+                }
+            }
+            if (in_array($field, ['firstname', 'lastname'], true) && trim($value) === '') {
+                return 'name';
+            }
+            $usernew->{$field} = $value;
+        }
+
+        // Interests (comma-separated tags).
+        $interests = null;
+        if (array_key_exists('interests', $raw) && !self::profile_field_is_locked($user, 'interests')) {
+            $rawinterests = trim(clean_param((string) $raw['interests'], PARAM_TEXT));
+            $interests = $rawinterests === ''
+                ? []
+                : array_values(array_filter(array_map('trim', preg_split('/\s*,\s*/', $rawinterests) ?: [])));
+        }
+
+        // Simple custom profile fields (profile_field_*).
+        $custom = [];
+        foreach ($raw as $key => $val) {
+            if (strpos((string) $key, 'profile_field_') !== 0) {
+                continue;
+            }
+            if (self::profile_field_is_locked($user, (string) $key)) {
+                continue;
+            }
+            $short = substr((string) $key, strlen('profile_field_'));
+            $custom[$short] = clean_param((string) $val, PARAM_TEXT);
+            $usernew->{$key} = $custom[$short];
+        }
+
+        try {
+            // Email confirmation path (match Moodle edit.php).
+            if (!empty($CFG->emailchangeconfirmation)
+                    && isset($usernew->email)
+                    && $usernew->email !== $user->email
+                    && !has_capability('moodle/user:update', \context_system::instance())) {
+                $validuntil = time() + 600;
+                create_user_key('core_user/email_change', $user->id, null, null, $validuntil);
+                set_user_preference('newemail', $usernew->email, $user->id);
+                set_user_preference('newemailattemptsleft', 3, $user->id);
+                $usernew->email = $user->email;
+            }
+
+            $usernew->timemodified = time();
+            if (!$authplugin->user_update($user, $usernew)) {
+                return 'failed';
+            }
+            user_update_user($usernew, false, false);
+
+            if ($custom !== []) {
+                profile_save_custom_fields((int) $user->id, $custom);
+            }
+            if ($interests !== null) {
+                useredit_update_interests($usernew, $interests);
+            }
+
+            // Keep session $USER in sync for immediate UI (full reload, not field cherry-pick).
+            global $USER;
+            if ((int) $USER->id === (int) $user->id) {
+                $reloaded = \core_user::get_user((int) $user->id, '*', MUST_EXIST);
+                profile_load_data($reloaded);
+                foreach ((array) $reloaded as $key => $val) {
+                    $USER->{$key} = $val;
+                }
+            }
+            return '';
+        } catch (\Throwable $e) {
+            debugging('employer_tools save_profile: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return 'failed';
+        }
+    }
+
+    /**
+     * @param \stdClass $user
+     * @param string $field
+     * @return bool
+     */
+    private static function profile_field_is_locked(\stdClass $user, string $field): bool {
+        try {
+            $authplugin = get_auth_plugin($user->auth);
+            $configvariable = 'field_lock_' . $field;
+            if (!isset($authplugin->config->{$configvariable})) {
+                return false;
+            }
+            $lock = $authplugin->config->{$configvariable};
+            if ($lock === 'locked') {
+                return true;
+            }
+            if ($lock === 'unlockedifempty') {
+                if (strpos($field, 'profile_field_') === 0) {
+                    $short = substr($field, strlen('profile_field_'));
+                    $data = profile_user_record((int) $user->id, false);
+                    $value = isset($data->{$short}) ? (string) $data->{$short} : '';
+                } else {
+                    $value = (string) ($user->{$field} ?? '');
+                }
+                return $value !== '';
+            }
+        } catch (\Throwable $e) {
+            // Treat as unlocked.
+        }
+        return false;
+    }
+
+    /**
+     * Display sections for overview tab.
+     *
+     * @param \stdClass $user
+     * @return list<array<string,mixed>>
+     */
+    private static function profile_display_sections(\stdClass $user): array {
+        global $CFG;
+
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+
+        $countries = get_string_manager()->get_list_of_countries(true);
+        $country = (string) ($user->country ?? '');
+        $countrylabel = ($country !== '' && isset($countries[$country])) ? $countries[$country] : $country;
+
+        $tz = (string) ($user->timezone ?? '');
+        if ($tz === '' || $tz === '99') {
+            $servertz = \core_date::get_server_timezone();
+            if (get_string_manager()->string_exists('timezoneserver', 'admin')) {
+                $tzlabel = get_string('timezoneserver', 'admin', $servertz);
+            } else {
+                $tzlabel = 'Server timezone (' . $servertz . ')';
+            }
+        } else {
+            $tzlist = \core_date::get_list_of_timezones($tz, true);
+            $tzlabel = $tzlist[$tz] ?? $tz;
+        }
+
+        $lang = (string) ($user->lang ?? '');
+        $translations = get_string_manager()->get_list_of_translations();
+        $langlabel = ($lang !== '' && isset($translations[$lang])) ? $translations[$lang] : $lang;
+
+        $interests = [];
+        try {
+            $tags = \core_tag_tag::get_item_tags_array('core', 'user', (int) $user->id);
+            foreach ($tags as $tag) {
+                $interests[] = (string) $tag;
+            }
+        } catch (\Throwable $e) {
+            // Ignore.
+        }
+
+        $general = self::profile_kv_rows([
+            [get_string('firstname'), (string) ($user->firstname ?? '')],
+            [get_string('lastname'), (string) ($user->lastname ?? '')],
+            [get_string('email'), (string) ($user->email ?? '')],
+            [get_string('city'), (string) ($user->city ?? '')],
+            [get_string('country'), $countrylabel],
+            [get_string('timezone'), $tzlabel],
+            [get_string('preferredlanguage'), $langlabel],
+        ]);
+
+        $contact = self::profile_kv_rows([
+            [get_string('phone1'), (string) ($user->phone1 ?? '')],
+            [get_string('phone2'), (string) ($user->phone2 ?? '')],
+            [get_string('address'), (string) ($user->address ?? '')],
+            [get_string('institution'), (string) ($user->institution ?? '')],
+            [get_string('department'), (string) ($user->department ?? '')],
+            [get_string('idnumber'), (string) ($user->idnumber ?? '')],
+        ]);
+
+        $about = [];
+        $desc = trim(strip_tags((string) ($user->description ?? '')));
+        if ($desc !== '') {
+            $about[] = [
+                'label' => get_string('userdescription'),
+                'value' => format_text((string) $user->description, (int) ($user->descriptionformat ?? FORMAT_HTML), [
+                    'filter' => false,
+                    'para' => false,
+                ]),
+                'is_html' => true,
+            ];
+        }
+        if ($interests !== []) {
+            $about[] = [
+                'label' => get_string('interests'),
+                'value' => s(implode(', ', $interests)),
+                'is_html' => false,
+            ];
+        }
+
+        $sections = [];
+        if ($general !== []) {
+            $sections[] = [
+                'title' => get_string('general'),
+                'rows' => $general,
+            ];
+        }
+        if ($contact !== []) {
+            $sections[] = [
+                'title' => self::str('employer_profile_section_contact', null, 'Contact & organisation'),
+                'rows' => $contact,
+            ];
+        }
+        if ($about !== []) {
+            $sections[] = [
+                'title' => self::str('employer_profile_section_about', null, 'About'),
+                'rows' => $about,
+            ];
+        }
+
+        // Custom profile fields by category.
+        try {
+            $bycat = profile_get_user_fields_with_data_by_category((int) $user->id);
+            foreach ($bycat as $fields) {
+                if ($fields === []) {
+                    continue;
+                }
+                $catname = $fields[0]->get_category_name() ?: get_string('other');
+                $rows = [];
+                foreach ($fields as $fieldobj) {
+                    if (!$fieldobj->is_visible()) {
+                        continue;
+                    }
+                    $display = $fieldobj->display_data();
+                    $text = trim(strip_tags((string) $display));
+                    if ($text === '') {
+                        continue;
+                    }
+                    $rows[] = [
+                        'label' => format_string($fieldobj->field->name),
+                        'value' => $display,
+                        'is_html' => true,
+                    ];
+                }
+                if ($rows !== []) {
+                    $sections[] = [
+                        'title' => format_string($catname),
+                        'rows' => $rows,
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            debugging('employer_tools profile custom fields: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+
+        return $sections;
+    }
+
+    /**
+     * @param list<array{0:string,1:string}> $pairs
+     * @return list<array<string,mixed>>
+     */
+    private static function profile_kv_rows(array $pairs): array {
+        $rows = [];
+        foreach ($pairs as $pair) {
+            $value = trim((string) ($pair[1] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            $rows[] = [
+                'label' => (string) $pair[0],
+                'value' => s($value),
+                'is_html' => false,
+            ];
+        }
+        return $rows;
+    }
+
+    /**
+     * Edit form context.
+     *
+     * @param \stdClass $user
+     * @return array<string,mixed>
+     */
+    private static function profile_edit_form(\stdClass $user): array {
+        global $CFG;
+
+        require_once($CFG->dirroot . '/user/profile/lib.php');
+        profile_load_data($user);
+
+        $countries = ['' => get_string('selectacountry') . '...'] + get_string_manager()->get_list_of_countries(true);
+        $countryoptions = [];
+        foreach ($countries as $code => $label) {
+            $countryoptions[] = [
+                'value' => (string) $code,
+                'label' => (string) $label,
+                'selected' => (string) ($user->country ?? '') === (string) $code,
+            ];
+        }
+
+        $tzoptions = [];
+        try {
+            $tzlist = \core_date::get_list_of_timezones($user->timezone ?? 99, true);
+            foreach ($tzlist as $code => $label) {
+                $tzoptions[] = [
+                    'value' => (string) $code,
+                    'label' => (string) $label,
+                    'selected' => (string) ($user->timezone ?? '') === (string) $code,
+                ];
+            }
+        } catch (\Throwable $e) {
+            $tzoptions = [];
+        }
+
+        $langoptions = [];
+        $translations = get_string_manager()->get_list_of_translations();
+        $currentlang = (string) ($user->lang ?? $CFG->lang);
+        foreach ($translations as $code => $label) {
+            $langoptions[] = [
+                'value' => (string) $code,
+                'label' => (string) $label,
+                'selected' => $currentlang === (string) $code,
+            ];
+        }
+
+        $interests = '';
+        try {
+            $tags = \core_tag_tag::get_item_tags_array('core', 'user', (int) $user->id);
+            $interests = implode(', ', array_map('strval', $tags));
+        } catch (\Throwable $e) {
+            $interests = '';
+        }
+
+        $fields = [
+            self::profile_form_text('firstname', get_string('firstname'), (string) ($user->firstname ?? ''), $user, true),
+            self::profile_form_text('lastname', get_string('lastname'), (string) ($user->lastname ?? ''), $user, true),
+            self::profile_form_text('email', get_string('email'), (string) ($user->email ?? ''), $user, true, 'email'),
+            self::profile_form_text('city', get_string('city'), (string) ($user->city ?? ''), $user),
+            self::profile_form_select('country', get_string('selectacountry'), $countryoptions, $user),
+            self::profile_form_select('timezone', get_string('timezone'), $tzoptions, $user),
+            self::profile_form_select('lang', get_string('preferredlanguage'), $langoptions, $user),
+            self::profile_form_text('phone1', get_string('phone1'), (string) ($user->phone1 ?? ''), $user),
+            self::profile_form_text('phone2', get_string('phone2'), (string) ($user->phone2 ?? ''), $user),
+            self::profile_form_text('institution', get_string('institution'), (string) ($user->institution ?? ''), $user),
+            self::profile_form_text('department', get_string('department'), (string) ($user->department ?? ''), $user),
+            self::profile_form_text('idnumber', get_string('idnumber'), (string) ($user->idnumber ?? ''), $user),
+            self::profile_form_text('address', get_string('address'), (string) ($user->address ?? ''), $user),
+            self::profile_form_textarea(
+                'description',
+                get_string('userdescription'),
+                self::plain_text((string) ($user->description ?? '')),
+                $user
+            ),
+            self::profile_form_text('interests', get_string('interests'), $interests, $user),
+        ];
+
+        // Custom fields — text-like only in LaunchPad form; others link to Moodle.
+        $customfields = [];
+        try {
+            require_once($CFG->dirroot . '/user/profile/lib.php');
+            foreach (profile_get_user_fields_with_data((int) $user->id) as $fieldobj) {
+                $cfg = (object) $fieldobj->get_field_config_for_external();
+                if (!$fieldobj->is_editable()) {
+                    continue;
+                }
+                $datatype = (string) ($cfg->datatype ?? '');
+                $name = 'profile_field_' . $cfg->shortname;
+                $label = format_string($cfg->name);
+                $value = '';
+                if (!empty($user->{$name})) {
+                    $value = (string) $user->{$name};
+                } else if (method_exists($fieldobj, 'display_data')) {
+                    $value = self::plain_text((string) $fieldobj->display_data());
+                }
+                if (in_array($datatype, ['text', 'textarea'], true)) {
+                    $customfields[] = $datatype === 'textarea'
+                        ? self::profile_form_textarea($name, $label, $value, $user)
+                        : self::profile_form_text($name, $label, $value, $user);
+                }
+            }
+        } catch (\Throwable $e) {
+            debugging('employer_tools profile edit custom: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+
+        return [
+            'fields' => array_values(array_filter($fields)),
+            'custom_fields' => array_values(array_filter($customfields)),
+            'has_custom_fields' => $customfields !== [],
+        ];
+    }
+
+    /**
+     * @param string $name
+     * @param string $label
+     * @param string $value
+     * @param \stdClass $user
+     * @param bool $required
+     * @param string $inputtype
+     * @return array<string,mixed>|null
+     */
+    private static function profile_form_text(
+        string $name,
+        string $label,
+        string $value,
+        \stdClass $user,
+        bool $required = false,
+        string $inputtype = 'text'
+    ): ?array {
+        $locked = self::profile_field_is_locked($user, $name);
+        return [
+            'name' => $name,
+            'label' => $label,
+            'value' => $value,
+            'required' => $required,
+            'locked' => $locked,
+            'is_text' => true,
+            'is_textarea' => false,
+            'is_select' => false,
+            'inputtype' => $inputtype,
+            'options' => [],
+        ];
+    }
+
+    /**
+     * @param string $name
+     * @param string $label
+     * @param string $value
+     * @param \stdClass $user
+     * @return array<string,mixed>|null
+     */
+    private static function profile_form_textarea(
+        string $name,
+        string $label,
+        string $value,
+        \stdClass $user
+    ): ?array {
+        return [
+            'name' => $name,
+            'label' => $label,
+            'value' => $value,
+            'required' => false,
+            'locked' => self::profile_field_is_locked($user, $name),
+            'is_text' => false,
+            'is_textarea' => true,
+            'is_select' => false,
+            'inputtype' => 'text',
+            'options' => [],
+        ];
+    }
+
+    /**
+     * @param string $name
+     * @param string $label
+     * @param list<array<string,mixed>> $options
+     * @param \stdClass $user
+     * @return array<string,mixed>|null
+     */
+    private static function profile_form_select(
+        string $name,
+        string $label,
+        array $options,
+        \stdClass $user
+    ): ?array {
+        if ($options === []) {
+            return null;
+        }
+        return [
+            'name' => $name,
+            'label' => $label,
+            'value' => '',
+            'required' => false,
+            'locked' => self::profile_field_is_locked($user, $name),
+            'is_text' => false,
+            'is_textarea' => false,
+            'is_select' => true,
+            'inputtype' => 'text',
+            'options' => $options,
+        ];
+    }
+
+    /**
+     * Preference hub links — stay inside Employer/Fellowship chrome via pref=.
+     *
+     * @param int $userid
+     * @param string $portalpath
+     * @return list<array<string,mixed>>
+     */
+    private static function profile_preference_links(int $userid, string $portalpath): array {
+        $prefurl = static function (string $key) use ($portalpath): string {
+            return (new \moodle_url($portalpath, [
+                'view' => 'profile',
+                'ptab' => 'preferences',
+                'pref' => $key,
+            ]))->out(false);
+        };
+
+        $groups = [
+            [
+                'title' => self::str('employer_profile_prefs_account', null, 'Account'),
+                'items' => [
+                    [
+                        'label' => self::str('employer_profile_prefs_edit', null, 'Edit full profile'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_edit_desc',
+                            null,
+                            'Picture upload, rich description, and all custom field types.'
+                        ),
+                        'url' => $prefurl('edit'),
+                        'icon' => 'user-edit-01',
+                    ],
+                    [
+                        'label' => self::str('employer_profile_prefs_public', null, 'Public profile'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_public_desc',
+                            null,
+                            'How others see your Moodle profile page.'
+                        ),
+                        'url' => $prefurl('public'),
+                        'icon' => 'user-circle',
+                    ],
+                    [
+                        'label' => self::str('employer_profile_prefs_password', null, 'Change password'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_password_desc',
+                            null,
+                            'Update the password for this Moodle account.'
+                        ),
+                        'url' => $prefurl('password'),
+                        'icon' => 'lock-password',
+                    ],
+                ],
+            ],
+            [
+                'title' => self::str('employer_profile_prefs_communication', null, 'Communication'),
+                'items' => [
+                    [
+                        'label' => self::core_str('messagepreferences', 'message', 'Messaging preferences'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_messages_desc',
+                            null,
+                            'Who can message you and how you receive chat.'
+                        ),
+                        'url' => $prefurl('messages'),
+                        'icon' => 'message-01',
+                    ],
+                    [
+                        'label' => self::core_str('notificationpreferences', 'message', 'Notification preferences'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_notifs_desc',
+                            null,
+                            'Email and popup notification channels.'
+                        ),
+                        'url' => $prefurl('notifications'),
+                        'icon' => 'notification-01',
+                    ],
+                    [
+                        'label' => self::core_str('forumpreferences', 'moodle', 'Forum preferences'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_forum_desc',
+                            null,
+                            'Forum digest and tracking preferences.'
+                        ),
+                        'url' => $prefurl('forum'),
+                        'icon' => 'comment-01',
+                    ],
+                ],
+            ],
+            [
+                'title' => self::str('employer_profile_prefs_system', null, 'System'),
+                'items' => [
+                    [
+                        'label' => self::core_str('preferredlanguage', 'moodle', 'Preferred language'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_lang_desc',
+                            null,
+                            'Interface language for Moodle.'
+                        ),
+                        'url' => $prefurl('language'),
+                        'icon' => 'translate',
+                    ],
+                    [
+                        'label' => self::core_str('editorpreferences', 'moodle', 'Editor preferences'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_editor_desc',
+                            null,
+                            'Preferred text editor.'
+                        ),
+                        'url' => $prefurl('editor'),
+                        'icon' => 'text-font',
+                    ],
+                    [
+                        'label' => self::core_str('preferences', 'calendar', 'Calendar preferences'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_cal_desc',
+                            null,
+                            'Time format, calendar type, and event filters.'
+                        ),
+                        'url' => $prefurl('calendar'),
+                        'icon' => 'calendar-03',
+                    ],
+                    [
+                        'label' => self::core_str('privatefiles', 'moodle', 'Private files'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_files_desc',
+                            null,
+                            'Your private Moodle file area.'
+                        ),
+                        'url' => $prefurl('files'),
+                        'icon' => 'folder-01',
+                    ],
+                    [
+                        'label' => self::core_str('contentbank', 'moodle', 'Content bank'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_contentbank_desc',
+                            null,
+                            'Personal content bank preferences.'
+                        ),
+                        'url' => $prefurl('contentbank'),
+                        'icon' => 'database',
+                    ],
+                    [
+                        'label' => self::core_str('managetokens', 'webservice', 'Manage tokens'),
+                        'desc' => self::str(
+                            'employer_profile_prefs_tokens_desc',
+                            null,
+                            'Security keys for web services and apps.'
+                        ),
+                        'url' => $prefurl('tokens'),
+                        'icon' => 'key-01',
+                    ],
+                ],
+            ],
+        ];
+
+        $out = [];
+        foreach ($groups as $group) {
+            $items = [];
+            foreach ($group['items'] as $item) {
+                if (empty($item['url'])) {
+                    continue;
+                }
+                $items[] = $item;
+            }
+            if ($items !== []) {
+                $out[] = [
+                    'title' => $group['title'],
+                    'items' => $items,
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param bool $saved
+     * @param string $err
+     * @return array{ok:bool,text:string}|null
+     */
+    private static function profile_flash(bool $saved, string $err): ?array {
+        if ($saved) {
+            return [
+                'ok' => true,
+                'text' => self::str('employer_profile_save_ok', null, 'Profile updated.'),
+            ];
+        }
+        if ($err === '') {
+            return null;
+        }
+        $map = [
+            'denied' => self::str('employer_profile_save_denied', null, 'You cannot edit this profile here.'),
+            'email' => self::str('employer_profile_save_email', null, 'Enter a valid email address.'),
+            'emaildup' => self::str('employer_profile_save_emaildup', null, 'That email is already used by another account.'),
+            'name' => self::str('employer_profile_save_name', null, 'First and last name are required.'),
+            'failed' => self::str('employer_profile_save_failed', null, 'Moodle could not save your profile. Try again or open Moodle edit.'),
+        ];
+        return [
+            'ok' => false,
+            'text' => $map[$err] ?? $map['failed'],
+        ];
+    }
+
+    /**
+     * Whitelisted preference subpage keys.
+     *
+     * @return list<string>
+     */
+    public static function preference_whitelist(): array {
+        return [
+            'password', 'language', 'editor', 'forum', 'calendar', 'messages', 'notifications',
+            'edit', 'public', 'files', 'contentbank', 'tokens',
+        ];
+    }
+
+    /**
+     * Preference subpage context for Mustache.
+     *
+     * @param \stdClass $user
+     * @param string $pref
+     * @param array<string,string> $urls
+     * @param string $portalpath
+     * @param string $actionpath
+     * @param bool $saved
+     * @param string $err
+     * @return array<string,mixed>
+     */
+    public static function preference_page(
+        \stdClass $user,
+        string $pref,
+        array $urls,
+        string $portalpath,
+        string $actionpath,
+        bool $saved = false,
+        string $err = ''
+    ): array {
+        global $CFG;
+
+        $userid = (int) ($user->id ?? 0);
+        $huburl = (new \moodle_url($portalpath, [
+            'view' => 'profile',
+            'ptab' => 'preferences',
+        ]))->out(false);
+
+        $meta = self::preference_meta($pref);
+        $flash = self::preference_flash($saved, $err);
+        $base = [
+            'has_pref_detail' => true,
+            'pref_key' => $pref,
+            'pref_title' => $meta['title'],
+            'pref_help' => $meta['help'],
+            'pref_icon' => $meta['icon'],
+            'pref_hub_url' => $huburl,
+            'pref_is_form' => false,
+            'pref_is_handoff' => false,
+            'pref_fields' => [],
+            'pref_has_fields' => false,
+            'pref_moodle_url' => '',
+            'pref_handoff_body' => '',
+            'pref_advanced_url' => '',
+            'pref_has_advanced' => false,
+            'pref_action_url' => (new \moodle_url($actionpath))->out(false),
+            'pref_cancel_url' => $huburl,
+            'pref_has_flash' => $flash !== null,
+            'pref_flash' => $flash,
+            'pref_password_policy' => '',
+        ];
+
+        $formkeys = ['password', 'language', 'editor', 'forum', 'calendar', 'messages', 'notifications'];
+        if (in_array($pref, $formkeys, true)) {
+            $fields = self::preference_form_fields($user, $pref);
+            $base['pref_is_form'] = true;
+            $base['pref_fields'] = $fields;
+            $base['pref_has_fields'] = $fields !== [];
+            if ($pref === 'password' && !empty($CFG->passwordpolicy)) {
+                $base['pref_password_policy'] = trim(strip_tags(print_password_policy()));
+            }
+            if ($pref === 'notifications') {
+                $adv = (string) ($urls['moodle_notification_prefs']
+                    ?? (new \moodle_url('/message/notificationpreferences.php'))->out(false));
+                $base['pref_advanced_url'] = $adv;
+                $base['pref_has_advanced'] = $adv !== '';
+            }
+            if ($pref === 'messages') {
+                $adv = (new \moodle_url('/message/edit.php', ['id' => $userid]))->out(false);
+                $base['pref_advanced_url'] = $adv;
+                $base['pref_has_advanced'] = true;
+            }
+            return $base;
+        }
+
+        // Handoff / redirect-style pages.
+        $moodleurl = '';
+        $body = $meta['help'];
+        $editportal = (new \moodle_url($portalpath, [
+            'view' => 'profile',
+            'ptab' => 'edit',
+        ]))->out(false);
+
+        switch ($pref) {
+            case 'edit':
+                $moodleurl = (string) ($urls['moodle_profile_edit']
+                    ?? (new \moodle_url('/user/edit.php', [
+                        'id' => $userid,
+                        'returnto' => 'profile',
+                    ]))->out(false));
+                $body = self::str(
+                    'employer_pref_edit_body',
+                    null,
+                    'Use the in-portal editor for common fields, or open Moodle’s full profile editor for picture upload and advanced fields.'
+                );
+                $base['pref_portal_edit_url'] = $editportal;
+                $base['pref_has_portal_edit'] = true;
+                break;
+            case 'public':
+                $moodleurl = (string) ($urls['moodle_profile']
+                    ?? (new \moodle_url('/user/profile.php', ['id' => $userid]))->out(false));
+                break;
+            case 'files':
+                $moodleurl = (new \moodle_url('/user/files.php'))->out(false);
+                break;
+            case 'contentbank':
+                $moodleurl = (new \moodle_url('/user/contentbank.php'))->out(false);
+                break;
+            case 'tokens':
+                $moodleurl = (new \moodle_url('/user/managetoken.php'))->out(false);
+                break;
+            default:
+                $moodleurl = (string) ($urls['preferences']
+                    ?? (new \moodle_url('/user/preferences.php'))->out(false));
+                break;
+        }
+
+        $base['pref_is_handoff'] = true;
+        $base['pref_moodle_url'] = $moodleurl;
+        $base['pref_handoff_body'] = $body;
+        $base['pref_has_portal_edit'] = !empty($base['pref_has_portal_edit']);
+        $base['pref_portal_edit_url'] = (string) ($base['pref_portal_edit_url'] ?? '');
+
+        return $base;
+    }
+
+    /**
+     * Collect preference POST fields for save_preference().
+     *
+     * @param string $pref
+     * @return array<string,mixed>
+     */
+    public static function preference_post_payload(string $pref): array {
+        $payload = ['pref' => $pref];
+        switch ($pref) {
+            case 'password':
+                $payload['password'] = optional_param('password', '', PARAM_RAW);
+                $payload['newpassword1'] = optional_param('newpassword1', '', PARAM_RAW);
+                $payload['newpassword2'] = optional_param('newpassword2', '', PARAM_RAW);
+                $payload['logoutothersessions'] = optional_param('logoutothersessions', 0, PARAM_INT);
+                break;
+            case 'language':
+                $payload['lang'] = optional_param('lang', '', PARAM_LANG);
+                break;
+            case 'editor':
+                $payload['htmleditor'] = optional_param('htmleditor', '', PARAM_PLUGIN);
+                break;
+            case 'forum':
+                $payload['maildigest'] = optional_param('maildigest', 0, PARAM_INT);
+                $payload['autosubscribe'] = optional_param('autosubscribe', 1, PARAM_INT);
+                $payload['trackforums'] = optional_param('trackforums', 0, PARAM_INT);
+                $payload['markasreadonnotification'] = optional_param('markasreadonnotification', 1, PARAM_INT);
+                break;
+            case 'calendar':
+                $payload['timeformat'] = optional_param('timeformat', '', PARAM_NOTAGS);
+                $payload['startwday'] = optional_param('startwday', 0, PARAM_INT);
+                $payload['maxevents'] = optional_param('maxevents', 10, PARAM_INT);
+                $payload['lookahead'] = optional_param('lookahead', 20, PARAM_INT);
+                $payload['persistflt'] = optional_param('persistflt', 0, PARAM_INT);
+                $payload['calendartype'] = optional_param('calendartype', '', PARAM_ALPHAEXT);
+                break;
+            case 'messages':
+                $payload['message_blocknoncontacts'] = optional_param('message_blocknoncontacts', 0, PARAM_INT);
+                break;
+            case 'notifications':
+                $payload['email_enabled'] = optional_param('email_enabled', 0, PARAM_INT);
+                $payload['popup_enabled'] = optional_param('popup_enabled', 0, PARAM_INT);
+                break;
+        }
+        return $payload;
+    }
+
+    /**
+     * Save a preference subpage via Moodle APIs.
+     *
+     * @param \stdClass $user
+     * @param string $pref
+     * @param array<string,mixed> $raw
+     * @return string '' on success, else error code
+     */
+    public static function save_preference(\stdClass $user, string $pref, array $raw): string {
+        global $CFG, $USER;
+
+        if (isguestuser($user) || empty($user->id)) {
+            return 'denied';
+        }
+        if ($pref === '' || !in_array($pref, self::preference_whitelist(), true)) {
+            return 'denied';
+        }
+        if (!in_array($pref, ['password', 'language', 'editor', 'forum', 'calendar', 'messages', 'notifications'], true)) {
+            return 'denied';
+        }
+
+        require_once($CFG->dirroot . '/user/lib.php');
+        require_once($CFG->dirroot . '/user/editlib.php');
+
+        try {
+            switch ($pref) {
+                case 'password':
+                    return self::save_preference_password($user, $raw);
+                case 'language':
+                    return self::save_preference_language($user, $raw);
+                case 'editor':
+                    return self::save_preference_editor($user, $raw);
+                case 'forum':
+                    return self::save_preference_forum($user, $raw);
+                case 'calendar':
+                    return self::save_preference_calendar($user, $raw);
+                case 'messages':
+                    return self::save_preference_messages($user, $raw);
+                case 'notifications':
+                    return self::save_preference_notifications($user, $raw);
+            }
+        } catch (\Throwable $e) {
+            debugging('employer_tools save_preference: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return 'failed';
+        }
+
+        return 'failed';
+    }
+
+    /**
+     * @param \stdClass $user
+     * @param array<string,mixed> $raw
+     * @return string
+     */
+    private static function save_preference_password(\stdClass $user, array $raw): string {
+        global $CFG, $USER;
+
+        require_once($CFG->libdir . '/authlib.php');
+        require_once($CFG->dirroot . '/login/lib.php');
+
+        if (!has_capability('moodle/user:changeownpassword', \context_system::instance())
+                && !get_user_preferences('auth_forcepasswordchange', false, $user->id)) {
+            return 'denied';
+        }
+        if (\core\session\manager::is_loggedinas()) {
+            return 'denied';
+        }
+
+        $userauth = get_auth_plugin($user->auth);
+        if (!$userauth->can_change_password()) {
+            return 'denied';
+        }
+        if ($userauth->change_password_url()) {
+            return 'external';
+        }
+
+        $current = (string) ($raw['password'] ?? '');
+        $new1 = (string) ($raw['newpassword1'] ?? '');
+        $new2 = (string) ($raw['newpassword2'] ?? '');
+        if ($current === '' || $new1 === '' || $new2 === '') {
+            return 'required';
+        }
+        if ($new1 !== $new2) {
+            return 'mismatch';
+        }
+        if ($current === $new1) {
+            return 'same';
+        }
+
+        $reason = null;
+        if (!authenticate_user_login($user->username, $current, true, $reason, false)) {
+            return 'current';
+        }
+        if (user_is_previously_used_password((int) $user->id, $new1)) {
+            return 'reused';
+        }
+        $errmsg = '';
+        if (!check_password_policy($new1, $errmsg, $user)) {
+            return 'policy';
+        }
+        if (!$userauth->user_update_password($USER, $new1)) {
+            return 'failed';
+        }
+
+        user_add_password_history((int) $user->id, $new1);
+        if (!empty($CFG->passwordchangelogout) || !empty($raw['logoutothersessions'])) {
+            \core\session\manager::destroy_user_sessions((int) $user->id, session_id());
+        }
+        unset_user_preference('auth_forcepasswordchange', $user);
+        unset_user_preference('create_password', $user);
+        login_unlock_account($user);
+
+        return '';
+    }
+
+    /**
+     * @param \stdClass $user
+     * @param array<string,mixed> $raw
+     * @return string
+     */
+    private static function save_preference_language(\stdClass $user, array $raw): string {
+        global $USER;
+
+        $lang = (string) ($raw['lang'] ?? '');
+        if ($lang === '' || !get_string_manager()->translation_exists($lang, false)) {
+            $lang = \core_user::get_property_default('lang');
+        }
+        $user->lang = $lang;
+        user_update_user($user, false, false);
+        \core\event\user_updated::create_from_userid((int) $user->id)->trigger();
+        if ((int) $USER->id === (int) $user->id) {
+            $USER->lang = $lang;
+        }
+        return '';
+    }
+
+    /**
+     * @param \stdClass $user
+     * @param array<string,mixed> $raw
+     * @return string
+     */
+    private static function save_preference_editor(\stdClass $user, array $raw): string {
+        global $CFG;
+        require_once($CFG->libdir . '/editorlib.php');
+        $editor = (string) ($raw['htmleditor'] ?? '');
+        $editors = editors_get_enabled();
+        if ($editor !== '' && !array_key_exists($editor, $editors)) {
+            return 'invalid';
+        }
+        $user->preference_htmleditor = $editor;
+        useredit_update_user_preference($user);
+        \core\event\user_updated::create_from_userid((int) $user->id)->trigger();
+        return '';
+    }
+
+    /**
+     * @param \stdClass $user
+     * @param array<string,mixed> $raw
+     * @return string
+     */
+    private static function save_preference_forum(\stdClass $user, array $raw): string {
+        global $CFG, $USER;
+
+        $digest = (int) ($raw['maildigest'] ?? 0);
+        if (!in_array($digest, [0, 1, 2], true)) {
+            $digest = 0;
+        }
+        $user->maildigest = $digest;
+        $user->autosubscribe = !empty($raw['autosubscribe']) ? 1 : 0;
+        if (!empty($CFG->forum_trackreadposts)) {
+            $user->trackforums = !empty($raw['trackforums']) ? 1 : 0;
+            $user->preference_forum_markasreadonnotification = !empty($raw['markasreadonnotification']) ? 1 : 0;
+        }
+        useredit_update_user_preference($user);
+        user_update_user($user, false, false);
+        \core\event\user_updated::create_from_userid((int) $user->id)->trigger();
+        if ((int) $USER->id === (int) $user->id) {
+            $USER->maildigest = $user->maildigest;
+            $USER->autosubscribe = $user->autosubscribe;
+            if (!empty($CFG->forum_trackreadposts)) {
+                $USER->trackforums = $user->trackforums;
+            }
+        }
+        return '';
+    }
+
+    /**
+     * @param \stdClass $user
+     * @param array<string,mixed> $raw
+     * @return string
+     */
+    private static function save_preference_calendar(\stdClass $user, array $raw): string {
+        global $CFG, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $calendartype = (string) ($raw['calendartype'] ?? '');
+        $types = \core_calendar\type_factory::get_list_of_calendar_types();
+        if ($calendartype === '' || !array_key_exists($calendartype, $types)) {
+            $calendartype = (string) $CFG->calendartype;
+        }
+
+        $usernew = [
+            'id' => (int) $user->id,
+            'preference_calendar_timeformat' => (string) ($raw['timeformat'] ?? ''),
+            'preference_calendar_startwday' => max(0, min(6, (int) ($raw['startwday'] ?? 0))),
+            'preference_calendar_maxevents' => max(1, min(100, (int) ($raw['maxevents'] ?? 10))),
+            'preference_calendar_lookahead' => max(1, min(365, (int) ($raw['lookahead'] ?? 20))),
+            'preference_calendar_persistflt' => !empty($raw['persistflt']) ? 1 : 0,
+        ];
+        useredit_update_user_preference($usernew);
+
+        $user->calendartype = $calendartype;
+        user_update_user($user, false, false);
+        \core\event\user_updated::create_from_userid((int) $user->id)->trigger();
+        if ((int) $USER->id === (int) $user->id) {
+            $USER->calendartype = $calendartype;
+        }
+        return '';
+    }
+
+    /**
+     * @param \stdClass $user
+     * @param array<string,mixed> $raw
+     * @return string
+     */
+    private static function save_preference_messages(\stdClass $user, array $raw): string {
+        global $CFG;
+
+        require_once($CFG->dirroot . '/message/lib.php');
+
+        if (!has_capability('moodle/user:editownmessageprofile', \context_system::instance())) {
+            return 'denied';
+        }
+
+        $privacy = (int) ($raw['message_blocknoncontacts'] ?? \core_message\api::MESSAGE_PRIVACY_COURSEMEMBER);
+        $allowed = [
+            \core_message\api::MESSAGE_PRIVACY_ONLYCONTACTS,
+            \core_message\api::MESSAGE_PRIVACY_COURSEMEMBER,
+            \core_message\api::MESSAGE_PRIVACY_SITE,
+        ];
+        if (!in_array($privacy, $allowed, true)) {
+            $privacy = \core_message\api::MESSAGE_PRIVACY_COURSEMEMBER;
+        }
+        if (empty($CFG->messagingallusers) && $privacy === \core_message\api::MESSAGE_PRIVACY_SITE) {
+            $privacy = \core_message\api::MESSAGE_PRIVACY_COURSEMEMBER;
+        }
+        set_user_preference('message_blocknoncontacts', $privacy, (int) $user->id);
+        return '';
+    }
+
+    /**
+     * Simplified notification processor toggles (email + popup for personal messages).
+     *
+     * @param \stdClass $user
+     * @param array<string,mixed> $raw
+     * @return string
+     */
+    private static function save_preference_notifications(\stdClass $user, array $raw): string {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/message/lib.php');
+
+        if (!has_capability('moodle/user:editownmessageprofile', \context_system::instance())) {
+            return 'denied';
+        }
+
+        $emailon = !empty($raw['email_enabled']) ? 1 : 0;
+        $popupon = !empty($raw['popup_enabled']) ? 1 : 0;
+        $providers = ['moodle_instantmessage', 'moodle_badgeawarded'];
+
+        foreach ($providers as $componentprovider) {
+            // Preference keys: message_provider_<component>_<name>_enabled / loggedin / loggedoff.
+            // Modern Moodle uses enabled processors CSV in preference message_provider_*_enabled.
+            $pref = 'message_provider_' . $componentprovider . '_enabled';
+            $enabled = [];
+            if ($popupon) {
+                $enabled[] = 'popup';
+            }
+            if ($emailon) {
+                $enabled[] = 'email';
+            }
+            if ($enabled === []) {
+                // Keep preference present but empty so processors stay off.
+                set_user_preference($pref, 'none', (int) $user->id);
+            } else {
+                set_user_preference($pref, implode(',', $enabled), (int) $user->id);
+            }
+        }
+
+        // Also set loggedin/loggedoff legacy keys when processors table exists.
+        $processors = $DB->get_records('message_processors', null, '', 'name');
+        foreach (['popup', 'email'] as $proc) {
+            if (!isset($processors[$proc])) {
+                continue;
+            }
+            $on = ($proc === 'popup') ? $popupon : $emailon;
+            foreach ($providers as $componentprovider) {
+                set_user_preference(
+                    'message_provider_' . $componentprovider . '_loggedin',
+                    $on ? $proc : 'none',
+                    (int) $user->id
+                );
+                set_user_preference(
+                    'message_provider_' . $componentprovider . '_loggedoff',
+                    $on ? $proc : 'none',
+                    (int) $user->id
+                );
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param string $pref
+     * @return array{title:string,help:string,icon:string}
+     */
+    private static function preference_meta(string $pref): array {
+        $map = [
+            'password' => [
+                'title' => self::str('employer_profile_prefs_password', null, 'Change password'),
+                'help' => self::str('employer_pref_password_help', null, 'Choose a strong password you have not used on this site before.'),
+                'icon' => 'lock-password',
+            ],
+            'language' => [
+                'title' => self::core_str('preferredlanguage', 'moodle', 'Preferred language'),
+                'help' => self::str('employer_profile_prefs_lang_desc', null, 'Interface language for Moodle.'),
+                'icon' => 'translate',
+            ],
+            'editor' => [
+                'title' => self::core_str('editorpreferences', 'moodle', 'Editor preferences'),
+                'help' => self::str('employer_profile_prefs_editor_desc', null, 'Preferred text editor.'),
+                'icon' => 'text-font',
+            ],
+            'forum' => [
+                'title' => self::core_str('forumpreferences', 'moodle', 'Forum preferences'),
+                'help' => self::str('employer_profile_prefs_forum_desc', null, 'Forum digest and tracking preferences.'),
+                'icon' => 'comment-01',
+            ],
+            'calendar' => [
+                'title' => self::core_str('preferences', 'calendar', 'Calendar preferences'),
+                'help' => self::str('employer_profile_prefs_cal_desc', null, 'Time format, calendar type, and event filters.'),
+                'icon' => 'calendar-03',
+            ],
+            'messages' => [
+                'title' => self::core_str('messagepreferences', 'message', 'Messaging preferences'),
+                'help' => self::str('employer_profile_prefs_messages_desc', null, 'Who can message you and how you receive chat.'),
+                'icon' => 'message-01',
+            ],
+            'notifications' => [
+                'title' => self::core_str('notificationpreferences', 'message', 'Notification preferences'),
+                'help' => self::str(
+                    'employer_pref_notifications_help',
+                    null,
+                    'Quick toggles for email and popup on common alerts. Open Moodle for the full matrix.'
+                ),
+                'icon' => 'notification-01',
+            ],
+            'edit' => [
+                'title' => self::str('employer_profile_prefs_edit', null, 'Edit full profile'),
+                'help' => self::str(
+                    'employer_profile_prefs_edit_desc',
+                    null,
+                    'Picture upload, rich description, and all custom field types.'
+                ),
+                'icon' => 'user-edit-01',
+            ],
+            'public' => [
+                'title' => self::str('employer_profile_prefs_public', null, 'Public profile'),
+                'help' => self::str(
+                    'employer_profile_prefs_public_desc',
+                    null,
+                    'How others see your Moodle profile page.'
+                ),
+                'icon' => 'user-circle',
+            ],
+            'files' => [
+                'title' => self::core_str('privatefiles', 'moodle', 'Private files'),
+                'help' => self::str('employer_profile_prefs_files_desc', null, 'Your private Moodle file area.'),
+                'icon' => 'folder-01',
+            ],
+            'contentbank' => [
+                'title' => self::core_str('contentbank', 'moodle', 'Content bank'),
+                'help' => self::str(
+                    'employer_profile_prefs_contentbank_desc',
+                    null,
+                    'Personal content bank preferences.'
+                ),
+                'icon' => 'database',
+            ],
+            'tokens' => [
+                'title' => self::core_str('managetokens', 'webservice', 'Manage tokens'),
+                'help' => self::str(
+                    'employer_profile_prefs_tokens_desc',
+                    null,
+                    'Security keys for web services and apps.'
+                ),
+                'icon' => 'key-01',
+            ],
+        ];
+        return $map[$pref] ?? [
+            'title' => self::str('employer_nav_preferences', null, 'Preferences'),
+            'help' => '',
+            'icon' => 'settings-01',
+        ];
+    }
+
+    /**
+     * @param bool $saved
+     * @param string $err
+     * @return array{ok:bool,text:string}|null
+     */
+    private static function preference_flash(bool $saved, string $err): ?array {
+        if ($saved) {
+            return [
+                'ok' => true,
+                'text' => self::str('employer_pref_save_ok', null, 'Preferences saved.'),
+            ];
+        }
+        if ($err === '') {
+            return null;
+        }
+        $map = [
+            'denied' => self::str('employer_pref_save_denied', null, 'You cannot change this preference here.'),
+            'external' => self::str(
+                'employer_pref_save_external',
+                null,
+                'Your login method manages passwords outside LaunchPad. Open Moodle or your identity provider.'
+            ),
+            'required' => self::str('employer_pref_save_required', null, 'Fill in all required fields.'),
+            'mismatch' => self::str('employer_pref_save_mismatch', null, 'New passwords do not match.'),
+            'same' => self::str('employer_pref_save_same', null, 'New password must be different from the current one.'),
+            'current' => self::str('employer_pref_save_current', null, 'Current password is incorrect.'),
+            'reused' => self::str('employer_pref_save_reused', null, 'That password was used recently. Choose a new one.'),
+            'policy' => self::str('employer_pref_save_policy', null, 'New password does not meet the site password policy.'),
+            'invalid' => self::str('employer_pref_save_invalid', null, 'That option is not available.'),
+            'failed' => self::str('employer_pref_save_failed', null, 'Moodle could not save this preference. Try again.'),
+        ];
+        return [
+            'ok' => false,
+            'text' => $map[$err] ?? $map['failed'],
+        ];
+    }
+
+    /**
+     * Build form fields for a preference subpage.
+     *
+     * @param \stdClass $user
+     * @param string $pref
+     * @return list<array<string,mixed>>
+     */
+    private static function preference_form_fields(\stdClass $user, string $pref): array {
+        global $CFG;
+
+        $fields = [];
+        switch ($pref) {
+            case 'password':
+                $fields[] = self::pref_field_password('password', self::core_str('oldpassword', 'moodle', 'Current password'), true);
+                $fields[] = self::pref_field_password('newpassword1', self::core_str('newpassword', 'moodle', 'New password'), true);
+                $fields[] = self::pref_field_password(
+                    'newpassword2',
+                    self::core_str('newpassword', 'moodle', 'New password') . ' (' . self::core_str('again', 'moodle', 'again') . ')',
+                    true
+                );
+                if (empty($CFG->passwordchangelogout)) {
+                    $fields[] = self::pref_field_checkbox(
+                        'logoutothersessions',
+                        self::core_str('logoutalsosessions', 'moodle', 'Log out of other browsers'),
+                        false
+                    );
+                }
+                break;
+
+            case 'language':
+                $langs = get_string_manager()->get_list_of_translations();
+                $options = [];
+                foreach ($langs as $code => $name) {
+                    $options[] = [
+                        'value' => $code,
+                        'label' => $name,
+                        'selected' => ((string) ($user->lang ?? '') === (string) $code),
+                    ];
+                }
+                $fields[] = self::pref_field_select(
+                    'lang',
+                    self::core_str('preferredlanguage', 'moodle', 'Preferred language'),
+                    $options
+                );
+                break;
+
+            case 'editor':
+                require_once($CFG->libdir . '/editorlib.php');
+                $editors = editors_get_enabled();
+                $current = (string) get_user_preferences('htmleditor', '', (int) $user->id);
+                $options = [[
+                    'value' => '',
+                    'label' => self::str('employer_pref_editor_default', null, 'Default editor'),
+                    'selected' => $current === '',
+                ]];
+                foreach ($editors as $name => $unused) {
+                    $options[] = [
+                        'value' => $name,
+                        'label' => get_string('pluginname', 'editor_' . $name),
+                        'selected' => $current === $name,
+                    ];
+                }
+                $fields[] = self::pref_field_select(
+                    'htmleditor',
+                    self::core_str('editorpreferences', 'moodle', 'Preferred editor'),
+                    $options
+                );
+                break;
+
+            case 'forum':
+                $digest = (int) ($user->maildigest ?? 0);
+                $fields[] = self::pref_field_select('maildigest', self::core_str('emaildigest', 'moodle', 'Email digest type'), [
+                    ['value' => '0', 'label' => self::core_str('emaildigestoff', 'moodle', 'No digest'), 'selected' => $digest === 0],
+                    ['value' => '1', 'label' => self::core_str('emaildigestcomplete', 'moodle', 'Complete'), 'selected' => $digest === 1],
+                    ['value' => '2', 'label' => self::core_str('emaildigestsubjects', 'moodle', 'Subjects'), 'selected' => $digest === 2],
+                ]);
+                $fields[] = self::pref_field_select('autosubscribe', self::core_str('autosubscribe', 'moodle', 'Forum auto-subscribe'), [
+                    [
+                        'value' => '1',
+                        'label' => self::core_str('autosubscribeyes', 'moodle', 'Yes: when I post, subscribe me'),
+                        'selected' => !empty($user->autosubscribe),
+                    ],
+                    [
+                        'value' => '0',
+                        'label' => self::core_str('autosubscribeno', 'moodle', 'No: do not auto-subscribe'),
+                        'selected' => empty($user->autosubscribe),
+                    ],
+                ]);
+                if (!empty($CFG->forum_trackreadposts)) {
+                    $fields[] = self::pref_field_select('trackforums', self::core_str('trackforums', 'moodle', 'Forum tracking'), [
+                        [
+                            'value' => '1',
+                            'label' => self::core_str('trackforumsyes', 'moodle', 'Yes: highlight new posts'),
+                            'selected' => !empty($user->trackforums),
+                        ],
+                        [
+                            'value' => '0',
+                            'label' => self::core_str('trackforumsno', 'moodle', 'No: do not highlight'),
+                            'selected' => empty($user->trackforums),
+                        ],
+                    ]);
+                    $mark = (int) get_user_preferences('forum_markasreadonnotification', 1, (int) $user->id);
+                    $fields[] = self::pref_field_checkbox(
+                        'markasreadonnotification',
+                        self::core_str('markasreadonnotification', 'moodle', 'Mark as read on notification'),
+                        $mark === 1
+                    );
+                }
+                break;
+
+            case 'calendar':
+                require_once($CFG->dirroot . '/calendar/lib.php');
+                $timeformat = (string) get_user_preferences('calendar_timeformat', '', (int) $user->id);
+                $fields[] = self::pref_field_select('timeformat', self::str('employer_pref_cal_timeformat', null, 'Time format'), [
+                    ['value' => '', 'label' => self::core_str('default', 'moodle', 'Default'), 'selected' => $timeformat === ''],
+                    ['value' => '%H:%M', 'label' => self::str('employer_pref_cal_24h', null, '24-hour'), 'selected' => $timeformat === '%H:%M'],
+                    [
+                        'value' => '%I:%M %p',
+                        'label' => self::str('employer_pref_cal_12h', null, '12-hour'),
+                        'selected' => $timeformat === '%I:%M %p' || $timeformat === '%I:%M',
+                    ],
+                ]);
+
+                $startwday = (int) calendar_get_starting_weekday();
+                $weekdays = [
+                    0 => self::core_str('sunday', 'calendar', 'Sunday'),
+                    1 => self::core_str('monday', 'calendar', 'Monday'),
+                    2 => self::core_str('tuesday', 'calendar', 'Tuesday'),
+                    3 => self::core_str('wednesday', 'calendar', 'Wednesday'),
+                    4 => self::core_str('thursday', 'calendar', 'Thursday'),
+                    5 => self::core_str('friday', 'calendar', 'Friday'),
+                    6 => self::core_str('saturday', 'calendar', 'Saturday'),
+                ];
+                $dayopts = [];
+                foreach ($weekdays as $i => $label) {
+                    $dayopts[] = [
+                        'value' => (string) $i,
+                        'label' => $label,
+                        'selected' => $startwday === $i,
+                    ];
+                }
+                $fields[] = self::pref_field_select(
+                    'startwday',
+                    self::str('employer_pref_cal_startwday', null, 'First day of week'),
+                    $dayopts
+                );
+
+                $defaultmax = isset($CFG->calendar_maxevents) ? (int) $CFG->calendar_maxevents : CALENDAR_DEFAULT_UPCOMING_MAXEVENTS;
+                $defaultlook = isset($CFG->calendar_lookahead) ? (int) $CFG->calendar_lookahead : CALENDAR_DEFAULT_UPCOMING_LOOKAHEAD;
+                $maxevents = (int) get_user_preferences('calendar_maxevents', $defaultmax, (int) $user->id);
+                $lookahead = (int) get_user_preferences('calendar_lookahead', $defaultlook, (int) $user->id);
+                $persist = (int) get_user_preferences('calendar_persistflt', 0, (int) $user->id);
+
+                $fields[] = self::pref_field_number(
+                    'maxevents',
+                    self::str('employer_pref_cal_maxevents', null, 'Upcoming events max'),
+                    $maxevents
+                );
+                $fields[] = self::pref_field_number(
+                    'lookahead',
+                    self::str('employer_pref_cal_lookahead', null, 'Upcoming events look-ahead (days)'),
+                    $lookahead
+                );
+                $fields[] = self::pref_field_checkbox(
+                    'persistflt',
+                    self::str('employer_pref_cal_persist', null, 'Remember filter settings'),
+                    $persist === 1
+                );
+
+                $types = \core_calendar\type_factory::get_list_of_calendar_types();
+                $caltype = (string) ($user->calendartype ?? $CFG->calendartype);
+                $calopts = [];
+                foreach ($types as $key => $label) {
+                    $calopts[] = [
+                        'value' => $key,
+                        'label' => $label,
+                        'selected' => $caltype === $key,
+                    ];
+                }
+                if ($calopts !== []) {
+                    $fields[] = self::pref_field_select(
+                        'calendartype',
+                        self::str('employer_pref_cal_type', null, 'Preferred calendar'),
+                        $calopts
+                    );
+                }
+                break;
+
+            case 'messages':
+                require_once($CFG->dirroot . '/message/lib.php');
+                $privacy = (int) get_user_preferences(
+                    'message_blocknoncontacts',
+                    \core_message\api::MESSAGE_PRIVACY_COURSEMEMBER,
+                    (int) $user->id
+                );
+                $opts = [
+                    [
+                        'value' => (string) \core_message\api::MESSAGE_PRIVACY_ONLYCONTACTS,
+                        'label' => self::core_str('contactableprivacy_onlycontacts', 'message', 'My contacts only'),
+                        'selected' => $privacy === \core_message\api::MESSAGE_PRIVACY_ONLYCONTACTS,
+                    ],
+                    [
+                        'value' => (string) \core_message\api::MESSAGE_PRIVACY_COURSEMEMBER,
+                        'label' => self::core_str(
+                            'contactableprivacy_coursemember',
+                            'message',
+                            'My contacts and anyone in my courses'
+                        ),
+                        'selected' => $privacy === \core_message\api::MESSAGE_PRIVACY_COURSEMEMBER,
+                    ],
+                ];
+                if (!empty($CFG->messagingallusers)) {
+                    $opts[] = [
+                        'value' => (string) \core_message\api::MESSAGE_PRIVACY_SITE,
+                        'label' => self::core_str('contactableprivacy_site', 'message', 'Anyone on the site'),
+                        'selected' => $privacy === \core_message\api::MESSAGE_PRIVACY_SITE,
+                    ];
+                }
+                $fields[] = self::pref_field_select(
+                    'message_blocknoncontacts',
+                    self::core_str('contactableprivacy', 'message', 'Who can message me'),
+                    $opts
+                );
+                break;
+
+            case 'notifications':
+                $emailpref = (string) get_user_preferences('message_provider_moodle_instantmessage_enabled', '', (int) $user->id);
+                $popupon = $emailpref === '' || strpos($emailpref, 'popup') !== false;
+                $emailon = $emailpref === '' || strpos($emailpref, 'email') !== false;
+                // Empty preference usually means site defaults (often both on).
+                if ($emailpref === 'none') {
+                    $popupon = false;
+                    $emailon = false;
+                }
+                $fields[] = self::pref_field_checkbox(
+                    'popup_enabled',
+                    self::str('employer_pref_notif_popup', null, 'Web / popup notifications'),
+                    $popupon
+                );
+                $fields[] = self::pref_field_checkbox(
+                    'email_enabled',
+                    self::str('employer_pref_notif_email', null, 'Email notifications'),
+                    $emailon
+                );
+                break;
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param string $name
+     * @param string $label
+     * @param bool $required
+     * @return array<string,mixed>
+     */
+    private static function pref_field_password(string $name, string $label, bool $required): array {
+        return [
+            'name' => $name,
+            'label' => $label,
+            'required' => $required,
+            'is_password' => true,
+            'is_text' => false,
+            'is_number' => false,
+            'is_checkbox' => false,
+            'is_select' => false,
+            'value' => '',
+            'checked' => false,
+            'options' => [],
+        ];
+    }
+
+    /**
+     * @param string $name
+     * @param string $label
+     * @param string|int $value
+     * @return array<string,mixed>
+     */
+    private static function pref_field_number(string $name, string $label, $value): array {
+        return [
+            'name' => $name,
+            'label' => $label,
+            'required' => false,
+            'is_password' => false,
+            'is_text' => false,
+            'is_number' => true,
+            'is_checkbox' => false,
+            'is_select' => false,
+            'value' => (string) $value,
+            'checked' => false,
+            'options' => [],
+        ];
+    }
+
+    /**
+     * @param string $name
+     * @param string $label
+     * @param bool $checked
+     * @return array<string,mixed>
+     */
+    private static function pref_field_checkbox(string $name, string $label, bool $checked): array {
+        return [
+            'name' => $name,
+            'label' => $label,
+            'required' => false,
+            'is_password' => false,
+            'is_text' => false,
+            'is_number' => false,
+            'is_checkbox' => true,
+            'is_select' => false,
+            'value' => '1',
+            'checked' => $checked,
+            'options' => [],
+        ];
+    }
+
+    /**
+     * @param string $name
+     * @param string $label
+     * @param list<array{value:string,label:string,selected:bool}> $options
+     * @return array<string,mixed>
+     */
+    private static function pref_field_select(string $name, string $label, array $options): array {
+        $selectedlabel = '';
+        foreach ($options as $opt) {
+            if (!empty($opt['selected'])) {
+                $selectedlabel = (string) $opt['label'];
+                break;
+            }
+        }
+        if ($selectedlabel === '' && $options !== []) {
+            $selectedlabel = (string) $options[0]['label'];
+            $options[0]['selected'] = true;
+        }
+        return [
+            'name' => $name,
+            'label' => $label,
+            'required' => false,
+            'is_password' => false,
+            'is_text' => false,
+            'is_number' => false,
+            'is_checkbox' => false,
+            'is_select' => true,
+            'value' => '',
+            'checked' => false,
+            'options' => $options,
+            'selected_label' => $selectedlabel,
+        ];
     }
 
     /**
@@ -1590,5 +3896,22 @@ final class employer_tools {
             return str_replace('{$a}', (string) $a, $fallback);
         }
         return $fallback !== '' ? $fallback : (is_scalar($a) ? (string) $a : '');
+    }
+
+    /**
+     * Safe core / component string with fallback (never [[missing]]).
+     *
+     * @param string $identifier
+     * @param string $component
+     * @param string $fallback
+     */
+    private static function core_str(string $identifier, string $component, string $fallback): string {
+        if (get_string_manager()->string_exists($identifier, $component)) {
+            $out = get_string($identifier, $component);
+            if (is_string($out) && $out !== '' && strpos($out, '[[') === false) {
+                return $out;
+            }
+        }
+        return $fallback;
     }
 }

@@ -1,46 +1,214 @@
 {{!
     @template local_launchpad/fellowship_progress
-}}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
 
-{{^has_courses}}
+    Progress — programme gates, journey, requirements, certificate (Moodle-backed).
+    Replaces the former Phase progress + Completion pages.
+}}
+<div class="lp-tools-page lp-reveal" data-region="fellowship-progress-page" style="--lp-d:0">
+{{^has_course}}
   <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">LP</div>
-    <h2>{{#str}} fellowship_nav_progress, local_launchpad {{/str}}</h2>
+    <div class="lp-empty-mark" aria-hidden="true">
+      <iconify-icon icon="hugeicons:flag-02" width="26" height="26"></iconify-icon>
+    </div>
+    <h2>{{strings.empty_title}}</h2>
     <p>{{empty_message}}</p>
+    {{#track_url}}
+      <a class="lp-btn lp-btn-primary" href="{{track_url}}">{{strings.go_track}}</a>
+    {{/track_url}}
   </div>
-{{/has_courses}}
-{{#has_courses}}
-  <p class="lp-muted">{{#str}} fellowship_progress_intro, local_launchpad {{/str}}</p>
-  <div class="lp-stack">
-    {{#courses}}
-      <section class="lp-card lift">
-        <div class="lp-card-head">
-          <div>
-            <h3>{{{fullname}}}</h3>
-            <span class="lp-muted">{{idnumber}}</span>
-          </div>
-          <a class="lp-link" href="{{url}}">{{#str}} fellowship_nav_track, local_launchpad {{/str}} →</a>
-        </div>
-        {{#has_percent}}
-          <div class="lp-progress-block">
-            <div class="lp-progress-meta">
-              <b>{{percent}}%</b>
-              <span class="lp-muted">{{completed}} / {{trackable}}</span>
+{{/has_course}}
+
+{{#has_course}}
+  {{#multi_course}}
+    <div class="lp-course-switch lp-home-switch lp-reveal" role="navigation" aria-label="{{#str}} fellowship_switch_courses, local_launchpad {{/str}}" style="--lp-d:0">
+      {{#course_switch}}
+        <a class="lp-chip{{#selected}} is-on{{/selected}}" href="{{url}}"{{#selected}} aria-current="page"{{/selected}}>{{{fullname}}}</a>
+      {{/course_switch}}
+    </div>
+  {{/multi_course}}
+
+  <div class="lp-comp-system">
+    <section class="lp-card lift lp-theme-hero lp-comp-overview">
+      <div class="lp-theme-hero-main">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:flag-02" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <div class="lp-theme-hero-heading">
+              <h3>{{strings.gates_heading}}</h3>
             </div>
-            <div class="lp-bar" aria-hidden="true"><i style="width:{{percent}}%"></i></div>
+            <p>{{strings.gates_sub}}</p>
           </div>
-        {{/has_percent}}
-        <p class="lp-sm">{{honest_note}}</p>
-        <a class="lp-link-sm" href="{{moodle_url}}">{{#str}} fellowship_open_moodle_course, local_launchpad {{/str}}</a>
-      </section>
-    {{/courses}}
+        </div>
+        <p class="lp-sm lp-theme-hero-body">{{strings.gates_lead}}</p>
+        <div class="lp-comp-hero-summary">
+          <h2 class="lp-completion-gates">{{gates_label}}</h2>
+          <p class="lp-muted lp-sm">{{gates_note}}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-comp-ring-card" aria-label="{{ring_pct}}% {{strings.ring_label}}">
+      <div class="lp-comp-ring-card-inner">
+        <div class="lp-ring lp-comp-ring" style="width:{{ring_size}}px;height:{{ring_size}}px">
+          <svg viewBox="0 0 {{ring_size}} {{ring_size}}" aria-hidden="true">
+            <circle class="lp-ring-track" cx="{{ring_cx}}" cy="{{ring_cy}}" r="{{ring_radius}}" fill="none" stroke-width="12"/>
+            <circle class="lp-ring-arc" cx="{{ring_cx}}" cy="{{ring_cy}}" r="{{ring_radius}}" fill="none" stroke="var(--lp-blue)" stroke-width="12" stroke-linecap="round" stroke-dasharray="{{ring_circ}}" stroke-dashoffset="{{ring_circ}}" data-to="{{ring_dashoffset}}" transform="rotate(-90 {{ring_cx}} {{ring_cy}})"/>
+          </svg>
+          <div class="lp-ring-v">
+            <b>{{ring_pct}}%</b>
+            <span>{{strings.ring_label}}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-comp-stats">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:analytics-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.stats_heading}}</h3>
+          </div>
+        </div>
+      </div>
+      <dl class="lp-theme-kv lp-comp-stats-kv">
+        <div class="lp-theme-kv-row{{#all_met}} is-hot{{/all_met}}">
+          <dt>{{strings.stat_gates}}</dt>
+          <dd><b class="lp-num">{{gates_met}}</b><span class="lp-comp-stat-of">/ {{gates_total}}</span></dd>
+        </div>
+        <div class="lp-theme-kv-row{{#orientation_done}} is-hot{{/orientation_done}}">
+          <dt>{{strings.stat_orientation}}</dt>
+          <dd><span class="lp-chip {{orientation_chip}}">{{orientation_status}}</span></dd>
+        </div>
+        <div class="lp-theme-kv-row">
+          <dt>{{strings.stat_weighted}}</dt>
+          <dd>
+            <b class="lp-num">{{weighted_display}}</b>
+            <span class="lp-chip {{weighted_chip}}">{{weighted_status}}</span>
+          </dd>
+        </div>
+      </dl>
+    </section>
   </div>
-{{/has_courses}}
+
+  {{#journey.has_gates}}
+    <section class="lp-card lift lp-journey-card lp-stack-lg lp-progress-journey">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:route-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.journey_heading}}</h3>
+            <p>{{strings.journey_sub}}</p>
+          </div>
+        </div>
+      </div>
+      {{> local_launchpad/fellowship_journey}}
+    </section>
+  {{/journey.has_gates}}
+
+  <div class="lp-comp-layout">
+    <section class="lp-card lift lp-comp-workspace">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:task-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.req_heading}}</h3>
+            <p>{{strings.calc_note}}</p>
+          </div>
+        </div>
+      </div>
+
+      <ul class="lp-comp-req-list">
+        <li class="lp-comp-req-row">
+          <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+            <iconify-icon icon="hugeicons:book-open-01" width="18" height="18"></iconify-icon>
+          </span>
+          <div class="lp-comp-req-main">
+            <span class="lp-comp-req-name">{{strings.orientation}}</span>
+            <div class="lp-comp-req-meta">
+              <span>{{strings.col_weight}}: {{orientation_weight}}</span>
+              <span>{{strings.col_result}}: {{orientation_result}}</span>
+            </div>
+          </div>
+          <span class="lp-chip {{orientation_chip}}">{{orientation_status}}</span>
+        </li>
+        {{#phases}}
+          <li class="lp-comp-req-row{{#is_met}} is-met{{/is_met}}{{#is_not_released}} is-locked{{/is_not_released}}">
+            <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+              <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+            </span>
+            <div class="lp-comp-req-main">
+              <span class="lp-comp-req-name">{{name}}</span>
+              {{#show_bar}}
+                <div class="lp-bar" aria-hidden="true"><i style="width:{{bar_pct}}%"></i></div>
+              {{/show_bar}}
+              <div class="lp-comp-req-meta">
+                <span>{{strings.col_weight}}: {{weight_label}}</span>
+                <span>{{strings.col_result}}: {{result_display}}</span>
+                {{#hint}}
+                  <span class="lp-comp-req-hint">{{hint}}</span>
+                {{/hint}}
+              </div>
+            </div>
+            {{#has_chip_class}}
+              <span class="lp-chip {{chip}}">{{status}}</span>
+            {{/has_chip_class}}
+            {{^has_chip_class}}
+              <span class="lp-chip">{{status}}</span>
+            {{/has_chip_class}}
+          </li>
+        {{/phases}}
+        <li class="lp-comp-req-row is-total">
+          <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+            <iconify-icon icon="hugeicons:chart-histogram" width="18" height="18"></iconify-icon>
+          </span>
+          <div class="lp-comp-req-main">
+            <span class="lp-comp-req-name">{{strings.weighted}}</span>
+            <div class="lp-comp-req-meta">
+              <span>{{strings.col_weight}}: 100%</span>
+              <span>{{strings.col_result}}: {{weighted_display}}</span>
+            </div>
+          </div>
+          <span class="lp-chip {{weighted_chip}}">{{weighted_status}}</span>
+        </li>
+      </ul>
+      <p class="lp-note lp-muted lp-xs">{{strings.note}}</p>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-comp-cert">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:certificate-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.cert_heading}}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="lp-cert locked">
+        <span class="lp-cert-lock" aria-hidden="true">
+          <iconify-icon icon="hugeicons:square-lock-02" width="34" height="34"></iconify-icon>
+        </span>
+        <b>{{strings.cert_title}}</b>
+        <small>{{strings.cert_na}}</small>
+      </div>
+      <div class="lp-mascot">
+        {{#prof_url}}
+          <img src="{{prof_url}}" alt="" width="90" height="90" decoding="async">
+        {{/prof_url}}
+        <div class="lp-bubble">{{{cert_message}}}</div>
+      </div>
+      <p class="lp-xs lp-muted">{{strings.cert_disclaimer}}</p>
+    </section>
+  </div>
+{{/has_course}}
+</div>

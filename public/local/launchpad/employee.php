@@ -40,12 +40,29 @@ $courseid = optional_param('id', 0, PARAM_INT);
 $tab = optional_param('tab', 'all', PARAM_ALPHA);
 $mtab = optional_param('mtab', 'all', PARAM_ALPHA);
 $gtab = optional_param('gtab', 'all', PARAM_ALPHA);
+$ntab = optional_param('ntab', 'all', PARAM_ALPHA);
+$ptab = optional_param('ptab', 'overview', PARAM_ALPHA);
 $convid = optional_param('convid', 0, PARAM_INT);
+$notifid = optional_param('notifid', 0, PARAM_INT);
 $msgsent = optional_param('msgsent', 0, PARAM_INT);
 $msgerr = optional_param('msgerr', '', PARAM_ALPHA);
-$allowedviews = ['home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages', 'notifications'];
+$notifdone = optional_param('notifdone', 0, PARAM_INT);
+$notiferr = optional_param('notiferr', '', PARAM_ALPHA);
+$profilesaved = optional_param('profilesaved', 0, PARAM_INT);
+$profileerr = optional_param('profileerr', '', PARAM_ALPHAEXT);
+$prefsaved = optional_param('prefsaved', 0, PARAM_INT);
+$preferr = optional_param('preferr', '', PARAM_ALPHAEXT);
+$pref = optional_param('pref', '', PARAM_ALPHAEXT);
+$allowedviews = ['home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages', 'notifications', 'profile'];
+$allowedprefs = [
+    'password', 'language', 'editor', 'forum', 'calendar', 'messages', 'notifications',
+    'edit', 'public', 'files', 'contentbank', 'tokens',
+];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+if ($pref !== '' && !in_array($pref, $allowedprefs, true)) {
+    $pref = '';
 }
 if ($tab !== 'earned') {
     $tab = 'all';
@@ -56,17 +73,37 @@ if (!in_array($mtab, ['all', 'starred', 'private', 'group'], true)) {
 if (!in_array($gtab, ['all', 'graded', 'pending'], true)) {
     $gtab = 'all';
 }
+if (!in_array($ntab, ['all', 'unread'], true)) {
+    $ntab = 'all';
+}
+if (!in_array($ptab, ['overview', 'edit', 'preferences'], true)) {
+    $ptab = 'overview';
+}
 if ($convid < 0) {
     $convid = 0;
+}
+if ($notifid < 0) {
+    $notifid = 0;
 }
 // Course id: home focus, course detail, or grades detail. Cleared on other tools.
 if ($view === 'courses' || $view === 'badges'
         || $view === 'calendar' || $view === 'messages' || $view === 'notifications'
+        || $view === 'profile'
         || $courseid < 0) {
     $courseid = 0;
 }
 if ($view !== 'messages') {
     $convid = 0;
+}
+if ($view !== 'notifications') {
+    $notifid = 0;
+}
+if ($view !== 'profile') {
+    $ptab = 'overview';
+    $pref = '';
+}
+if ($ptab !== 'preferences') {
+    $pref = '';
 }
 
 $PAGE->set_context($context);
@@ -77,6 +114,10 @@ $PAGE->set_url(new moodle_url('/local/launchpad/employee.php', array_filter([
     'mtab' => ($view === 'messages' && $mtab !== 'all') ? $mtab : null,
     'gtab' => ($view === 'grades' && $courseid <= 0 && $gtab !== 'all') ? $gtab : null,
     'convid' => ($view === 'messages' && $convid > 0) ? $convid : null,
+    'ntab' => ($view === 'notifications' && $ntab !== 'all') ? $ntab : null,
+    'notifid' => ($view === 'notifications' && $notifid > 0) ? $notifid : null,
+    'ptab' => ($view === 'profile' && $ptab !== 'overview') ? $ptab : null,
+    'pref' => ($view === 'profile' && $ptab === 'preferences' && $pref !== '') ? $pref : null,
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('employer_area_title', 'local_launchpad'));
@@ -96,7 +137,17 @@ $templatecontext = array_merge(
         $convid,
         $msgsent > 0,
         $msgerr,
-        $gtab
+        $gtab,
+        $ntab,
+        $notifid,
+        $notifdone > 0,
+        $notiferr,
+        $ptab,
+        $profilesaved > 0,
+        $profileerr,
+        $pref,
+        $prefsaved > 0,
+        $preferr
     ),
     $mismatch
 );

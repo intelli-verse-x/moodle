@@ -29,6 +29,8 @@ require_once(__DIR__ . '/classes/portal_gate.php');
 require_once(__DIR__ . '/classes/messaging.php');
 require_once(__DIR__ . '/classes/calendar_service.php');
 
+use local_launchpad\employer_dashboard;
+use local_launchpad\employer_tools;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\messaging;
@@ -60,10 +62,72 @@ $messageuserid = 0;
 $messageconvid = 0;
 $messagetab = 'all';
 $courseid = 0;
+$ptab = optional_param('ptab', 'overview', PARAM_ALPHA);
+if (!in_array($ptab, ['overview', 'edit', 'preferences'], true)) {
+    $ptab = 'overview';
+}
+$profilesaved = optional_param('profilesaved', 0, PARAM_INT);
+$profileerr = optional_param('profileerr', '', PARAM_ALPHAEXT);
+$prefsaved = optional_param('prefsaved', 0, PARAM_INT);
+$preferr = optional_param('preferr', '', PARAM_ALPHAEXT);
+$pref = optional_param('pref', '', PARAM_ALPHAEXT);
+$allowedprefs = [
+    'password', 'language', 'editor', 'forum', 'calendar', 'messages', 'notifications',
+    'edit', 'public', 'files', 'contentbank', 'tokens',
+];
+if ($pref !== '' && !in_array($pref, $allowedprefs, true)) {
+    $pref = '';
+}
 $tab = optional_param('tab', 'all', PARAM_ALPHA);
 if ($tab !== 'earned') {
     $tab = 'all';
 }
+if ($view !== 'profile') {
+    $ptab = 'overview';
+    $pref = '';
+}
+if ($ptab !== 'preferences') {
+    $pref = '';
+}
+
+// Save profile / preference from Fellowship shell (form posts here without view= in action URL).
+if (data_submitted() && confirm_sesskey()) {
+    $postaction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($postaction === 'update_profile') {
+        $err = employer_tools::save_profile($USER, employer_tools::profile_post_payload());
+        if ($err !== '') {
+            redirect(new moodle_url(persona_home::FELLOW_PATH, [
+                'view' => 'profile',
+                'ptab' => 'edit',
+                'profileerr' => $err,
+            ]));
+        }
+        redirect(new moodle_url(persona_home::FELLOW_PATH, [
+            'view' => 'profile',
+            'ptab' => 'overview',
+            'profilesaved' => 1,
+        ]));
+    }
+    if ($postaction === 'update_preference') {
+        $prefkey = optional_param('pref', '', PARAM_ALPHAEXT);
+        $err = employer_tools::save_preference($USER, $prefkey, employer_tools::preference_post_payload($prefkey));
+        if ($err !== '') {
+            redirect(new moodle_url(persona_home::FELLOW_PATH, [
+                'view' => 'profile',
+                'ptab' => 'preferences',
+                'pref' => $prefkey !== '' ? $prefkey : null,
+                'preferr' => $err,
+            ]));
+        }
+        redirect(new moodle_url(persona_home::FELLOW_PATH, [
+            'view' => 'profile',
+            'ptab' => 'preferences',
+            'pref' => $prefkey !== '' ? $prefkey : null,
+            'prefsaved' => 1,
+        ]));
+    }
+}
+
 if ($view === 'messages') {
     $messageuserid = optional_param('id', 0, PARAM_INT);
     $messageconvid = optional_param('convid', 0, PARAM_INT);
@@ -117,6 +181,8 @@ $PAGE->set_url(new moodle_url(persona_home::FELLOW_PATH, array_filter([
     'convid' => ($view === 'messages' && $messageuserid <= 0 && $messageconvid > 0) ? $messageconvid : null,
     'mtab' => ($view === 'messages' && $messagetab !== 'all') ? $messagetab : null,
     'tab' => ($view === 'achievements' && $tab !== 'all') ? $tab : null,
+    'ptab' => ($view === 'profile' && $ptab !== 'overview') ? $ptab : null,
+    'pref' => ($view === 'profile' && $ptab === 'preferences' && $pref !== '') ? $pref : null,
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title($lpstr('fellowship_area_title', null, 'Fellowship · ToBa Learn'));
@@ -130,10 +196,13 @@ $assetv = (string) ($plugin->version ?? time());
 $cssurl = $pluginbase . '/styles_fellowship.css?v=' . rawurlencode($assetv);
 $jsurl = $pluginbase . '/fellowship.js?v=' . rawurlencode($assetv);
 $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
-$profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
+$profileurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'profile']))->out(false);
+$preferencesurl = (new moodle_url(persona_home::FELLOW_PATH, [
+    'view' => 'profile',
+    'ptab' => 'preferences',
+]))->out(false);
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
-// Legacy Progress tab redirects to Phase progress; keep URL for shell/home links.
-$progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
+$progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 $messagesurl = messaging::messages_url(null, 'fellow');
 $msgunread = messaging::conversation_unread_count($userid);
@@ -186,18 +255,11 @@ $nav = [
                 'icon_svg' => $icon('message-01'),
             ],
             [
-                'label' => $lpstr('fellowship_nav_phases', null, 'Phase progress'),
-                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false),
-                'current' => $view === 'phases',
-                'key' => 'phases',
+                'label' => $lpstr('fellowship_nav_progress', null, 'Progress'),
+                'url' => $progressurl,
+                'current' => $view === 'progress',
+                'key' => 'progress',
                 'icon_svg' => $icon('chart-histogram'),
-            ],
-            [
-                'label' => $lpstr('fellowship_nav_completion', null, 'Completion'),
-                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'completion']))->out(false),
-                'current' => $view === 'completion',
-                'key' => 'completion',
-                'icon_svg' => $icon('checkmark-circle-02'),
             ],
         ],
     ],
@@ -235,6 +297,13 @@ $nav = [
                 'badge' => $msgunread > 0 ? (string) $msgunread : '',
             ],
             [
+                'label' => $lpstr('fellowship_nav_profile', null, 'Profile'),
+                'url' => $profileurl,
+                'current' => $view === 'profile',
+                'key' => 'profile',
+                'icon_svg' => $icon('user-circle'),
+            ],
+            [
                 'label' => $lpstr('fellowship_nav_help', null, 'Help & FAQ'),
                 'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'help']))->out(false),
                 'current' => $view === 'help',
@@ -265,9 +334,10 @@ if ($courseid > 0) {
     if ($selected === null && is_siteadmin()) {
         $selected = get_course($courseid);
     }
-} else if (count($courses) === 1) {
-    $selected = $courses[0];
-    $courseid = (int) $selected->id;
+} else if ($courses !== []) {
+    // Prefer a track course over Shared orientation when no ?id= is given.
+    $selected = fellowship_dashboard::prefer_course($courses);
+    $courseid = $selected ? (int) $selected->id : 0;
 }
 
 $outline = null;
@@ -332,8 +402,27 @@ switch ($view) {
         break;
 
     case 'progress':
-        // Sidebar Progress removed — Phase progress is the programme record view.
-        redirect(new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']));
+        $pagetitle = $lpstr('fellowship_nav_progress', null, 'Progress');
+        $progressdata = fellowship_dashboard::completion_for_user($userid, $courses, $selected);
+        $progressswitch = [];
+        $progressselectedid = $selected !== null ? (int) $selected->id : 0;
+        foreach ($coursecards as $card) {
+            $cid = (int) $card['id'];
+            $progressswitch[] = [
+                'fullname' => $card['fullname'],
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, [
+                    'view' => 'progress',
+                    'id' => $cid,
+                ]))->out(false),
+                'selected' => $progressselectedid > 0 && $cid === $progressselectedid,
+            ];
+        }
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_progress', array_merge($progressdata, [
+            'bot_url' => $pluginbase . '/assets/img/bot.webp',
+            'prof_url' => $pluginbase . '/assets/img/prof.webp',
+            'multi_course' => count($progressswitch) > 1,
+            'course_switch' => $progressswitch,
+        ]));
         break;
 
     case 'news':
@@ -378,8 +467,38 @@ switch ($view) {
 
     case 'portfolio':
         $pagetitle = $lpstr('fellowship_nav_portfolio', null, 'Portfolio');
-        $portdata = fellowship_dashboard::list_portfolio_evidence($userid, $courses);
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_portfolio', $portdata);
+        // Same multi-course scope as Home / Feedback / Progress: selected track only.
+        $portfolioscope = $selected ? [$selected] : $courses;
+        $portfoliocourseid = $selected ? (int) $selected->id : ($courseid > 0 ? $courseid : null);
+        $portdata = fellowship_dashboard::list_portfolio_evidence(
+            $userid,
+            $portfolioscope,
+            $portfoliocourseid
+        );
+        $portfolioswitch = [];
+        $portfolioselectedid = $selected !== null ? (int) $selected->id : 0;
+        foreach ($coursecards as $card) {
+            $cid = (int) $card['id'];
+            $portfolioswitch[] = [
+                'fullname' => $card['fullname'],
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, [
+                    'view' => 'portfolio',
+                    'id' => $cid,
+                ]))->out(false),
+                'selected' => $portfolioselectedid > 0 && $cid === $portfolioselectedid,
+            ];
+        }
+        if (empty($portdata['selected_course_name']) && $selected) {
+            $portdata['selected_course_name'] = fellowship_dashboard::display_label(format_string($selected->fullname));
+        }
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_portfolio', array_merge($portdata, [
+            'multi_course' => count($portfolioswitch) > 1,
+            'course_switch' => $portfolioswitch,
+            'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+                'view' => 'track',
+                'id' => $portfoliocourseid,
+            ])))->out(false),
+        ]));
         break;
 
     case 'achievements':
@@ -395,19 +514,36 @@ switch ($view) {
         break;
 
     case 'phases':
-        $pagetitle = $lpstr('fellowship_nav_phases', null, 'Phase progress');
-        $phasedata = fellowship_dashboard::phase_progress_for_user($userid, $courses, $selected);
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_phases', array_merge($phasedata, [
-            'bot_url' => $pluginbase . '/assets/img/bot.webp',
-        ]));
+    case 'completion':
+        // Legacy URLs — Progress combines phase gates + completion record.
+        redirect(new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']));
         break;
 
-    case 'completion':
-        $pagetitle = $lpstr('fellowship_nav_completion', null, 'Completion');
-        $completiondata = fellowship_dashboard::completion_for_user($userid, $courses, $selected);
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_completion', array_merge($completiondata, [
-            'prof_url' => $pluginbase . '/assets/img/prof.webp',
-        ]));
+    case 'profile':
+        $pagetitle = $lpstr('fellowship_nav_profile', null, 'Profile');
+        $profilectx = employer_tools::profile_page(
+            $USER,
+            [
+                'moodle_profile' => (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false),
+                'moodle_profile_edit' => (new moodle_url('/user/edit.php', [
+                    'id' => $userid,
+                    'returnto' => 'profile',
+                ]))->out(false),
+                'preferences' => (new moodle_url('/user/preferences.php'))->out(false),
+            ],
+            $ptab,
+            $profilesaved > 0,
+            $profileerr,
+            persona_home::FELLOW_PATH,
+            persona_home::FELLOW_PATH,
+            $pref,
+            $prefsaved > 0,
+            $preferr
+        );
+        $content = $OUTPUT->render_from_template('local_launchpad/employer_profile', array_merge(
+            $profilectx,
+            ['strings' => employer_tools::profile_strings()]
+        ));
         break;
 
     case 'help':
@@ -432,14 +568,14 @@ switch ($view) {
                     'icon' => 'book-open-01',
                 ],
                 [
-                    'label' => $lpstr('fellowship_nav_phases', null, 'Phase progress'),
+                    'label' => $lpstr('fellowship_nav_progress', null, 'Progress'),
                     'hint' => $lpstr(
-                        'fellowship_help_link_phases_hint',
+                        'fellowship_help_link_progress_hint',
                         null,
-                        'Gate status from released assign grades'
+                        'Phase gates, orientation, weighted result, and certificate'
                     ),
-                    'url' => $fellowview('phases'),
-                    'icon' => 'route-01',
+                    'url' => $fellowview('progress'),
+                    'icon' => 'flag-02',
                 ],
                 [
                     'label' => $lpstr('fellowship_nav_feedback', null, 'Feedback'),
@@ -450,16 +586,6 @@ switch ($view) {
                     ),
                     'url' => $fellowview('feedback'),
                     'icon' => 'comment-01',
-                ],
-                [
-                    'label' => $lpstr('fellowship_nav_completion', null, 'Completion'),
-                    'hint' => $lpstr(
-                        'fellowship_help_link_completion_hint',
-                        null,
-                        'Gates, orientation, and certificate status'
-                    ),
-                    'url' => $fellowview('completion'),
-                    'icon' => 'flag-02',
                 ],
                 [
                     'label' => $lpstr('fellowship_nav_messages', null, 'Messages'),
@@ -502,7 +628,7 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_grade_a',
                         null,
-                        'In Moodle Assign activities and the gradebook. Feedback shows released mentor comments and scores; Phase progress and Completion read the same released grades. This dashboard does not invent grades.'
+                        'In Moodle Assign activities and the gradebook. Feedback and Progress read the same released grades. This dashboard does not invent grades.'
                     ),
                 ],
                 [
@@ -518,7 +644,7 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_cert_a',
                         null,
-                        'Only when published criteria are met (phase gates at 70+, Shared orientation when required) and your programme confirms issuance. Until then Completion keeps the certificate locked. A certificate does not imply a job, internship, or placement.'
+                        'Only when published criteria are met (phase gates at 70+, Shared orientation when required) and your programme confirms issuance. Until then Progress keeps the certificate locked. A certificate does not imply a job, internship, or placement.'
                     ),
                 ],
                 [
@@ -719,14 +845,51 @@ if ($view === 'achievements') {
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_achievements', $ach);
 }
 
-$feedbackdata = fellowship_dashboard::list_assignment_feedback($userid, $courses);
-$feedbackattention = (int) ($feedbackdata['attention_count'] ?? 0);
+$feedbacktab = optional_param('ftab', 'all', PARAM_ALPHAEXT);
+// Nav badge: attention across every enrolled track (do not miss revise on another course).
+$feedbackattention = (int) (
+    fellowship_dashboard::list_assignment_feedback($userid, $courses, 'all')['attention_count'] ?? 0
+);
 if ($view === 'feedback') {
+    // Page data: selected track only (same scoping as Progress / My Track).
+    $feedbackscope = $selected ? [$selected] : $courses;
+    $feedbackcourseid = $selected ? (int) $selected->id : ($courseid > 0 ? $courseid : null);
+    $feedbackdata = fellowship_dashboard::list_assignment_feedback(
+        $userid,
+        $feedbackscope,
+        $feedbacktab,
+        $feedbackcourseid
+    );
+
+    // Same multi-course switch as Home: one chip per enrolled course via $coursecards.
+    $feedbackswitch = [];
+    $feedbackselectedid = $selected !== null ? (int) $selected->id : 0;
+    foreach ($coursecards as $card) {
+        $cid = (int) $card['id'];
+        $feedbackswitch[] = [
+            'fullname' => $card['fullname'],
+            'url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+                'view' => 'feedback',
+                'id' => $cid,
+                'ftab' => $feedbacktab !== 'all' ? $feedbacktab : null,
+            ])))->out(false),
+            'selected' => $feedbackselectedid > 0 && $cid === $feedbackselectedid,
+        ];
+    }
+
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_feedback', array_merge($feedbackdata, [
         'has_courses' => $courses !== [],
         'empty_message' => $nocourses,
-        'track_url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
+        'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'track',
+            'id' => $feedbackcourseid,
+        ])))->out(false),
         'empty_avatar_url' => $pluginbase . '/assets/img/prof.webp',
+        'multi_course' => count($feedbackswitch) > 1,
+        'course_switch' => $feedbackswitch,
+        'selected_course_name' => $selected
+            ? fellowship_dashboard::display_label(format_string($selected->fullname))
+            : '',
     ]));
 }
 
@@ -761,9 +924,9 @@ $orbittips = [
         'Open activities in Moodle. Later phases unlock when the programme releases them.'
     ),
     'progress' => $lpstr(
-        'fellowship_orbit_tip_phases',
+        'fellowship_orbit_tip_progress_page',
         null,
-        'Each phase passes only after a released review at 70/100 or above. Weights are fixed by the programme.'
+        'Gates need a released review at 70/100. Orientation and the weighted result sit on this page — the certificate stays locked until issuance is on.'
     ),
     'achievements' => $lpstr(
         'fellowship_orbit_tip_achievements',
@@ -774,16 +937,6 @@ $orbittips = [
         'fellowship_orbit_tip_feedback',
         null,
         'Mentor comments and grades live on Moodle assignments. Open an item to revise or read the full review.'
-    ),
-    'phases' => $lpstr(
-        'fellowship_orbit_tip_phases',
-        null,
-        'Each phase passes only after a released review at 70/100 or above. Weights are fixed by the programme.'
-    ),
-    'completion' => $lpstr(
-        'fellowship_orbit_tip_completion',
-        null,
-        'Every gate must reach 70. The certificate stays locked until the programme turns issuance on.'
     ),
     'help' => $lpstr(
         'fellowship_orbit_tip_help',
@@ -819,6 +972,17 @@ if ($hour < 12) {
 }
 
 $mismatch = portal_gate::consume_modal_context();
+$fellowinitials = fellowship_dashboard::initials($USER);
+$fellowemail = trim((string) ($USER->email ?? ''));
+$fellowrole = $lpstr('fellowship_role_label', null, 'Fellow · LaunchPad');
+$profilemenu = employer_dashboard::profile_menu_context(
+    $fellowinitials,
+    $displayname,
+    $fellowemail,
+    $profileurl,
+    $preferencesurl,
+    $logouturl
+);
 $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array_merge([
     'data_region' => fellowship_dashboard::DATA_REGION,
     'assets' => $pluginbase . '/assets/img',
@@ -826,6 +990,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     'firstname' => $firstname,
     'greeting' => $greeting,
     'portallabel' => $lpstr('fellowship_portal_label', null, 'Fellowship portal'),
+    'role_label' => $fellowrole,
     'is_home' => $view === 'home',
     'has_courses' => $courses !== [],
     'nav_groups' => $nav,
@@ -848,7 +1013,20 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     'next_level_name' => $ach['next_level_name'],
     'xp_to_next' => $ach['xp_to_next'],
     'pct_to_next' => $ach['pct_to_next'],
-    'initials' => fellowship_dashboard::initials($USER),
+    'initials' => $fellowinitials,
+    'profile_menu' => $profilemenu,
+    'profile_menu_side' => [
+        'profile_menu' => employer_dashboard::profile_menu_context(
+            $fellowinitials,
+            $displayname,
+            $fellowemail,
+            $profileurl,
+            $preferencesurl,
+            $logouturl,
+            true,
+            $fellowrole
+        ),
+    ],
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,
 ], $mismatch));

@@ -19,17 +19,11 @@
         </a>
       {{/items}}
     {{/nav_groups}}
-    <div class="lp-me">
-      <div class="lp-av" aria-hidden="true">{{initials}}</div>
-      <div class="lp-me-text">
-        <b>{{{displayname}}}</b>
-        <span>{{role_label}}</span>
-      </div>
+    <div class="lp-side-foot">
+      {{#profile_menu_side}}
+        {{> local_launchpad/profile_menu }}
+      {{/profile_menu_side}}
     </div>
-    <a class="lp-nav" href="{{logout_url}}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 7V5a2 2 0 012-2h7v18h-7a2 2 0 01-2-2v-2"/><path d="M15 12H3m0 0l3-3m-3 3l3 3"/></svg>
-      <span>{{#str}} fellowship_nav_signout, local_launchpad {{/str}}</span>
-    </a>
   </nav>
   <div class="lp-main-wrap">
     <header class="lp-topbar">
@@ -46,9 +40,7 @@
             <span class="lp-notif-dot">{{unread_notifications}}</span>
           {{/has_unread_notifications}}
         </a>
-        <a class="lp-profile-icon" href="{{profile_url}}" aria-label="{{#str}} fellowship_nav_account, local_launchpad {{/str}}" title="{{#str}} fellowship_nav_account, local_launchpad {{/str}}">
-          <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
-        </a>
+        {{> local_launchpad/profile_menu }}
       </div>
     </header>
     <main class="lp-main" id="lp-main">

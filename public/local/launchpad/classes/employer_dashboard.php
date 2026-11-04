@@ -46,6 +46,16 @@ final class employer_dashboard {
      * @param bool $msgsent flash: message sent
      * @param string $msgerr flash: send error code
      * @param string $gtab grades filter: all|graded|pending
+     * @param string $ntab notifications tab: all|unread
+     * @param int $notifid selected notification id
+     * @param bool $notifdone flash: mark-all succeeded
+     * @param string $notiferr flash: notification action error
+     * @param string $ptab profile tab: overview|edit|preferences
+     * @param bool $profilesaved flash: profile saved
+     * @param string $profileerr flash: profile save error
+     * @param string $pref preference subpage key
+     * @param bool $prefsaved flash: preference saved
+     * @param string $preferr flash: preference save error
      * @return array Mustache context
      */
     public static function export_for_template(
@@ -57,19 +67,32 @@ final class employer_dashboard {
         int $convid = 0,
         bool $msgsent = false,
         string $msgerr = '',
-        string $gtab = 'all'
+        string $gtab = 'all',
+        string $ntab = 'all',
+        int $notifid = 0,
+        bool $notifdone = false,
+        string $notiferr = '',
+        string $ptab = 'overview',
+        bool $profilesaved = false,
+        string $profileerr = '',
+        string $pref = '',
+        bool $prefsaved = false,
+        string $preferr = ''
     ): array {
         global $CFG;
 
         require_once($CFG->libdir . '/enrollib.php');
         require_once($CFG->libdir . '/completionlib.php');
 
-        $allowed = ['home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages', 'notifications'];
+        $allowed = ['home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages', 'notifications', 'profile'];
         $view = in_array($view, $allowed, true) ? $view : 'home';
         $tab = ($tab === 'earned') ? 'earned' : 'all';
         $mtab = in_array($mtab, ['all', 'starred', 'private', 'group'], true) ? $mtab : 'all';
         $gtab = in_array($gtab, ['all', 'graded', 'pending'], true) ? $gtab : 'all';
+        $ntab = in_array($ntab, ['all', 'unread'], true) ? $ntab : 'all';
+        $ptab = in_array($ptab, ['overview', 'edit', 'preferences'], true) ? $ptab : 'overview';
         $convid = max(0, $convid);
+        $notifid = max(0, $notifid);
         $userid = (int) $user->id;
         $firstname = self::display_firstname($user);
         $fullname = fullname($user);
@@ -158,7 +181,27 @@ final class employer_dashboard {
         } else if ($view === 'messages') {
             $toolpage = employer_tools::messages_page($userid, $urls, $mtab, $convid, $msgsent, $msgerr);
         } else if ($view === 'notifications') {
-            $toolpage = employer_tools::notifications_page($userid, $urls);
+            $toolpage = employer_tools::notifications_page(
+                $userid,
+                $urls,
+                $ntab,
+                $notifid,
+                $notifdone,
+                $notiferr
+            );
+        } else if ($view === 'profile') {
+            $toolpage = employer_tools::profile_page(
+                $user,
+                $urls,
+                $ptab,
+                $profilesaved,
+                $profileerr,
+                '/local/launchpad/employee.php',
+                '/local/launchpad/employee_action.php',
+                $pref,
+                $prefsaved,
+                $preferr
+            );
         }
 
         // Portal-first URL contract (stay in Employer shell):
@@ -261,7 +304,11 @@ final class employer_dashboard {
             'calendar' => self::str('employer_nav_calendar', null, 'Calendar'),
             'messages' => self::str('employer_nav_messages', null, 'Messages'),
             'notifications' => self::str('employer_nav_notifications', null, 'Notifications'),
+            'profile' => self::str('employer_nav_profile', null, 'Profile'),
         ];
+
+        $email = trim((string) ($user->email ?? ''));
+        $initials = self::initials($fullname);
 
         return array_merge([
             'dataregion' => self::DATA_REGION,
@@ -270,8 +317,28 @@ final class employer_dashboard {
             'firstname' => $firstname,
             'fullname' => $fullname,
             'displayname' => $fullname,
-            'initials' => self::initials($fullname),
-            'email' => (string) ($user->email ?? ''),
+            'initials' => $initials,
+            'email' => $email,
+            'profile_menu' => self::profile_menu_context(
+                $initials,
+                $fullname,
+                $email,
+                (string) ($urls['profile'] ?? ''),
+                (string) ($urls['preferences'] ?? ''),
+                (string) ($urls['logout'] ?? '')
+            ),
+            'profile_menu_side' => [
+                'profile_menu' => self::profile_menu_context(
+                    $initials,
+                    $fullname,
+                    $email,
+                    (string) ($urls['profile'] ?? ''),
+                    (string) ($urls['preferences'] ?? ''),
+                    (string) ($urls['logout'] ?? ''),
+                    true,
+                    self::str('employer_role_label', null, 'Employee · Upskilling')
+                ),
+            ],
             'rolelabel' => self::str('employer_role_label', null, 'Employee · Upskilling'),
             'portallabel' => self::str('employer_portal_label', null, 'Employer portal'),
             'pagetitle' => $pagetitles[$view] ?? $pagetitles['home'],
@@ -291,6 +358,7 @@ final class employer_dashboard {
             'is_calendar' => $view === 'calendar',
             'is_messages' => $view === 'messages',
             'is_notifications' => $view === 'notifications',
+            'is_profile' => $view === 'profile',
             'hascourses' => $hascourses,
             'coursecount' => count($courses),
             'coursescountlabel' => self::str(
@@ -338,7 +406,7 @@ final class employer_dashboard {
             'badges_total' => $badges['total'],
             'bot_url' => $pluginbase . '/assets/img/bot.webp',
             'orbit_tip' => self::orbit_tip_for($view, $hascourses),
-            'nav_groups' => self::nav_groups($urls, $primary, $unread, $view),
+            'nav_groups' => self::nav_groups($urls, $primary, $unread, $view, $ptab),
             'unread' => $unread,
             'hasunread' => $unread > 0,
             'notifications_label' => $unread > 0
@@ -756,12 +824,59 @@ final class employer_dashboard {
             'notifications_intro' => self::str(
                 'employer_notifications_intro',
                 null,
-                'Recent Moodle notifications. Open Moodle to manage or mark them as read.'
+                'Course and site alerts from Moodle. Open one to read it, or mark all as read.'
             ),
+            'notifications_inbox_lead' => self::str(
+                'employer_notifications_inbox_lead',
+                null,
+                'Popup notifications from your courses and the site — same feed as Moodle’s bell.'
+            ),
+            'notifications_total_label' => self::str(
+                'employer_notifications_total_label',
+                null,
+                'Recent'
+            ),
+            'notifications_unread_label' => self::str(
+                'employer_notifications_unread_label',
+                null,
+                'Unread'
+            ),
+            'notifications_inbox_heading' => self::str(
+                'employer_notifications_inbox_heading',
+                null,
+                'Inbox'
+            ),
+            'notifications_detail_heading' => self::str(
+                'employer_notifications_detail_heading',
+                null,
+                'Notification'
+            ),
+            'notifications_tab_all' => self::str('employer_notifications_tab_all', null, 'All'),
+            'notifications_tab_unread' => self::str('employer_notifications_tab_unread', null, 'Unread'),
             'notifications_open_moodle' => self::str(
                 'employer_notifications_open_moodle',
                 null,
-                'Open notifications in Moodle'
+                'Open in Moodle'
+            ),
+            'notifications_preferences' => self::str(
+                'employer_notifications_preferences',
+                null,
+                'Notification preferences'
+            ),
+            'notifications_mark_all' => self::str(
+                'employer_notifications_mark_all',
+                null,
+                'Mark all as read'
+            ),
+            'notifications_open_related' => self::str(
+                'employer_notifications_open_related',
+                null,
+                'Open related'
+            ),
+            'notifications_back' => self::str(
+                'employer_notifications_back',
+                null,
+                'Back to list'
             ),
             'notifications_empty_title' => self::str(
                 'employer_notifications_empty_title',
@@ -773,11 +888,85 @@ final class employer_dashboard {
                 null,
                 'Course and site notifications from Moodle will show here when they arrive.'
             ),
+            'notifications_empty_filter_title' => self::str(
+                'employer_notifications_empty_filter_title',
+                null,
+                'No unread notifications'
+            ),
+            'notifications_empty_filter_body' => self::str(
+                'employer_notifications_empty_filter_body',
+                null,
+                'You’re caught up. Switch to All to browse earlier alerts.'
+            ),
+            'notifications_detail_empty_title' => self::str(
+                'employer_notifications_detail_empty_title',
+                null,
+                'Select a notification'
+            ),
+            'notifications_detail_empty_body' => self::str(
+                'employer_notifications_detail_empty_body',
+                null,
+                'Choose an alert from the list to read the full message.'
+            ),
+            'profile_intro' => self::str(
+                'employer_profile_intro',
+                null,
+                'Your Moodle account details, editable profile fields, and preference links.'
+            ),
+            'profile_tabs_aria' => self::str('employer_profile_tabs_aria', null, 'Profile sections'),
+            'profile_tab_overview' => self::str('employer_profile_tab_overview', null, 'Overview'),
+            'profile_tab_edit' => self::str('employer_profile_tab_edit', null, 'Edit'),
+            'profile_tab_preferences' => self::str('employer_profile_tab_preferences', null, 'Preferences'),
+            'profile_edit_cta' => self::str('employer_profile_edit_cta', null, 'Edit profile'),
+            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor in Moodle'),
+            'profile_edit_external' => self::str('employer_profile_edit_external', null, 'Edit in identity provider'),
+            'profile_open_moodle' => self::str('employer_profile_open_moodle', null, 'Open public profile'),
+            'profile_empty_title' => self::str('employer_profile_empty_title', null, 'No profile details yet'),
+            'profile_empty_body' => self::str(
+                'employer_profile_empty_body',
+                null,
+                'Add your city, contact details, or bio so mentors and peers can find you.'
+            ),
+            'profile_edit_heading' => self::str('employer_profile_edit_heading', null, 'Edit profile'),
+            'profile_edit_help' => self::str(
+                'employer_profile_edit_help',
+                null,
+                'Changes save to your Moodle user account. Locked fields are controlled by your login method.'
+            ),
+            'profile_edit_note' => self::str(
+                'employer_profile_edit_note',
+                null,
+                'Picture upload and advanced custom fields open in Moodle’s full profile editor.'
+            ),
+            'profile_custom_heading' => self::str('employer_profile_custom_heading', null, 'Additional fields'),
+            'profile_save' => self::str('employer_profile_save', null, 'Save profile'),
+            'profile_cancel' => self::str('employer_profile_cancel', null, 'Cancel'),
+            'profile_edit_unavailable_title' => self::str(
+                'employer_profile_edit_unavailable_title',
+                null,
+                'Edit this profile in Moodle'
+            ),
+            'profile_edit_unavailable_body' => self::str(
+                'employer_profile_edit_unavailable_body',
+                null,
+                'Your account settings require Moodle’s profile editor (or an external identity provider).'
+            ),
+            'profile_prefs_lead' => self::str(
+                'employer_profile_prefs_lead',
+                null,
+                'Account, communication, and system preferences — edited here when possible, or opened in Moodle for heavy tools.'
+            ),
             'native_tools_note' => self::str(
                 'employer_native_tools_note',
                 null,
                 'Full grades, messaging, calendar editing, and notification settings stay in Moodle.'
             ),
+            'pref_back' => self::str('employer_pref_back', null, 'Back to preferences'),
+            'pref_save' => self::str('employer_pref_save', null, 'Save preferences'),
+            'pref_cancel' => self::str('employer_pref_cancel', null, 'Cancel'),
+            'pref_open_moodle' => self::str('employer_pref_open_moodle', null, 'Open in Moodle'),
+            'pref_open_portal_edit' => self::str('employer_pref_open_portal_edit', null, 'Edit in LaunchPad'),
+            'pref_advanced_moodle' => self::str('employer_pref_advanced_moodle', null, 'Advanced in Moodle'),
         ];
     }
 
@@ -1198,13 +1387,20 @@ final class employer_dashboard {
             'calendar' => $portal('calendar'),
             'messages' => $portal('messages'),
             'notifications' => $portal('notifications'),
+            'profile' => $portal('profile'),
+            'preferences' => (new \moodle_url('/local/launchpad/employee.php', [
+                'view' => 'profile',
+                'ptab' => 'preferences',
+            ]))->out(false),
             'moodle_grades' => (new \moodle_url('/grade/report/overview/index.php'))->out(false),
             'moodle_badges' => (new \moodle_url('/badges/mybadges.php'))->out(false),
             'moodle_calendar' => (new \moodle_url('/calendar/view.php', ['view' => 'month']))->out(false),
             'moodle_messages' => (new \moodle_url('/message/index.php'))->out(false),
             'moodle_notifications' => (new \moodle_url('/message/output/popup/notifications.php'))->out(false),
-            'profile' => (new \moodle_url('/user/profile.php'))->out(false),
-            'preferences' => (new \moodle_url('/user/preferences.php'))->out(false),
+            'moodle_notification_prefs' => (new \moodle_url('/message/notificationpreferences.php'))->out(false),
+            'moodle_profile' => (new \moodle_url('/user/profile.php'))->out(false),
+            'moodle_profile_edit' => (new \moodle_url('/user/edit.php', ['returnto' => 'profile']))->out(false),
+            'moodle_preferences' => (new \moodle_url('/user/preferences.php'))->out(false),
             'public' => (new \moodle_url('/'))->out(false),
             'logout' => (new \moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false),
             'course' => '',
@@ -1391,6 +1587,8 @@ final class employer_dashboard {
                 if (!$cm || !$cm->uservisible || $cm->modname === 'label') {
                     continue;
                 }
+                // News/forums stay listed for awareness but never become the hero "next" quest.
+                $skipnext = ($cm->modname === 'forum');
 
                 $tracked = false;
                 $complete = false;
@@ -1399,9 +1597,11 @@ final class employer_dashboard {
                     $data = $completion->get_data($cm, false, $userid);
                     $complete = ((int) $data->completionstate === COMPLETION_COMPLETE
                         || (int) $data->completionstate === COMPLETION_COMPLETE_PASS);
-                    $total++;
-                    if ($complete) {
-                        $done++;
+                    if (!$skipnext) {
+                        $total++;
+                        if ($complete) {
+                            $done++;
+                        }
                     }
                 }
 
@@ -1422,7 +1622,7 @@ final class employer_dashboard {
                     'section' => (int) $section->section,
                 ]);
                 $activities[] = $item;
-                if ((!$tracked || !$complete) && $next === null) {
+                if (!$skipnext && (!$tracked || !$complete) && $next === null) {
                     $next = $item;
                 }
             }
@@ -2342,7 +2542,13 @@ final class employer_dashboard {
      * @param string $view
      * @return list<array{group:string,items:list<array<string,mixed>>}>
      */
-    private static function nav_groups(array $urls, ?array $primary, int $unread, string $view = 'home'): array {
+    private static function nav_groups(
+        array $urls,
+        ?array $primary,
+        int $unread,
+        string $view = 'home',
+        string $ptab = 'overview'
+    ): array {
         // Hugeicons (Iconify) — same stroke-rounded set as LaunchPad landing.
         $icon = static function (string $name, int $size = 18): string {
             $safe = preg_replace('/[^a-z0-9-]/', '', $name) ?? 'circle';
@@ -2427,10 +2633,20 @@ final class employer_dashboard {
 
         // Profile also in sidebar footer (lp-me); keep discoverable under You like Fellowship.
         $you = [
-            $item('profile', self::str('employer_nav_profile', null, 'Profile'), $urls['profile'],
-                'user-circle'),
-            $item('preferences', self::str('employer_nav_preferences', null, 'Preferences'), $urls['preferences'],
-                'settings-01'),
+            $item(
+                'profile',
+                self::str('employer_nav_profile', null, 'Profile'),
+                (string) ($urls['profile'] ?? $urls['home']),
+                'user-circle',
+                $view === 'profile' && $ptab !== 'preferences'
+            ),
+            $item(
+                'preferences',
+                self::str('employer_nav_preferences', null, 'Preferences'),
+                (string) ($urls['preferences'] ?? $urls['home']),
+                'settings-01',
+                $view === 'profile' && $ptab === 'preferences'
+            ),
             $item('public', self::str('employer_public_site', null, 'Public site'), $urls['public'],
                 'globe-02'),
         ];
@@ -2448,6 +2664,54 @@ final class employer_dashboard {
                 'group' => self::str('employer_navgroup_you', null, 'You'),
                 'items' => $you,
             ],
+        ];
+    }
+
+    /**
+     * Topbar account dropdown context (shared Mustache partial).
+     *
+     * @param string $initials
+     * @param string $displayname
+     * @param string $email
+     * @param string $profileurl
+     * @param string $preferencesurl
+     * @param string $logouturl
+     * @return array<string,mixed>
+     */
+    public static function profile_menu_context(
+        string $initials,
+        string $displayname,
+        string $email,
+        string $profileurl,
+        string $preferencesurl,
+        string $logouturl,
+        bool $side = false,
+        string $rolelabel = ''
+    ): array {
+        $email = trim($email);
+        if ($preferencesurl === '') {
+            $preferencesurl = (new \moodle_url('/user/preferences.php'))->out(false);
+        }
+        if ($profileurl === '') {
+            $profileurl = (new \moodle_url('/user/profile.php'))->out(false);
+        }
+        if ($logouturl === '') {
+            $logouturl = (new \moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
+        }
+        return [
+            'initials' => $initials,
+            'displayname' => $displayname,
+            'email' => $email,
+            'has_email' => $email !== '',
+            'role_label' => $rolelabel,
+            'side' => $side,
+            'profile_url' => $profileurl,
+            'preferences_url' => $preferencesurl,
+            'logout_url' => $logouturl,
+            'label_account' => self::str('employer_profile_menu_account', null, 'Account menu'),
+            'label_profile' => self::str('employer_link_profile', null, 'Profile'),
+            'label_preferences' => self::str('employer_nav_preferences', null, 'Preferences'),
+            'label_signout' => self::str('employer_sign_out', null, 'Sign out'),
         ];
     }
 

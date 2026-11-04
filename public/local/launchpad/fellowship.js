@@ -69,6 +69,82 @@
             });
         });
     }
+
+    // Account menus (topbar avatar + sidebar foot).
+    var profileMenus = Array.prototype.slice.call(shell.querySelectorAll('[data-lp-profile-menu]'));
+
+    function setProfileOpen(menu, open) {
+        if (!menu) {
+            return;
+        }
+        var toggle = menu.querySelector('[data-lp-profile-toggle]');
+        var panel = menu.querySelector('[data-lp-profile-panel]');
+        if (!toggle || !panel) {
+            return;
+        }
+        menu.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+            panel.removeAttribute('hidden');
+        } else {
+            panel.setAttribute('hidden', 'hidden');
+        }
+    }
+
+    function closeAllProfileMenus(except) {
+        profileMenus.forEach(function (menu) {
+            if (except && menu === except) {
+                return;
+            }
+            setProfileOpen(menu, false);
+        });
+    }
+
+    profileMenus.forEach(function (menu) {
+        var toggle = menu.querySelector('[data-lp-profile-toggle]');
+        var panel = menu.querySelector('[data-lp-profile-panel]');
+        if (!toggle || !panel) {
+            return;
+        }
+        toggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var willOpen = !menu.classList.contains('is-open');
+            closeAllProfileMenus(menu);
+            setProfileOpen(menu, willOpen);
+        });
+    });
+
+    if (profileMenus.length) {
+        document.addEventListener('click', function (e) {
+            var openMenu = profileMenus.find(function (menu) {
+                return menu.classList.contains('is-open');
+            });
+            if (!openMenu) {
+                return;
+            }
+            if (!openMenu.contains(e.target)) {
+                setProfileOpen(openMenu, false);
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') {
+                return;
+            }
+            var openMenu = profileMenus.find(function (menu) {
+                return menu.classList.contains('is-open');
+            });
+            if (!openMenu) {
+                return;
+            }
+            setProfileOpen(openMenu, false);
+            var toggle = openMenu.querySelector('[data-lp-profile-toggle]');
+            if (toggle) {
+                toggle.focus();
+            }
+        });
+    }
+
     var calRoot = shell.querySelector('[data-lp-cal-root]');
     var calDetail = shell.querySelector('[data-lp-cal-detail]');
     var calForm = shell.querySelector('[data-lp-cal-form]');
@@ -311,10 +387,7 @@
         return Math.min(52, n);
     }
     function closeAllLpSelects(except) {
-        if (!calForm) {
-            return;
-        }
-        calForm.querySelectorAll('[data-lp-select]').forEach(function (root) {
+        shell.querySelectorAll('[data-lp-select]').forEach(function (root) {
             if (except && root === except) {
                 return;
             }
@@ -404,10 +477,7 @@
         setLpSelectValue(root, input.value || '');
     }
     function initLpSelects() {
-        if (!calForm) {
-            return;
-        }
-        calForm.querySelectorAll('[data-lp-select]').forEach(function (root) {
+        shell.querySelectorAll('[data-lp-select]').forEach(function (root) {
             if (root.getAttribute('data-lp-select-ready') === '1') {
                 syncLpSelectFromInput(root);
                 return;
@@ -418,6 +488,9 @@
             if (trigger) {
                 trigger.addEventListener('click', function (e) {
                     e.preventDefault();
+                    if (trigger.disabled || root.classList.contains('is-locked')) {
+                        return;
+                    }
                     if (root.classList.contains('is-open')) {
                         closeLpSelect(root);
                     } else {
@@ -433,7 +506,7 @@
                     }
                     var value = opt.getAttribute('data-value') || '';
                     setLpSelectValue(root, value);
-                    if (root.hasAttribute('data-lp-select-minutes') && value === 'custom') {
+                    if (root.hasAttribute('data-lp-select-minutes') && value === 'custom' && calForm) {
                         var customInput = calForm.querySelector('[data-lp-cal-form-duration-custom]');
                         var hidden = root.querySelector('[data-lp-select-input]');
                         if (customInput && hidden) {
@@ -475,6 +548,30 @@
             syncLpSelectFromInput(root);
         });
     }
+
+    // Profile + any shell selects (calendar form also calls init again safely).
+    initLpSelects();
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('[data-lp-select]')) {
+            return;
+        }
+        closeAllLpSelects(null);
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') {
+            return;
+        }
+        var openSelect = shell.querySelector('[data-lp-select].is-open');
+        if (!openSelect) {
+            return;
+        }
+        e.preventDefault();
+        closeLpSelect(openSelect);
+        var openTrigger = openSelect.querySelector('[data-lp-select-trigger]');
+        if (openTrigger) {
+            openTrigger.focus();
+        }
+    });
 
     function anyCalOverlayOpen() {
         return (calDetail && calDetail.classList.contains('is-open'))

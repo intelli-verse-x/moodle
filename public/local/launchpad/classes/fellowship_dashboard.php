@@ -73,6 +73,188 @@ final class fellowship_dashboard {
     }
 
     /**
+     * True when the course is Shared orientation (lp-orient-*), not a track.
+     */
+    public static function is_orientation_course(\stdClass $course): bool {
+        $idn = \core_text::strtolower(trim((string) ($course->idnumber ?? '')));
+        return str_starts_with($idn, 'lp-orient-');
+    }
+
+    /**
+     * Prefer a track course over Shared orientation when auto-selecting.
+     *
+     * @param list<\stdClass> $courses
+     * @return \stdClass|null
+     */
+    public static function prefer_course(array $courses): ?\stdClass {
+        if ($courses === []) {
+            return null;
+        }
+        foreach ($courses as $course) {
+            if (!self::is_orientation_course($course)) {
+                return $course;
+            }
+        }
+        return $courses[0];
+    }
+
+    /**
+     * Track-specific My Track copy (blurbs, tools, capstone) from course idnumber.
+     *
+     * @return array{
+     *   blurbs: array<int,string>,
+     *   lead: string,
+     *   prerequisite: string,
+     *   device: string,
+     *   tools: string,
+     *   capstone_body: string
+     * }
+     */
+    public static function track_copy_for_course(\stdClass $course): array {
+        $idn = \core_text::strtolower(trim((string) ($course->idnumber ?? '')));
+        $key = 'default';
+        if (str_starts_with($idn, 'lp-orient-')) {
+            $key = 'orient';
+        } else if (str_contains($idn, '-ai-') || str_starts_with($idn, 'lp-ai-')) {
+            $key = 'ai';
+        } else if (str_contains($idn, 'fullstack') || str_contains($idn, 'full-stack')) {
+            $key = 'fullstack';
+        } else if (str_contains($idn, '-pm-') || str_contains($idn, 'product')) {
+            $key = 'pm';
+        } else if (str_contains($idn, 'marketing')) {
+            $key = 'marketing';
+        } else if (str_contains($idn, 'startup')) {
+            $key = 'startup';
+        }
+
+        $blurbs = [
+            1 => self::str('fellowship_track_blurb_1', null, 'Evidence versus assumptions, problem framing and prioritisation.'),
+            2 => self::str('fellowship_track_blurb_2', null, 'Brief, backlog, acceptance scenarios and prototype.'),
+            3 => self::str('fellowship_track_blurb_3', null, 'A simulated stakeholder adds capacity and accessibility constraints.'),
+            4 => self::str('fellowship_track_blurb_4', null, 'Defend the revised roadmap; submit prototype, change log and decision pack.'),
+        ];
+        $capstone = self::str(
+            'fellowship_track_capstone_body',
+            null,
+            'Brief, backlog, acceptance scenarios, prototype, change log and an evidence-linked decision memo. Stakeholder and data are <b>simulated</b> and labelled.'
+        );
+        $tools = self::str('fellowship_track_tools', null, 'No paid tools required.');
+        $lead = self::str(
+            'fellowship_track_lead_default',
+            null,
+            'Work through the phases on your assigned Moodle track. Activities open in Moodle. Later phases appear when the programme releases them.'
+        );
+
+        if ($key === 'ai') {
+            $blurbs = [
+                1 => self::str('fellowship_track_blurb_ai_1', null, 'Prompt patterns, evaluation basics, and honest limits of automation.'),
+                2 => self::str('fellowship_track_blurb_ai_2', null, 'Build a guided automation with clear inputs, checks, and failure modes.'),
+                3 => self::str('fellowship_track_blurb_ai_3', null, 'A simulated ops change adds volume, latency, and review constraints.'),
+                4 => self::str('fellowship_track_blurb_ai_4', null, 'Defend the workflow, evaluation notes, and a labelled decision memo.'),
+            ];
+            $capstone = self::str(
+                'fellowship_track_capstone_ai',
+                null,
+                'Runnable workflow notes, evaluation checklist, change log, and an evidence-linked memo. Constraints are <b>simulated</b> and labelled.'
+            );
+            $tools = self::str('fellowship_track_tools_ai', null, 'Browser plus any free automation / LLM sandbox your mentor names.');
+            $lead = self::str(
+                'fellowship_track_lead_ai',
+                null,
+                'AI & Automation track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+            );
+        } else if ($key === 'fullstack') {
+            $blurbs = [
+                1 => self::str('fellowship_track_blurb_fs_1', null, 'Stack basics, readability, and shipping a small vertical slice.'),
+                2 => self::str('fellowship_track_blurb_fs_2', null, 'Guided feature with acceptance checks and a reviewable PR-style write-up.'),
+                3 => self::str('fellowship_track_blurb_fs_3', null, 'A simulated product change adds load, a11y, and deadline pressure.'),
+                4 => self::str('fellowship_track_blurb_fs_4', null, 'Demo the slice, walk the change log, and defend trade-offs.'),
+            ];
+            $capstone = self::str(
+                'fellowship_track_capstone_fs',
+                null,
+                'Working slice, acceptance notes, change log, and decision memo. Stakeholder pressure is <b>simulated</b> and labelled.'
+            );
+            $tools = self::str('fellowship_track_tools_fs', null, 'Laptop recommended; free editor and Git hosting only.');
+            $lead = self::str(
+                'fellowship_track_lead_fs',
+                null,
+                'Full Stack track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+            );
+        } else if ($key === 'marketing') {
+            $blurbs = [
+                1 => self::str('fellowship_track_blurb_mkt_1', null, 'Audience evidence, channel fit, and honest measurement basics.'),
+                2 => self::str('fellowship_track_blurb_mkt_2', null, 'Guided campaign brief with creatives, funnel, and success metrics.'),
+                3 => self::str('fellowship_track_blurb_mkt_3', null, 'A simulated budget cut forces prioritisation and message tests.'),
+                4 => self::str('fellowship_track_blurb_mkt_4', null, 'Defend the plan, results pack, and next-experiment notes.'),
+            ];
+            $capstone = self::str(
+                'fellowship_track_capstone_mkt',
+                null,
+                'Campaign brief, creatives, metrics sheet, and decision memo. Market responses are <b>simulated</b> and labelled.'
+            );
+            $lead = self::str(
+                'fellowship_track_lead_mkt',
+                null,
+                'Digital Marketing track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+            );
+        } else if ($key === 'startup') {
+            $blurbs = [
+                1 => self::str('fellowship_track_blurb_su_1', null, 'Problem evidence, beachhead customer, and riskiest assumption.'),
+                2 => self::str('fellowship_track_blurb_su_2', null, 'Guided experiment plan with prototype and learning goals.'),
+                3 => self::str('fellowship_track_blurb_su_3', null, 'A simulated pivot request changes scope, budget, or channel.'),
+                4 => self::str('fellowship_track_blurb_su_4', null, 'Defend the learning, next bet, and decision pack.'),
+            ];
+            $capstone = self::str(
+                'fellowship_track_capstone_su',
+                null,
+                'Experiment plan, prototype evidence, change log, and decision memo. Market feedback is <b>simulated</b> and labelled.'
+            );
+            $lead = self::str(
+                'fellowship_track_lead_su',
+                null,
+                'Startup Building track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+            );
+        } else if ($key === 'orient') {
+            $blurbs = [
+                1 => self::str('fellowship_track_blurb_orient_1', null, 'How LaunchPad works, portals, and what “done” means here.'),
+                2 => self::str('fellowship_track_blurb_orient_2', null, 'Reserved — orientation uses the overview activities above.'),
+                3 => self::str('fellowship_track_blurb_orient_3', null, 'Reserved — orientation uses the overview activities above.'),
+                4 => self::str('fellowship_track_blurb_orient_4', null, 'Reserved — orientation uses the overview activities above.'),
+            ];
+            $capstone = self::str(
+                'fellowship_track_capstone_orient',
+                null,
+                'Complete Shared orientation before your assigned track gates count toward certification.'
+            );
+            $lead = self::str(
+                'fellowship_track_lead_orient',
+                null,
+                'Shared orientation — finish the overview and check, then continue on your assigned track.'
+            );
+        } else if ($key === 'pm') {
+            $lead = self::str(
+                'fellowship_track_lead_pm',
+                null,
+                'Product Management track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+            );
+        }
+
+        return [
+            'blurbs' => $blurbs,
+            'lead' => $lead,
+            'prerequisite' => self::str('fellowship_track_prerequisite', null, 'Shared orientation ✓'),
+            'device' => self::str(
+                'fellowship_track_device',
+                null,
+                'Phone or laptop to read and submit; a laptop helps for the prototype.'
+            ),
+            'tools' => $tools,
+            'capstone_body' => $capstone,
+        ];
+    }
+
+    /**
      * Visible course modules for a fellow, grouped by section, with completion.
      *
      * @param \stdClass $course
@@ -119,16 +301,20 @@ final class fellowship_dashboard {
                 if ($cm->modname === 'label') {
                     continue;
                 }
+                // News/forums stay visible in outlines but never become the hero "next" quest.
+                $skipnext = ($cm->modname === 'forum');
 
                 $iscomplete = false;
                 $tracked = false;
                 if ($completionenabled && $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE) {
                     $tracked = true;
-                    $trackable++;
+                    if (!$skipnext) {
+                        $trackable++;
+                    }
                     $data = $completion->get_data($cm, false, $userid);
                     $state = (int) $data->completionstate;
                     $iscomplete = ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS);
-                    if ($iscomplete) {
+                    if ($iscomplete && !$skipnext) {
                         $completed++;
                     }
                 }
@@ -149,7 +335,7 @@ final class fellowship_dashboard {
                 ];
                 $activities[] = $item;
 
-                if ($next === null && (!$tracked || !$iscomplete)) {
+                if (!$skipnext && $next === null && (!$tracked || !$iscomplete)) {
                     $next = $item;
                 }
             }
@@ -509,8 +695,17 @@ final class fellowship_dashboard {
                 $hasgrade = false;
                 $submitted = false;
                 $revising = false;
+                $tracked = 0;
+                $done = 0;
 
                 foreach ($activities as $activity) {
+                    if (!empty($activity['tracked'])) {
+                        $tracked++;
+                        if (!empty($activity['complete'])) {
+                            $done++;
+                        }
+                    }
+
                     $cmid = (int) ($activity['cmid'] ?? 0);
                     if ($cmid <= 0 || !isset($modinfo->cms[$cmid])) {
                         continue;
@@ -551,6 +746,8 @@ final class fellowship_dashboard {
                     }
                 }
 
+                $allcomplete = ($tracked > 0 && $done >= $tracked);
+
                 if ($hasgrade && $bestpct !== null) {
                     $score = (int) round($bestpct);
                     $scored = true;
@@ -562,12 +759,21 @@ final class fellowship_dashboard {
                         $status = 'Not yet met';
                         $chip = 'warn';
                     }
+                } else if (!$allcomplete && ($submitted || $revising)) {
+                    // Submission exists but phase activities are still open — keep "In progress".
+                    $status = 'In progress';
+                    $chip = 'line';
                 } else if ($submitted) {
                     $status = 'Review pending';
                     $chip = '';
                 } else if ($revising) {
                     $status = 'Revising';
                     $chip = 'line';
+                } else if ($allcomplete) {
+                    // Foundations-style phases (page/quiz only) finish via completion, not assign grades.
+                    $status = 'Complete';
+                    $chip = 'ok';
+                    $ico = '✓';
                 } else {
                     $status = 'In progress';
                     $chip = 'line';
@@ -590,7 +796,9 @@ final class fellowship_dashboard {
                 'score_display' => $scored ? ($score . '/100') : '—',
                 'ico' => $ico,
                 'ico_dim' => $icodim,
-                'is_met' => $status === 'Met',
+                // Activity-complete phases (no 70+ grade yet) still clear "current" on My Track.
+                'is_met' => ($status === 'Met'),
+                'is_phase_done' => ($status === 'Met' || $status === 'Complete'),
                 'is_not_released' => $status === 'Not released',
             ];
         }
@@ -669,22 +877,19 @@ final class fellowship_dashboard {
     public static function track_for_user(int $userid, \stdClass $course): array {
         $progress = self::phase_progress_for_user($userid, [$course], $course);
         $outline = $progress['outline'] ?? self::course_outline($course, $userid);
+        $copy = self::track_copy_for_course($course);
         $bysection = [];
         foreach ($outline['sections'] ?? [] as $section) {
             $num = (int) ($section['sectionnum'] ?? 0);
-            if ($num > 0) {
-                $bysection[$num] = $section;
-            }
+            // Orientation lives in section 0; track phases use 1–4.
+            $bysection[$num] = $section;
         }
 
-        $blurbs = [
-            1 => get_string('fellowship_track_blurb_1', 'local_launchpad'),
-            2 => get_string('fellowship_track_blurb_2', 'local_launchpad'),
-            3 => get_string('fellowship_track_blurb_3', 'local_launchpad'),
-            4 => get_string('fellowship_track_blurb_4', 'local_launchpad'),
-        ];
+        $blurbs = $copy['blurbs'];
+        $isorient = self::is_orientation_course($course);
 
         $phaseicons = [
+            0 => ['icon' => 'student', 'tone' => 'blue'],
             1 => ['icon' => 'book-open-01', 'tone' => 'blue'],
             2 => ['icon' => 'task-01', 'tone' => 'teal'],
             3 => ['icon' => 'layers-01', 'tone' => 'violet'],
@@ -694,20 +899,70 @@ final class fellowship_dashboard {
         $trackphases = [];
         $firstopen = true;
         $currentset = false;
-        foreach ($progress['phases'] ?? [] as $phase) {
-            $num = (int) $phase['sectionnum'];
-            $section = $bysection[$num] ?? null;
-            $activities = array_map(
+
+        // Shared orientation: show section-0 activities as one honest phase (not four locked gates).
+        $sourcephases = $progress['phases'] ?? [];
+        if ($isorient) {
+            $orientacts = array_map(
                 [self::class, 'decorate_home_activity'],
-                array_values($section['activities'] ?? [])
+                array_values($bysection[0]['activities'] ?? [])
             );
+            $orientdone = true;
+            $orienttracked = 0;
+            foreach ($orientacts as $act) {
+                if (!empty($act['tracked'])) {
+                    $orienttracked++;
+                    if (empty($act['complete'])) {
+                        $orientdone = false;
+                    }
+                }
+            }
+            if ($orienttracked === 0) {
+                $orientdone = false;
+            }
+            $sourcephases = [[
+                'sectionnum' => 0,
+                'name' => self::str('fellowship_completion_orientation', null, 'Shared orientation'),
+                'short' => 'Orientation',
+                'weight' => 0,
+                'weight_label' => '—',
+                'hint' => '',
+                'status' => $orientdone
+                    ? self::str('fellowship_complete', null, 'Complete')
+                    : self::str('fellowship_track_status_inprogress', null, 'In progress'),
+                'chip' => $orientdone ? 'ok' : 'line',
+                'has_chip_class' => true,
+                'score' => null,
+                'has_score' => false,
+                'score_display' => '—',
+                'ico' => $orientdone ? '✓' : '1',
+                'ico_dim' => false,
+                'is_met' => $orientdone,
+                'is_phase_done' => $orientdone,
+                'is_not_released' => false,
+                '_orient_activities' => $orientacts,
+            ]];
+        }
+
+        foreach ($sourcephases as $phase) {
+            $num = (int) $phase['sectionnum'];
+            if (!empty($phase['_orient_activities'])) {
+                $activities = $phase['_orient_activities'];
+            } else {
+                $section = $bysection[$num] ?? null;
+                $activities = array_map(
+                    [self::class, 'decorate_home_activity'],
+                    array_values($section['activities'] ?? [])
+                );
+            }
             $released = $activities !== [];
             $isopen = $released && $firstopen;
             if ($released) {
                 $firstopen = false;
             }
+            $phasedone = !empty($phase['is_met']) || !empty($phase['is_phase_done']);
             $iscurrent = false;
-            if ($released && !$currentset && empty($phase['is_met'])) {
+            if ($released && !$currentset && !$phasedone) {
                 $iscurrent = true;
                 $currentset = true;
             }
@@ -715,10 +970,11 @@ final class fellowship_dashboard {
             if (!$released) {
                 $iconmeta = ['icon' => 'square-lock-02', 'tone' => 'slate'];
             }
+            unset($phase['_orient_activities']);
             $trackphases[] = array_merge($phase, [
-                'index' => $num,
-                'anchor' => 'phase-' . $num,
-                'blurb' => $blurbs[$num] ?? '',
+                'index' => $num > 0 ? $num : 1,
+                'anchor' => 'phase-' . ($num > 0 ? $num : 'orient'),
+                'blurb' => $blurbs[$num] ?? ($blurbs[1] ?? ''),
                 'released' => $released,
                 'is_open' => $isopen,
                 'is_current' => $iscurrent,
@@ -732,17 +988,19 @@ final class fellowship_dashboard {
         }
 
         $weights = [];
-        $maxw = max(1, max(self::phase_weights()));
-        foreach (self::phase_weights() as $num => $weight) {
-            $iconmeta = $phaseicons[$num] ?? ['icon' => 'book-open-01', 'tone' => 'blue'];
-            $weights[] = [
-                'name' => blueprint::phase_sections()[$num] ?? ('Phase ' . $num),
-                'weight' => $weight,
-                'weight_label' => $weight . '%',
-                'bar_pct' => (int) round(($weight / $maxw) * 100),
-                'icon' => $iconmeta['icon'],
-                'icon_tone' => $iconmeta['tone'],
-            ];
+        if (!$isorient) {
+            $maxw = max(1, max(self::phase_weights()));
+            foreach (self::phase_weights() as $num => $weight) {
+                $iconmeta = $phaseicons[$num] ?? ['icon' => 'book-open-01', 'tone' => 'blue'];
+                $weights[] = [
+                    'name' => blueprint::phase_sections()[$num] ?? ('Phase ' . $num),
+                    'weight' => $weight,
+                    'weight_label' => $weight . '%',
+                    'bar_pct' => (int) round(($weight / $maxw) * 100),
+                    'icon' => $iconmeta['icon'],
+                    'icon_tone' => $iconmeta['tone'],
+                ];
+            }
         }
 
         $summary = trim(format_string($course->summary ?? ''));
@@ -790,16 +1048,24 @@ final class fellowship_dashboard {
 
         $lead = $hasrealsummary
             ? self::display_label($summary)
-            : get_string('fellowship_track_lead_default', 'local_launchpad');
+            : $copy['lead'];
+
+        // Orientation has no 1–4 journey gates — hide the journey strip.
+        $journey = $progress['journey'] ?? ['has_gates' => false];
+        if ($isorient) {
+            $journey = ['has_gates' => false, 'gates' => []];
+        }
 
         return [
             'course_name' => self::display_label(format_string($course->fullname)),
             'course_idnumber' => s($course->idnumber),
             'course_lead' => $lead,
-            'course_badge' => get_string('fellowship_track_badge', 'local_launchpad'),
+            'course_badge' => $isorient
+                ? self::str('fellowship_completion_orientation', null, 'Shared orientation')
+                : get_string('fellowship_track_badge', 'local_launchpad'),
             'course_status' => $coursestatus,
             'course_statustype' => $coursestatustype,
-            'journey' => $progress['journey'],
+            'journey' => $journey,
             'track_phases' => $trackphases,
             'has_track_phases' => $trackphases !== [],
             'first_section_anchor' => $firstanchor,
@@ -808,10 +1074,10 @@ final class fellowship_dashboard {
             'has_next' => is_array($next),
             'next_label' => $nextlabel,
             'cta_label' => $ctalabel,
-            'capstone_body' => get_string('fellowship_track_capstone_body', 'local_launchpad'),
-            'prerequisite' => get_string('fellowship_track_prerequisite', 'local_launchpad'),
-            'device' => get_string('fellowship_track_device', 'local_launchpad'),
-            'tools' => get_string('fellowship_track_tools', 'local_launchpad'),
+            'capstone_body' => $copy['capstone_body'],
+            'prerequisite' => $copy['prerequisite'],
+            'device' => $copy['device'],
+            'tools' => $copy['tools'],
             'mentor' => $mentorlabel,
             'mentors' => $mentors,
             'has_mentors' => $mentors !== [],
@@ -960,16 +1226,22 @@ final class fellowship_dashboard {
         $gates = max(1, count($phases));
         $ringpct = (int) round(($met / $gates) * 100);
 
-        // SVG ring geometry (size 120, matching HTML completion ring).
-        $size = 120;
-        $radius = ($size / 2) - 10;
+        // SVG ring geometry for the dedicated gates-passed card.
+        $size = 168;
+        $radius = ($size / 2) - 14;
         $circ = 2 * M_PI * $radius;
         $dashoffset = $circ * (1 - ($ringpct / 100));
 
         $gatestotal = count($phases);
         $strings = [
-            'page_title' => self::str('fellowship_nav_completion', null, 'Completion'),
+            'page_title' => self::str('fellowship_nav_progress', null, 'Progress'),
             'record_eyebrow' => self::str('fellowship_nav_record', null, 'My record'),
+            'journey_heading' => self::str('fellowship_your_journey', null, 'Your journey'),
+            'journey_sub' => self::str(
+                'fellowship_journey_help_short',
+                null,
+                'Gates follow your Moodle course sections. Status updates from activity completion on this track.'
+            ),
             'gates_heading' => self::str('fellowship_completion_gates_heading', null, 'Programme gates'),
             'gates_sub' => self::str(
                 'fellowship_completion_gates_sub',
@@ -995,6 +1267,11 @@ final class fellowship_dashboard {
                 'fellowship_completion_calc_note',
                 null,
                 'Calculated only when every phase has a released review. Practice quizzes carry no weight.'
+            ),
+            'note' => self::str(
+                'fellowship_phases_note',
+                null,
+                'A missing or unreviewed grade stays pending. A high capstone mark can’t make up for a phase that hasn’t passed.'
             ),
             'cert_heading' => self::str('fellowship_completion_cert_heading', null, 'Certificate'),
             'cert_title' => self::str('fellowship_completion_cert_title', null, 'Completion certificate'),
@@ -1996,7 +2273,7 @@ final class fellowship_dashboard {
             ]);
         }
 
-        $phasesurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
+        $phasesurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false);
         $trackurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false);
         $hasscoped = $scoped !== [];
         $hasgates = $gatelegend !== [];
@@ -2259,9 +2536,13 @@ final class fellowship_dashboard {
     }
 
     /**
-     * Portfolio = assign evidence from enrolled tracks (submissions + grades), not invented files.
+     * Portfolio = Moodle assign evidence for the selected track (submissions + released reviews).
      *
-     * @param list<\stdClass> $courses
+     * Reuses list_assignment_feedback() visibility rules. Not-submitted assigns are counted
+     * in stats only — they are not portfolio evidence yet.
+     *
+     * @param list<\stdClass> $courses Courses to scan (pass the selected track for page scope)
+     * @param int|null $courseid Selected course id (preserved for callers / switch URLs)
      * @return array{
      *   items: list<array>,
      *   has_items: bool,
@@ -2269,18 +2550,31 @@ final class fellowship_dashboard {
      *   count_reviewed: int,
      *   count_awaiting: int,
      *   count_open: int,
-     *   has_attention: bool
+     *   has_attention: bool,
+     *   has_awaiting: bool,
+     *   has_submitted: bool
      * }
      */
-    public static function list_portfolio_evidence(int $userid, array $courses): array {
-        $feedback = self::list_assignment_feedback($userid, $courses);
+    public static function list_portfolio_evidence(int $userid, array $courses, ?int $courseid = null): array {
+        $feedback = self::list_assignment_feedback($userid, $courses, 'all', $courseid);
         $attention = [];
         $pending = [];
         $reviewed = [];
-        $open = [];
+        $countopen = 0;
+        $counttotal = 0;
+        $coursename = '';
 
         foreach ($feedback['items'] ?? [] as $row) {
+            $counttotal++;
             $status = (string) ($row['status'] ?? 'not_submitted');
+            if ($coursename === '' && !empty($row['course_name'])) {
+                $coursename = (string) $row['course_name'];
+            }
+            if ($status === 'not_submitted') {
+                $countopen++;
+                continue;
+            }
+
             $when = (string) ($row['graded_at'] ?? '');
             $whenlabel = '';
             if ($when !== '') {
@@ -2292,6 +2586,7 @@ final class fellowship_dashboard {
                 }
             }
             $attempt = (int) ($row['attempt'] ?? 0);
+            $showattempt = !empty($row['has_attempt']);
             $icon = match ($status) {
                 'pending' => 'time-04',
                 'changes' => 'alert-02',
@@ -2300,8 +2595,10 @@ final class fellowship_dashboard {
             };
             $item = [
                 'cmid' => (int) ($row['cmid'] ?? 0),
+                'course_id' => (int) ($row['course_id'] ?? 0),
                 'name' => $row['name'],
-                'course_name' => $row['course_name'] ?? '',
+                // Single-track page already has the course switch — skip repeating the title.
+                'course_name' => '',
                 'status_key' => $status,
                 'status' => $row['status_label'] ?? '',
                 'chip' => $row['chip'] ?? 'line',
@@ -2314,9 +2611,9 @@ final class fellowship_dashboard {
                 'has_comment' => !empty($row['has_comment']),
                 'has_grade' => !empty($row['has_grade']),
                 'grade_display' => $row['grade_display'] ?? '',
-                'has_attempt' => $attempt > 0,
+                'has_attempt' => $showattempt,
                 'attempt' => $attempt,
-                'attempt_label' => $attempt > 0
+                'attempt_label' => $showattempt
                     ? self::str('fellowship_portfolio_attempt', (string) $attempt, 'Attempt {$a}')
                     : '',
                 'needs_attention' => !empty($row['needs_attention']),
@@ -2324,48 +2621,115 @@ final class fellowship_dashboard {
                 'is_pending' => $status === 'pending',
                 'is_reviewed' => $status === 'reviewed',
                 'is_changes' => $status === 'changes',
-                'is_open' => $status === 'not_submitted',
+                'is_open' => false,
             ];
 
             if (!empty($item['needs_attention'])) {
                 $attention[] = $item;
             } else if ($status === 'pending') {
                 $pending[] = $item;
-            } else if ($status === 'reviewed' || $status === 'changes') {
-                $reviewed[] = $item;
             } else {
-                $open[] = $item;
+                $reviewed[] = $item;
             }
         }
 
-        $items = array_values(array_merge($attention, $pending, $reviewed, $open));
-        $countreviewed = 0;
-        $countsubmitted = 0;
-        $countopen = 0;
-        $countawaiting = 0;
-        foreach ($items as $item) {
-            $key = (string) ($item['status_key'] ?? '');
-            if ($key === 'not_submitted') {
-                $countopen++;
-                continue;
+        // Portfolio order: released evidence first, then revise, then waiting.
+        $items = array_values(array_merge($reviewed, $attention, $pending));
+        $countattention = count($attention);
+        $countreviewed = count($reviewed);
+        $countawaiting = count($pending);
+        $countevidence = $countreviewed + $countattention + $countawaiting;
+
+        // Mutually exclusive At a glance buckets (reviewed + awaiting + attention + open = total).
+        $evidencechip = $countevidence > 0
+            ? ($countawaiting + $countattention === 0 ? 'ok' : 'line')
+            : 'line';
+        $evidencestatus = $counttotal <= 0
+            ? self::str('fellowship_portfolio_status_none', null, 'No assignments yet')
+            : ($countevidence >= $counttotal
+                ? self::str('fellowship_portfolio_status_complete', null, 'All have evidence')
+                : self::str('fellowship_portfolio_status_partial', null, 'In progress'));
+
+        if ($counttotal <= 0) {
+            $herosummary = self::str(
+                'fellowship_portfolio_hero_empty',
+                null,
+                'When this track has Moodle assignments, submitted work and released mentor reviews appear here.'
+            );
+            $evidenceheadline = self::str('fellowship_portfolio_evidence_none', null, 'No assignments on this track');
+        } else {
+            $heroparts = [
+                self::str(
+                    'fellowship_portfolio_hero_evidence',
+                    (object) ['evidence' => $countevidence, 'total' => $counttotal],
+                    "{$countevidence} of {$counttotal} track assignments have Moodle evidence"
+                ),
+            ];
+            if (str_contains($heroparts[0], '{$a')) {
+                $heroparts[0] = "{$countevidence} of {$counttotal} track assignments have Moodle evidence";
             }
-            $countsubmitted++;
-            if ($key === 'pending') {
-                $countawaiting++;
-            } else if ($key === 'reviewed' || $key === 'changes') {
-                $countreviewed++;
+            if ($countreviewed > 0) {
+                $heroparts[] = self::str(
+                    'fellowship_portfolio_hero_reviewed',
+                    (string) $countreviewed,
+                    "{$countreviewed} reviewed"
+                );
+            }
+            if ($countawaiting > 0) {
+                $heroparts[] = self::str(
+                    'fellowship_portfolio_hero_awaiting',
+                    (string) $countawaiting,
+                    "{$countawaiting} awaiting release"
+                );
+            }
+            if ($countattention > 0) {
+                $heroparts[] = self::str(
+                    'fellowship_portfolio_hero_attention',
+                    (string) $countattention,
+                    "{$countattention} need changes"
+                );
+            }
+            if ($countopen > 0) {
+                $heroparts[] = self::str(
+                    'fellowship_portfolio_hero_open',
+                    (string) $countopen,
+                    "{$countopen} still open"
+                );
+            }
+            $herosummary = implode(' · ', $heroparts) . '.';
+            $evidenceheadline = self::str(
+                'fellowship_portfolio_evidence_label',
+                (object) ['evidence' => $countevidence, 'total' => $counttotal],
+                "{$countevidence} of {$counttotal} with evidence"
+            );
+            if (str_contains($evidenceheadline, '{$a')) {
+                $evidenceheadline = "{$countevidence} of {$counttotal} with evidence";
             }
         }
 
         return [
             'items' => $items,
             'has_items' => $items !== [],
-            'count_submitted' => $countsubmitted,
+            'count_total' => $counttotal,
+            'count_evidence' => $countevidence,
+            'count_submitted' => $countevidence,
             'count_reviewed' => $countreviewed,
             'count_awaiting' => $countawaiting,
+            'count_attention' => $countattention,
             'count_open' => $countopen,
-            'has_attention' => $attention !== [],
-            'has_submitted' => $countsubmitted > 0,
+            'has_attention' => $countattention > 0,
+            'has_awaiting' => $countawaiting > 0,
+            'has_reviewed' => $countreviewed > 0,
+            'has_submitted' => $countevidence > 0,
+            'has_evidence' => $countevidence > 0,
+            'has_open' => $countopen > 0,
+            'has_total' => $counttotal > 0,
+            'evidence_headline' => $evidenceheadline,
+            'evidence_chip' => $evidencechip,
+            'evidence_status' => $evidencestatus,
+            'hero_summary' => $herosummary,
+            'selected_course_name' => $coursename,
+            'list_heading' => self::str('fellowship_portfolio_list_heading', null, 'Evidence'),
         ];
     }
 
@@ -2456,12 +2820,18 @@ final class fellowship_dashboard {
     }
 
     /**
-     * Assignment feedback cards for the Fellowship Feedback tab (Moodle assign + gradebook).
+     * Assignment feedback cards for the Fellowship Feedback tab.
+     *
+     * Uses Moodle assign APIs so grades/comments only appear when a student
+     * would see them on mod/assign/view.php (marking workflow released,
+     * gradebook not hidden, non-empty feedback plugins).
      *
      * Statuses: not_submitted | pending | reviewed | changes
-     * "changes" = graded and attempt reopened for resubmit, or latest submission is reopened/draft after a grade.
+     * "changes" = Moodle-visible feedback and attempt reopened/draft for resubmit.
      *
-     * @param list<\stdClass> $courses
+     * @param list<\stdClass> $courses Courses to scan (pass the selected track for page scope)
+     * @param string $ftab all|attention|reviewed|pending|not_submitted
+     * @param int|null $courseid Course id preserved on tab URLs (selected track)
      * @return array{
      *   items: list<array>,
      *   has_items: bool,
@@ -2470,10 +2840,16 @@ final class fellowship_dashboard {
      *   has_attention: bool
      * }
      */
-    public static function list_assignment_feedback(int $userid, array $courses): array {
+    public static function list_assignment_feedback(
+        int $userid,
+        array $courses,
+        string $ftab = 'all',
+        ?int $courseid = null
+    ): array {
         global $CFG, $DB;
 
         require_once($CFG->libdir . '/gradelib.php');
+        require_once($CFG->dirroot . '/mod/assign/locallib.php');
 
         $items = [];
         $attention = 0;
@@ -2486,42 +2862,41 @@ final class fellowship_dashboard {
                     continue;
                 }
                 $assigncount++;
-                $instanceid = (int) $cm->instance;
-                $name = $cm->get_formatted_name();
+                $name = self::display_label($cm->get_formatted_name());
                 $url = (new \moodle_url('/mod/assign/view.php', ['id' => $cm->id]))->out(false);
+                $context = \context_module::instance($cm->id);
+                $assign = new \assign($context, $cm, $course);
+                $instance = $assign->get_instance($userid);
+                $instanceid = (int) $instance->id;
 
-                $latest = $DB->get_record('assign_submission', [
-                    'assignment' => $instanceid,
-                    'userid' => $userid,
-                    'latest' => 1,
-                ]);
+                $latest = $assign->get_user_submission($userid, false);
+                $substatus = $latest ? (string) $latest->status : '';
+                $attemptnumber = $latest ? (int) $latest->attemptnumber : -1;
                 $submittedcount = (int) $DB->count_records('assign_submission', [
                     'assignment' => $instanceid,
                     'userid' => $userid,
                     'status' => 'submitted',
                 ]);
 
-                // Prefer grade for the latest attempt. If latest is only reopened/draft (no mark yet),
-                // fall back to the most recent graded attempt so released comments still show.
-                // A fresh *submitted* attempt with no grade stays pending (do not inherit old marks).
-                $substatus = $latest ? (string) $latest->status : '';
-                $attemptnumber = $latest ? (int) $latest->attemptnumber : -1;
+                // Grade for the current attempt (do not create records).
                 $agrade = false;
                 if ($attemptnumber >= 0) {
-                    $agrade = $DB->get_record('assign_grades', [
-                        'assignment' => $instanceid,
-                        'userid' => $userid,
-                        'attemptnumber' => $attemptnumber,
-                    ]);
-                    $agradeusable = $agrade && $agrade->grade !== null && (float) $agrade->grade >= 0;
-                    if (!$agradeusable) {
+                    $agrade = $assign->get_user_grade($userid, false, $attemptnumber);
+                    $usable = $agrade && (
+                        ($agrade->grade !== null && (float) $agrade->grade >= 0)
+                        || self::assign_feedback_plugins_have_content($assign, $agrade)
+                    );
+                    if (!$usable) {
                         $agrade = false;
                     }
                 }
+                // Reopened/draft attempt: fall back to prior graded attempt so released
+                // comments still show (Moodle attempt history), without inheriting into a
+                // fresh submitted attempt that has no grade yet.
                 if (!$agrade && $latest && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
                     $prior = $DB->get_records_select(
                         'assign_grades',
-                        'assignment = :assignment AND userid = :userid AND grade >= 0 AND attemptnumber < :attempt',
+                        'assignment = :assignment AND userid = :userid AND attemptnumber < :attempt',
                         [
                             'assignment' => $instanceid,
                             'userid' => $userid,
@@ -2532,59 +2907,103 @@ final class fellowship_dashboard {
                         0,
                         1
                     );
-                    $agrade = $prior ? reset($prior) : false;
+                    $candidate = $prior ? reset($prior) : false;
+                    if ($candidate && (
+                        ((float) $candidate->grade >= 0)
+                        || self::assign_feedback_plugins_have_content($assign, $candidate)
+                    )) {
+                        $agrade = $candidate;
+                    }
                 }
+
+                $gradingstatus = $assign->get_grading_status($userid);
+                $workflowblocks = !empty($instance->markingworkflow)
+                    && $gradingstatus !== ASSIGN_MARKING_WORKFLOW_STATE_RELEASED;
+
+                $gradinginfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
+                $gradingitem = $gradinginfo->items[0] ?? null;
+                $gradebookgrade = ($gradingitem && isset($gradingitem->grades[$userid]))
+                    ? $gradingitem->grades[$userid]
+                    : null;
+
+                $pluginfeedback = false;
+                $otherpluginfeedback = false;
+                if ($agrade && !$workflowblocks) {
+                    foreach ($assign->get_feedback_plugins() as $plugin) {
+                        if (!$plugin->is_visible() || !$plugin->is_enabled()) {
+                            continue;
+                        }
+                        if ($plugin->is_empty($agrade)) {
+                            continue;
+                        }
+                        $pluginfeedback = true;
+                        if ($plugin->get_type() !== 'comments') {
+                            $otherpluginfeedback = true;
+                        }
+                    }
+                }
+
+                $cangrade = has_capability('mod/assign:grade', $context, $userid);
+                $hasgradebookmark = (float) $instance->grade != GRADE_TYPE_NONE
+                    && $gradebookgrade
+                    && $gradebookgrade->grade !== null;
+                $gradevisible = $cangrade
+                    || (float) $instance->grade == GRADE_TYPE_NONE
+                    || ($gradebookgrade !== null && empty($gradebookgrade->hidden));
+
+                // Mirror assign::get_assign_feedback_status_renderable visibility.
+                $feedbackvisible = ($hasgradebookmark || $pluginfeedback) && $gradevisible && !$workflowblocks;
 
                 $commenttext = '';
                 $gradedat = 0;
                 $gradepct = null;
                 $gradestr = '';
-                $hasgrade = false;
+                $shownumeric = false;
 
-                if ($agrade) {
-                    $gradedat = (int) ($agrade->timemodified ?: 0);
-                    // Moodle uses -1 for "no grade" on assign_grades.
-                    if ($agrade->grade !== null && (float) $agrade->grade >= 0) {
-                        $hasgrade = true;
-                        $assignmax = $DB->get_field('assign', 'grade', ['id' => $instanceid]);
-                        if ($assignmax !== false && (float) $assignmax > 0) {
-                            $gradepct = (((float) $agrade->grade) / ((float) $assignmax)) * 100;
+                if ($feedbackvisible) {
+                    if ($agrade) {
+                        $gradedat = (int) ($agrade->timemodified ?: 0);
+                    }
+                    if ($hasgradebookmark && $gradebookgrade) {
+                        $shownumeric = true;
+                        $grademax = isset($gradingitem->grademax) ? (float) $gradingitem->grademax : 0.0;
+                        if ($grademax > 0) {
+                            $gradepct = (((float) $gradebookgrade->grade) / $grademax) * 100;
+                        }
+                        $gradestr = trim((string) ($gradebookgrade->str_long_grade ?? ''));
+                        if ($gradestr === '' && $gradepct !== null) {
                             $gradestr = format_float($gradepct, 0) . '%';
-                        } else {
-                            $gradestr = format_float((float) $agrade->grade, 2);
                         }
-                    }
-                    $fc = $DB->get_record('assignfeedback_comments', [
-                        'assignment' => $instanceid,
-                        'grade' => (int) $agrade->id,
-                    ]);
-                    if ($fc && trim((string) $fc->commenttext) !== '') {
-                        $hasgrade = true; // Comment released counts as feedback even if mark pending.
-                        $commenttext = format_text(
-                            $fc->commenttext,
-                            (int) $fc->commentformat,
-                            ['context' => \context_module::instance($cm->id), 'para' => false]
-                        );
-                    }
-                }
-
-                // Gradebook fallback only when we already have an assign grade for display.
-                if ($hasgrade) {
-                    $gradeinfo = grade_get_grades($course->id, 'mod', 'assign', $instanceid, $userid);
-                    $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
-                    $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
-                    if ($gg && $gg->grade !== null && $grademax > 0) {
-                        $gradepct = (((float) $gg->grade) / $grademax) * 100;
-                        $gradestr = format_float($gradepct, 0) . '%';
-                        if (!empty($gg->dategraded)) {
-                            $gradedat = max($gradedat, (int) $gg->dategraded);
+                        if (!empty($gradebookgrade->dategraded)) {
+                            $gradedat = max($gradedat, (int) $gradebookgrade->dategraded);
                         }
-                        if ($commenttext === '' && !empty($gg->feedback)) {
+                        if (!empty($gradebookgrade->feedback)) {
                             $commenttext = format_text(
-                                $gg->feedback,
-                                (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
-                                ['context' => \context_module::instance($cm->id), 'para' => false]
+                                $gradebookgrade->feedback,
+                                (int) ($gradebookgrade->feedbackformat ?? FORMAT_MOODLE),
+                                ['context' => $context, 'para' => false]
                             );
+                        }
+                    } else if ($agrade && $agrade->grade !== null && (float) $agrade->grade >= 0
+                            && (float) $instance->grade > 0) {
+                        // Visible plugin feedback without gradebook push yet — show assign mark.
+                        $shownumeric = true;
+                        $gradepct = (((float) $agrade->grade) / (float) $instance->grade) * 100;
+                        $gradestr = format_float($gradepct, 0) . '%';
+                    }
+
+                    if ($agrade && $commenttext === '') {
+                        $commentsplugin = $assign->get_feedback_plugin_by_type('comments');
+                        if ($commentsplugin && $commentsplugin->is_enabled()
+                                && method_exists($commentsplugin, 'get_feedback_comments')) {
+                            $fc = $commentsplugin->get_feedback_comments((int) $agrade->id);
+                            if ($fc && trim((string) $fc->commenttext) !== '') {
+                                $commenttext = format_text(
+                                    $fc->commenttext,
+                                    (int) $fc->commentformat,
+                                    ['context' => $context, 'para' => false]
+                                );
+                            }
                         }
                     }
                 }
@@ -2608,29 +3027,30 @@ final class fellowship_dashboard {
                     }
                 }
 
-                // Classify.
-                // Attention badge = fellow must act (revise). A released Met (≥70) clears it
-                // even if the attempt was previously reopened for changes.
+                // Classify from Moodle-visible feedback + submission state.
+                // Attention = fellow must revise. ≥70 soft-warn only after Moodle release.
                 $status = 'not_submitted';
                 $chip = 'line';
                 $needsattention = false;
                 $passedgate = ($gradepct !== null && $gradepct >= 70);
-                if ($hasgrade && $passedgate) {
+                // ≥70 Met clears attention even if Moodle left the attempt reopened.
+                if ($feedbackvisible && $passedgate) {
                     $status = 'reviewed';
                     $chip = 'ok';
                     $needsattention = false;
-                } else if ($hasgrade && ($substatus === 'reopened' || $substatus === 'draft' || $substatus === 'new')) {
+                } else if ($feedbackvisible
+                        && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
                     $status = 'changes';
                     $chip = 'warn';
                     $needsattention = true;
-                } else if ($hasgrade) {
-                    // Released below 70 without reopen — warn, but no revise badge unless changes.
+                } else if ($feedbackvisible) {
+                    // Released below 70 without reopen — warn, no revise badge.
                     $status = 'reviewed';
                     $chip = 'warn';
                     $needsattention = false;
                 } else if ($substatus === 'submitted' || $submittedcount > 0) {
                     $status = 'pending';
-                    $chip = '';
+                    $chip = 'line';
                 } else {
                     $status = 'not_submitted';
                     $chip = 'line';
@@ -2654,25 +3074,50 @@ final class fellowship_dashboard {
                     default => get_string('fellowship_feedback_summary_none', 'local_launchpad'),
                 };
 
+                $moodlenote = '';
+                if ($feedbackvisible && $commenttext === '' && $otherpluginfeedback) {
+                    $moodlenote = get_string('fellowship_feedback_plugins_note', 'local_launchpad');
+                }
+
+                // Moodle creates empty "new" rows when a student opens an assign —
+                // do not surface "Attempt 1" until there is a real submission or review.
+                $showattempt = $attempt > 0 && (
+                    in_array($status, ['pending', 'reviewed', 'changes'], true)
+                    || in_array($substatus, ['submitted', 'reopened'], true)
+                    || $submittedcount > 0
+                );
+
                 $items[] = [
                     'cmid' => (int) $cm->id,
+                    'course_id' => (int) $course->id,
                     'name' => $name,
-                    'course_name' => format_string($course->fullname),
+                    'course_name' => self::display_label(format_string($course->fullname)),
                     'course_idnumber' => s($course->idnumber),
                     'url' => $url,
                     'status' => $status,
                     'status_label' => $statuslabel,
                     'chip' => $chip,
                     'summary' => $summary,
-                    'has_grade' => $hasgrade && $gradestr !== '',
+                    'has_grade' => $shownumeric && $gradestr !== '',
                     'grade_display' => $gradestr,
                     'has_comment' => $commenttext !== '',
                     'comment_html' => $commenttext,
-                    'has_attempt' => $attempt > 0,
+                    'has_moodle_feedback_note' => $moodlenote !== '',
+                    'moodle_feedback_note' => $moodlenote,
+                    'has_attempt' => $showattempt,
                     'attempt' => $attempt,
-                    'submitted_at' => $submittedat ? userdate($submittedat, get_string('strftimedatetimeshort', 'langconfig')) : '',
-                    'graded_at' => $gradedat ? userdate($gradedat, get_string('strftimedatetimeshort', 'langconfig')) : '',
+                    'submitted_at' => $submittedat
+                        ? userdate($submittedat, get_string('strftimedatetimeshort', 'langconfig'))
+                        : '',
+                    'graded_at' => $gradedat
+                        ? userdate($gradedat, get_string('strftimedatetimeshort', 'langconfig'))
+                        : '',
                     'needs_attention' => $needsattention,
+                    '_sort' => max(
+                        $gradedat,
+                        $submittedat,
+                        $latest ? (int) ($latest->timemodified ?? 0) : 0
+                    ),
                     'cta_label' => match ($status) {
                         'not_submitted' => get_string('fellowship_feedback_cta_open', 'local_launchpad'),
                         'pending' => get_string('fellowship_feedback_cta_view', 'local_launchpad'),
@@ -2683,21 +3128,41 @@ final class fellowship_dashboard {
             }
         }
 
-        $released = [];
+        // Status categories: attention → released → waiting → not submitted.
+        $attentionitems = [];
+        $reviewed = [];
         $pending = [];
         $notsubmitted = [];
         foreach ($items as $item) {
-            if ($item['status'] === 'reviewed' || $item['status'] === 'changes') {
-                $released[] = $item;
-            } else if ($item['status'] === 'pending') {
-                $pending[] = $item;
-            } else {
-                $notsubmitted[] = $item;
+            switch ($item['status']) {
+                case 'changes':
+                    $attentionitems[] = $item;
+                    break;
+                case 'reviewed':
+                    $reviewed[] = $item;
+                    break;
+                case 'pending':
+                    $pending[] = $item;
+                    break;
+                default:
+                    $notsubmitted[] = $item;
+                    break;
             }
         }
 
-        // HTML-style empty: no *released* mentor feedback yet.
-        $hasreleased = $released !== [];
+        $bysort = static function (array $a, array $b): int {
+            return ((int) ($b['_sort'] ?? 0)) <=> ((int) ($a['_sort'] ?? 0));
+        };
+        usort($attentionitems, $bysort);
+        usort($reviewed, $bysort);
+        usort($pending, $bysort);
+        // Not submitted: keep Moodle section order (no activity timestamps).
+        usort($notsubmitted, static function (array $a, array $b): int {
+            return ((int) ($a['cmid'] ?? 0)) <=> ((int) ($b['cmid'] ?? 0));
+        });
+
+        // Empty banner only when Moodle-visible feedback (reviewed or changes) is absent.
+        $hasmoodlereleased = ($attentionitems !== [] || $reviewed !== []);
         $emptyctaurl = '';
         $emptyctalabel = get_string('fellowship_feedback_cta_open', 'local_launchpad');
         $emptybody = get_string('fellowship_feedback_empty_submit', 'local_launchpad');
@@ -2713,27 +3178,100 @@ final class fellowship_dashboard {
             $emptyctaurl = $items[0]['url'];
         }
 
+        $allowedtabs = ['all', 'attention', 'reviewed', 'pending', 'not_submitted'];
+        $ftab = in_array($ftab, $allowedtabs, true) ? $ftab : 'all';
+        if ($courseid === null && count($courses) === 1) {
+            $courseid = (int) ($courses[0]->id ?? 0) ?: null;
+        }
+
+        $taburls = [];
+        foreach ($allowedtabs as $key) {
+            $params = array_filter([
+                'view' => 'feedback',
+                'id' => ($courseid !== null && $courseid > 0) ? $courseid : null,
+                'ftab' => $key !== 'all' ? $key : null,
+            ]);
+            $taburls[$key] = (new \moodle_url(persona_home::FELLOW_PATH, $params))->out(false);
+        }
+
+        $showattention = ($ftab === 'all' || $ftab === 'attention') && $attentionitems !== [];
+        $showreviewed = ($ftab === 'all' || $ftab === 'reviewed') && $reviewed !== [];
+        $showpending = ($ftab === 'all' || $ftab === 'pending') && $pending !== [];
+        $shownotsubmitted = ($ftab === 'all' || $ftab === 'not_submitted') && $notsubmitted !== [];
+
+        $filterempty = false;
+        if ($ftab === 'attention') {
+            $filterempty = $attentionitems === [];
+        } else if ($ftab === 'reviewed') {
+            $filterempty = $reviewed === [];
+        } else if ($ftab === 'pending') {
+            $filterempty = $pending === [];
+        } else if ($ftab === 'not_submitted') {
+            $filterempty = $notsubmitted === [];
+        }
+
         return [
             'items' => $items,
-            'released_items' => $released,
+            'attention_items' => $attentionitems,
+            'reviewed_items' => $reviewed,
             'pending_items' => $pending,
+            'not_submitted_items' => $notsubmitted,
+            // Legacy aliases for older callers/templates.
+            'released_items' => array_values(array_merge($attentionitems, $reviewed)),
             'open_items' => array_values(array_merge($pending, $notsubmitted)),
-            'has_released' => $hasreleased,
+            'has_attention_items' => $showattention,
+            'has_reviewed_items' => $showreviewed,
+            'has_pending_items' => $showpending,
+            'has_not_submitted_items' => $shownotsubmitted,
+            'has_released' => $hasmoodlereleased,
             'has_open_items' => ($pending !== [] || $notsubmitted !== []),
             'has_items' => $items !== [],
             'has_assigns' => $assigncount > 0,
             'attention_count' => $attention,
             'has_attention' => $attention > 0,
-            // Banner only — cards below still update from Moodle (not a static forever page).
-            'show_empty_released' => $assigncount > 0 && !$hasreleased,
+            'all_count' => count($items),
+            'attention_tab_count' => count($attentionitems),
+            'reviewed_count' => count($reviewed),
+            'pending_count' => count($pending),
+            'not_submitted_count' => count($notsubmitted),
+            'ftab' => $ftab,
+            'ftab_all' => $ftab === 'all',
+            'ftab_attention' => $ftab === 'attention',
+            'ftab_reviewed' => $ftab === 'reviewed',
+            'ftab_pending' => $ftab === 'pending',
+            'ftab_not_submitted' => $ftab === 'not_submitted',
+            'tab_all_url' => $taburls['all'],
+            'tab_attention_url' => $taburls['attention'],
+            'tab_reviewed_url' => $taburls['reviewed'],
+            'tab_pending_url' => $taburls['pending'],
+            'tab_not_submitted_url' => $taburls['not_submitted'],
+            'show_tabs' => $assigncount > 0,
+            'show_filter_empty' => $assigncount > 0 && $filterempty,
+            'show_empty_released' => $assigncount > 0 && !$hasmoodlereleased && $ftab === 'all',
             'empty_title' => self::str('fellowship_feedback_empty_title', null, 'No released feedback yet'),
             'empty_title_lead' => self::str('fellowship_feedback_empty_title_lead', null, 'No released'),
-            'empty_title_accent' => self::str('fellowship_feedback_empty_title_accent', null, 'feedback yet'),
+            'empty_title_accent' => self::str('fellowship_feedback_empty_title_accent', null, 'feedback'),
+            'empty_title_trail' => self::str('fellowship_feedback_empty_title_trail', null, 'yet'),
             'empty_body' => $emptybody,
             'empty_cta_url' => $emptyctaurl,
             'empty_cta_label' => $emptyctalabel,
             'has_empty_cta' => $emptyctaurl !== '',
         ];
+    }
+
+    /**
+     * Whether any enabled assign feedback plugin has content for this grade row.
+     *
+     * @param \assign $assign
+     * @param \stdClass $grade assign_grades record
+     */
+    private static function assign_feedback_plugins_have_content(\assign $assign, \stdClass $grade): bool {
+        foreach ($assign->get_feedback_plugins() as $plugin) {
+            if ($plugin->is_visible() && $plugin->is_enabled() && !$plugin->is_empty($grade)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
