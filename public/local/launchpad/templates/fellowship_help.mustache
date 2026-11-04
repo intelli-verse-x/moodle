@@ -1,21 +1,60 @@
 {{!
     @template local_launchpad/fellowship_help
-}}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
 
-<p class="lp-muted">{{#str}} fellowship_help_intro, local_launchpad {{/str}}</p>
-<div class="lp-stack">
-  {{#faqs}}
-    <details class="lp-faq">
-      <summary>{{q}}<span class="lp-faq-plus" aria-hidden="true">+</span></summary>
-      <p>{{a}}</p>
-    </details>
-  {{/faqs}}
+    Help & FAQ — FAQ accordion + Where to look, side by side.
+}}
+<div class="lp-tools-page lp-reveal" data-region="fellowship-help-page" style="--lp-d:0">
+  <div class="lp-help-system">
+    <section class="lp-card lift lp-help-faq" aria-labelledby="lp-help-faq-title">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:message-question" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3 id="lp-help-faq-title">{{#str}} fellowship_help_faq_heading, local_launchpad {{/str}}</h3>
+            <p>{{#str}} fellowship_help_faq_sub, local_launchpad {{/str}}</p>
+          </div>
+        </div>
+      </div>
+      <div class="lp-stack lp-help-faq-list">
+        {{#faqs}}
+          <details class="lp-faq">
+            <summary>{{q}}<span class="lp-faq-plus" aria-hidden="true">+</span></summary>
+            <p>{{a}}</p>
+          </details>
+        {{/faqs}}
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-help-links">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:route-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{#str}} fellowship_help_links_heading, local_launchpad {{/str}}</h3>
+            <p>{{#str}} fellowship_help_links_sub, local_launchpad {{/str}}</p>
+          </div>
+        </div>
+      </div>
+      <ul class="lp-help-link-list">
+        {{#links}}
+          <li>
+            <a class="lp-help-link" href="{{url}}">
+              <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+                <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+              </span>
+              <span class="lp-help-link-copy">
+                <b>{{label}}</b>
+                <small>{{hint}}</small>
+              </span>
+              <iconify-icon class="lp-help-link-chev" icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon>
+            </a>
+          </li>
+        {{/links}}
+      </ul>
+    </section>
+  </div>
 </div>

@@ -46,6 +46,8 @@ final class fellowship_dashboard {
 
         require_once($CFG->libdir . '/enrollib.php');
 
+        // Match Moodle student access: hidden courses (visible=0) show "unavailable"
+        // on /course/view.php even when the user is enrolled — do not list them here.
         $sql = "SELECT DISTINCT c.id, c.fullname, c.shortname, c.idnumber, c.summary, c.summaryformat
                   FROM {user_enrolments} ue
                   JOIN {enrol} e ON e.id = ue.enrolid
@@ -56,6 +58,7 @@ final class fellowship_dashboard {
                  WHERE ue.userid = :userid
                    AND ue.status = :uestatus
                    AND e.status = :estatus
+                   AND c.visible = 1
                    AND " . $DB->sql_like('c.idnumber', ':idn', false) . "
               ORDER BY c.fullname ASC";
 
@@ -136,7 +139,7 @@ final class fellowship_dashboard {
 
                 $item = [
                     'cmid' => (int) $cm->id,
-                    'name' => $cm->get_formatted_name(),
+                    'name' => self::display_label($cm->get_formatted_name()),
                     'modname' => $cm->modname,
                     'modname_display' => get_string('modulename', 'mod_' . $cm->modname),
                     'url' => $url,
@@ -167,7 +170,7 @@ final class fellowship_dashboard {
             }
 
             $sections[] = [
-                'name' => $secname,
+                'name' => self::display_label($secname),
                 'sectionnum' => (int) $section->section,
                 'activities' => $activities,
                 'has_activities' => true,
@@ -301,6 +304,12 @@ final class fellowship_dashboard {
             $iscurrent = false;
             $islock = true;
             $mark = '🔒';
+            $section = $bysection[$num] ?? null;
+            $hasmoodlesection = $section !== null;
+            // Prefer live Moodle section titles when the course has that section.
+            $moodlename = trim((string) ($section['name'] ?? ''));
+            $displayname = $moodlename !== '' ? $moodlename : $meta['name'];
+            $displayshort = $moodlename !== '' ? $moodlename : $meta['short'];
             if ($isdone) {
                 $status = 'done';
                 $isdoneflag = true;
@@ -313,11 +322,24 @@ final class fellowship_dashboard {
                 $mark = (string) ($i + 1);
                 $foundcurrent = true;
             }
-            $statustext = $phasestatus[$num] ?? ($isdone ? 'Met' : ($iscurrent ? 'In progress' : 'Not released'));
+            if ($phasestatus !== null && isset($phasestatus[$num])) {
+                $statustext = $phasestatus[$num];
+            } else if ($isdone) {
+                $statustext = 'Met';
+            } else if ($iscurrent) {
+                $statustext = 'In progress';
+            } else if (!$hasmoodlesection) {
+                $statustext = get_string('fellowship_journey_section_missing', 'local_launchpad');
+            } else {
+                $statustext = 'Not released';
+            }
             $weight = (int) ($weights[$num] ?? 0);
             $gates[] = [
-                'name' => $meta['name'],
-                'short' => $meta['short'],
+                'name' => $displayname,
+                'short' => $displayshort,
+                'spine_name' => $meta['name'],
+                'spine_short' => $meta['short'],
+                'has_moodle_section' => $hasmoodlesection,
                 'sectionnum' => $num,
                 'status' => $status,
                 'is_done' => $isdoneflag,
@@ -575,6 +597,36 @@ final class fellowship_dashboard {
 
         $journey = self::journey_from_outline($outline, false, $statusmap);
 
+        $met = 0;
+        foreach ($phases as $phase) {
+            if (!empty($phase['is_met'])) {
+                $met++;
+            }
+        }
+        $gatestotal = count($phases);
+        $allmet = $gatestotal > 0 && $met === $gatestotal;
+
+        $strings = [
+            'journey_heading' => self::str('fellowship_your_journey', null, 'Your journey'),
+            'journey_sub' => self::str(
+                'fellowship_journey_help_short',
+                null,
+                'Your Fellowship learning journey'
+            ),
+            'gates_heading' => self::str('fellowship_nav_phases', null, 'Phase progress'),
+            'gates_sub' => self::str(
+                'fellowship_phases_lead',
+                null,
+                'Each phase passes only after a released review at 70/100 or above.'
+            ),
+            'note' => self::str(
+                'fellowship_phases_note',
+                null,
+                'A missing or unreviewed grade stays pending. A high capstone mark can’t make up for a phase that hasn’t passed.'
+            ),
+            'empty_title' => self::str('fellowship_no_courses_heading', null, 'No LaunchPad course yet'),
+        ];
+
         return [
             'has_course' => $course !== null,
             'course_name' => $course ? format_string($course->fullname) : '',
@@ -583,6 +635,24 @@ final class fellowship_dashboard {
             'has_phases' => $phases !== [],
             'journey' => $journey,
             'outline' => $outline,
+            'gates_met' => $met,
+            'gates_total' => $gatestotal,
+            'gates_label' => get_string_manager()->string_exists('fellowship_completion_gates', 'local_launchpad')
+                ? get_string('fellowship_completion_gates', 'local_launchpad', [
+                    'met' => $met,
+                    'total' => $gatestotal,
+                ])
+                : ($met . ' of ' . $gatestotal . ' gates passed'),
+            'status_chip' => $allmet ? 'ok' : 'line',
+            'status_label' => $allmet
+                ? self::str('fellowship_completion_met', null, 'Requirements met')
+                : self::str('fellowship_completion_outstanding', null, 'Requirements outstanding'),
+            'empty_message' => self::str(
+                'fellowship_no_courses',
+                null,
+                'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.'
+            ),
+            'strings' => $strings,
         ];
     }
 
@@ -614,35 +684,64 @@ final class fellowship_dashboard {
             4 => get_string('fellowship_track_blurb_4', 'local_launchpad'),
         ];
 
+        $phaseicons = [
+            1 => ['icon' => 'book-open-01', 'tone' => 'blue'],
+            2 => ['icon' => 'task-01', 'tone' => 'teal'],
+            3 => ['icon' => 'layers-01', 'tone' => 'violet'],
+            4 => ['icon' => 'award-01', 'tone' => 'amber'],
+        ];
+
         $trackphases = [];
         $firstopen = true;
+        $currentset = false;
         foreach ($progress['phases'] ?? [] as $phase) {
             $num = (int) $phase['sectionnum'];
             $section = $bysection[$num] ?? null;
-            $activities = $section['activities'] ?? [];
+            $activities = array_map(
+                [self::class, 'decorate_home_activity'],
+                array_values($section['activities'] ?? [])
+            );
             $released = $activities !== [];
             $isopen = $released && $firstopen;
             if ($released) {
                 $firstopen = false;
             }
+            $iscurrent = false;
+            if ($released && !$currentset && empty($phase['is_met'])) {
+                $iscurrent = true;
+                $currentset = true;
+            }
+            $iconmeta = $phaseicons[$num] ?? ['icon' => 'book-open-01', 'tone' => 'blue'];
+            if (!$released) {
+                $iconmeta = ['icon' => 'square-lock-02', 'tone' => 'slate'];
+            }
             $trackphases[] = array_merge($phase, [
+                'index' => $num,
+                'anchor' => 'phase-' . $num,
                 'blurb' => $blurbs[$num] ?? '',
                 'released' => $released,
                 'is_open' => $isopen,
+                'is_current' => $iscurrent,
                 'activities' => $activities,
                 'has_activities' => $activities !== [],
                 'locked_note' => get_string('fellowship_track_phase_locked', 'local_launchpad', $phase['weight']),
+                'icon' => $iconmeta['icon'],
+                'icon_tone' => $iconmeta['tone'],
+                'show_lock' => !$released,
             ]);
         }
 
         $weights = [];
         $maxw = max(1, max(self::phase_weights()));
         foreach (self::phase_weights() as $num => $weight) {
+            $iconmeta = $phaseicons[$num] ?? ['icon' => 'book-open-01', 'tone' => 'blue'];
             $weights[] = [
                 'name' => blueprint::phase_sections()[$num] ?? ('Phase ' . $num),
                 'weight' => $weight,
                 'weight_label' => $weight . '%',
                 'bar_pct' => (int) round(($weight / $maxw) * 100),
+                'icon' => $iconmeta['icon'],
+                'icon_tone' => $iconmeta['tone'],
             ];
         }
 
@@ -655,15 +754,60 @@ final class fellowship_dashboard {
             ? implode(', ', $mentornames)
             : get_string('fellowship_track_mentor_tba', 'local_launchpad');
 
+        $completed = (int) ($outline['completed'] ?? 0);
+        $trackable = (int) ($outline['trackable'] ?? 0);
+        $percent = $outline['percent'] ?? null;
+        $haspercent = $percent !== null;
+        $next = $outline['next'] ?? null;
+        if (is_array($next)) {
+            $next = self::decorate_home_activity($next);
+        }
+
+        if ($haspercent && (int) $percent >= 100) {
+            $coursestatus = get_string('fellowship_complete', 'local_launchpad');
+            $coursestatustype = 'ok';
+        } else if ($haspercent || $trackable > 0) {
+            $coursestatus = get_string('fellowship_track_status_inprogress', 'local_launchpad');
+            $coursestatustype = 'line';
+        } else {
+            $coursestatus = get_string('fellowship_track_status_ready', 'local_launchpad');
+            $coursestatustype = 'warn';
+        }
+
+        $firstanchor = $trackphases !== [] ? (string) ($trackphases[0]['anchor'] ?? '') : '';
+
+        $started = ($haspercent && (int) $percent > 0) || $completed > 0;
+        $ctalabel = $started
+            ? get_string('fellowship_cta_resume', 'local_launchpad')
+            : get_string('fellowship_cta_start', 'local_launchpad');
+        $nextlabel = $started
+            ? get_string('fellowship_next_activity', 'local_launchpad')
+            : get_string('fellowship_next_activity_start', 'local_launchpad');
+        if (is_array($next)) {
+            $next['next_label'] = $nextlabel;
+            $next['cta_label'] = $ctalabel;
+        }
+
+        $lead = $hasrealsummary
+            ? self::display_label($summary)
+            : get_string('fellowship_track_lead_default', 'local_launchpad');
+
         return [
-            'course_name' => format_string($course->fullname),
+            'course_name' => self::display_label(format_string($course->fullname)),
             'course_idnumber' => s($course->idnumber),
-            'course_lead' => $hasrealsummary
-                ? $summary
-                : get_string('fellowship_track_lead_default', 'local_launchpad'),
+            'course_lead' => $lead,
+            'course_badge' => get_string('fellowship_track_badge', 'local_launchpad'),
+            'course_status' => $coursestatus,
+            'course_statustype' => $coursestatustype,
             'journey' => $progress['journey'],
             'track_phases' => $trackphases,
             'has_track_phases' => $trackphases !== [],
+            'first_section_anchor' => $firstanchor,
+            'has_first_section' => $firstanchor !== '',
+            'next' => $next,
+            'has_next' => is_array($next),
+            'next_label' => $nextlabel,
+            'cta_label' => $ctalabel,
             'capstone_body' => get_string('fellowship_track_capstone_body', 'local_launchpad'),
             'prerequisite' => get_string('fellowship_track_prerequisite', 'local_launchpad'),
             'device' => get_string('fellowship_track_device', 'local_launchpad'),
@@ -673,11 +817,32 @@ final class fellowship_dashboard {
             'has_mentors' => $mentors !== [],
             'weight_rows' => $weights,
             'completion_enabled' => !empty($outline['completion_enabled']),
-            'completed' => (int) ($outline['completed'] ?? 0),
-            'trackable' => (int) ($outline['trackable'] ?? 0),
-            'percent' => $outline['percent'] ?? null,
-            'has_percent' => isset($outline['percent']) && $outline['percent'] !== null,
+            'completed' => $completed,
+            'trackable' => $trackable,
+            'percent' => $haspercent ? (int) $percent : null,
+            'has_percent' => $haspercent,
+            'activitypct' => $haspercent ? (int) $percent : ($trackable > 0
+                ? (int) round(($completed / $trackable) * 100) : 0),
+            'activitydone' => $completed,
+            'activitytotal' => $trackable,
+            'hasprogress' => $haspercent || $trackable > 0,
         ];
+    }
+
+    /**
+     * Learner-facing label: plain text, no curriculum placeholders, soft punctuation.
+     */
+    public static function display_label(string $value): string {
+        $text = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = trim(strip_tags($text));
+        // Blueprint activities ship as "Name [placeholder — content pending]".
+        $text = preg_replace('/\s*\[[^\]]*placeholder[^\]]*\]\s*$/iu', '', $text) ?? $text;
+        $text = preg_replace('/\s*\[[^\]]*content pending[^\]]*\]\s*$/iu', '', $text) ?? $text;
+        $text = trim($text);
+        // Soften em/en dashes used in seeded LaunchPad course titles.
+        $text = str_replace(["\u{2014}", "\u{2013}"], ' · ', $text);
+        $text = preg_replace('/\s+·\s+/u', ' · ', $text) ?? $text;
+        return trim($text, " \t\n\r\0\x0B·");
     }
 
     /**
@@ -746,10 +911,11 @@ final class fellowship_dashboard {
     }
 
     /**
-     * Completion tab: gates passed + requirements table + locked certificate.
+     * Completion tab: gates ring + requirements table + locked certificate.
      *
      * Reuses {@see phase_progress_for_user()} status. Weighted result only when
-     * every phase has a released score. Certificate stays locked (tool not live).
+     * every phase has a released score. Shared orientation uses Moodle completion
+     * on the enrolled lp-orient-* course when present. Certificate stays locked.
      *
      * @param list<\stdClass> $courses
      * @param \stdClass|null $selected
@@ -759,17 +925,26 @@ final class fellowship_dashboard {
         $base = self::phase_progress_for_user($userid, $courses, $selected);
         $phases = $base['phases'] ?? [];
         $met = 0;
-        $outstanding = [];
         $allscored = $phases !== [];
         $weightsum = 0.0;
+        $phaseicons = [
+            1 => 'book-open-01',
+            2 => 'task-01',
+            3 => 'layers-01',
+            4 => 'award-01',
+        ];
+        $n = 0;
 
-        foreach ($phases as $phase) {
+        foreach ($phases as &$phase) {
+            $n++;
+            $phase['result_display'] = !empty($phase['has_score']) ? (string) (int) $phase['score'] : '—';
+            $phase['icon'] = $phaseicons[$n] ?? 'flag-02';
+            $phase['bar_pct'] = !empty($phase['has_score'])
+                ? max(0, min(100, (int) round((float) $phase['score'])))
+                : 0;
+            $phase['show_bar'] = !empty($phase['has_score']);
             if (!empty($phase['is_met'])) {
                 $met++;
-            } else {
-                $outstanding[] = [
-                    'label' => $phase['name'] . ': ' . \core_text::strtolower($phase['status']),
-                ];
             }
             if (empty($phase['has_score'])) {
                 $allscored = false;
@@ -777,6 +952,9 @@ final class fellowship_dashboard {
                 $weightsum += ((float) $phase['score']) * ((int) $phase['weight']) / 100.0;
             }
         }
+        unset($phase);
+
+        $orientation = self::orientation_status_for_user($userid, $courses);
 
         $allmet = $phases !== [] && $met === count($phases);
         $gates = max(1, count($phases));
@@ -788,18 +966,65 @@ final class fellowship_dashboard {
         $circ = 2 * M_PI * $radius;
         $dashoffset = $circ * (1 - ($ringpct / 100));
 
+        $gatestotal = count($phases);
+        $strings = [
+            'page_title' => self::str('fellowship_nav_completion', null, 'Completion'),
+            'record_eyebrow' => self::str('fellowship_nav_record', null, 'My record'),
+            'gates_heading' => self::str('fellowship_completion_gates_heading', null, 'Programme gates'),
+            'gates_sub' => self::str(
+                'fellowship_completion_gates_sub',
+                null,
+                'Phase reviews must reach 70/100. Practice quizzes carry no weight.'
+            ),
+            'gates_lead' => self::str(
+                'fellowship_completion_gates_lead',
+                null,
+                'Track how each gate and Shared orientation stand against the published criteria.'
+            ),
+            'ring_label' => self::str('fellowship_completion_ring_label', null, 'gates passed'),
+            'stats_heading' => self::str('fellowship_completion_stats_heading', null, 'At a glance'),
+            'stat_gates' => self::str('fellowship_completion_stat_gates', null, 'Gates'),
+            'stat_orientation' => self::str('fellowship_completion_stat_orientation', null, 'Orientation'),
+            'stat_weighted' => self::str('fellowship_completion_stat_weighted', null, 'Weighted'),
+            'req_heading' => self::str('fellowship_completion_req_heading', null, 'Requirements'),
+            'col_req' => self::str('fellowship_completion_col_req', null, 'Requirement'),
+            'col_weight' => self::str('fellowship_completion_col_weight', null, 'Weight'),
+            'col_result' => self::str('fellowship_completion_col_result', null, 'Result'),
+            'col_status' => self::str('fellowship_completion_col_status', null, 'Status'),
+            'calc_note' => self::str(
+                'fellowship_completion_calc_note',
+                null,
+                'Calculated only when every phase has a released review. Practice quizzes carry no weight.'
+            ),
+            'cert_heading' => self::str('fellowship_completion_cert_heading', null, 'Certificate'),
+            'cert_title' => self::str('fellowship_completion_cert_title', null, 'Completion certificate'),
+            'cert_na' => self::str('fellowship_completion_cert_na', null, 'Not available yet'),
+            'cert_disclaimer' => self::str(
+                'fellowship_completion_cert_disclaimer',
+                null,
+                'A certificate means the published criteria were met. It doesn’t imply a job, internship or placement.'
+            ),
+            'empty_title' => self::str('fellowship_no_courses_heading', null, 'No LaunchPad course yet'),
+            'go_track' => self::str('fellowship_nav_track', null, 'My track'),
+            'weighted' => self::str('fellowship_completion_weighted', null, 'Weighted result'),
+            'orientation' => self::str('fellowship_completion_orientation', null, 'Shared orientation'),
+        ];
+
         return array_merge($base, [
             'gates_met' => $met,
-            'gates_total' => count($phases),
-            'gates_label' => get_string('fellowship_completion_gates', 'local_launchpad', [
-                'met' => $met,
-                'total' => count($phases),
-            ]),
+            'gates_total' => $gatestotal,
+            'gates_label' => get_string_manager()->string_exists('fellowship_completion_gates', 'local_launchpad')
+                ? get_string('fellowship_completion_gates', 'local_launchpad', [
+                    'met' => $met,
+                    'total' => $gatestotal,
+                ])
+                : ($met . ' of ' . $gatestotal . ' gates passed'),
+            'gates_note' => $orientation['gates_note'],
             'all_met' => $allmet,
             'status_chip' => $allmet ? 'ok' : 'line',
             'status_label' => $allmet
-                ? get_string('fellowship_completion_met', 'local_launchpad')
-                : get_string('fellowship_completion_outstanding', 'local_launchpad'),
+                ? self::str('fellowship_completion_met', null, 'Requirements met')
+                : self::str('fellowship_completion_outstanding', null, 'Requirements outstanding'),
             'ring_pct' => $ringpct,
             'ring_size' => $size,
             'ring_radius' => round($radius, 2),
@@ -807,18 +1032,114 @@ final class fellowship_dashboard {
             'ring_cy' => $size / 2,
             'ring_circ' => round($circ, 2),
             'ring_dashoffset' => number_format($dashoffset, 2, '.', ''),
-            'has_outstanding' => $outstanding !== [],
-            'outstanding' => $outstanding,
+            'orientation_done' => !empty($orientation['done']),
+            'orientation_chip' => $orientation['chip'],
+            'orientation_status' => $orientation['status'],
+            'orientation_weight' => '—',
+            'orientation_result' => '—',
+            'phases' => $phases,
             'has_weighted' => $allscored,
             'weighted_display' => $allscored ? (string) (int) round($weightsum) : '—',
             'weighted_chip' => $allscored ? ($weightsum >= 70 ? 'ok' : 'warn') : 'line',
             'weighted_status' => $allscored
                 ? ($weightsum >= 70
-                    ? get_string('fellowship_completion_weighted_ok', 'local_launchpad')
-                    : get_string('fellowship_completion_weighted_low', 'local_launchpad'))
-                : get_string('fellowship_completion_weighted_pending', 'local_launchpad'),
+                    ? self::str('fellowship_completion_weighted_ok', null, 'On track')
+                    : self::str('fellowship_completion_weighted_low', null, 'Below 70'))
+                : self::str('fellowship_completion_weighted_pending', null, 'Pending'),
             'certificate_locked' => true,
+            'cert_message' => self::str(
+                'fellowship_completion_cert_body',
+                null,
+                '<b>Certificate issuance is not available</b> yet. Your results are your record until the programme confirms the tool and you meet the criteria.'
+            ),
+            'track_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
+            'empty_message' => self::str(
+                'fellowship_no_courses',
+                null,
+                'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.'
+            ),
+            'strings' => $strings,
         ]);
+    }
+
+    /**
+     * Shared orientation row for Completion — from enrolled lp-orient-* course.
+     *
+     * @param list<\stdClass> $courses
+     * @return array{done:bool,chip:string,status:string,gates_note:string}
+     */
+    private static function orientation_status_for_user(int $userid, array $courses): array {
+        $donelabel = self::str('fellowship_completion_orientation_done', null, 'Complete');
+        $pendinglabel = self::str('fellowship_completion_orientation_pending', null, 'Pending');
+        $progresslabel = self::str('fellowship_completion_orientation_progress', null, 'In progress');
+        $notedone = self::str(
+            'fellowship_completion_gates_note',
+            null,
+            'Plus Shared orientation ✓. Every gate must reach 70.'
+        );
+        $noteopen = self::str(
+            'fellowship_completion_gates_note_open',
+            null,
+            'Shared orientation still open. Every gate must reach 70.'
+        );
+
+        $orientation = null;
+        foreach ($courses as $course) {
+            $idn = strtolower(trim((string) ($course->idnumber ?? '')));
+            if (str_starts_with($idn, 'lp-orient-')) {
+                $orientation = $course;
+                break;
+            }
+        }
+
+        if ($orientation === null) {
+            return [
+                'done' => false,
+                'chip' => 'line',
+                'status' => $pendinglabel,
+                'gates_note' => $noteopen,
+            ];
+        }
+
+        $outline = self::course_outline($orientation, $userid);
+        $trackable = (int) ($outline['trackable'] ?? 0);
+        $completed = (int) ($outline['completed'] ?? 0);
+        $percent = $outline['percent'] ?? null;
+
+        if ($trackable > 0) {
+            $done = $completed >= $trackable;
+            if ($done) {
+                return [
+                    'done' => true,
+                    'chip' => 'ok',
+                    'status' => $donelabel,
+                    'gates_note' => $notedone,
+                ];
+            }
+            return [
+                'done' => false,
+                'chip' => 'line',
+                'status' => $completed > 0 ? $progresslabel : $pendinglabel,
+                'gates_note' => $noteopen,
+            ];
+        }
+
+        if ($percent !== null && (int) $percent >= 100) {
+            return [
+                'done' => true,
+                'chip' => 'ok',
+                'status' => $donelabel,
+                'gates_note' => $notedone,
+            ];
+        }
+
+        // Enrolled but nothing trackable yet — do not invent a Complete tick.
+        return [
+            'done' => false,
+            'chip' => 'line',
+            'status' => $pendinglabel,
+            'gates_note' => $noteopen,
+        ];
     }
 
     /**
@@ -887,26 +1208,56 @@ final class fellowship_dashboard {
      * Build Achievements view context from a {@see live_achievements()} result.
      *
      * @param array $live
+     * @param string $tab all|earned badge collection filter
      * @return array
      */
-    public static function achievements_context_from_live(array $live): array {
+    public static function achievements_context_from_live(array $live, string $tab = 'all'): array {
+        $tab = ($tab === 'earned') ? 'earned' : 'all';
         $xp = (int) ($live['xp_total'] ?? 0);
         $levels = self::achievement_levels();
         $li = self::level_index_for_xp($xp);
+        $currentlabel = self::str('fellowship_level_status_current', null, 'Current Level');
+        $nextlabel = self::str('fellowship_level_status_next', null, 'Next Level');
+        $lockedlabellevel = self::str('fellowship_level_status_locked', null, 'Locked');
+        $donelabel = self::str('fellowship_level_status_done', null, 'Unlocked');
+
         $ladder = [];
         foreach ($levels as $i => $level) {
             $ispast = $i < $li;
             $isnow = $i === $li;
+            $isnext = $i === ($li + 1);
+            $islocked = $i > $li;
+            if ($isnow) {
+                $status = $currentlabel;
+                $statusicon = 'checkmark-circle-02';
+                $css = 'now';
+            } else if ($ispast) {
+                $status = $donelabel;
+                $statusicon = 'checkmark-circle-02';
+                $css = 'past';
+            } else if ($isnext) {
+                $status = $nextlabel;
+                $statusicon = 'arrow-right-02';
+                $css = 'next';
+            } else {
+                $status = $lockedlabellevel;
+                $statusicon = 'square-lock-02';
+                $css = 'locked';
+            }
             $ladder[] = [
                 'name' => $level['name'],
                 'xp' => $level['xp'],
+                'xp_label' => number_format((int) $level['xp']) . ' XP',
                 'index' => $i + 1,
-                'mark' => $ispast ? '✓' : (string) ($i + 1),
+                'mark' => (string) ($i + 1),
                 'is_past' => $ispast,
                 'is_now' => $isnow,
-                'css' => $ispast ? 'past' : ($isnow ? 'now' : ''),
-                // Past = green done; current keeps level colour; locked = grey.
-                'badge_color' => $ispast ? '#2E9E4F' : ($isnow ? $level['color'] : '#D6DEEC'),
+                'is_next' => $isnext,
+                'is_locked' => $islocked,
+                'status_label' => $status,
+                'status_icon' => $statusicon,
+                'css' => $css,
+                'badge_color' => $ispast ? '#2E9E4F' : ($isnow ? $level['color'] : ($isnext ? '#8FB3FF' : '#C5CDD8')),
             ];
         }
 
@@ -914,46 +1265,216 @@ final class fellowship_dashboard {
         $next = $levels[$li + 1] ?? null;
         $tonext = null;
         $pcttonext = 100;
+        $progresscaption = '';
+        $nextlevelxp = (int) $current['xp'];
         if ($next !== null) {
             $span = max(1, (int) $next['xp'] - (int) $current['xp']);
             $into = max(0, $xp - (int) $current['xp']);
             $tonext = max(0, (int) $next['xp'] - $xp);
             $pcttonext = (int) min(100, round(($into / $span) * 100));
-            // Exactly at a level threshold → 0% into the next band looks "broken"; show a floor fill.
-            if ($pcttonext === 0 && $xp >= (int) $current['xp']) {
-                $pcttonext = 6;
-            }
+            $nextlevelxp = (int) $next['xp'];
+            $progresscaption = number_format($xp) . ' / ' . number_format($nextlevelxp)
+                . ' XP to ' . $next['name'];
+        } else {
+            $progresscaption = self::str('fellowship_level_top', null, 'Top level reached.');
         }
 
         $badges = $live['badges'] ?? self::badge_catalogue_empty();
+        $earnedlabel = self::str('fellowship_badge_pill_earned', null, 'Earned');
+        $lockedlabel = self::str('fellowship_badge_pill_locked', null, 'Locked');
+        foreach ($badges as &$badge) {
+            $isearned = !empty($badge['earned']);
+            $badge['status_pill'] = $isearned ? $earnedlabel : $lockedlabel;
+            $badge['description'] = (string) ($badge['how'] ?? $badge['detail'] ?? '');
+            $badge['has_image'] = !empty($badge['imageurl']);
+            if (empty($badge['icon'])) {
+                $badge['icon'] = 'square-lock-02';
+            }
+        }
+        unset($badge);
+
+        $earneditems = array_values(array_filter($badges, static fn(array $b): bool => !empty($b['earned'])));
+        usort($earneditems, static function (array $a, array $b): int {
+            return ((int) ($b['at'] ?? 0)) <=> ((int) ($a['at'] ?? 0));
+        });
+        $lockeditems = array_values(array_filter($badges, static fn(array $b): bool => empty($b['earned'])));
+        $recent = array_slice($earneditems, 0, 4);
+        $nextbadges = array_slice($lockeditems, 0, 3);
+
+        $badgesearned = (int) ($live['badges_earned'] ?? count($earneditems));
+        $badgestotal = count($badges);
+        $badgespct = $badgestotal > 0 ? (int) round(($badgesearned / $badgestotal) * 100) : 0;
+
+        $pageitems = $tab === 'earned' ? $earneditems : $badges;
         $xplog = $live['xp_log'] ?? [];
 
         $xprules = [
-            ['label' => 'Finish a lesson', 'xp' => 50],
-            ['label' => 'Submit a quiz attempt', 'xp' => 40],
-            ['label' => 'Each correct answer', 'xp' => 10],
-            ['label' => 'Submit an assignment', 'xp' => 120],
-            ['label' => 'Resubmit after feedback', 'xp' => 80],
-            ['label' => 'Pass a gate', 'xp' => 200],
-            ['label' => 'Save a portfolio case study', 'xp' => 60],
+            [
+                'label' => self::str('fellowship_xp_rule_lesson', null, 'Finish a lesson'),
+                'xp' => 50,
+                'icon' => 'book-open-01',
+            ],
+            [
+                'label' => self::str('fellowship_xp_rule_quiz', null, 'Submit a quiz attempt'),
+                'xp' => 40,
+                'icon' => 'quiz-05',
+            ],
+            [
+                'label' => self::str('fellowship_xp_rule_correct', null, 'Each correct answer'),
+                'xp' => 10,
+                'icon' => 'checkmark-circle-02',
+            ],
+            [
+                'label' => self::str('fellowship_xp_rule_assign', null, 'Submit an assignment'),
+                'xp' => 120,
+                'icon' => 'file-upload',
+            ],
+            [
+                'label' => self::str('fellowship_xp_rule_resubmit', null, 'Resubmit after feedback'),
+                'xp' => 80,
+                'icon' => 'refresh',
+            ],
+            [
+                'label' => self::str('fellowship_xp_rule_gate', null, 'Pass a gate'),
+                'xp' => 200,
+                'icon' => 'flag-02',
+            ],
+            [
+                'label' => self::str('fellowship_xp_rule_portfolio', null, 'Save a portfolio case study'),
+                'xp' => 60,
+                'icon' => 'folder-01',
+            ],
+        ];
+
+        $achievementsurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false);
+        $moodlebadges = (new \moodle_url('/badges/mybadges.php'))->out(false);
+
+        // Pre-resolve with fallbacks so tabs/pills never show Moodle [[missing]] placeholders.
+        $strings = [
+            'level_path' => self::str('fellowship_level_path', null, 'Level path'),
+            'progress_sub' => self::str(
+                'fellowship_achievements_progress_sub',
+                null,
+                'Earn XP through lessons, quizzes, and submissions to unlock new levels.'
+            ),
+            'level_chip' => self::str('fellowship_level_chip', null, 'Level'),
+            'level_now' => self::str('fellowship_level_now', null, 'Current level:'),
+            'level_current_tag' => self::str('fellowship_level_current_tag', null, 'Current Level'),
+            'xp_earned_label' => self::str('fellowship_xp_earned_label', null, 'XP earned'),
+            'xp_to_level' => self::str('fellowship_xp_to_level', null, 'to'),
+            'level_top' => self::str('fellowship_level_top', null, 'Top level reached.'),
+            'xp_history_sub' => self::str(
+                'fellowship_xp_history_sub',
+                null,
+                'Track your learning activity and XP earned from lessons, quizzes, and submissions.'
+            ),
+            'xp_empty_title' => self::str('fellowship_xp_empty_title', null, 'No XP Yet!'),
+            'xp_empty_body' => self::str(
+                'fellowship_xp_empty_body',
+                null,
+                'Finish a lesson, quiz, or assignment in Moodle to earn your first XP and start building your learning progress.'
+            ),
+            'xp_step_lessons' => self::str('fellowship_xp_step_lessons', null, 'Complete Lessons'),
+            'xp_step_quizzes' => self::str('fellowship_xp_step_quizzes', null, 'Take Quizzes'),
+            'xp_step_assigns' => self::str('fellowship_xp_step_assigns', null, 'Submit Assignments'),
+            'xp_go_courses' => self::str('fellowship_xp_go_courses', null, 'Go to My Courses'),
+            'xp_title' => self::str(
+                'fellowship_xp_title',
+                null,
+                'XP from your Moodle activity record (lessons, quizzes, submissions). Does not affect grades.'
+            ),
+            'badges_heading' => self::str('fellowship_badges_heading', null, 'Badges'),
+            'badges_of' => self::str('fellowship_badges_of', null, 'of'),
+            'badges_earned' => self::str('fellowship_badges_earned', null, 'earned'),
+            'badges_open_moodle' => self::str('fellowship_badges_open_moodle', null, 'Open Moodle badges'),
+            'badges_tab_all' => self::str('fellowship_badges_tab_all', null, 'All'),
+            'badges_tab_earned' => self::str('fellowship_badges_tab_earned', null, 'Earned'),
+            'badges_empty_title' => self::str('fellowship_badges_empty_title', null, 'No badges in this view'),
+            'badges_empty_body' => self::str(
+                'fellowship_badges_empty_body',
+                null,
+                'Finish lessons, quizzes or assignments to unlock badges here.'
+            ),
+            'badges_recent_heading' => self::str('fellowship_badges_recent_heading', null, 'Recently earned'),
+            'badges_recent_empty' => self::str(
+                'fellowship_badges_recent_empty',
+                null,
+                'No badges earned yet — your first unlock will show here.'
+            ),
+            'badges_next_heading' => self::str('fellowship_badges_next_heading', null, 'Next up'),
+            'badges_next_done' => self::str(
+                'fellowship_badges_next_done',
+                null,
+                'You’ve unlocked every LaunchPad badge in this set.'
+            ),
+            'xp_history' => self::str('fellowship_xp_history', null, 'XP history'),
+            'xp_history_empty' => self::str(
+                'fellowship_xp_history_empty',
+                null,
+                'Nothing yet. Finish a lesson, quiz or assignment in Moodle to earn your first XP.'
+            ),
+            'xp_provisional_note' => self::str(
+                'fellowship_xp_provisional_note',
+                null,
+                'XP and badges refresh from your Moodle completion, quiz and assignment records.'
+            ),
+            'xp_how' => self::str('fellowship_xp_how', null, 'How XP works'),
+            'xp_how_note' => self::str(
+                'fellowship_xp_how_note',
+                null,
+                'Each listed action counts once from your Moodle record. XP never affects your grade. Portfolio XP stays unavailable until that feature ships.'
+            ),
+            'xp_how_sub' => self::str(
+                'fellowship_xp_how_sub',
+                null,
+                'Each action awards XP once from your Moodle activity.'
+            ),
+            'badge_pill_earned' => $earnedlabel,
+            'badge_pill_locked' => $lockedlabel,
         ];
 
         return [
             'xp_total' => $xp,
+            'xp_total_label' => number_format($xp),
             'level_name' => $current['name'],
             'level_index' => $li + 1,
             'level_color' => $current['color'],
             'has_next_level' => $next !== null,
             'next_level_name' => $next['name'] ?? '',
+            'next_level_xp' => $nextlevelxp,
+            'next_level_xp_label' => number_format($nextlevelxp),
             'xp_to_next' => $tonext,
             'pct_to_next' => $pcttonext,
+            'progress_caption' => $progresscaption,
+            'track_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
             'ladder' => $ladder,
             'badges' => $badges,
-            'badges_earned' => (int) ($live['badges_earned'] ?? 0),
-            'badges_total' => count($badges),
+            'page_items' => $pageitems,
+            'has_items' => $pageitems !== [],
+            'earned_items' => $earneditems,
+            'has_earned_items' => $earneditems !== [],
+            'recent_items' => $recent,
+            'has_recent' => $recent !== [],
+            'next_items' => $nextbadges,
+            'has_next_badges' => $nextbadges !== [],
+            'has_side_panels' => true,
+            'badges_earned' => $badgesearned,
+            'badges_total' => $badgestotal,
+            'badges_pct' => $badgespct,
+            'tab_all' => $tab === 'all',
+            'tab_earned' => $tab === 'earned',
+            'tab_all_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false),
+            'tab_earned_url' => (new \moodle_url(persona_home::FELLOW_PATH, [
+                'view' => 'achievements',
+                'tab' => 'earned',
+            ]))->out(false),
+            'moodle_badges_url' => $moodlebadges,
+            'achievements_url' => $achievementsurl,
             'has_xp_log' => $xplog !== [],
             'xp_log' => $xplog,
             'xp_rules' => $xprules,
+            'xp_empty_art_url' => (new \moodle_url('/local/launchpad/assets/img/fellowship-xp-empty.png'))->out(false),
+            'strings' => $strings,
         ];
     }
 
@@ -1201,66 +1722,67 @@ final class fellowship_dashboard {
             }
         }
 
+        // Hugeicons slugs (iconify: hugeicons:<slug>) — no emoji.
         $badgedefs = [
             'first' => [
                 'name' => 'First step',
-                'icon' => '🌱',
+                'icon' => 'plant-01',
                 'how' => 'Finish your first lesson',
                 'earned' => $pagesdone >= 1,
                 'at' => $pagesdone >= 1 ? self::first_log_ts($xplog, 'page-') : 0,
             ],
             'evidence' => [
                 'name' => 'Evidence hunter',
-                'icon' => '🔍',
+                'icon' => 'search-01',
                 'how' => 'Finish Lesson 2: Evidence versus assumptions',
                 'earned' => $evidence,
                 'at' => $evidence ? self::first_log_ts($xplog, 'page-') : 0,
             ],
             'allLessons' => [
                 'name' => 'Foundations reader',
-                'icon' => '📚',
+                'icon' => 'books-01',
                 'how' => 'Finish all Foundations lessons in your track',
                 'earned' => $alllessons,
                 'at' => $alllessons ? self::first_log_ts($xplog, 'page-') : 0,
             ],
             'ace' => [
                 'name' => 'Quiz ace',
-                'icon' => '🎯',
+                'icon' => 'target-01',
                 'how' => 'Score full marks on the Foundations check',
                 'earned' => $quizperfect,
                 'at' => $quizperfectat,
             ],
             'handin' => [
                 'name' => 'Hand-in hero',
-                'icon' => '📨',
+                'icon' => 'mail-send-01',
                 'how' => 'Submit your first assignment',
                 'earned' => $assignsubmitted,
                 'at' => $assignsubmittedat,
             ],
             'loop' => [
                 'name' => 'Feedback loop',
-                'icon' => '🔄',
+                'icon' => 'refresh',
                 'how' => 'Resubmit after your mentor requests changes',
                 'earned' => $assignresubmit,
                 'at' => $assignresubmitat,
             ],
             'gate' => [
                 'name' => 'Gate one cleared',
-                'icon' => '🏁',
+                'icon' => 'flag-02',
                 'how' => 'Pass Foundations (completion or grade ≥ 70)',
                 'earned' => $gatecleared,
                 'at' => $foundationsgateat,
             ],
             'portfolio' => [
                 'name' => 'Portfolio starter',
-                'icon' => '🗂️',
+                'icon' => 'folder-01',
                 'how' => 'Save your first portfolio case study',
                 'earned' => false,
                 'at' => 0,
             ],
             'profile' => [
                 'name' => 'Introduced',
-                'icon' => '👋',
+                'icon' => 'waving-hand-01',
                 'how' => 'Add a city or description on your Moodle profile',
                 'earned' => $profiledone,
                 'at' => $profileat,
@@ -1282,7 +1804,7 @@ final class fellowship_dashboard {
                 'how' => $def['how'],
                 'earned' => $earned,
                 'at' => $at,
-                'display_icon' => $earned ? $def['icon'] : '🔒',
+                'has_iconify' => true,
                 'detail' => $earned
                     ? get_string('fellowship_badge_earned_on', 'local_launchpad', $at ? userdate($at, get_string('strftimedate', 'langconfig')) : get_string('fellowship_badge_earned_recent', 'local_launchpad'))
                     : $def['how'],
@@ -1323,15 +1845,18 @@ final class fellowship_dashboard {
         $currentshort = $currentgate;
         $currentsection = 0;
         foreach ($journey['gates'] ?? [] as $gate) {
+            // Ring caption stays compact (spine short); full Moodle section name is for cards/KPIs.
+            $gateshort = (string) ($gate['spine_short'] ?? $gate['short'] ?? $gate['name'] ?? $currentgate);
+            $gatename = (string) ($gate['name'] ?? $gateshort);
             if (!empty($gate['is_current'])) {
-                $currentgate = (string) ($gate['name'] ?? $currentgate);
-                $currentshort = (string) ($gate['short'] ?? $currentgate);
+                $currentgate = $gatename;
+                $currentshort = $gateshort;
                 $currentsection = (int) ($gate['sectionnum'] ?? 0);
                 break;
             }
             if (!empty($gate['is_done'])) {
-                $currentgate = (string) ($gate['name'] ?? $currentgate);
-                $currentshort = (string) ($gate['short'] ?? $currentgate);
+                $currentgate = $gatename;
+                $currentshort = $gateshort;
                 $currentsection = (int) ($gate['sectionnum'] ?? 0);
             }
         }
@@ -1372,6 +1897,15 @@ final class fellowship_dashboard {
         $radius = ($size / 2) - 10;
         $circ = 2 * M_PI * $radius;
         $dashoffset = $circ * (1 - ($ringpct / 100));
+        $ring = [
+            'pct' => $ringpct,
+            'size' => $size,
+            'radius' => round($radius, 2),
+            'cx' => $size / 2,
+            'cy' => $size / 2,
+            'circ' => round($circ, 2),
+            'dashoffset' => number_format($dashoffset, 2, '.', ''),
+        ];
 
         $badges = $live['badges'] ?? [];
         $earned = [];
@@ -1388,27 +1922,96 @@ final class fellowship_dashboard {
             }
             return strcmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
         });
+        $achievementsurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false);
         $recent = array_slice($earned, 0, max(1, $limit));
+        foreach ($recent as &$badge) {
+            $badge['url'] = $achievementsurl;
+            $badge['has_image'] = !empty($badge['imageurl']);
+            $badge['has_iconify'] = !empty($badge['icon']);
+        }
+        unset($badge);
 
         $badgesearned = (int) ($live['badges_earned'] ?? count($earned));
         $badgestotal = count($badges);
 
-        $requiredvalue = '—';
+        $requiredvalue = get_string('fellowship_stat_required_na', 'local_launchpad');
         if ($hascoursepercent) {
             $requiredvalue = $completed . '/' . $trackable;
         } else if ($gatetrackable > 0) {
             $requiredvalue = $gatecompleted . '/' . $gatetrackable;
         }
 
+        // Scoped list: current gate section (Employer pattern); keep Foundations for BC.
         $foundations = self::section_activities_from_outline($outline, 1);
+        $scoped = [];
+        $scopedname = $currentgate;
+        if ($currentsection > 0) {
+            $scoped = self::section_activities_from_outline($outline, $currentsection);
+        }
+        if ($scoped === [] && !empty($outline['sections'])) {
+            foreach ($outline['sections'] as $section) {
+                $acts = array_values($section['activities'] ?? []);
+                if ($acts === []) {
+                    continue;
+                }
+                $scoped = $acts;
+                $scopedname = (string) ($section['name'] ?? $scopedname);
+                break;
+            }
+        }
+        if ($scoped === [] && $foundations !== []) {
+            $scoped = $foundations;
+            $scopedname = get_string('fellowship_foundations_heading', 'local_launchpad');
+        }
+        $scoped = array_slice($scoped, 0, 8);
+        $scoped = array_map([self::class, 'decorate_home_activity'], $scoped);
+
+        $seccounts = [];
+        foreach ($outline['sections'] ?? [] as $section) {
+            $sec = (int) ($section['sectionnum'] ?? 0);
+            if ($sec <= 0) {
+                continue;
+            }
+            $seccounts[$sec] = count($section['activities'] ?? []);
+        }
+        $gatelegend = [];
+        foreach ($journey['gates'] ?? [] as $gate) {
+            $sec = (int) ($gate['sectionnum'] ?? 0);
+            $step = (string) ($gate['status'] ?? 'lock');
+            $count = $seccounts[$sec] ?? 0;
+            $hasmoodlesection = !empty($gate['has_moodle_section']) || isset($seccounts[$sec]);
+            if ($count > 0) {
+                $activitymeta = get_string('fellowship_activities_count', 'local_launchpad', $count);
+            } else if (!$hasmoodlesection && empty($gate['is_current'])) {
+                $activitymeta = get_string('fellowship_journey_section_missing', 'local_launchpad');
+            } else {
+                $activitymeta = '';
+            }
+            $gatelegend[] = array_merge($gate, [
+                'step' => $step,
+                'activity_count' => $count,
+                'activity_meta' => $activitymeta,
+                'has_activity_meta' => $activitymeta !== '' && empty($gate['is_current']),
+                'legend_icon' => self::section_legend_icon($step),
+            ]);
+        }
+
+        $phasesurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))->out(false);
+        $trackurl = (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false);
+        $hasscoped = $scoped !== [];
+        $hasgates = $gatelegend !== [];
+        $badgesvalue = $badgestotal > 0
+            ? $badgesearned . '/' . $badgestotal
+            : (string) $badgesearned;
 
         return [
             // Always render the hero ring for enrolled fellows (0% is honest).
             'show_hero_ring' => true,
-            'has_percent' => $hascoursepercent,
+            'has_percent' => $hascoursepercent || $trackable > 0 || !empty($outline['sections']),
             'percent' => $hascoursepercent ? (int) $percent : null,
             'completed' => $completed,
             'trackable' => $trackable,
+            'ring' => $ring,
             'ring_pct' => $ringpct,
             'ring_label' => $currentshort,
             'ring_size' => $size,
@@ -1417,15 +2020,119 @@ final class fellowship_dashboard {
             'ring_cy' => $size / 2,
             'ring_circ' => round($circ, 2),
             'ring_dashoffset' => number_format($dashoffset, 2, '.', ''),
-            'stat_badges_value' => $badgesearned . '/' . $badgestotal,
+            'stat_badges_value' => $badgesvalue,
             'stat_required_value' => $requiredvalue,
             'stat_gate_value' => $currentgate,
+            'has_stats' => true,
+            'stat_cards' => [
+                [
+                    'url' => $achievementsurl,
+                    'icon' => 'champion',
+                    'tone' => 'blue',
+                    'value' => $badgesvalue,
+                    'label' => get_string('fellowship_stat_badges', 'local_launchpad'),
+                ],
+                [
+                    // Prefer in-page scoped list; fall back to Track when that block is absent.
+                    'url' => $hasscoped ? '#fellowship-scoped' : $trackurl,
+                    'icon' => 'checkmark-circle-02',
+                    'tone' => 'violet',
+                    'value' => $requiredvalue,
+                    'label' => get_string('fellowship_stat_required', 'local_launchpad'),
+                ],
+                [
+                    // Prefer journey card; fall back to Phase progress when gates are absent.
+                    'url' => $hasgates ? '#fellowship-journey' : $phasesurl,
+                    'icon' => 'flag-01',
+                    'tone' => 'green',
+                    'value' => $currentgate,
+                    'label' => get_string('fellowship_stat_gate', 'local_launchpad'),
+                    'is_text' => true,
+                ],
+            ],
+            'scoped_activities' => $scoped,
+            'has_scoped_activities' => $hasscoped,
+            'scoped_section_name' => $scopedname,
+            'scoped_section_help' => get_string('fellowship_scoped_help', 'local_launchpad'),
+            'gate_legend' => $gatelegend,
+            'has_gate_legend' => $hasgates,
             'recent_badges' => $recent,
             'has_recent_badges' => $recent !== [],
-            'achievements_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false),
+            'achievements_url' => $achievementsurl,
+            'phases_url' => $phasesurl,
+            'track_url_default' => $trackurl,
             'foundations_activities' => $foundations,
             'has_foundations_activities' => $foundations !== [],
+            'progresspct' => $ringpct,
+            'all_tracked_done' => $alldone,
         ];
+    }
+
+    /**
+     * Moodle course overview image URL when an image is uploaded (empty string otherwise).
+     *
+     * @param \stdClass $course
+     * @return string
+     */
+    public static function course_image_url(\stdClass $course): string {
+        $image = \core_course\external\course_summary_exporter::get_course_image($course);
+        return is_string($image) && $image !== '' ? $image : '';
+    }
+
+    /**
+     * Legend icon for a journey gate step (Hugeicons name).
+     */
+    public static function section_legend_icon(string $step): string {
+        return match ($step) {
+            'done' => 'checkmark-circle-02',
+            'cur' => 'flag-01',
+            'lock' => 'square-lock-02',
+            default => 'book-open-01',
+        };
+    }
+
+    /**
+     * Iconify row chrome for home activity list (Moodle modname only).
+     *
+     * @param array<string,mixed> $activity
+     * @return array<string,mixed>
+     */
+    public static function decorate_home_activity(array $activity): array {
+        $mod = (string) ($activity['modname'] ?? '');
+        $icon = 'book-open-01';
+        $tone = 'blue';
+        if ($mod === 'quiz') {
+            $icon = 'help-circle';
+            $tone = 'violet';
+        } else if (in_array($mod, ['assign', 'workshop'], true)) {
+            $icon = 'task-01';
+            $tone = 'teal';
+        } else if (in_array($mod, ['page', 'resource', 'url', 'book', 'folder', 'file'], true)) {
+            $icon = 'file-01';
+            $tone = 'blue';
+        } else if ($mod === 'forum') {
+            $icon = 'message-01';
+            $tone = 'amber';
+        }
+        $tracked = !empty($activity['tracked']);
+        $complete = !empty($activity['complete']);
+        if ($tracked && $complete) {
+            $status = get_string('fellowship_complete', 'local_launchpad');
+            $statustone = 'ok';
+        } else if ($tracked) {
+            $status = get_string('fellowship_incomplete', 'local_launchpad');
+            $statustone = 'line';
+        } else {
+            $status = get_string('fellowship_not_tracked', 'local_launchpad');
+            $statustone = 'line';
+        }
+        $meta = (string) ($activity['modname_display'] ?? '');
+        $activity['icon'] = $icon;
+        $activity['tone'] = $tone;
+        $activity['status_label'] = $status;
+        $activity['statustone'] = $statustone;
+        $activity['meta'] = $meta !== '' ? \core_text::strtoupper($meta) : $meta;
+        return $activity;
     }
 
     /**
@@ -1448,14 +2155,23 @@ final class fellowship_dashboard {
      * Course news-forum posts for enrolled lp-* courses (newest first).
      *
      * @param list<\stdClass> $courses
-     * @return array{items: list<array>, has_items: bool, moodle_news_url: string}
+     * @return array{
+     *   items: list<array>,
+     *   has_items: bool,
+     *   has_posts: bool,
+     *   count_posts: int,
+     *   count_courses: int,
+     *   moodle_news_url: string,
+     *   has_moodle_news: bool
+     * }
      */
     public static function list_announcements(int $userid, array $courses): array {
         global $DB;
 
         // Read-only: never call forum_get_course_forum() — it creates a news forum if missing.
         $items = [];
-        $firstforumurl = (new \moodle_url('/my/'))->out(false);
+        $firstforumurl = '';
+        $ctalabel = self::str('fellowship_news_open', null, 'Open');
 
         foreach ($courses as $course) {
             $modinfo = get_fast_modinfo($course, $userid);
@@ -1469,7 +2185,7 @@ final class fellowship_dashboard {
                 }
 
                 $forumurl = (new \moodle_url('/mod/forum/view.php', ['id' => $cm->id]))->out(false);
-                if ($firstforumurl === (new \moodle_url('/my/'))->out(false)) {
+                if ($firstforumurl === '') {
                     $firstforumurl = $forumurl;
                 }
 
@@ -1485,6 +2201,7 @@ final class fellowship_dashboard {
                         continue;
                     }
                     $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
+                    $authorname = $author ? fullname($author) : '';
                     $items[] = [
                         'id' => (int) $discussion->id,
                         'subject' => format_string($discussion->name),
@@ -1493,11 +2210,14 @@ final class fellowship_dashboard {
                             (int) $post->messageformat,
                             ['context' => \context_module::instance((int) $cm->id), 'para' => false]
                         ), 180),
-                        'author' => $author ? fullname($author) : '',
+                        'author' => $authorname,
+                        'has_author' => $authorname !== '',
                         'when' => userdate((int) $discussion->timemodified, get_string('strftimedatetimeshort', 'langconfig')),
                         'timemodified' => (int) $discussion->timemodified,
                         'url' => (new \moodle_url('/mod/forum/discuss.php', ['d' => $discussion->id]))->out(false),
                         'course_name' => format_string($course->fullname),
+                        'cta_label' => $ctalabel,
+                        'icon' => 'news',
                     ];
                 }
             }
@@ -1506,10 +2226,25 @@ final class fellowship_dashboard {
         usort($items, static fn(array $a, array $b): int => ($b['timemodified'] <=> $a['timemodified']));
         $items = array_slice($items, 0, 15);
 
+        $coursenames = [];
+        foreach ($items as $item) {
+            $name = (string) ($item['course_name'] ?? '');
+            if ($name !== '') {
+                $coursenames[$name] = true;
+            }
+        }
+
+        $hasitems = $items !== [];
+        $hasmoodlenews = $firstforumurl !== '';
+
         return [
             'items' => $items,
-            'has_items' => $items !== [],
+            'has_items' => $hasitems,
+            'has_posts' => $hasitems,
+            'count_posts' => count($items),
+            'count_courses' => count($coursenames),
             'moodle_news_url' => $firstforumurl,
+            'has_moodle_news' => $hasmoodlenews,
         ];
     }
 
@@ -1527,30 +2262,134 @@ final class fellowship_dashboard {
      * Portfolio = assign evidence from enrolled tracks (submissions + grades), not invented files.
      *
      * @param list<\stdClass> $courses
-     * @return array{items: list<array>, has_items: bool}
+     * @return array{
+     *   items: list<array>,
+     *   has_items: bool,
+     *   count_submitted: int,
+     *   count_reviewed: int,
+     *   count_awaiting: int,
+     *   count_open: int,
+     *   has_attention: bool
+     * }
      */
     public static function list_portfolio_evidence(int $userid, array $courses): array {
         $feedback = self::list_assignment_feedback($userid, $courses);
-        $items = [];
+        $attention = [];
+        $pending = [];
+        $reviewed = [];
+        $open = [];
+
         foreach ($feedback['items'] ?? [] as $row) {
+            $status = (string) ($row['status'] ?? 'not_submitted');
             $when = (string) ($row['graded_at'] ?? '');
-            if ($when === '') {
+            $whenlabel = '';
+            if ($when !== '') {
+                $whenlabel = self::str('fellowship_portfolio_when_graded', $when, 'Graded {$a}');
+            } else {
                 $when = (string) ($row['submitted_at'] ?? '');
+                if ($when !== '') {
+                    $whenlabel = self::str('fellowship_portfolio_when_submitted', $when, 'Submitted {$a}');
+                }
             }
-            $items[] = [
+            $attempt = (int) ($row['attempt'] ?? 0);
+            $icon = match ($status) {
+                'pending' => 'time-04',
+                'changes' => 'alert-02',
+                'reviewed' => 'checkmark-circle-02',
+                default => 'file-02',
+            };
+            $item = [
+                'cmid' => (int) ($row['cmid'] ?? 0),
                 'name' => $row['name'],
                 'course_name' => $row['course_name'] ?? '',
+                'status_key' => $status,
                 'status' => $row['status_label'] ?? '',
                 'chip' => $row['chip'] ?? 'line',
+                'icon' => $icon,
+                'summary' => $row['summary'] ?? '',
                 'when' => $when,
+                'when_label' => $whenlabel,
+                'has_when' => $whenlabel !== '',
                 'url' => $row['url'],
                 'has_comment' => !empty($row['has_comment']),
+                'has_grade' => !empty($row['has_grade']),
+                'grade_display' => $row['grade_display'] ?? '',
+                'has_attempt' => $attempt > 0,
+                'attempt' => $attempt,
+                'attempt_label' => $attempt > 0
+                    ? self::str('fellowship_portfolio_attempt', (string) $attempt, 'Attempt {$a}')
+                    : '',
+                'needs_attention' => !empty($row['needs_attention']),
+                'cta_label' => $row['cta_label'] ?? '',
+                'is_pending' => $status === 'pending',
+                'is_reviewed' => $status === 'reviewed',
+                'is_changes' => $status === 'changes',
+                'is_open' => $status === 'not_submitted',
             ];
+
+            if (!empty($item['needs_attention'])) {
+                $attention[] = $item;
+            } else if ($status === 'pending') {
+                $pending[] = $item;
+            } else if ($status === 'reviewed' || $status === 'changes') {
+                $reviewed[] = $item;
+            } else {
+                $open[] = $item;
+            }
         }
+
+        $items = array_values(array_merge($attention, $pending, $reviewed, $open));
+        $countreviewed = 0;
+        $countsubmitted = 0;
+        $countopen = 0;
+        $countawaiting = 0;
+        foreach ($items as $item) {
+            $key = (string) ($item['status_key'] ?? '');
+            if ($key === 'not_submitted') {
+                $countopen++;
+                continue;
+            }
+            $countsubmitted++;
+            if ($key === 'pending') {
+                $countawaiting++;
+            } else if ($key === 'reviewed' || $key === 'changes') {
+                $countreviewed++;
+            }
+        }
+
         return [
             'items' => $items,
             'has_items' => $items !== [],
+            'count_submitted' => $countsubmitted,
+            'count_reviewed' => $countreviewed,
+            'count_awaiting' => $countawaiting,
+            'count_open' => $countopen,
+            'has_attention' => $attention !== [],
+            'has_submitted' => $countsubmitted > 0,
         ];
+    }
+
+    /**
+     * Resolve a Moodle lang key with a hard fallback (never emit [[missing]] markers).
+     *
+     * Production: prefer lang/en/local_launchpad.php via get_string; fallback only when
+     * the string cache is stale or the key is not installed yet.
+     *
+     * @param string $identifier
+     * @param mixed $a
+     * @param string $fallback
+     */
+    public static function str(string $identifier, $a = null, string $fallback = ''): string {
+        if (get_string_manager()->string_exists($identifier, 'local_launchpad')) {
+            $out = get_string($identifier, 'local_launchpad', $a);
+            if (is_string($out) && $out !== '' && strpos($out, '[[') === false) {
+                return $out;
+            }
+        }
+        if ($fallback !== '' && $a !== null && is_string($a) && strpos($fallback, '{$a}') !== false) {
+            return str_replace('{$a}', $a, $fallback);
+        }
+        return $fallback !== '' ? $fallback : $identifier;
     }
 
     /**
@@ -1563,15 +2402,15 @@ final class fellowship_dashboard {
         ];
         // Reuse definitions with nothing earned via a zero-user path is heavy; inline locked catalogue.
         foreach ([
-            ['first', 'First step', '🌱', 'Finish your first lesson'],
-            ['evidence', 'Evidence hunter', '🔍', 'Finish Lesson 2: Evidence versus assumptions'],
-            ['allLessons', 'Foundations reader', '📚', 'Finish all Foundations lessons in your track'],
-            ['ace', 'Quiz ace', '🎯', 'Score full marks on the Foundations check'],
-            ['handin', 'Hand-in hero', '📨', 'Submit your first assignment'],
-            ['loop', 'Feedback loop', '🔄', 'Resubmit after your mentor requests changes'],
-            ['gate', 'Gate one cleared', '🏁', 'Pass Foundations (completion or grade ≥ 70)'],
-            ['portfolio', 'Portfolio starter', '🗂️', 'Save your first portfolio case study'],
-            ['profile', 'Introduced', '👋', 'Add a city or description on your Moodle profile'],
+            ['first', 'First step', 'plant-01', 'Finish your first lesson'],
+            ['evidence', 'Evidence hunter', 'search-01', 'Finish Lesson 2: Evidence versus assumptions'],
+            ['allLessons', 'Foundations reader', 'books-01', 'Finish all Foundations lessons in your track'],
+            ['ace', 'Quiz ace', 'target-01', 'Score full marks on the Foundations check'],
+            ['handin', 'Hand-in hero', 'mail-send-01', 'Submit your first assignment'],
+            ['loop', 'Feedback loop', 'refresh', 'Resubmit after your mentor requests changes'],
+            ['gate', 'Gate one cleared', 'flag-02', 'Pass Foundations (completion or grade ≥ 70)'],
+            ['portfolio', 'Portfolio starter', 'folder-01', 'Save your first portfolio case study'],
+            ['profile', 'Introduced', 'waving-hand-01', 'Add a city or description on your Moodle profile'],
         ] as $row) {
             $live['badges'][] = [
                 'id' => $row[0],
@@ -1579,7 +2418,7 @@ final class fellowship_dashboard {
                 'icon' => $row[2],
                 'how' => $row[3],
                 'earned' => false,
-                'display_icon' => '🔒',
+                'has_iconify' => true,
                 'detail' => $row[3],
                 'css' => '',
             ];
@@ -1887,7 +2726,9 @@ final class fellowship_dashboard {
             'has_attention' => $attention > 0,
             // Banner only — cards below still update from Moodle (not a static forever page).
             'show_empty_released' => $assigncount > 0 && !$hasreleased,
-            'empty_title' => get_string('fellowship_feedback_empty_title', 'local_launchpad'),
+            'empty_title' => self::str('fellowship_feedback_empty_title', null, 'No released feedback yet'),
+            'empty_title_lead' => self::str('fellowship_feedback_empty_title_lead', null, 'No released'),
+            'empty_title_accent' => self::str('fellowship_feedback_empty_title_accent', null, 'feedback yet'),
             'empty_body' => $emptybody,
             'empty_cta_url' => $emptyctaurl,
             'empty_cta_label' => $emptyctalabel,

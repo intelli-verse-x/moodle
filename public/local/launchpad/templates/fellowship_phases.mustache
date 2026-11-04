@@ -1,54 +1,71 @@
 {{!
     @template local_launchpad/fellowship_phases
 
-    Phase progress — full journey + weight/score/status from Moodle assign grades.
+    Phase progress — journey + weight/score/status from Moodle assign grades.
+    Tools chrome aligned with Completion / Achievements.
 }}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
-
-<div class="lp-ach-head">
-  <span class="lp-eyebrow">{{#str}} fellowship_phases_eyebrow, local_launchpad {{/str}}</span>
-  <h2>{{#str}} fellowship_nav_phases, local_launchpad {{/str}}</h2>
-  <p class="lp-muted">{{#str}} fellowship_phases_lead, local_launchpad {{/str}}</p>
-</div>
-
+<div class="lp-tools-page lp-reveal" data-region="fellowship-phases-page" style="--lp-d:0">
 {{^has_course}}
   <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">LP</div>
-    <h2>{{#str}} fellowship_nav_phases, local_launchpad {{/str}}</h2>
+    <div class="lp-empty-mark" aria-hidden="true">
+      <iconify-icon icon="hugeicons:flag-02" width="26" height="26"></iconify-icon>
+    </div>
+    <h2>{{strings.empty_title}}</h2>
     <p>{{empty_message}}</p>
   </div>
 {{/has_course}}
 
 {{#has_course}}
-  <section class="lp-card lift lp-journey-card">
+  <section class="lp-card lift lp-journey-card lp-stack-lg">
+    <div class="lp-card-head">
+      <div class="lp-grade-progress-title">
+        <span class="lp-grade-progress-icon" aria-hidden="true">
+          <iconify-icon icon="hugeicons:route-01" width="22" height="22"></iconify-icon>
+        </span>
+        <div class="lp-card-copy">
+          <h3>{{strings.journey_heading}}</h3>
+          <p>{{strings.journey_sub}}</p>
+        </div>
+      </div>
+      <span class="lp-chip {{status_chip}}">{{status_label}}</span>
+    </div>
     {{> local_launchpad/fellowship_journey}}
   </section>
 
-  <div class="lp-stack lp-phase-list">
-    {{#phases}}
-      <div class="lp-phase-item">
-        <div class="lp-phase-ico{{#ico_dim}} dim{{/ico_dim}}" aria-hidden="true">{{ico}}</div>
-        <div class="lp-phase-bd">
-          <b>{{name}}</b>
-          <small>{{#str}} fellowship_phase_weight, local_launchpad {{/str}} {{weight_label}} · {{hint}}</small>
+  <section class="lp-card lift lp-stack-lg" data-region="fellowship-phase-gates">
+    <div class="lp-card-head">
+      <div class="lp-grade-progress-title">
+        <span class="lp-grade-progress-icon" aria-hidden="true">
+          <iconify-icon icon="hugeicons:flag-02" width="22" height="22"></iconify-icon>
+        </span>
+        <div class="lp-card-copy">
+          <h3>{{strings.gates_heading}}</h3>
+          <p>{{strings.gates_sub}}</p>
         </div>
-        <span class="lp-num lp-phase-score">{{score_display}}</span>
-        {{#has_chip_class}}
-          <span class="lp-chip {{chip}}">{{status}}</span>
-        {{/has_chip_class}}
-        {{^has_chip_class}}
-          <span class="lp-chip">{{status}}</span>
-        {{/has_chip_class}}
       </div>
-    {{/phases}}
-  </div>
+      <span class="lp-muted lp-sm">{{gates_label}}</span>
+    </div>
 
-  <p class="lp-note lp-muted">{{#str}} fellowship_phases_note, local_launchpad {{/str}}</p>
+    <div class="lp-stack lp-phase-list">
+      {{#phases}}
+        <div class="lp-phase-item{{#is_met}} is-met{{/is_met}}{{#is_not_released}} is-locked{{/is_not_released}}">
+          <div class="lp-phase-ico{{#ico_dim}} dim{{/ico_dim}}" aria-hidden="true">{{ico}}</div>
+          <div class="lp-phase-bd">
+            <b>{{name}}</b>
+            <small>{{#str}} fellowship_phase_weight, local_launchpad {{/str}} {{weight_label}} · {{hint}}</small>
+          </div>
+          <span class="lp-num lp-phase-score">{{score_display}}</span>
+          {{#has_chip_class}}
+            <span class="lp-chip {{chip}}">{{status}}</span>
+          {{/has_chip_class}}
+          {{^has_chip_class}}
+            <span class="lp-chip">{{status}}</span>
+          {{/has_chip_class}}
+        </div>
+      {{/phases}}
+    </div>
+
+    <p class="lp-note lp-muted lp-xs">{{strings.note}}</p>
+  </section>
 {{/has_course}}
+</div>

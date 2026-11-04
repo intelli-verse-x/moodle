@@ -4,21 +4,7 @@
     Live Moodle assign feedback. Empty banner = no released grade/comment yet;
     cards always reflect current submission/grade state.
 }}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
-
-<div class="lp-ach-head">
-  <span class="lp-eyebrow">{{#str}} fellowship_feedback_eyebrow, local_launchpad {{/str}}</span>
-  <h2>{{#str}} fellowship_nav_feedback, local_launchpad {{/str}}</h2>
-  <p class="lp-muted">{{#str}} fellowship_feedback_lead, local_launchpad {{/str}}</p>
-</div>
-
+<div class="lp-feedback-page lp-reveal" data-region="fellowship-feedback-page" style="--lp-d:0">
 {{^has_courses}}
   <div class="lp-empty" role="status">
     <div class="lp-empty-mark" aria-hidden="true">LP</div>
@@ -39,24 +25,39 @@
 
   {{#has_assigns}}
     {{#show_empty_released}}
-      <div class="lp-empty lp-empty-avatar" role="status">
-        {{#empty_avatar_url}}
-          <img class="lp-empty-av" src="{{empty_avatar_url}}" alt="">
-        {{/empty_avatar_url}}
-        {{^empty_avatar_url}}
-          <div class="lp-empty-mark" aria-hidden="true">·</div>
-        {{/empty_avatar_url}}
-        <h2>{{empty_title}}</h2>
-        <p>{{empty_body}}</p>
-        {{#has_empty_cta}}
-          <a class="lp-btn lp-btn-light" href="{{empty_cta_url}}">{{empty_cta_label}}</a>
-        {{/has_empty_cta}}
-      </div>
+      <section class="lp-feedback-empty" role="status">
+        <div class="lp-feedback-empty-art" aria-hidden="true">
+          {{#empty_avatar_url}}
+            <span class="lp-feedback-empty-glow"></span>
+            <img class="lp-feedback-empty-img" src="{{empty_avatar_url}}" alt="" width="280" height="280" decoding="async">
+          {{/empty_avatar_url}}
+          {{^empty_avatar_url}}
+            <div class="lp-empty-mark">·</div>
+          {{/empty_avatar_url}}
+        </div>
+        <div class="lp-feedback-empty-copy">
+          <span class="lp-feedback-tag">
+            <iconify-icon icon="hugeicons:comment-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+            {{#str}} fellowship_feedback_tag, local_launchpad {{/str}}
+          </span>
+          <h2 class="lp-feedback-empty-title">
+            {{empty_title_lead}}
+            <span>{{empty_title_accent}}</span>
+          </h2>
+          <p>{{empty_body}}</p>
+          {{#has_empty_cta}}
+            <a class="lp-btn lp-btn-primary lp-feedback-empty-cta" href="{{empty_cta_url}}">
+              <iconify-icon icon="hugeicons:link-square-02" width="18" height="18" aria-hidden="true"></iconify-icon>
+              {{empty_cta_label}}
+              <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon>
+            </a>
+          {{/has_empty_cta}}
+        </div>
+      </section>
     {{/show_empty_released}}
 
     {{#has_released}}
-      <div class="lp-stack lp-stack-lg">
-        <h3 class="lp-feedback-section">{{#str}} fellowship_feedback_section_released, local_launchpad {{/str}}</h3>
+      <div class="lp-feedback-list">
         {{#released_items}}
           {{> local_launchpad/fellowship_feedback_card}}
         {{/released_items}}
@@ -64,18 +65,12 @@
     {{/has_released}}
 
     {{#has_open_items}}
-      <div class="lp-stack lp-stack-lg">
-        {{#has_released}}
-          <h3 class="lp-feedback-section">{{#str}} fellowship_feedback_section_open, local_launchpad {{/str}}</h3>
-        {{/has_released}}
+      <div class="lp-feedback-list">
         {{#open_items}}
           {{> local_launchpad/fellowship_feedback_card}}
         {{/open_items}}
       </div>
     {{/has_open_items}}
-
-    {{#has_items}}
-      <p class="lp-xs lp-muted">{{#str}} fellowship_feedback_native_note, local_launchpad {{/str}}</p>
-    {{/has_items}}
   {{/has_assigns}}
 {{/has_courses}}
+</div>

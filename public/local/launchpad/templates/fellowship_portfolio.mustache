@@ -1,44 +1,100 @@
 {{!
     @template local_launchpad/fellowship_portfolio
+
+    Fellowship portfolio — Capstone hero + stats + Moodle assign evidence list.
 }}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
-
-<div class="lp-ach-head">
-  <span class="lp-eyebrow">{{#str}} fellowship_nav_you, local_launchpad {{/str}}</span>
-  <h2>{{#str}} fellowship_nav_portfolio, local_launchpad {{/str}}</h2>
-  <p class="lp-muted">{{#str}} fellowship_portfolio_intro, local_launchpad {{/str}}</p>
-</div>
-
-{{#has_items}}
-  <div class="lp-stack">
-    {{#items}}
-      <article class="lp-card lift lp-port-item">
-        <div class="lp-row-sb">
-          <div>
-            <span class="lp-eyebrow">{{{course_name}}}</span>
-            <h3><a href="{{url}}">{{{name}}}</a></h3>
-            {{#when}}<p class="lp-xs lp-muted">{{when}}</p>{{/when}}
+<div class="lp-tools-page lp-reveal" data-region="fellowship-portfolio" style="--lp-d:0">
+  <div class="lp-port-system">
+    <section class="lp-card lift lp-theme-hero lp-port-overview">
+      <div class="lp-theme-hero-main">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:folder-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <div class="lp-theme-hero-heading">
+              <h3>{{#str}} fellowship_nav_portfolio, local_launchpad {{/str}}</h3>
+            </div>
+            <p>{{#str}} fellowship_portfolio_intro, local_launchpad {{/str}}</p>
           </div>
-          <span class="lp-chip {{chip}}">{{status}}</span>
         </div>
-        {{#has_comment}}
-          <p class="lp-xs lp-muted">{{#str}} fellowship_portfolio_has_feedback, local_launchpad {{/str}}</p>
-        {{/has_comment}}
-      </article>
-    {{/items}}
+        <p class="lp-sm lp-theme-hero-body">{{#str}} fellowship_portfolio_lead, local_launchpad {{/str}}</p>
+      </div>
+      <div class="lp-theme-hero-art" aria-hidden="true">
+        <span class="lp-theme-hero-orb"></span>
+        <iconify-icon icon="hugeicons:folder-01" width="88" height="88"></iconify-icon>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-port-stats">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:analytics-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{#str}} fellowship_portfolio_stats_heading, local_launchpad {{/str}}</h3>
+          </div>
+        </div>
+      </div>
+      <dl class="lp-theme-kv lp-port-stats-kv">
+        <div class="lp-theme-kv-row{{#has_submitted}} is-hot{{/has_submitted}}">
+          <dt>{{#str}} fellowship_portfolio_stat_submitted, local_launchpad {{/str}}</dt>
+          <dd><b class="lp-num">{{count_submitted}}</b></dd>
+        </div>
+        <div class="lp-theme-kv-row">
+          <dt>{{#str}} fellowship_portfolio_stat_reviewed, local_launchpad {{/str}}</dt>
+          <dd><b class="lp-num">{{count_reviewed}}</b></dd>
+        </div>
+        <div class="lp-theme-kv-row{{#has_attention}} is-hot{{/has_attention}}">
+          <dt>{{#str}} fellowship_portfolio_stat_awaiting, local_launchpad {{/str}}</dt>
+          <dd><b class="lp-num">{{count_awaiting}}</b></dd>
+        </div>
+        <div class="lp-theme-kv-row">
+          <dt>{{#str}} fellowship_portfolio_stat_open, local_launchpad {{/str}}</dt>
+          <dd><b class="lp-num">{{count_open}}</b></dd>
+        </div>
+      </dl>
+    </section>
   </div>
-{{/has_items}}
-{{^has_items}}
-  <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">··</div>
-    <h2>{{#str}} fellowship_portfolio_empty_title, local_launchpad {{/str}}</h2>
-    <p>{{#str}} fellowship_portfolio_empty_body, local_launchpad {{/str}}</p>
-  </div>
-{{/has_items}}
+
+  {{#has_items}}
+    <section class="lp-card lift lp-port-workspace" aria-label="{{#str}} fellowship_nav_portfolio, local_launchpad {{/str}}">
+      <ul class="lp-port-list">
+        {{#items}}
+          <li class="lp-port-item{{#needs_attention}} is-attention{{/needs_attention}}{{#is_open}} is-open{{/is_open}}">
+            <div class="lp-port-item-main">
+              <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+                <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+              </span>
+              <div class="lp-port-item-copy">
+                {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
+                <h3><a href="{{url}}">{{{name}}}</a></h3>
+                {{#summary}}<p class="lp-sm lp-muted">{{summary}}</p>{{/summary}}
+                <div class="lp-port-item-meta">
+                  {{#has_when}}<span>{{when_label}}</span>{{/has_when}}
+                  {{#has_attempt}}<span>{{attempt_label}}</span>{{/has_attempt}}
+                  {{#has_grade}}<span class="lp-port-grade">{{grade_display}}</span>{{/has_grade}}
+                  {{#has_comment}}<span>{{#str}} fellowship_portfolio_has_feedback, local_launchpad {{/str}}</span>{{/has_comment}}
+                </div>
+              </div>
+            </div>
+            <div class="lp-port-item-aside">
+              <span class="lp-chip {{chip}}">{{status}}</span>
+              <a class="lp-btn lp-btn-light" href="{{url}}">{{cta_label}}</a>
+            </div>
+          </li>
+        {{/items}}
+      </ul>
+    </section>
+  {{/has_items}}
+  {{^has_items}}
+    <div class="lp-empty" role="status">
+      <div class="lp-empty-mark" aria-hidden="true">
+        <iconify-icon icon="hugeicons:folder-01" width="26" height="26"></iconify-icon>
+      </div>
+      <h2>{{#str}} fellowship_portfolio_empty_title, local_launchpad {{/str}}</h2>
+      <p>{{#str}} fellowship_portfolio_empty_body, local_launchpad {{/str}}</p>
+    </div>
+  {{/has_items}}
+</div>

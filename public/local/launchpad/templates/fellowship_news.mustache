@@ -1,45 +1,97 @@
 {{!
     @template local_launchpad/fellowship_news
+
+    Fellowship announcements — Capstone hero + stats + Moodle news-forum list.
 }}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
-
-<div class="lp-ach-head">
-  <div class="lp-row-sb">
-    <div>
-      <span class="lp-eyebrow">{{#str}} fellowship_nav_you, local_launchpad {{/str}}</span>
-      <h2>{{#str}} fellowship_nav_news, local_launchpad {{/str}}</h2>
-      <p class="lp-muted">{{#str}} fellowship_news_intro, local_launchpad {{/str}}</p>
-    </div>
-    <a class="lp-btn lp-btn-light" href="{{moodle_news_url}}">{{#str}} fellowship_news_open_moodle, local_launchpad {{/str}}</a>
-  </div>
-</div>
-
-{{#has_items}}
-  <div class="lp-stack">
-    {{#items}}
-      <article class="lp-card lift lp-news-item">
-        <div class="lp-row-sb">
-          <span class="lp-eyebrow">{{{course_name}}}</span>
-          <span class="lp-xs lp-muted">{{when}}</span>
+<div class="lp-tools-page lp-reveal" data-region="fellowship-news" style="--lp-d:0">
+  <div class="lp-news-system">
+    <section class="lp-card lift lp-theme-hero lp-news-overview">
+      <div class="lp-theme-hero-main">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:news" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <div class="lp-theme-hero-heading">
+              <h3>{{#str}} fellowship_nav_news, local_launchpad {{/str}}</h3>
+            </div>
+            <p>{{#str}} fellowship_news_intro, local_launchpad {{/str}}</p>
+          </div>
         </div>
-        <h3><a href="{{url}}">{{{subject}}}</a></h3>
-        {{#author}}<p class="lp-sm lp-muted">{{author}}</p>{{/author}}
-        <div class="lp-sm">{{{excerpt}}}</div>
-      </article>
-    {{/items}}
+        <p class="lp-sm lp-theme-hero-body">{{#str}} fellowship_news_lead, local_launchpad {{/str}}</p>
+        {{#has_moodle_news}}
+          <div class="lp-news-hero-actions">
+            <a class="lp-btn lp-btn-light" href="{{moodle_news_url}}">{{#str}} fellowship_news_open_moodle, local_launchpad {{/str}}</a>
+          </div>
+        {{/has_moodle_news}}
+      </div>
+      <div class="lp-theme-hero-art" aria-hidden="true">
+        <span class="lp-theme-hero-orb"></span>
+        <iconify-icon icon="hugeicons:news" width="88" height="88"></iconify-icon>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-news-stats">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:analytics-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{#str}} fellowship_news_stats_heading, local_launchpad {{/str}}</h3>
+          </div>
+        </div>
+      </div>
+      <dl class="lp-theme-kv lp-news-stats-kv">
+        <div class="lp-theme-kv-row{{#has_posts}} is-hot{{/has_posts}}">
+          <dt>{{#str}} fellowship_news_stat_posts, local_launchpad {{/str}}</dt>
+          <dd><b class="lp-num">{{count_posts}}</b></dd>
+        </div>
+        <div class="lp-theme-kv-row">
+          <dt>{{#str}} fellowship_news_stat_courses, local_launchpad {{/str}}</dt>
+          <dd><b class="lp-num">{{count_courses}}</b></dd>
+        </div>
+      </dl>
+    </section>
   </div>
-{{/has_items}}
-{{^has_items}}
-  <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">··</div>
-    <h2>{{#str}} fellowship_news_empty_title, local_launchpad {{/str}}</h2>
-    <p>{{#str}} fellowship_news_empty_body, local_launchpad {{/str}}</p>
-  </div>
-{{/has_items}}
+
+  {{#has_items}}
+    <section class="lp-card lift lp-news-workspace" aria-label="{{#str}} fellowship_nav_news, local_launchpad {{/str}}">
+      <ul class="lp-news-list">
+        {{#items}}
+          <li class="lp-news-item">
+            <div class="lp-news-item-main">
+              <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+                <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+              </span>
+              <div class="lp-news-item-copy">
+                {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
+                <h3><a href="{{url}}">{{{subject}}}</a></h3>
+                {{#excerpt}}<p class="lp-sm lp-muted">{{{excerpt}}}</p>{{/excerpt}}
+                <div class="lp-news-item-meta">
+                  {{#has_author}}<span>{{author}}</span>{{/has_author}}
+                  {{#when}}<span>{{when}}</span>{{/when}}
+                </div>
+              </div>
+            </div>
+            <div class="lp-news-item-aside">
+              <a class="lp-btn lp-btn-light" href="{{url}}">{{cta_label}}</a>
+            </div>
+          </li>
+        {{/items}}
+      </ul>
+    </section>
+  {{/has_items}}
+  {{^has_items}}
+    <div class="lp-empty" role="status">
+      <div class="lp-empty-mark" aria-hidden="true">
+        <iconify-icon icon="hugeicons:news" width="26" height="26"></iconify-icon>
+      </div>
+      <h2>{{#str}} fellowship_news_empty_title, local_launchpad {{/str}}</h2>
+      <p>{{#str}} fellowship_news_empty_body, local_launchpad {{/str}}</p>
+      {{#has_moodle_news}}
+        <a class="lp-btn lp-btn-light" href="{{moodle_news_url}}">{{#str}} fellowship_news_open_moodle, local_launchpad {{/str}}</a>
+      {{/has_moodle_news}}
+    </div>
+  {{/has_items}}
+</div>

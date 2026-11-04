@@ -107,15 +107,15 @@ final class blueprint {
                 'category_idnumber' => self::ROOT_IDNUMBER,
                 'shortname' => 'LP-ORIENT-' . strtoupper($slug),
                 'idnumber' => 'lp-orient-' . $slug,
-                'fullname' => 'LaunchPad Orientation — Cohort ' . $label,
-                'summary' => 'Shared LaunchPad orientation. Placeholder structure only — curriculum pending approval.',
+                'fullname' => 'LaunchPad Orientation · Cohort ' . $label,
+                'summary' => 'Shared LaunchPad orientation. Structure only until curriculum is approved.',
                 'kind' => 'orientation',
             ],
         ];
 
         foreach (self::track_categories() as $catid => $trackname) {
             $codeslug = str_replace('launchpad-', '', $catid);
-            $summary = 'LaunchPad track course (hidden until release). Placeholder structure only.';
+            $summary = 'LaunchPad track course (hidden until release). Structure only until curriculum is approved.';
             if ($catid === 'launchpad-fullstack') {
                 $summary .= ' A laptop is required for later build work (stated for fellows before placement).';
             }
@@ -123,7 +123,7 @@ final class blueprint {
                 'category_idnumber' => $catid,
                 'shortname' => 'LP-' . strtoupper($codeslug) . '-' . strtoupper($slug),
                 'idnumber' => 'lp-' . $codeslug . '-' . $slug,
-                'fullname' => 'LaunchPad — ' . $trackname . ' — Cohort ' . $label,
+                'fullname' => 'LaunchPad · ' . $trackname . ' · Cohort ' . $label,
                 'summary' => $summary,
                 'kind' => 'track',
             ];
@@ -140,7 +140,7 @@ final class blueprint {
      * @return list<array{section:int, modulename:string, name:string, idnumber:string}>
      */
     public static function activities_for(string $kind): array {
-        $placeholder = ' [placeholder — content pending]';
+        $placeholder = ' [placeholder · content pending]';
 
         if ($kind === 'orientation') {
             return [

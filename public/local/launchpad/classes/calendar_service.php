@@ -302,10 +302,17 @@ final class calendar_service {
             return ['ok' => true, 'error' => null, 'timeduration' => 0];
         }
         if ($mode === 'minutes') {
+            if ($durationminutes < 1) {
+                return [
+                    'ok' => false,
+                    'error' => get_string('fellowship_calendar_err_minutes', 'local_launchpad'),
+                    'timeduration' => 0,
+                ];
+            }
             return [
                 'ok' => true,
                 'error' => null,
-                'timeduration' => max(0, $durationminutes) * 60,
+                'timeduration' => $durationminutes * 60,
             ];
         }
         if ($mode === 'until') {
@@ -354,6 +361,19 @@ final class calendar_service {
             'upcoming_page_size' => self::UPCOMING_PAGE_SIZE,
             'moodle_calendar_url' => self::moodle_month_url(),
         ];
+    }
+
+    /**
+     * Whether the user may create/edit personal (user) calendar events.
+     */
+    public static function user_can_add_personal(int $userid): bool {
+        if ($userid <= 0 || isguestuser($userid)) {
+            return false;
+        }
+        return has_capability(
+            'moodle/calendar:manageownentries',
+            \context_user::instance($userid)
+        );
     }
 
     /**
@@ -482,6 +502,14 @@ final class calendar_service {
         $grid = self::build_month_grid($year, $month, $filteredmonth);
 
         $basemonth = make_timestamp($year, $month, 1, 0, 0, 0);
+        $todaytime = make_timestamp(
+            (int) userdate(time(), '%Y'),
+            (int) userdate(time(), '%m'),
+            1,
+            0,
+            0,
+            0
+        );
         if ($month === 1) {
             $prevtime = make_timestamp($year - 1, 12, 1, 0, 0, 0);
         } else {
@@ -543,11 +571,15 @@ final class calendar_service {
         }
 
         $manageable = self::courses_user_can_manage($userid, $courses);
-        $canaddpersonal = has_capability(
-            'moodle/calendar:manageownentries',
-            \context_user::instance($userid)
-        );
+        $canaddpersonal = self::user_can_add_personal($userid);
         $canaddcourse = $manageable !== [];
+        // Fellowship calendar is personal-first (study reminders, meetings). Mentors
+        // still prefer course deadlines when they can manage course calendars.
+        if ($portal === 'fellow') {
+            $canaddcourse = false;
+            $manageable = [];
+        }
+        $canaddevent = $canaddpersonal || $canaddcourse;
 
         $navparams = static function (array $extra) use ($filter): array {
             if ($filter !== 'all') {
@@ -563,7 +595,7 @@ final class calendar_service {
             $upcomingpaged[] = $item;
         }
 
-        return array_merge($grid, [
+        $ctx = array_merge($grid, [
             'mode_month' => $mode === 'month',
             'mode_upcoming' => $mode === 'upcoming',
             'mode_day' => $mode === 'day',
@@ -574,8 +606,10 @@ final class calendar_service {
             'filter' => $filter,
             'month_label' => userdate($basemonth, '%B %Y'),
             'day_label' => userdate($day['time'], get_string('strftimedaydate', 'langconfig')),
+            'day_key' => self::user_ymd($day['time']),
             'week_label' => $weeklabel,
             'current_time' => $basemonth,
+            'today_time' => $todaytime,
             'day_time' => $day['time'],
             'week_time' => $week['time'],
             'prev_time' => $prevtime,
@@ -593,6 +627,11 @@ final class calendar_service {
                 'view' => 'calendar',
                 'cal' => 'month',
                 'time' => $nexttime,
+            ])))->out(false),
+            'today_url' => (new \moodle_url($basepath, $navparams([
+                'view' => 'calendar',
+                'cal' => 'month',
+                'time' => $todaytime,
             ])))->out(false),
             'prev_day_url' => (new \moodle_url($basepath, $navparams([
                 'view' => 'calendar',
@@ -670,7 +709,7 @@ final class calendar_service {
             'sesskey' => sesskey(),
             'can_add_personal' => $canaddpersonal,
             'can_add_course' => $canaddcourse,
-            'can_add_event' => $canaddpersonal || $canaddcourse,
+            'can_add_event' => $canaddevent,
             'has_scope_choice' => $canaddpersonal && $canaddcourse,
             'default_scope' => ($portal === 'mentor' && $canaddcourse)
                 ? 'course'
@@ -690,6 +729,33 @@ final class calendar_service {
             'detail_events' => $monthitems,
             'has_detail_events' => $monthitems !== [],
         ]);
+
+        return self::stamp_can_add_on_days($ctx, $canaddevent);
+    }
+
+    /**
+     * Stamp can_add_event onto month/week day cells (Mustache day context is local).
+     *
+     * @param array<string,mixed> $ctx
+     * @return array<string,mixed>
+     */
+    private static function stamp_can_add_on_days(array $ctx, bool $canaddevent): array {
+        if (!empty($ctx['weeks']) && is_array($ctx['weeks'])) {
+            foreach ($ctx['weeks'] as $wi => $week) {
+                if (empty($week['days']) || !is_array($week['days'])) {
+                    continue;
+                }
+                foreach ($week['days'] as $di => $day) {
+                    $ctx['weeks'][$wi]['days'][$di]['can_add_event'] = $canaddevent;
+                }
+            }
+        }
+        if (!empty($ctx['week_days']) && is_array($ctx['week_days'])) {
+            foreach ($ctx['week_days'] as $di => $day) {
+                $ctx['week_days'][$di]['can_add_event'] = $canaddevent;
+            }
+        }
+        return $ctx;
     }
 
     /**
@@ -746,7 +812,7 @@ final class calendar_service {
         if ((int) $USER->id !== $userid) {
             return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
         }
-        if (!has_capability('moodle/calendar:manageownentries', \context_user::instance($userid))) {
+        if (!self::user_can_add_personal($userid)) {
             return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
         }
 

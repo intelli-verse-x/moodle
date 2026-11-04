@@ -79,7 +79,7 @@ final class fellowship_dashboard_test extends \basic_testcase {
                     'name' => 'Older badge',
                     'earned' => true,
                     'at' => 100,
-                    'display_icon' => 'A',
+                    'icon' => 'plant-01',
                     'detail' => 'Earned earlier',
                     'css' => 'on',
                 ],
@@ -88,7 +88,7 @@ final class fellowship_dashboard_test extends \basic_testcase {
                     'name' => 'Newer badge',
                     'earned' => true,
                     'at' => 200,
-                    'display_icon' => 'B',
+                    'icon' => 'search-01',
                     'detail' => 'Earned later',
                     'css' => 'on',
                 ],
@@ -97,7 +97,7 @@ final class fellowship_dashboard_test extends \basic_testcase {
                     'name' => 'Locked',
                     'earned' => false,
                     'at' => 0,
-                    'display_icon' => '🔒',
+                    'icon' => 'books-01',
                     'detail' => 'How',
                     'css' => '',
                 ],
@@ -110,8 +110,10 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $this->assertSame(20, $summary['ring_pct']);
         $this->assertSame('Foundations', $summary['ring_label']);
         $this->assertSame('2/3', $summary['stat_badges_value']);
+        $this->assertSame('2/3', $summary['stat_cards'][0]['value']);
         $this->assertSame('1/5', $summary['stat_required_value']);
         $this->assertSame('Foundations', $summary['stat_gate_value']);
+        $this->assertFalse($summary['all_tracked_done']);
         $this->assertTrue($summary['has_recent_badges']);
         $this->assertCount(2, $summary['recent_badges']);
         $this->assertSame('newer', $summary['recent_badges'][0]['id']);
@@ -135,9 +137,44 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $this->assertSame(0, $summary['ring_pct']);
         $this->assertSame('Foundations', $summary['ring_label']);
         $this->assertFalse($summary['has_recent_badges']);
-        $this->assertSame('—', $summary['stat_required_value']);
+        $this->assertSame(
+            get_string('fellowship_stat_required_na', 'local_launchpad'),
+            $summary['stat_required_value']
+        );
         $this->assertFalse($summary['has_foundations_activities']);
         $this->assertSame([], $summary['foundations_activities']);
+    }
+
+    public function test_journey_prefers_moodle_section_names(): void {
+        $outline = [
+            'sections' => [
+                [
+                    'sectionnum' => 1,
+                    'name' => 'Week 1 · Orientation',
+                    'activities' => [
+                        ['tracked' => true, 'complete' => true],
+                        ['tracked' => true, 'complete' => true],
+                    ],
+                ],
+                [
+                    'sectionnum' => 2,
+                    'name' => 'Client brief workshop',
+                    'activities' => [
+                        ['tracked' => true, 'complete' => false],
+                    ],
+                ],
+            ],
+        ];
+        $journey = fellowship_dashboard::journey_from_outline($outline);
+        $this->assertTrue($journey['has_gates']);
+        $this->assertCount(4, $journey['gates']);
+        $this->assertSame('Week 1 · Orientation', $journey['gates'][0]['name']);
+        $this->assertTrue($journey['gates'][0]['is_done']);
+        $this->assertTrue($journey['gates'][0]['has_moodle_section']);
+        $this->assertSame('Client brief workshop', $journey['gates'][1]['name']);
+        $this->assertTrue($journey['gates'][1]['is_current']);
+        $this->assertFalse($journey['gates'][2]['has_moodle_section']);
+        $this->assertStringContainsString('Not in this course', $journey['gates'][2]['sublabel']);
     }
 
     public function test_section_activities_from_outline_picks_section(): void {
@@ -166,5 +203,11 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $out = fellowship_dashboard::list_portfolio_evidence(1, []);
         $this->assertFalse($out['has_items']);
         $this->assertSame([], $out['items']);
+        $this->assertSame(0, $out['count_submitted']);
+        $this->assertSame(0, $out['count_reviewed']);
+        $this->assertSame(0, $out['count_awaiting']);
+        $this->assertSame(0, $out['count_open']);
+        $this->assertFalse($out['has_attention']);
+        $this->assertFalse($out['has_submitted']);
     }
 }
