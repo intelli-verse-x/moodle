@@ -2546,7 +2546,8 @@ final class admin_dashboard {
      * @param \stdClass $user
      * @return array<string, mixed>
      */
-    public static function reviews_context(\stdClass $user): array {
+    public static function reviews_context(\stdClass $user, array $flash = []): array {
+        unset($user);
         $pending = self::list_pending_reviews(50);
         $pendingtotal = self::count_reviews_pending();
         $released = self::count_reviews_released();
@@ -2615,6 +2616,14 @@ final class admin_dashboard {
             'pending' => $pending,
             'has_pending' => $pending !== [],
             'open_label' => get_string('admin_reviews_open', 'local_launchpad'),
+            'ping_label' => get_string('admin_reviews_ping', 'local_launchpad'),
+            'ping_cooled_label' => get_string('admin_reviews_ping_cooled', 'local_launchpad'),
+            'sesskey' => sesskey(),
+            'ping_action_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false),
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
         ], self::empty_state(
             'admin_reviews_empty',
             'admin_reviews_empty_title'
@@ -2669,13 +2678,19 @@ final class admin_dashboard {
         foreach ($rows as $row) {
             $courseid = (int) $row->courseid;
             if (!isset($teachercache[$courseid])) {
-                $names = self::teacher_names($courseid);
-                $teachercache[$courseid] = $names !== []
-                    ? implode(', ', $names)
-                    : get_string('admin_tracks_no_teacher', 'local_launchpad');
+                $teachercache[$courseid] = self::teacher_rows($courseid);
             }
+            $teachers = $teachercache[$courseid];
+            $primary = $teachers[0] ?? null;
+            $teacherid = $primary ? (int) $primary['id'] : 0;
+            $teacherlabel = $teachers !== []
+                ? implode(', ', array_map(static fn(array $t): string => (string) $t['name'], $teachers))
+                : get_string('admin_tracks_no_teacher', 'local_launchpad');
+            $submissionid = (int) $row->id;
+            $cooled = $teacherid > 0 && self::review_ping_is_cooled($submissionid, $teacherid);
             $submitted = (int) ($row->timemodified ?: $row->timecreated);
             $out[] = [
+                'submissionid' => $submissionid,
                 'courseid' => $courseid,
                 'fellow' => fullname($row),
                 'email' => s($row->email),
@@ -2684,7 +2699,10 @@ final class admin_dashboard {
                 'submitted' => $submitted > 0
                     ? userdate($submitted, get_string('strftimedatetimeshort', 'langconfig'))
                     : '—',
-                'teacher' => $teachercache[$courseid],
+                'teacher' => $teacherlabel,
+                'teacherid' => $teacherid,
+                'can_ping' => $teacherid > 0 && !$cooled,
+                'ping_cooled' => $cooled,
                 'state' => get_string('admin_reviews_state_pending', 'local_launchpad'),
                 'grader_url' => (new \moodle_url('/mod/assign/view.php', [
                     'id' => (int) $row->cmid,
@@ -2694,6 +2712,172 @@ final class admin_dashboard {
             ];
         }
         return $out;
+    }
+
+    /** Seconds before the same admin→teacher review ping may fire again. */
+    public const REVIEW_PING_COOLDOWN = 1800;
+
+    /**
+     * Teachers on a course (id + display name), ordered by name.
+     *
+     * @return list<array{id:int,name:string}>
+     */
+    public static function teacher_rows(int $courseid): array {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return [];
+        }
+        $context = \context_course::instance($courseid);
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename
+                  FROM {role_assignments} ra
+                  JOIN {role} r ON r.id = ra.roleid
+                  JOIN {user} u ON u.id = ra.userid
+                 WHERE ra.contextid = :ctx
+                   AND r.archetype IN ('teacher', 'editingteacher')
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $users = $DB->get_records_sql($sql, ['ctx' => $context->id]);
+        $out = [];
+        foreach ($users as $u) {
+            $out[] = [
+                'id' => (int) $u->id,
+                'name' => fullname($u),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Whether this submission/teacher pair was pinged within the cooldown window.
+     */
+    public static function review_ping_is_cooled(int $submissionid, int $teacherid): bool {
+        if ($submissionid <= 0 || $teacherid <= 0) {
+            return false;
+        }
+        $raw = get_user_preferences('local_launchpad_review_ping_' . $submissionid . '_' . $teacherid, 0);
+        $last = (int) $raw;
+        return $last > 0 && (time() - $last) < self::REVIEW_PING_COOLDOWN;
+    }
+
+    /**
+     * Mark a review ping as sent (starts cooldown for this admin).
+     */
+    public static function review_ping_mark(int $submissionid, int $teacherid): void {
+        if ($submissionid <= 0 || $teacherid <= 0) {
+            return;
+        }
+        set_user_preference(
+            'local_launchpad_review_ping_' . $submissionid . '_' . $teacherid,
+            time()
+        );
+    }
+
+    /**
+     * Admin pings the track teacher about a still-pending assign submission.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function ping_pending_review_mentor(
+        \stdClass $admin,
+        int $submissionid,
+        int $teacherid
+    ): array {
+        global $DB;
+
+        $adminid = (int) ($admin->id ?? 0);
+        if ($adminid <= 0 || (!self::can_access($adminid) && !is_siteadmin($adminid))) {
+            return ['error' => get_string('admin_reviews_ping_err_permission', 'local_launchpad')];
+        }
+        if ($submissionid <= 0 || $teacherid <= 0) {
+            return ['error' => get_string('admin_reviews_ping_err_params', 'local_launchpad')];
+        }
+        if (self::review_ping_is_cooled($submissionid, $teacherid)) {
+            return ['error' => get_string('admin_reviews_ping_err_cooled', 'local_launchpad')];
+        }
+
+        $sql = "SELECT s.id, s.userid, s.timemodified, s.timecreated, s.attemptnumber,
+                       a.id AS assignid, a.name AS assignname, a.course AS courseid,
+                       c.fullname AS coursefullname, c.idnumber AS courseidn,
+                       cm.id AS cmid,
+                       u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+                  JOIN {user} u ON u.id = s.userid AND u.deleted = 0
+                  JOIN {modules} m ON m.name = 'assign'
+                  JOIN {course_modules} cm ON cm.module = m.id AND cm.instance = a.id AND cm.course = a.course
+             LEFT JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.id = :sid
+                   AND s.latest = 1
+                   AND s.status = :status
+                   AND g.id IS NULL";
+        $row = $DB->get_record_sql($sql, [
+            'sid' => $submissionid,
+            'status' => 'submitted',
+        ]);
+        if (!$row) {
+            return ['error' => get_string('admin_reviews_ping_err_gone', 'local_launchpad')];
+        }
+        if (!self::is_track_idnumber((string) ($row->courseidn ?? ''))) {
+            return ['error' => get_string('admin_reviews_ping_err_params', 'local_launchpad')];
+        }
+
+        $courseid = (int) $row->courseid;
+        $isteacher = false;
+        foreach (self::teacher_rows($courseid) as $t) {
+            if ((int) $t['id'] === $teacherid) {
+                $isteacher = true;
+                break;
+            }
+        }
+        if (!$isteacher) {
+            return ['error' => get_string('admin_reviews_ping_err_teacher', 'local_launchpad')];
+        }
+
+        $fellow = fullname($row);
+        $track = format_string($row->coursefullname);
+        $assign = format_string($row->assignname);
+        $submittedts = (int) ($row->timemodified ?: $row->timecreated);
+        $submitted = $submittedts > 0
+            ? userdate($submittedts, get_string('strftimedatetimeshort', 'langconfig'))
+            : '—';
+        $graderurl = (new \moodle_url('/mod/assign/view.php', [
+            'id' => (int) $row->cmid,
+            'action' => 'grader',
+            'userid' => (int) $row->userid,
+        ]))->out(false);
+
+        $a = (object) [
+            'fellow' => $fellow,
+            'track' => $track,
+            'assign' => $assign,
+            'submitted' => $submitted,
+            'graderurl' => $graderurl,
+        ];
+        $msg = get_string('admin_reviews_ping_message', 'local_launchpad', $a);
+        $emailsubject = get_string('admin_reviews_ping_email_subject', 'local_launchpad', $a);
+        $emailbody = get_string('admin_reviews_ping_email_body', 'local_launchpad', $a);
+
+        $sent = messaging::send_admin_review_nudge($adminid, $teacherid, $msg, $emailsubject, $emailbody);
+        if (empty($sent['ok'])) {
+            return ['error' => (string) ($sent['error']
+                ?? get_string('admin_reviews_ping_err_send', 'local_launchpad'))];
+        }
+
+        self::review_ping_mark($submissionid, $teacherid);
+        $teacher = \core_user::get_user($teacherid, '*', IGNORE_MISSING);
+        $teachername = $teacher ? fullname($teacher) : get_string('admin_reviews_col_teacher', 'local_launchpad');
+        return [
+            'ok' => get_string('admin_reviews_ping_ok', 'local_launchpad', $teachername),
+        ];
     }
 
     /**
@@ -3449,25 +3633,9 @@ final class admin_dashboard {
      * @return list<string>
      */
     public static function teacher_names(int $courseid): array {
-        global $DB;
-
-        if ($courseid <= 0) {
-            return [];
-        }
-        $context = \context_course::instance($courseid);
-        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
-                       u.middlename, u.alternatename
-                  FROM {role_assignments} ra
-                  JOIN {role} r ON r.id = ra.roleid
-                  JOIN {user} u ON u.id = ra.userid
-                 WHERE ra.contextid = :ctx
-                   AND r.archetype IN ('teacher', 'editingteacher')
-                   AND u.deleted = 0
-              ORDER BY u.lastname ASC, u.firstname ASC";
-        $users = $DB->get_records_sql($sql, ['ctx' => $context->id]);
         $names = [];
-        foreach ($users as $u) {
-            $names[] = fullname($u);
+        foreach (self::teacher_rows($courseid) as $row) {
+            $names[] = (string) $row['name'];
         }
         return $names;
     }

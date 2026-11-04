@@ -320,7 +320,7 @@
             {{/can_send}}
             {{^can_send}}
               <div class="lp-msg-composer lp-msg-composer-cta">
-                <p class="lp-sm lp-muted">{{#other_id}}{{strings.permission}}{{/other_id}}{{^other_id}}{{strings.cannot_reply}}{{/other_id}}</p>
+                <p class="lp-sm lp-muted">{{#other_id}}{{strings.readonly}}{{/other_id}}{{^other_id}}{{strings.cannot_reply}}{{/other_id}}</p>
                 <a class="lp-btn lp-btn-light" href="{{moodle_messages_url}}">{{strings.open_thread}}</a>
               </div>
             {{/can_send}}

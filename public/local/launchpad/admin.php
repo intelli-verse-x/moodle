@@ -69,9 +69,16 @@ if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
 }
 
 if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage'
-            || $view === 'activity' || $view === 'announcements')
+            || $view === 'activity' || $view === 'announcements' || $view === 'reviews')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'reviews' && $action === 'ping_review') {
+        $submissionid = optional_param('submissionid', 0, PARAM_INT);
+        $pingteacherid = optional_param('teacherid', 0, PARAM_INT);
+        $flash = admin_dashboard::ping_pending_review_mentor($USER, $submissionid, $pingteacherid);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']));
+    }
     if ($view === 'announcements' && $action === 'post_announcement') {
         $subject = optional_param('subject', '', PARAM_TEXT);
         $message = optional_param('message', '', PARAM_RAW);
@@ -481,7 +488,7 @@ if ($view === 'tracks') {
     $pagetitle = get_string('admin_nav_reviews', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_reviews',
-        admin_dashboard::reviews_context($USER)
+        admin_dashboard::reviews_context($USER, $flash)
     );
 } else {
     $view = 'home';

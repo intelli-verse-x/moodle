@@ -107,6 +107,36 @@ final class messaging {
     }
 
     /**
+     * Existing 1:1 conversation id between two users (0 if none).
+     */
+    public static function existing_conversation_id(int $userid, int $otherid): int {
+        if ($userid <= 0 || $otherid <= 0 || $userid === $otherid) {
+            return 0;
+        }
+        if (!class_exists('\core_message\api')) {
+            return 0;
+        }
+        try {
+            $existing = \core_message\api::get_conversation_between_users([$userid, $otherid]);
+            return $existing ? (int) $existing : 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * May open a thread: can send, or already have a conversation (read-only OK).
+     *
+     * Lets mentors read admin Review-oversight pings even when Moodle blocks reply.
+     */
+    public static function can_view_thread_with(int $viewerid, int $otherid, string $portal = 'any'): bool {
+        if (self::can_message($viewerid, $otherid, $portal)) {
+            return true;
+        }
+        return self::existing_conversation_id($viewerid, $otherid) > 0;
+    }
+
+    /**
      * Fellow may message: mentors on a shared lp-* course, or classmates (student) on a shared lp-* course.
      */
     public static function is_launchpad_message_peer(int $fromid, int $toid): bool {
@@ -479,7 +509,10 @@ final class messaging {
 
         // Prefer 1:1 by other user; otherwise open a Moodle conversation id (group / self).
         if ($selectedother > 0) {
-            if (!self::can_message($userid, $selectedother, $portal)) {
+            $canmsg = self::can_message($userid, $selectedother, $portal);
+            $existingconvid = self::existing_conversation_id($userid, $selectedother);
+            // Deny only when they cannot send AND there is no prior conversation to read.
+            if (!$canmsg && $existingconvid <= 0) {
                 $ctx['thread_denied'] = true;
                 $ctx['other_name'] = $strings['unavailable_title'];
                 return $ctx;
@@ -492,7 +525,9 @@ final class messaging {
                 return $ctx;
             }
 
-            $selectedconvid = self::ensure_conversation($userid, $selectedother);
+            $selectedconvid = $existingconvid > 0
+                ? $existingconvid
+                : self::ensure_conversation($userid, $selectedother);
             if ($selectedconvid <= 0) {
                 $ctx['thread_denied'] = true;
                 $ctx['other_name'] = fullname($other);
@@ -507,7 +542,7 @@ final class messaging {
                 $selectedconvid,
                 $selectedother,
                 $other,
-                true,
+                $canmsg,
                 $strings['private']
             );
         }
@@ -526,19 +561,20 @@ final class messaging {
             return $ctx;
         }
 
-        // Individual rows should redirect-style open via other user when possible.
+        // Individual rows: open via other user when possible (send or read-only).
         if (!empty($matched['is_private']) && !empty($matched['other_id'])) {
-            $other = \core_user::get_user((int) $matched['other_id'], '*', IGNORE_MISSING);
-            if ($other && empty($other->deleted) && self::can_message($userid, (int) $matched['other_id'], $portal)) {
+            $oid = (int) $matched['other_id'];
+            $other = \core_user::get_user($oid, '*', IGNORE_MISSING);
+            if ($other && empty($other->deleted) && self::can_view_thread_with($userid, $oid, $portal)) {
                 return self::hydrate_thread_context(
                     $ctx,
                     $userid,
                     $portal,
                     $mtab,
                     $selectedconvid,
-                    (int) $matched['other_id'],
+                    $oid,
                     $other,
-                    true,
+                    self::can_message($userid, $oid, $portal),
                     (string) ($matched['type_label'] ?? $strings['private'])
                 );
             }
@@ -721,6 +757,10 @@ final class messaging {
             'cannot_reply' => $str(
                 'employer_messages_cannot_reply',
                 'You cannot reply here. Open Moodle Messages or check messaging permissions.'
+            ),
+            'readonly' => $str(
+                'fellowship_messages_readonly',
+                'You can read this conversation, but you cannot reply from LaunchPad.'
             ),
             'compose' => $str('fellowship_messages_compose', 'Message'),
             'compose_placeholder' => $str('fellowship_messages_compose_placeholder', 'Write a message…'),
@@ -932,6 +972,80 @@ final class messaging {
             }
         }
         return false;
+    }
+
+    /**
+     * Admin → teacher review nudge (Moodle message + email). Fail closed on caps.
+     *
+     * @return array{ok:bool,error:?string}
+     */
+    public static function send_admin_review_nudge(
+        int $adminid,
+        int $teacherid,
+        string $messagetext,
+        string $emailsubject,
+        string $emailbody
+    ): array {
+        global $CFG;
+
+        $messagetext = trim(clean_param($messagetext, PARAM_TEXT));
+        $emailsubject = trim(clean_param($emailsubject, PARAM_TEXT));
+        $emailbody = trim(clean_param($emailbody, PARAM_TEXT));
+        if ($messagetext === '' || $emailsubject === '' || $emailbody === '') {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_empty', 'local_launchpad'),
+            ];
+        }
+        if (!self::can_message($adminid, $teacherid, 'any')) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+            ];
+        }
+
+        $convid = self::ensure_conversation($adminid, $teacherid);
+        if ($convid <= 0) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_save', 'local_launchpad'),
+            ];
+        }
+
+        try {
+            if (!\core_message\api::can_send_message_to_conversation($adminid, $convid)) {
+                return [
+                    'ok' => false,
+                    'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+                ];
+            }
+            \core_message\api::send_message_to_conversation($adminid, $convid, $messagetext, FORMAT_PLAIN);
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_save', 'local_launchpad'),
+            ];
+        }
+
+        // Soft-fail email — message already delivered in-app.
+        try {
+            require_once($CFG->libdir . '/moodlelib.php');
+            $to = \core_user::get_user($teacherid, '*', IGNORE_MISSING);
+            if ($to && trim((string) ($to->email ?? '')) !== '') {
+                $html = nl2br(s($emailbody));
+                email_to_user(
+                    $to,
+                    \core_user::get_noreply_user(),
+                    $emailsubject,
+                    $emailbody,
+                    $html
+                );
+            }
+        } catch (\Throwable $e) {
+            // Ignore mail failures.
+        }
+
+        return ['ok' => true, 'error' => null];
     }
 
     /**
