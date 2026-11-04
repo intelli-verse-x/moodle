@@ -124,7 +124,9 @@ final class calendar_service {
         $courseid = (int) ($event->courseid ?? 0);
         $timestart = (int) ($event->timestart ?? 0);
         $timeduration = (int) ($event->timeduration ?? 0);
-        $ispersonal = $courseid <= 0 && (string) ($event->eventtype ?? '') !== 'site';
+        $eventtype = (string) ($event->eventtype ?? '');
+        $issite = $eventtype === 'site';
+        $ispersonal = !$issite && $courseid <= 0;
         $deschtml = '';
         $descplain = '';
         if (!empty($event->description)) {
@@ -147,8 +149,9 @@ final class calendar_service {
                     'moodle/calendar:manageownentries',
                     \context_user::instance($viewerid)
                 );
-            } else if (!$ispersonal && $courseid > 0
-                    && (string) ($event->eventtype ?? '') === 'course') {
+            } else if ($issite) {
+                $canedit = self::user_can_add_site($viewerid);
+            } else if (!$ispersonal && $courseid > 0 && $eventtype === 'course') {
                 $canedit = has_capability(
                     'moodle/calendar:manageentries',
                     \context_course::instance($courseid)
@@ -159,6 +162,13 @@ final class calendar_service {
         $location = trim((string) ($event->location ?? ''));
         $endts = $timestart + max(0, $timeduration);
         $durationmode = $timeduration > 0 ? 'until' : 'none';
+        if ($ispersonal) {
+            $coursename = get_string('fellowship_calendar_personal', 'local_launchpad');
+        } else if ($issite) {
+            $coursename = get_string('admin_calendar_scope_programme', 'local_launchpad');
+        } else {
+            $coursename = self::course_label($courseid, $coursenames);
+        }
 
         return [
             'id' => (int) ($event->id ?? 0),
@@ -178,12 +188,12 @@ final class calendar_service {
             'day_key' => self::user_ymd($timestart),
             'courseid' => $courseid,
             'is_personal' => $ispersonal,
-            'is_course_event' => !$ispersonal && (string) ($event->eventtype ?? '') === 'course',
+            'is_course_event' => !$ispersonal && !$issite && $eventtype === 'course',
+            'is_site_event' => $issite,
+            'scope' => $ispersonal ? 'personal' : ($issite ? 'site' : 'course'),
             'filter_bucket' => $ispersonal ? 'personal' : 'course',
             'can_edit' => $canedit,
-            'course_name' => $ispersonal
-                ? get_string('fellowship_calendar_personal', 'local_launchpad')
-                : ($coursenames[$courseid] ?? ''),
+            'course_name' => $coursename,
             'location' => $location,
             'has_location' => $location !== '',
             'description_excerpt' => $descexcerpt,
@@ -194,7 +204,7 @@ final class calendar_service {
                 'view' => 'day',
                 'time' => $timestart,
             ]))->out(false),
-            'eventtype' => (string) ($event->eventtype ?? ''),
+            'eventtype' => $eventtype,
             'modulename' => (string) ($event->modulename ?? ''),
             'is_module' => !empty($event->modulename),
         ];
@@ -377,6 +387,19 @@ final class calendar_service {
     }
 
     /**
+     * Whether the user may create/edit site calendar events (programme-wide).
+     */
+    public static function user_can_add_site(int $userid): bool {
+        if ($userid <= 0 || isguestuser($userid)) {
+            return false;
+        }
+        return has_capability(
+            'moodle/calendar:manageentries',
+            \context_system::instance()
+        );
+    }
+
+    /**
      * Courses from the visible set where the user may manage course calendar events.
      *
      * @param list<\stdClass> $courses
@@ -456,10 +479,17 @@ final class calendar_service {
     }
 
     /**
-     * Admin calendar page context (all LaunchPad tracks; course + personal events).
+     * Admin calendar page context (LaunchPad tracks; course + personal events).
      *
      * @param list<\stdClass> $courses
      * @param string $mode month|upcoming|day|week
+     * @param array{
+     *     trackid?:int,
+     *     include_orient?:bool,
+     *     preferred_courseid?:int,
+     *     show_track_filter?:bool,
+     *     all_tracks?:list<array{id:int,name:string}>
+     * } $adminui Admin-only sticky filter / create defaults
      */
     public static function admin_context(
         int $userid,
@@ -468,7 +498,8 @@ final class calendar_service {
         int $month,
         string $mode = 'month',
         string $filter = 'all',
-        ?int $daytime = null
+        ?int $daytime = null,
+        array $adminui = []
     ): array {
         return self::page_context(
             $userid,
@@ -479,7 +510,8 @@ final class calendar_service {
             persona_home::ADMIN_PATH,
             'admin',
             $filter,
-            $daytime
+            $daytime,
+            $adminui
         );
     }
 
@@ -491,6 +523,13 @@ final class calendar_service {
      * @param string $basepath Persona home path for calendar URLs
      * @param string $portal fellow|mentor|admin
      * @param string $filter all|course|personal
+     * @param array{
+     *     trackid?:int,
+     *     include_orient?:bool,
+     *     preferred_courseid?:int,
+     *     show_track_filter?:bool,
+     *     all_tracks?:list<array{id:int,name:string}>
+     * } $adminui Admin-only sticky filter UI (ignored for fellow/mentor)
      */
     public static function page_context(
         int $userid,
@@ -501,7 +540,8 @@ final class calendar_service {
         string $basepath = '',
         string $portal = 'fellow',
         string $filter = 'all',
-        ?int $daytime = null
+        ?int $daytime = null,
+        array $adminui = []
     ): array {
         if (!in_array($mode, ['month', 'upcoming', 'day', 'week'], true)) {
             $mode = 'month';
@@ -601,18 +641,63 @@ final class calendar_service {
         $manageable = self::courses_user_can_manage($userid, $courses);
         $canaddpersonal = self::user_can_add_personal($userid);
         $canaddcourse = $manageable !== [];
+        // Site (programme-wide) create is admin-only and caps-gated at system context.
+        $canaddsite = ($portal === 'admin') && self::user_can_add_site($userid);
         // Fellowship calendar is personal-first (study reminders, meetings). Mentors
         // and admins can also add course events when they have manageentries.
         if ($portal === 'fellow') {
             $canaddcourse = false;
             $manageable = [];
+            $canaddsite = false;
         }
-        $canaddevent = $canaddpersonal || $canaddcourse;
+        $canaddevent = $canaddpersonal || $canaddcourse || $canaddsite;
         $staffcalendar = ($portal === 'mentor' || $portal === 'admin');
+        $scopeoptions = (int) $canaddpersonal + (int) $canaddcourse + (int) $canaddsite;
+        $defaultscope = 'personal';
+        if ($staffcalendar && $canaddcourse) {
+            $defaultscope = 'course';
+        } else if ($canaddcourse && !$canaddpersonal) {
+            $defaultscope = 'course';
+        } else if ($canaddsite && !$canaddpersonal && !$canaddcourse) {
+            $defaultscope = 'site';
+        }
 
-        $navparams = static function (array $extra) use ($filter): array {
-            if ($filter !== 'all') {
-                $extra['filter'] = $filter;
+        $trackid = $portal === 'admin' ? (int) ($adminui['trackid'] ?? 0) : 0;
+        $includeorient = $portal === 'admin' && !empty($adminui['include_orient']);
+        $preferredcourseid = $portal === 'admin' ? (int) ($adminui['preferred_courseid'] ?? 0) : 0;
+        $showtrackfilter = $portal === 'admin' && !empty($adminui['show_track_filter']);
+        if ($preferredcourseid > 0) {
+            $canmanagepreferred = false;
+            foreach ($manageable as $mc) {
+                if ((int) ($mc['id'] ?? 0) === $preferredcourseid) {
+                    $canmanagepreferred = true;
+                    break;
+                }
+            }
+            if (!$canmanagepreferred) {
+                $preferredcourseid = 0;
+            }
+        }
+
+        $navparams = static function (
+            array $extra,
+            ?string $filteroverride = null,
+            ?int $trackoverride = null,
+            ?bool $orientoverride = null
+        ) use ($filter, $trackid, $includeorient, $portal): array {
+            $f = $filteroverride ?? $filter;
+            if ($f !== 'all') {
+                $extra['filter'] = $f;
+            }
+            if ($portal === 'admin') {
+                $t = $trackoverride !== null ? $trackoverride : $trackid;
+                if ($t > 0) {
+                    $extra['track'] = $t;
+                }
+                $o = $orientoverride !== null ? $orientoverride : $includeorient;
+                if ($o) {
+                    $extra['include_orient'] = 1;
+                }
             }
             return $extra;
         };
@@ -702,50 +787,76 @@ final class calendar_service {
                 'cal' => 'day',
                 'time' => $day['time'],
             ])))->out(false),
-            'filter_all_url' => (new \moodle_url($basepath, [
+            'filter_all_url' => (new \moodle_url($basepath, $navparams([
                 'view' => 'calendar',
                 'cal' => $mode,
                 'time' => $modetime,
-            ]))->out(false),
-            'filter_course_url' => (new \moodle_url($basepath, [
+            ], 'all')))->out(false),
+            'filter_course_url' => (new \moodle_url($basepath, $navparams([
                 'view' => 'calendar',
                 'cal' => $mode,
                 'time' => $modetime,
-                'filter' => 'course',
-            ]))->out(false),
-            'filter_personal_url' => (new \moodle_url($basepath, [
+            ], 'course')))->out(false),
+            'filter_personal_url' => (new \moodle_url($basepath, $navparams([
                 'view' => 'calendar',
                 'cal' => $mode,
                 'time' => $modetime,
-                'filter' => 'personal',
-            ]))->out(false),
-            'ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_month.php', [
-                'portal' => $portal,
-                'filter' => $filter,
-            ]))->out(false),
+            ], 'personal')))->out(false),
+            'ajax_url' => (new \moodle_url(
+                '/local/launchpad/ajax_calendar_month.php',
+                array_filter([
+                    'portal' => $portal,
+                    'filter' => $filter !== 'all' ? $filter : null,
+                    'track' => ($portal === 'admin' && $trackid > 0) ? $trackid : null,
+                    'include_orient' => ($portal === 'admin' && $includeorient) ? 1 : null,
+                ])
+            ))->out(false),
             'personal_ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_personal.php', [
                 'portal' => $portal,
             ]))->out(false),
             'reschedule_ajax_url' => (new \moodle_url('/local/launchpad/ajax_calendar_reschedule.php', [
                 'portal' => $portal,
             ]))->out(false),
-            'export_url' => (new \moodle_url('/local/launchpad/calendar_export.php', [
-                'portal' => $portal,
-                'sesskey' => sesskey(),
-            ]))->out(false),
+            'export_url' => (new \moodle_url(
+                '/local/launchpad/calendar_export.php',
+                array_filter([
+                    'portal' => $portal,
+                    'sesskey' => sesskey(),
+                    'track' => ($portal === 'admin' && $trackid > 0) ? $trackid : null,
+                    'include_orient' => ($portal === 'admin' && $includeorient) ? 1 : null,
+                ])
+            ))->out(false),
             'portal' => $portal,
             'is_mentor_calendar' => $staffcalendar,
             'is_admin_calendar' => $portal === 'admin',
             'sesskey' => sesskey(),
             'can_add_personal' => $canaddpersonal,
             'can_add_course' => $canaddcourse,
+            'can_add_site' => $canaddsite,
             'can_add_event' => $canaddevent,
-            'has_scope_choice' => $canaddpersonal && $canaddcourse,
-            'default_scope' => ($staffcalendar && $canaddcourse)
-                ? 'course'
-                : ($canaddcourse && !$canaddpersonal ? 'course' : 'personal'),
+            'has_scope_choice' => $scopeoptions > 1,
+            'default_scope' => $defaultscope,
+            'show_site_cap_note' => ($portal === 'admin' && !$canaddsite),
             'manageable_courses' => $manageable,
             'has_manageable_courses' => $manageable !== [],
+            'preferred_courseid' => $preferredcourseid,
+            'show_track_filter' => $showtrackfilter,
+            'include_orient' => $includeorient,
+            'include_orient_on_url' => $showtrackfilter
+                ? (new \moodle_url($basepath, $navparams([
+                    'view' => 'calendar',
+                    'cal' => $mode,
+                    'time' => $modetime,
+                ], null, null, true)))->out(false)
+                : '',
+            'include_orient_off_url' => $showtrackfilter
+                ? (new \moodle_url($basepath, $navparams([
+                    'view' => 'calendar',
+                    'cal' => $mode,
+                    'time' => $modetime,
+                ], null, null, false)))->out(false)
+                : '',
+            'track_filter_options' => [],
             'upcoming_items' => $upcomingpaged,
             'has_upcoming_items' => $upcomingpaged !== [],
             'upcoming_has_more' => count($upcomingitems) > self::UPCOMING_PAGE_SIZE,
@@ -759,6 +870,36 @@ final class calendar_service {
             'detail_events' => $monthitems,
             'has_detail_events' => $monthitems !== [],
         ]);
+
+        if ($showtrackfilter) {
+            $trackopts = [[
+                'id' => 0,
+                'name' => get_string('admin_calendar_track_all', 'local_launchpad'),
+                'selected' => $trackid === 0,
+                'url' => (new \moodle_url($basepath, $navparams([
+                    'view' => 'calendar',
+                    'cal' => $mode,
+                    'time' => $modetime,
+                ], null, 0)))->out(false),
+            ]];
+            foreach ($adminui['all_tracks'] ?? [] as $trackrow) {
+                $tid = (int) ($trackrow['id'] ?? 0);
+                if ($tid <= 0) {
+                    continue;
+                }
+                $trackopts[] = [
+                    'id' => $tid,
+                    'name' => (string) ($trackrow['name'] ?? ''),
+                    'selected' => $tid === $trackid,
+                    'url' => (new \moodle_url($basepath, $navparams([
+                        'view' => 'calendar',
+                        'cal' => $mode,
+                        'time' => $modetime,
+                    ], null, $tid)))->out(false),
+                ];
+            }
+            $ctx['track_filter_options'] = $trackopts;
+        }
 
         return self::stamp_can_add_on_days($ctx, $canaddevent);
     }
@@ -1175,10 +1316,171 @@ final class calendar_service {
         if (!$record) {
             return ['ok' => false, 'error' => get_string('fellowship_calendar_err_missing', 'local_launchpad'), 'id' => null];
         }
+        if ((string) $record->eventtype === 'site') {
+            return self::delete_site($userid, $eventid);
+        }
         if ((string) $record->eventtype === 'course' && (int) $record->courseid > 0) {
             return self::delete_course($userid, $eventid);
         }
         return self::delete_personal($userid, $eventid);
+    }
+
+    /**
+     * Create a site calendar event (eventtype=site). Fail closed on system caps.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function create_site(
+        int $userid,
+        string $name,
+        int $timestart,
+        int $timeduration = 0,
+        string $description = '',
+        string $location = '',
+        int $repeats = 1
+    ): array {
+        global $CFG, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $name = trim($name);
+        if ($name === '') {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_name', 'local_launchpad'), 'id' => null];
+        }
+        if ($timestart <= 0 || (int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_when', 'local_launchpad'), 'id' => null];
+        }
+        if (!self::user_can_add_site($userid)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        if ($timeduration < 0) {
+            $timeduration = 0;
+        }
+        $repeats = self::normalize_repeats($repeats);
+
+        $props = (object) [
+            'name' => $name,
+            'description' => $description,
+            'format' => FORMAT_HTML,
+            'location' => trim($location),
+            'courseid' => SITEID,
+            'groupid' => 0,
+            'userid' => $userid,
+            'modulename' => '',
+            'instance' => 0,
+            'eventtype' => 'site',
+            'timestart' => $timestart,
+            'timeduration' => $timeduration,
+            'visible' => 1,
+        ];
+        if ($repeats > 1) {
+            $props->repeat = 1;
+            $props->repeats = $repeats;
+        }
+        try {
+            $probe = new \calendar_event($props);
+            if (!calendar_add_event_allowed($probe)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $created = \calendar_event::create($props, true);
+            if (!$created) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+            }
+            return ['ok' => true, 'error' => null, 'id' => (int) $created->id];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
+    }
+
+    /**
+     * Update a site calendar event. Fail closed on caps / module rows.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function update_site(
+        int $userid,
+        int $eventid,
+        string $name,
+        int $timestart,
+        int $timeduration = 0,
+        string $description = '',
+        string $location = ''
+    ): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        $name = trim($name);
+        if ($name === '' || $eventid <= 0 || $timestart <= 0 || (int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        if (!self::user_can_add_site($userid)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        if ($timeduration < 0) {
+            $timeduration = 0;
+        }
+
+        $record = $DB->get_record('event', ['id' => $eventid]);
+        if (!$record || (string) $record->eventtype !== 'site'
+                || !empty($record->modulename) || !empty($record->component)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        try {
+            $event = new \calendar_event($record);
+            if (!calendar_edit_event_allowed($event, true)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $event->update((object) [
+                'name' => $name,
+                'description' => $description,
+                'format' => FORMAT_HTML,
+                'location' => trim($location),
+                'timestart' => $timestart,
+                'timeduration' => $timeduration,
+                'eventtype' => 'site',
+                'courseid' => SITEID,
+            ], true);
+            return ['ok' => true, 'error' => null, 'id' => $eventid];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
+    }
+
+    /**
+     * Delete a site calendar event. Fail closed on caps / module rows.
+     *
+     * @return array{ok:bool,error:?string,id:?int}
+     */
+    public static function delete_site(int $userid, int $eventid): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->dirroot . '/calendar/lib.php');
+
+        if ($eventid <= 0 || (int) $USER->id !== $userid) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+        if (!self::user_can_add_site($userid)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        $record = $DB->get_record('event', ['id' => $eventid]);
+        if (!$record || (string) $record->eventtype !== 'site'
+                || !empty($record->modulename) || !empty($record->component)) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+        }
+
+        try {
+            $event = new \calendar_event($record);
+            if (!calendar_delete_event_allowed($event)) {
+                return ['ok' => false, 'error' => get_string('fellowship_calendar_err_permission', 'local_launchpad'), 'id' => null];
+            }
+            $event->delete(false);
+            return ['ok' => true, 'error' => null, 'id' => $eventid];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => get_string('fellowship_calendar_err_save', 'local_launchpad'), 'id' => null];
+        }
     }
 
     /**
@@ -1409,6 +1711,23 @@ final class calendar_service {
             $map[(int) $c->id] = format_string($c->fullname);
         }
         return $map;
+    }
+
+    /**
+     * Resolve course display name; DB fallback when id was not in the calendar course list.
+     *
+     * @param array<int,string> $coursenames
+     */
+    private static function course_label(int $courseid, array $coursenames): string {
+        if ($courseid <= 0) {
+            return '';
+        }
+        if (!empty($coursenames[$courseid])) {
+            return $coursenames[$courseid];
+        }
+        global $DB;
+        $name = $DB->get_field('course', 'fullname', ['id' => $courseid]);
+        return $name ? format_string($name) : '';
     }
 
     private static function moodle_month_url(): string {

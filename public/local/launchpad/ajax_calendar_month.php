@@ -45,13 +45,35 @@ if (!in_array($portal, ['fellow', 'mentor', 'admin'], true)) {
     $portal = 'fellow';
 }
 
+$time = required_param('time', PARAM_INT);
+$filter = optional_param('filter', 'all', PARAM_ALPHA);
+$caltrack = 0;
+$calincludeorient = false;
+$adminui = [];
+
 if ($portal === 'admin') {
     if (!admin_dashboard::can_access($userid) && !is_siteadmin()) {
         throw new \moodle_exception('nopermissions', 'error', '', get_string('fellowship_nav_calendar', 'local_launchpad'));
     }
-    $courses = admin_dashboard::list_track_courses();
+    $caltrack = admin_dashboard::resolve_calendar_trackid(optional_param('track', 0, PARAM_INT));
+    $calincludeorient = (bool) optional_param('include_orient', 0, PARAM_BOOL);
+    $courses = admin_dashboard::calendar_courses($caltrack, $calincludeorient);
     $basepath = persona_home::ADMIN_PATH;
     $ctxfn = 'admin_context';
+    $alltracks = [];
+    foreach (admin_dashboard::list_track_courses() as $trackcourse) {
+        $alltracks[] = [
+            'id' => (int) $trackcourse->id,
+            'name' => format_string($trackcourse->fullname),
+        ];
+    }
+    $adminui = [
+        'trackid' => $caltrack,
+        'include_orient' => $calincludeorient,
+        'preferred_courseid' => $caltrack,
+        'show_track_filter' => true,
+        'all_tracks' => $alltracks,
+    ];
 } else if ($portal === 'mentor') {
     if (!mentor_dashboard::can_access($userid) && !is_siteadmin()) {
         throw new \moodle_exception('nopermissions', 'error', '', get_string('fellowship_nav_calendar', 'local_launchpad'));
@@ -68,28 +90,39 @@ if ($portal === 'admin') {
     $ctxfn = 'fellow_context';
 }
 
-$time = required_param('time', PARAM_INT);
-$filter = optional_param('filter', 'all', PARAM_ALPHA);
 $resolved = calendar_service::resolve_month($time > 0 ? $time : null, null, null);
-$ctx = calendar_service::{$ctxfn}(
-    $userid,
-    $courses,
-    (int) $resolved['year'],
-    (int) $resolved['month'],
-    'month',
-    $filter,
-    null
-);
+if ($portal === 'admin') {
+    $ctx = calendar_service::admin_context(
+        $userid,
+        $courses,
+        (int) $resolved['year'],
+        (int) $resolved['month'],
+        'month',
+        $filter,
+        null,
+        $adminui
+    );
+} else {
+    $ctx = calendar_service::{$ctxfn}(
+        $userid,
+        $courses,
+        (int) $resolved['year'],
+        (int) $resolved['month'],
+        'month',
+        $filter,
+        null
+    );
+}
 
 $html = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar_month', $ctx);
-$pageparams = [
+$pageparams = array_filter([
     'view' => 'calendar',
     'cal' => 'month',
     'time' => (int) $resolved['time'],
-];
-if ($filter === 'course' || $filter === 'personal') {
-    $pageparams['filter'] = $filter;
-}
+    'filter' => ($filter === 'course' || $filter === 'personal') ? $filter : null,
+    'track' => ($portal === 'admin' && $caltrack > 0) ? $caltrack : null,
+    'include_orient' => ($portal === 'admin' && $calincludeorient) ? 1 : null,
+]);
 $pageurl = (new moodle_url($basepath, $pageparams))->out(false);
 
 header('Content-Type: application/json; charset=utf-8');

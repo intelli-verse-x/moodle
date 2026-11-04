@@ -65,7 +65,11 @@ if ($action === 'delete') {
     $result = calendar_service::delete_event($userid, $eventid);
 } else if ($action === 'create' || $action === 'update') {
     $scope = optional_param('scope', 'personal', PARAM_ALPHA);
-    if ($scope !== 'course') {
+    if (!in_array($scope, ['personal', 'course', 'site'], true)) {
+        $scope = 'personal';
+    }
+    // Site create/update is admin portal only (caps still fail-closed in service).
+    if ($scope === 'site' && $portal !== 'admin') {
         $scope = 'personal';
     }
     $name = required_param('name', PARAM_TEXT);
@@ -120,6 +124,29 @@ if ($action === 'delete') {
                         $userid,
                         $eventid,
                         $courseid,
+                        (string) $name,
+                        $timestart,
+                        $timeduration,
+                        $description,
+                        $location
+                    );
+                }
+            } else if ($scope === 'site') {
+                if ($action === 'create') {
+                    $result = calendar_service::create_site(
+                        $userid,
+                        (string) $name,
+                        $timestart,
+                        $timeduration,
+                        $description,
+                        $location,
+                        $repeats
+                    );
+                } else {
+                    $eventid = required_param('id', PARAM_INT);
+                    $result = calendar_service::update_site(
+                        $userid,
+                        $eventid,
                         (string) $name,
                         $timestart,
                         $timeduration,

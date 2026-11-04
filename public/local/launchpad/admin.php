@@ -174,6 +174,14 @@ $calfilter = optional_param('filter', 'all', PARAM_ALPHA);
 $caltime = optional_param('time', 0, PARAM_INT);
 $calyear = optional_param('year', 0, PARAM_INT);
 $calmonth = optional_param('month', 0, PARAM_INT);
+$caltrack = optional_param('track', 0, PARAM_INT);
+$calincludeorient = optional_param('include_orient', 0, PARAM_BOOL);
+if ($view === 'calendar') {
+    $caltrack = admin_dashboard::resolve_calendar_trackid($caltrack);
+} else {
+    $caltrack = 0;
+    $calincludeorient = false;
+}
 
 $urlparams = array_filter([
     'view' => $view !== 'home' ? $view : null,
@@ -184,6 +192,8 @@ $urlparams = array_filter([
     'cal' => ($view === 'calendar' && $calmode !== 'month') ? $calmode : null,
     'filter' => ($view === 'calendar' && ($calfilter === 'course' || $calfilter === 'personal')) ? $calfilter : null,
     'time' => ($view === 'calendar' && $caltime > 0) ? $caltime : null,
+    'track' => ($view === 'calendar' && $caltrack > 0) ? $caltrack : null,
+    'include_orient' => ($view === 'calendar' && $calincludeorient) ? 1 : null,
 ]);
 
 $context = context_system::instance();
@@ -364,14 +374,28 @@ if ($view === 'tracks') {
         $calyear > 0 ? $calyear : null,
         $calmonth > 0 ? $calmonth : null
     );
+    $alltracks = [];
+    foreach (admin_dashboard::list_track_courses() as $trackcourse) {
+        $alltracks[] = [
+            'id' => (int) $trackcourse->id,
+            'name' => format_string($trackcourse->fullname),
+        ];
+    }
     $caldata = calendar_service::admin_context(
         $userid,
-        admin_dashboard::list_track_courses(),
+        admin_dashboard::calendar_courses($caltrack, (bool) $calincludeorient),
         (int) $resolved['year'],
         (int) $resolved['month'],
         $calmode,
         $calfilter,
-        $caltime > 0 ? $caltime : null
+        $caltime > 0 ? $caltime : null,
+        [
+            'trackid' => $caltrack,
+            'include_orient' => (bool) $calincludeorient,
+            'preferred_courseid' => $caltrack,
+            'show_track_filter' => true,
+            'all_tracks' => $alltracks,
+        ]
     );
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', $caldata);
 } else if ($view === 'cohorts') {

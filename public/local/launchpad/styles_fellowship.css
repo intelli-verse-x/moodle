@@ -3289,6 +3289,12 @@ body.local-launchpad-mentor {
   background: var(--lp-blue-2, #1554d6);
   color: #fff;
 }
+.lp-cal-filter-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
 .lp-cal-filters {
   display: inline-flex;
   align-items: center;
@@ -3302,6 +3308,18 @@ body.local-launchpad-mentor {
   font-weight: 600;
   color: var(--lp-muted);
   cursor: pointer;
+}
+.lp-cal-orient-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.lp-cal-orient-toggle input {
+  margin: 0;
+  accent-color: var(--lp-blue);
+}
+.lp-cal-track-filter .lp-cal-filter-select {
+  min-width: 10rem;
+  max-width: 16rem;
 }
 .lp-cal-filters-ico {
   display: grid;
@@ -3706,6 +3724,12 @@ body.lp-cal-detail-lock { overflow: hidden; }
   font-weight: 500;
   line-height: 1.4;
   color: var(--lp-muted);
+}
+.lp-cal-cap-note {
+  margin: 0 0 12px;
+}
+.lp-cal-repeat-help {
+  margin-top: -4px;
 }
 .lp-cal-form-x {
   flex: none;
@@ -4146,12 +4170,18 @@ body.lp-cal-detail-lock { overflow: hidden; }
     padding: 6px 8px;
     font-size: 12.5px;
   }
+  .lp-cal-filter-row {
+    width: 100%;
+  }
   .lp-cal-filters {
     width: 100%;
   }
   .lp-cal-filter-select {
     flex: 1 1 auto;
     width: 100%;
+  }
+  .lp-cal-track-filter .lp-cal-filter-select {
+    max-width: none;
   }
   .lp-cal-month-head {
     flex-wrap: wrap;

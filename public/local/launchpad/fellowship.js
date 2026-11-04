@@ -216,16 +216,22 @@
         calStrings.network = calRoot.getAttribute('data-str-network') || calStrings.network;
         calStrings.courseRequired = calRoot.getAttribute('data-str-course-required') || calStrings.courseRequired;
     }
+    function normalizeCalScope(value) {
+        if (value === 'course' || value === 'site') {
+            return value;
+        }
+        return 'personal';
+    }
     function getCalScope() {
         var checked = calForm ? calForm.querySelector('[data-lp-cal-form-scope]:checked') : null;
         if (checked) {
-            return checked.value === 'course' ? 'course' : 'personal';
+            return normalizeCalScope(checked.value);
         }
         var fixed = calForm ? calForm.querySelector('[data-lp-cal-form-scope-fixed]') : null;
         if (fixed && fixed.value) {
-            return fixed.value === 'course' ? 'course' : 'personal';
+            return normalizeCalScope(fixed.value);
         }
-        return (calRoot && calRoot.getAttribute('data-default-scope') === 'course') ? 'course' : 'personal';
+        return normalizeCalScope(calRoot ? calRoot.getAttribute('data-default-scope') : 'personal');
     }
     function setCalScope(scope, lock) {
         var radios = calForm ? calForm.querySelectorAll('[data-lp-cal-form-scope]') : [];
@@ -246,7 +252,9 @@
         var courseWrap = calForm.querySelector('[data-lp-cal-form-course-wrap]');
         var helpPersonal = calForm.querySelector('[data-lp-cal-form-help]');
         var helpCourse = calForm.querySelector('[data-lp-cal-form-help-course]');
+        var helpSite = calForm.querySelector('[data-lp-cal-form-help-site]');
         var isCourse = scope === 'course';
+        var isSite = scope === 'site';
         if (courseWrap) {
             if (isCourse) {
                 courseWrap.removeAttribute('hidden');
@@ -255,7 +263,7 @@
             }
         }
         if (helpPersonal) {
-            if (isCourse) {
+            if (isCourse || isSite) {
                 helpPersonal.setAttribute('hidden', 'hidden');
             } else {
                 helpPersonal.removeAttribute('hidden');
@@ -268,6 +276,14 @@
                 helpCourse.setAttribute('hidden', 'hidden');
             }
         }
+        if (helpSite) {
+            if (isSite) {
+                helpSite.removeAttribute('hidden');
+            } else {
+                helpSite.setAttribute('hidden', 'hidden');
+            }
+        }
+        syncRepeatHelp(scope);
     }
     function getDurationMode() {
         var checked = calForm ? calForm.querySelector('[data-lp-cal-form-duration-mode]:checked') : null;
@@ -390,6 +406,31 @@
             }
         }
     }
+    function syncRepeatHelp(scope) {
+        if (!calForm) {
+            return;
+        }
+        var helpCourse = calForm.querySelector('[data-lp-cal-form-repeat-help]');
+        var helpSite = calForm.querySelector('[data-lp-cal-form-repeat-help-site]');
+        var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
+        var weekly = !!(repeatEl && repeatEl.checked);
+        var wrapVisible = calForm.querySelector('[data-lp-cal-form-repeat-wrap]');
+        var creating = wrapVisible && !wrapVisible.hasAttribute('hidden');
+        if (helpCourse) {
+            if (creating && weekly && scope === 'course') {
+                helpCourse.removeAttribute('hidden');
+            } else {
+                helpCourse.setAttribute('hidden', 'hidden');
+            }
+        }
+        if (helpSite) {
+            if (creating && weekly && scope === 'site') {
+                helpSite.removeAttribute('hidden');
+            } else {
+                helpSite.setAttribute('hidden', 'hidden');
+            }
+        }
+    }
     function syncRepeatUi(isCreate) {
         if (!calForm) {
             return;
@@ -402,6 +443,7 @@
         }
         if (!isCreate) {
             wrap.setAttribute('hidden', 'hidden');
+            syncRepeatHelp(getCalScope());
             return;
         }
         wrap.removeAttribute('hidden');
@@ -413,6 +455,7 @@
                 countWrap.setAttribute('hidden', 'hidden');
             }
         }
+        syncRepeatHelp(getCalScope());
     }
     function getRepeatCount() {
         if (!calForm) {
@@ -812,7 +855,7 @@
             if (durMode === 'minutes') {
                 setMinutesSelectValue(sourceBtn.getAttribute('data-duration') || '60', false);
             }
-            var editScope = sourceBtn.getAttribute('data-scope') === 'course' ? 'course' : 'personal';
+            var editScope = normalizeCalScope(sourceBtn.getAttribute('data-scope') || 'personal');
             setCalScope(editScope, true);
             if (courseEl && editScope === 'course') {
                 courseEl.value = sourceBtn.getAttribute('data-courseid') || courseEl.value;
@@ -875,6 +918,21 @@
             setCalScope(defaultScope, false);
             if (courseEl) {
                 courseEl.disabled = false;
+                var preferredCourse = calRoot
+                    ? (calRoot.getAttribute('data-preferred-courseid') || '')
+                    : '';
+                if (preferredCourse && preferredCourse !== '0') {
+                    var hasPreferred = false;
+                    for (var pi = 0; pi < courseEl.options.length; pi++) {
+                        if (courseEl.options[pi].value === preferredCourse) {
+                            hasPreferred = true;
+                            break;
+                        }
+                    }
+                    if (hasPreferred) {
+                        courseEl.value = preferredCourse;
+                    }
+                }
                 var courseSelectCreate = calForm.querySelector('[data-lp-select-course]');
                 if (courseSelectCreate) {
                     syncLpSelectFromInput(courseSelectCreate);
@@ -1175,14 +1233,23 @@
         }
     }
     shell.addEventListener('change', function (e) {
-        var filter = e.target.closest('[data-lp-cal-filter]');
-        if (!filter) {
+        var filter = e.target.closest('[data-lp-cal-filter], [data-lp-cal-track-filter]');
+        if (filter) {
+            var opt = filter.options[filter.selectedIndex];
+            var url = opt ? opt.getAttribute('data-url') : '';
+            if (url) {
+                window.location.href = url;
+            }
             return;
         }
-        var opt = filter.options[filter.selectedIndex];
-        var url = opt ? opt.getAttribute('data-url') : '';
-        if (url) {
-            window.location.href = url;
+        var orient = e.target.closest('[data-lp-cal-orient-toggle]');
+        if (orient) {
+            var orientUrl = orient.checked
+                ? orient.getAttribute('data-url-on')
+                : orient.getAttribute('data-url-off');
+            if (orientUrl) {
+                window.location.href = orientUrl;
+            }
         }
     });
     shell.addEventListener('click', function (e) {

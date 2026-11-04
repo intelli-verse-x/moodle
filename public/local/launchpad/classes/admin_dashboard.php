@@ -3014,6 +3014,98 @@ final class admin_dashboard {
     }
 
     /**
+     * Shared orientation courses (`lp-orient-*`), ordered by name.
+     *
+     * @return list<\stdClass> id, fullname, shortname, idnumber, visible, summary, startdate
+     */
+    public static function list_orientation_courses(): array {
+        global $DB;
+
+        $like = $DB->sql_like('idnumber', ':orient', false);
+        $params = [
+            'orient' => $DB->sql_like_escape(self::ORIENT_IDNUMBER_PREFIX) . '%',
+            'site' => SITEID,
+        ];
+        $sql = "SELECT id, fullname, shortname, idnumber, visible, summary, startdate
+                  FROM {course}
+                 WHERE id <> :site
+                   AND {$like}
+              ORDER BY fullname ASC";
+
+        return array_values($DB->get_records_sql($sql, $params));
+    }
+
+    /**
+     * Valid track id for admin calendar filter (0 = all tracks).
+     */
+    public static function resolve_calendar_trackid(int $trackid): int {
+        if ($trackid <= 0) {
+            return 0;
+        }
+        foreach (self::list_track_courses() as $course) {
+            if ((int) $course->id === $trackid) {
+                return $trackid;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Courses for the admin calendar grid (does not change Overview KPI lists).
+     *
+     * Optional single-track filter; optional orientation append (all orients, or
+     * the filtered track's cohort orientation only).
+     *
+     * @return list<\stdClass>
+     */
+    public static function calendar_courses(int $trackid = 0, bool $includeorient = false): array {
+        $tracks = self::list_track_courses();
+        $resolved = self::resolve_calendar_trackid($trackid);
+        $courses = [];
+        if ($resolved > 0) {
+            foreach ($tracks as $course) {
+                if ((int) $course->id === $resolved) {
+                    $courses[] = $course;
+                    break;
+                }
+            }
+        }
+        if ($courses === []) {
+            $courses = $tracks;
+            $resolved = 0;
+        }
+
+        if (!$includeorient) {
+            return $courses;
+        }
+
+        $orients = [];
+        if ($resolved > 0) {
+            $slug = self::cohort_slug_from_track_idnumber((string) ($courses[0]->idnumber ?? ''));
+            $one = $slug !== null ? self::orientation_course_for_slug($slug) : null;
+            if ($one) {
+                $orients[] = $one;
+            }
+        } else {
+            $orients = self::list_orientation_courses();
+        }
+
+        $seen = [];
+        foreach ($courses as $course) {
+            $seen[(int) $course->id] = true;
+        }
+        foreach ($orients as $orient) {
+            $oid = (int) $orient->id;
+            if (!isset($seen[$oid])) {
+                $courses[] = $orient;
+                $seen[$oid] = true;
+            }
+        }
+
+        return $courses;
+    }
+
+    /**
      * KPI numbers for Overview tiles.
      *
      * Tracks ready = visible + ≥1 activity + ≥1 teacher/editingteacher.

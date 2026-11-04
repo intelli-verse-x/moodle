@@ -44,7 +44,9 @@ if ($portal === 'admin') {
     if (!admin_dashboard::can_access($userid) && !is_siteadmin()) {
         throw new \moodle_exception('nopermissions', 'error', '', get_string('fellowship_nav_calendar', 'local_launchpad'));
     }
-    $courses = admin_dashboard::list_track_courses();
+    $caltrack = admin_dashboard::resolve_calendar_trackid(optional_param('track', 0, PARAM_INT));
+    $calincludeorient = (bool) optional_param('include_orient', 0, PARAM_BOOL);
+    $courses = admin_dashboard::calendar_courses($caltrack, $calincludeorient);
 } else if ($portal === 'mentor') {
     if (!mentor_dashboard::can_access($userid) && !is_siteadmin()) {
         throw new \moodle_exception('nopermissions', 'error', '', get_string('fellowship_nav_calendar', 'local_launchpad'));
