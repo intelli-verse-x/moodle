@@ -382,6 +382,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'home_url' => $homeurl,
     'logout_url' => $logouturl,
     'profile_url' => $profileurl,
+    'logo_url' => $pluginbase . '/assets/img/logo-on-dark.png',
     'notifications_url' => $notificationsurl,
     'notifications_label' => $notificationslabel,
     'unread_notifications' => $unread,
@@ -413,6 +414,7 @@ if (!empty($mismatch['show_portal_mismatch'])) {
 }
 echo '<body class="' . $bodyclass . '">' . "\n";
 echo $shell;
+echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
 echo '</body>' . "\n";
 echo '</html>';

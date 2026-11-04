@@ -43,8 +43,9 @@
   {{/flash_err}}
 
   {{^has_course}}
-    <p class="lp-muted" style="margin-top:16px">{{empty_body}}</p>
-    <p style="margin-top:12px"><a class="lp-btn lp-btn-solid" href="{{builder_url}}">{{builder_label}}</a></p>
+    <div style="margin-top:16px">
+      {{> local_launchpad/admin_empty}}
+    </div>
   {{/has_course}}
 
   {{#has_course}}

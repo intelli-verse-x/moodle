@@ -64,7 +64,9 @@
         </tbody>
       </table>
     {{/has_people}}
-    <p class="lp-muted" data-lp-people-empty style="margin:0{{#has_people}};display:none{{/has_people}}">{{empty_body}}</p>
+    <div data-lp-people-empty style="{{#has_people}}display:none{{/has_people}}" role="status">
+      {{> local_launchpad/admin_empty}}
+    </div>
   </div>
 </div>
 <p class="lp-xs lp-muted" style="margin-top:12px">{{footnote}}</p>

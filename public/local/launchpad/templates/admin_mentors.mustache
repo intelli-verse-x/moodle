@@ -75,5 +75,7 @@
   </div>
 {{/has_tracks}}
 {{^has_tracks}}
-  <p class="lp-muted" style="margin-top:16px">{{empty_body}}</p>
+  <div style="margin-top:16px">
+    {{> local_launchpad/admin_empty}}
+  </div>
 {{/has_tracks}}

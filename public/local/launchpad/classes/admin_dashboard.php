@@ -98,6 +98,44 @@ final class admin_dashboard {
     public const PLACEHOLDER_MARKER = '[placeholder';
 
     /**
+     * Shared empty-state fields for {{> local_launchpad/admin_empty}}.
+     *
+     * @return array<string, mixed>
+     */
+    public static function empty_state(
+        string $bodykey,
+        ?string $titlekey = null,
+        ?string $ctaurl = null,
+        ?string $ctalabelkey = null,
+        string $mark = 'AD'
+    ): array {
+        $hascta = $ctaurl !== null && $ctaurl !== '' && $ctalabelkey !== null;
+        return [
+            'empty_mark' => $mark,
+            'empty_title' => $titlekey !== null
+                ? get_string($titlekey, 'local_launchpad')
+                : '',
+            'empty_body' => get_string($bodykey, 'local_launchpad'),
+            'has_empty_cta' => $hascta,
+            'empty_cta_url' => $hascta ? $ctaurl : '',
+            'empty_cta_label' => $hascta
+                ? get_string($ctalabelkey, 'local_launchpad')
+                : '',
+        ];
+    }
+
+    /**
+     * Flash / empty error text — capability failures stay plain; no raw stack dumps.
+     */
+    public static function flash_error_message(\Throwable $e): string {
+        if ($e instanceof \required_capability_exception) {
+            return get_string('admin_err_capability', 'local_launchpad');
+        }
+        $msg = trim($e->getMessage());
+        return $msg !== '' ? $msg : get_string('admin_err_generic', 'local_launchpad');
+    }
+
+    /**
      * Tracks & courses page (HTML a-tracks) — card grid from live Moodle.
      *
      * @param \stdClass $user
@@ -113,8 +151,9 @@ final class admin_dashboard {
 
         $root = self::fellowship_root_category();
         $catvisible = $root && (int) $root->visible === 1;
+        $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
 
-        return [
+        return array_merge([
             'firstname' => $firstname,
             'eyebrow' => get_string('admin_tracks_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_tracks_heading', 'local_launchpad'),
@@ -125,8 +164,12 @@ final class admin_dashboard {
             'category_chip_ok' => $catvisible,
             'has_tracks' => $cards !== [],
             'tracks' => $cards,
-            'empty_body' => get_string('admin_tracks_empty', 'local_launchpad'),
-        ];
+        ], self::empty_state(
+            'admin_tracks_empty',
+            'admin_empty_title_no_tracks',
+            $builderurl,
+            'admin_empty_cta_builder'
+        ));
     }
 
     /**
@@ -141,17 +184,19 @@ final class admin_dashboard {
         unset($user);
         $tracks = self::list_track_courses();
         if ($tracks === []) {
-            return [
+            return array_merge([
                 'eyebrow' => get_string('admin_builder_eyebrow', 'local_launchpad'),
                 'heading' => get_string('admin_builder_heading', 'local_launchpad'),
                 'lead' => get_string('admin_builder_lead', 'local_launchpad'),
                 'has_tracks' => false,
-                'empty_body' => get_string('admin_builder_empty', 'local_launchpad'),
                 'flash_ok' => !empty($flash['ok']),
                 'flash_ok_body' => (string) ($flash['ok'] ?? ''),
                 'flash_err' => !empty($flash['error']),
                 'flash_err_body' => (string) ($flash['error'] ?? ''),
-            ];
+            ], self::empty_state(
+                'admin_builder_empty',
+                'admin_empty_title_no_tracks'
+            ));
         }
 
         $selected = null;
@@ -394,16 +439,21 @@ final class admin_dashboard {
             $trackid = (int) $course->id;
         }
         if ($course === null) {
-            return [
+            $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+            return array_merge([
                 'has_course' => false,
-                'empty_body' => get_string('admin_builder_empty', 'local_launchpad'),
-                'builder_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false),
+                'builder_url' => $builderurl,
                 'builder_label' => get_string('admin_nav_builder', 'local_launchpad'),
                 'flash_ok' => !empty($flash['ok']),
                 'flash_ok_body' => (string) ($flash['ok'] ?? ''),
                 'flash_err' => !empty($flash['error']),
                 'flash_err_body' => (string) ($flash['error'] ?? ''),
-            ];
+            ], self::empty_state(
+                'admin_builder_empty',
+                'admin_empty_title_no_tracks',
+                $builderurl,
+                'admin_empty_cta_builder'
+            ));
         }
 
         $phases = blueprint::phase_sections();
@@ -564,7 +614,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -574,7 +624,7 @@ final class admin_dashboard {
         try {
             require_capability('moodle/course:manageactivities', $context);
         } catch (\required_capability_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $name = trim($name);
@@ -594,7 +644,7 @@ final class admin_dashboard {
             // create_module uses $USER for capability checks.
             $created = create_module($moduleinfo);
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $createdname = format_string($name);
@@ -629,7 +679,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -643,7 +693,7 @@ final class admin_dashboard {
             try {
                 require_capability('moodle/course:manageactivities', $context);
             } catch (\required_capability_exception $e2) {
-                return ['error' => $e2->getMessage()];
+                return ['error' => self::flash_error_message($e2)];
             }
         }
 
@@ -688,7 +738,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -698,7 +748,7 @@ final class admin_dashboard {
         try {
             require_capability('moodle/course:manageactivities', $context);
         } catch (\required_capability_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $cm = get_coursemodule_from_id('', $cmid, $trackcourseid, false, IGNORE_MISSING);
@@ -720,7 +770,7 @@ final class admin_dashboard {
             \core_courseformat\formatactions::cm($trackcourseid)->delete($cmid, false);
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         return [
@@ -749,7 +799,7 @@ final class admin_dashboard {
             $newcm = \core_courseformat\formatactions::cm($course)->duplicate((int) $cm->id);
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!$newcm) {
             return ['error' => get_string('admin_manage_err_duplicate', 'local_launchpad')];
@@ -785,7 +835,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -795,7 +845,7 @@ final class admin_dashboard {
         try {
             require_capability('moodle/course:manageactivities', $context);
         } catch (\required_capability_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $orderedcmids = array_values(array_filter(array_map('intval', $orderedcmids)));
@@ -844,7 +894,7 @@ final class admin_dashboard {
             }
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         return ['ok' => get_string('admin_manage_ok_order_saved', 'local_launchpad')];
@@ -881,7 +931,7 @@ final class admin_dashboard {
             $ok = \core_courseformat\formatactions::cm($course)->rename($cmid, $name);
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!$ok) {
             // Same name — treat as success (no-op).
@@ -911,7 +961,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -923,7 +973,7 @@ final class admin_dashboard {
                 require_capability('moodle/course:manageactivities', $context);
             }
         } catch (\required_capability_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $cm = get_coursemodule_from_id('', $cmid, $trackcourseid, false, IGNORE_MISSING);
@@ -962,46 +1012,38 @@ final class admin_dashboard {
             'trackid' => $trackid > 0 ? $trackid : null,
         ])))->out(false);
 
-        if ($trackid <= 0 || $cmid <= 0) {
-            return [
+        $activityempty = static function (string $body, array $flash = []) use ($manageurl): array {
+            return array_merge([
                 'has_activity' => false,
-                'empty_body' => get_string('admin_builder_err_params', 'local_launchpad'),
                 'manage_url' => $manageurl,
                 'back_label' => get_string('admin_activity_back', 'local_launchpad'),
                 'flash_ok' => !empty($flash['ok']),
                 'flash_ok_body' => (string) ($flash['ok'] ?? ''),
                 'flash_err' => !empty($flash['error']),
                 'flash_err_body' => (string) ($flash['error'] ?? ''),
-            ];
+                'empty_mark' => 'AD',
+                'empty_title' => get_string('admin_empty_title_no_activity', 'local_launchpad'),
+                'empty_body' => $body,
+                'has_empty_cta' => true,
+                'empty_cta_url' => $manageurl,
+                'empty_cta_label' => get_string('admin_activity_back', 'local_launchpad'),
+            ]);
+        };
+
+        if ($trackid <= 0 || $cmid <= 0) {
+            return $activityempty(get_string('admin_builder_err_params', 'local_launchpad'), $flash);
         }
 
         try {
             $course = account_provision::require_launchpad_course($trackid);
         } catch (account_provision_exception $e) {
-            return [
-                'has_activity' => false,
-                'empty_body' => $e->getMessage(),
-                'manage_url' => $manageurl,
-                'back_label' => get_string('admin_activity_back', 'local_launchpad'),
-                'flash_ok' => false,
-                'flash_ok_body' => '',
-                'flash_err' => true,
-                'flash_err_body' => $e->getMessage(),
-            ];
+            // Empty block carries the message — avoid duplicate flash.
+            return $activityempty(self::flash_error_message($e));
         }
 
         $cm = get_coursemodule_from_id('', $cmid, $trackid, false, IGNORE_MISSING);
         if (!$cm) {
-            return [
-                'has_activity' => false,
-                'empty_body' => get_string('admin_builder_err_cm', 'local_launchpad'),
-                'manage_url' => $manageurl,
-                'back_label' => get_string('admin_activity_back', 'local_launchpad'),
-                'flash_ok' => !empty($flash['ok']),
-                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
-                'flash_err' => !empty($flash['error']),
-                'flash_err_body' => (string) ($flash['error'] ?? ''),
-            ];
+            return $activityempty(get_string('admin_builder_err_cm', 'local_launchpad'), $flash);
         }
 
         $sectionnum = 1;
@@ -1020,13 +1062,18 @@ final class admin_dashboard {
         if (!in_array($modname, $allowed, true)) {
             return [
                 'has_activity' => false,
-                'empty_body' => get_string('admin_manage_err_mod', 'local_launchpad'),
                 'manage_url' => $manageurl,
                 'back_label' => get_string('admin_activity_back', 'local_launchpad'),
                 'flash_ok' => false,
                 'flash_ok_body' => '',
-                'flash_err' => true,
-                'flash_err_body' => get_string('admin_manage_err_mod', 'local_launchpad'),
+                'flash_err' => false,
+                'flash_err_body' => '',
+                'empty_mark' => 'AD',
+                'empty_title' => get_string('admin_empty_title_no_activity', 'local_launchpad'),
+                'empty_body' => get_string('admin_manage_err_mod', 'local_launchpad'),
+                'has_empty_cta' => true,
+                'empty_cta_url' => $manageurl,
+                'empty_cta_label' => get_string('admin_activity_back', 'local_launchpad'),
             ];
         }
 
@@ -1170,7 +1217,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -1189,7 +1236,7 @@ final class admin_dashboard {
         try {
             require_capability('moodle/course:manageactivities', $context);
         } catch (\required_capability_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $name = trim($name);
@@ -1253,7 +1300,7 @@ final class admin_dashboard {
             }
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $ok = get_string('admin_activity_ok_saved', 'local_launchpad', format_string($name));
@@ -1902,7 +1949,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -1912,7 +1959,7 @@ final class admin_dashboard {
         try {
             require_capability('moodle/course:manageactivities', $context);
         } catch (\required_capability_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $cm = $DB->get_record('course_modules', ['id' => $cmid, 'course' => $trackcourseid], '*', IGNORE_MISSING);
@@ -1967,7 +2014,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -1977,7 +2024,7 @@ final class admin_dashboard {
         try {
             require_capability('moodle/course:update', $context);
         } catch (\required_capability_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $section = $DB->get_record('course_sections', [
@@ -2161,6 +2208,7 @@ final class admin_dashboard {
             'tip_prof_url' => (new \moodle_url('/local/launchpad/assets/img/prof.webp'))->out(false),
             'recent_title' => get_string('admin_cohorts_recent_title', 'local_launchpad'),
             'recent_empty' => get_string('admin_cohorts_recent_empty', 'local_launchpad'),
+            'bytrack_empty' => get_string('admin_cohorts_bytrack_empty', 'local_launchpad'),
             'col_fellow' => get_string('admin_cohorts_col_fellow', 'local_launchpad'),
             'col_track' => get_string('admin_cohorts_col_track', 'local_launchpad'),
             'col_role' => get_string('admin_cohorts_col_role', 'local_launchpad'),
@@ -2213,7 +2261,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_cohorts_err_not_track', 'local_launchpad')];
@@ -2225,7 +2273,7 @@ final class admin_dashboard {
         try {
             $result = account_provision::enrol_fellow($actor, (int) $user->id, $trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $parts = [
@@ -2303,7 +2351,8 @@ final class admin_dashboard {
             ];
         }
 
-        return [
+        $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
+        return array_merge([
             'eyebrow' => get_string('admin_people_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_people_heading', 'local_launchpad'),
             'lead' => get_string('admin_people_lead', 'local_launchpad'),
@@ -2315,9 +2364,13 @@ final class admin_dashboard {
             'col_reach' => get_string('admin_people_col_reach', 'local_launchpad'),
             'people' => $all,
             'has_people' => $all !== [],
-            'empty_body' => get_string('admin_people_empty', 'local_launchpad'),
             'footnote' => get_string('admin_people_footnote', 'local_launchpad'),
-        ];
+        ], self::empty_state(
+            'admin_people_empty',
+            'admin_people_empty_title',
+            $cohortsurl,
+            'admin_empty_cta_cohorts'
+        ));
     }
 
     /**
@@ -2549,7 +2602,7 @@ final class admin_dashboard {
             ],
         ];
 
-        return [
+        return array_merge([
             'eyebrow' => get_string('admin_reviews_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_reviews_heading', 'local_launchpad'),
             'lead' => get_string('admin_reviews_lead', 'local_launchpad'),
@@ -2561,9 +2614,11 @@ final class admin_dashboard {
             'col_state' => get_string('admin_reviews_col_state', 'local_launchpad'),
             'pending' => $pending,
             'has_pending' => $pending !== [],
-            'empty_body' => get_string('admin_reviews_empty', 'local_launchpad'),
             'open_label' => get_string('admin_reviews_open', 'local_launchpad'),
-        ];
+        ], self::empty_state(
+            'admin_reviews_empty',
+            'admin_reviews_empty_title'
+        ));
     }
 
     /**
@@ -2725,20 +2780,25 @@ final class admin_dashboard {
             $cards[] = self::mentor_track_card_context($course);
         }
 
-        return [
+        $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        return array_merge([
             'eyebrow' => get_string('admin_mentors_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_mentors_heading', 'local_launchpad'),
             'lead' => get_string('admin_mentors_lead', 'local_launchpad'),
             'has_tracks' => $cards !== [],
             'tracks' => $cards,
-            'empty_body' => get_string('admin_mentors_empty', 'local_launchpad'),
             'flash_ok' => !empty($flash['ok']),
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
             'form_action' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false),
             'sesskey' => sesskey(),
-        ];
+        ], self::empty_state(
+            'admin_mentors_empty',
+            'admin_empty_title_no_tracks',
+            $builderurl,
+            'admin_empty_cta_builder'
+        ));
     }
 
     /**
@@ -2813,7 +2873,7 @@ final class admin_dashboard {
         try {
             $course = account_provision::require_launchpad_course($trackcourseid);
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
@@ -2828,7 +2888,7 @@ final class admin_dashboard {
                 'teacher'
             );
         } catch (account_provision_exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => self::flash_error_message($e)];
         }
 
         $key = $result['status'] === 'already_enrolled'
