@@ -101,6 +101,21 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $cmid = optional_param('cmid', 0, PARAM_INT);
         $show = (bool) optional_param('show', 0, PARAM_BOOL);
         $flash = admin_dashboard::set_activity_visible($USER, $trackid, $cmid, $show);
+    } else if (($view === 'manage' || $view === 'activity') && $action === 'delete_cm') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        $sectionnum = optional_param('section', $sectionnum, PARAM_INT);
+        $flash = admin_dashboard::delete_activity($USER, $trackid, $cmid);
+        // After delete, always land on Manage for that phase (activity page no longer exists).
+        if (!empty($flash['ok'])) {
+            $SESSION->lp_admin_flash = $flash;
+            redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+                'view' => 'manage',
+                'trackid' => $trackid > 0 ? $trackid : null,
+                'section' => $sectionnum > 0 ? $sectionnum : null,
+            ])));
+        }
+        $view = 'manage';
     } else if ($view === 'activity' && $action === 'save_activity') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
@@ -114,6 +129,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         if (!empty($_FILES['resourcefiles'])) {
             $uploadfiles = $_FILES['resourcefiles'];
         }
+        $removefiles = optional_param_array('removeresourcefiles', [], PARAM_FILE);
         $flash = admin_dashboard::save_activity_settings(
             $USER,
             $trackid,
@@ -123,7 +139,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $content,
             $grade,
             $trackcompletion,
-            $uploadfiles
+            $uploadfiles,
+            $removefiles
         );
     }
 }

@@ -2002,4 +2002,127 @@
         }
         setEdit(false);
     })();
+
+    // Confirm before deleting a whole activity (Manage + activity settings).
+    document.querySelectorAll('form[data-lp-delete-confirm]').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            var msg = form.getAttribute('data-lp-delete-confirm') || '';
+            if (msg && !window.confirm(msg)) {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // Admin File settings: pending picks with ×, mark attached files for removal on Save.
+    document.querySelectorAll('[data-lp-file-picker]').forEach(function (root) {
+        var input = root.querySelector('[data-lp-file-input]');
+        var status = root.querySelector('[data-lp-file-status]');
+        var pendingWrap = root.querySelector('[data-lp-pending-wrap]');
+        var pendingList = root.querySelector('[data-lp-pending-list]');
+        var removeBox = root.querySelector('[data-lp-remove-inputs]');
+        var removeLabel = root.querySelector('[data-lp-attached-remove]');
+        var removeAria = removeLabel ? (removeLabel.getAttribute('aria-label') || 'Remove file') : 'Remove file';
+        if (!input || !status) {
+            return;
+        }
+        var emptyLabel = status.textContent;
+
+        function syncRemoveInputs() {
+            if (!removeBox) {
+                return;
+            }
+            removeBox.innerHTML = '';
+            root.querySelectorAll('[data-lp-attached-card].is-removing').forEach(function (card) {
+                var name = card.getAttribute('data-filename') || '';
+                if (!name) {
+                    return;
+                }
+                var hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'removeresourcefiles[]';
+                hidden.value = name;
+                removeBox.appendChild(hidden);
+            });
+        }
+
+        root.querySelectorAll('[data-lp-attached-remove]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var card = btn.closest('[data-lp-attached-card]');
+                if (!card) {
+                    return;
+                }
+                card.classList.toggle('is-removing');
+                syncRemoveInputs();
+            });
+        });
+
+        function setInputFiles(fileList) {
+            var dt = new DataTransfer();
+            for (var i = 0; i < fileList.length; i++) {
+                dt.items.add(fileList[i]);
+            }
+            input.files = dt.files;
+        }
+
+        function renderPending() {
+            var files = input.files ? Array.prototype.slice.call(input.files) : [];
+            if (!pendingWrap || !pendingList) {
+                if (!files.length) {
+                    status.textContent = emptyLabel;
+                } else if (files.length === 1) {
+                    status.textContent = files[0].name + ' — save to attach';
+                } else {
+                    status.textContent = files.length + ' selected — save to attach';
+                }
+                return;
+            }
+            pendingList.innerHTML = '';
+            if (!files.length) {
+                pendingWrap.hidden = true;
+                status.textContent = emptyLabel;
+                return;
+            }
+            pendingWrap.hidden = false;
+            status.textContent = files.length === 1
+                ? (files[0].name + ' — save to attach')
+                : (files.length + ' selected — save to attach');
+            files.forEach(function (file, index) {
+                var li = document.createElement('li');
+                li.className = 'lp-admin-file-card';
+                li.title = file.name;
+                var ext = (file.name.split('.').pop() || 'FILE').toUpperCase();
+                if (ext.length > 5) {
+                    ext = 'FILE';
+                }
+                li.innerHTML =
+                    '<span class="lp-admin-file-ico" aria-hidden="true"></span>' +
+                    '<span class="lp-admin-file-body">' +
+                    '<span class="lp-admin-file-name"></span>' +
+                    '<span class="lp-admin-file-meta"></span>' +
+                    '</span>' +
+                    '<button type="button" class="lp-file-remove" data-lp-pending-remove aria-label=""></button>';
+                li.querySelector('.lp-admin-file-ico').textContent = ext;
+                li.querySelector('.lp-admin-file-name').textContent = file.name;
+                li.querySelector('.lp-admin-file-meta').textContent = file.size
+                    ? (Math.max(1, Math.round(file.size / 1024)) + ' KB')
+                    : '';
+                var rm = li.querySelector('[data-lp-pending-remove]');
+                rm.setAttribute('aria-label', removeAria);
+                rm.title = removeAria;
+                rm.textContent = '×';
+                rm.addEventListener('click', function () {
+                    var next = Array.prototype.slice.call(input.files || []).filter(function (_f, i) {
+                        return i !== index;
+                    });
+                    setInputFiles(next);
+                    renderPending();
+                });
+                pendingList.appendChild(li);
+            });
+        }
+
+        input.addEventListener('change', function () {
+            renderPending();
+        });
+    });
 })();

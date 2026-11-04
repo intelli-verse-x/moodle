@@ -63,20 +63,43 @@
         {{/is_page}}
 
         {{#is_resource}}
-          <div class="lp-field lp-admin-files">
+          <div class="lp-field lp-admin-files" data-lp-file-picker>
             <span>{{files_label}}</span>
-            <p class="lp-sm{{^has_file}} lp-warn{{/has_file}}" style="margin:0">
+            <p class="lp-sm{{^has_file}} lp-warn{{/has_file}}" style="margin:0" data-lp-file-attached-status>
               {{#has_file}}{{file_status_label}}{{/has_file}}
               {{^has_file}}{{file_empty_warn}}{{/has_file}}
             </p>
             {{#has_file_list}}
-              <ul class="lp-admin-file-list">
+              <ul class="lp-admin-file-cards" data-lp-attached-files>
                 {{#file_list}}
-                  <li>{{filename}}</li>
+                  <li class="lp-admin-file-card{{#has_preview}} has-thumb{{/has_preview}}" title="{{filename}}" data-lp-attached-card data-filename="{{filename}}">
+                    {{#has_preview}}
+                      <span class="lp-admin-file-thumb" aria-hidden="true"><img src="{{previewurl}}" alt=""></span>
+                    {{/has_preview}}
+                    {{^has_preview}}
+                      <span class="lp-admin-file-ico" aria-hidden="true">{{#ext}}{{ext}}{{/ext}}{{^ext}}FILE{{/ext}}</span>
+                    {{/has_preview}}
+                    <span class="lp-admin-file-body">
+                      <span class="lp-admin-file-name">{{displayname}}</span>
+                      <span class="lp-admin-file-meta">{{size}}</span>
+                    </span>
+                    <button type="button" class="lp-file-remove" data-lp-attached-remove aria-label="{{remove_file_label}}" title="{{remove_file_label}}">×</button>
+                  </li>
                 {{/file_list}}
               </ul>
+              <div data-lp-remove-inputs></div>
             {{/has_file_list}}
-            <input type="file" name="resourcefiles[]" multiple>
+            <div class="lp-file-picker">
+              <label class="lp-file-picker-trigger">
+                <span class="lp-btn lp-btn-light lp-file-picker-btn">{{choose_files_label}}</span>
+                <input class="lp-file-picker-input" type="file" name="resourcefiles[]" multiple data-lp-file-input>
+              </label>
+              <span class="lp-file-picker-status lp-sm lp-muted" data-lp-file-status>{{picker_empty_label}}</span>
+            </div>
+            <div class="lp-admin-pending" data-lp-pending-wrap hidden>
+              <span class="lp-sm" style="font-weight:600">{{pending_heading}}</span>
+              <ul class="lp-admin-file-cards" data-lp-pending-list></ul>
+            </div>
             {{#has_file}}
               <span class="lp-sm lp-muted">{{file_replace_hint}}</span>
             {{/has_file}}
@@ -110,10 +133,18 @@
           <span class="lp-sm lp-muted">{{track_completion_hint}}</span>
         </label>
 
-        <div class="lp-row-sb" style="margin-top:4px">
+        <div class="lp-activity-actions" style="margin-top:4px">
           <button type="submit" class="lp-btn lp-btn-solid">{{save_label}}</button>
-          <a class="lp-btn lp-btn-light" href="{{manage_url}}">{{back_label}}</a>
+          <a class="lp-btn lp-btn-light" href="{{manage_url}}">{{cancel_label}}</a>
         </div>
+      </form>
+      <form method="post" action="{{delete_form_action}}" class="lp-activity-delete" data-lp-delete-confirm="{{delete_confirm}}">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="action" value="delete_cm">
+        <input type="hidden" name="trackid" value="{{trackid}}">
+        <input type="hidden" name="cmid" value="{{cmid}}">
+        <input type="hidden" name="section" value="{{sectionnum}}">
+        <button type="submit" class="lp-btn lp-btn-light lp-btn-danger">{{delete_label}}</button>
       </form>
     </div>
   {{/has_activity}}

@@ -130,6 +130,14 @@
                     <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
                   </form>
                 {{/is_draft}}
+                <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{delete_confirm}}">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="delete_cm">
+                  <input type="hidden" name="trackid" value="{{trackid}}">
+                  <input type="hidden" name="cmid" value="{{cmid}}">
+                  <input type="hidden" name="section" value="{{sectionnum}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{delete_label}}</button>
+                </form>
               </div>
             </div>
           {{/activities}}

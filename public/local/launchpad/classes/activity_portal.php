@@ -258,12 +258,12 @@ final class activity_portal {
                     $hasvideo = true;
                     $videourl = $streamurl;
                 }
-                $files[] = [
-                    'filename' => $file->get_filename(),
+                $card = self::describe_resource_file($file, $context);
+                $files[] = array_merge($card, [
                     'url' => $downloadurl,
-                    'size' => display_size($file->get_filesize()),
+                    'previewurl' => $streamurl,
                     'isvideo' => $isvideo,
-                ];
+                ]);
             }
             $hasfiles = $files !== [];
         } else if ($modname === 'assign') {
@@ -358,6 +358,54 @@ final class activity_portal {
                 'needsengine' => $needsengine,
                 'is_lesson' => $islesson,
             ], $lesson, $assignbrief, $quizbrief),
+        ];
+    }
+
+    /**
+     * Friendly card fields for a stored resource file (fellow + admin shells).
+     *
+     * @return array{
+     *   filename:string,
+     *   displayname:string,
+     *   size:string,
+     *   ext:string,
+     *   mimetype:string,
+     *   isimage:bool,
+     *   ispdf:bool,
+     *   download_label:string
+     * }
+     */
+    public static function describe_resource_file(\stored_file $file, \context $context): array {
+        unset($context);
+        $filename = $file->get_filename();
+        $mimetype = (string) $file->get_mimetype();
+        $ext = strtoupper(pathinfo($filename, PATHINFO_EXTENSION) ?: '');
+        $isimage = str_starts_with($mimetype, 'image/');
+        $ispdf = ($mimetype === 'application/pdf' || $ext === 'PDF');
+
+        $displayname = $filename;
+        // UUID-style camera dumps → short type label (full name stays in title).
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\./i', $filename)) {
+            if ($isimage) {
+                $displayname = get_string('activity_file_image_label', 'local_launchpad', $ext !== '' ? $ext : 'IMG');
+            } else if ($ispdf) {
+                $displayname = get_string('activity_file_pdf_label', 'local_launchpad');
+            } else if ($ext !== '') {
+                $displayname = get_string('activity_file_type_label', 'local_launchpad', $ext);
+            } else {
+                $displayname = get_string('activity_file_handout_label', 'local_launchpad');
+            }
+        }
+
+        return [
+            'filename' => $filename,
+            'displayname' => $displayname,
+            'size' => display_size($file->get_filesize()),
+            'ext' => $ext,
+            'mimetype' => $mimetype,
+            'isimage' => $isimage,
+            'ispdf' => $ispdf,
+            'download_label' => get_string('activity_file_download', 'local_launchpad'),
         ];
     }
 

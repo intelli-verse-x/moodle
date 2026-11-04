@@ -431,6 +431,8 @@ final class admin_dashboard {
         $hidelabel = get_string('admin_manage_hide_activity', 'local_launchpad');
         $showcmlabel = get_string('admin_manage_show_activity', 'local_launchpad');
         $hiddenbadge = get_string('admin_manage_hidden_badge', 'local_launchpad');
+        $deletelabel = get_string('admin_manage_delete_activity', 'local_launchpad');
+        $deleteconfirm = get_string('admin_manage_delete_confirm', 'local_launchpad');
         foreach ($activities as &$act) {
             $act['form_action'] = $formaction;
             $act['sesskey'] = $sesskey;
@@ -441,6 +443,8 @@ final class admin_dashboard {
             $act['hide_label'] = $hidelabel;
             $act['show_cm_label'] = $showcmlabel;
             $act['hidden_badge'] = $hiddenbadge;
+            $act['delete_label'] = $deletelabel;
+            $act['delete_confirm'] = $deleteconfirm;
             $act['settings_url'] = (new \moodle_url(persona_home::ADMIN_PATH, [
                 'view' => 'activity',
                 'trackid' => $trackid,
@@ -659,6 +663,63 @@ final class admin_dashboard {
     }
 
     /**
+     * Delete a LaunchPad track activity (full course module) via Moodle.
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function delete_activity(\stdClass $actor, int $trackcourseid, int $cmid): array {
+        global $CFG, $DB;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        if ($trackcourseid <= 0 || $cmid <= 0) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        $context = \context_course::instance($trackcourseid);
+        try {
+            require_capability('moodle/course:manageactivities', $context);
+        } catch (\required_capability_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $cm = get_coursemodule_from_id('', $cmid, $trackcourseid, false, IGNORE_MISSING);
+        if (!$cm) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+        $modname = (string) $cm->modname;
+        if (!in_array($modname, ['page', 'resource', 'quiz', 'assign'], true)) {
+            return ['error' => get_string('admin_manage_err_mod', 'local_launchpad')];
+        }
+
+        $title = format_string((string) $cm->name);
+        $instance = $DB->get_record($modname, ['id' => (int) $cm->instance], 'name', IGNORE_MISSING);
+        if ($instance && !empty($instance->name)) {
+            $title = format_string((string) $instance->name);
+        }
+
+        try {
+            \core_courseformat\formatactions::cm($trackcourseid)->delete($cmid, false);
+            rebuild_course_cache($trackcourseid, true);
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        return [
+            'ok' => get_string('admin_manage_ok_cm_deleted', 'local_launchpad', $title),
+        ];
+    }
+
+    /**
      * Slim activity settings screen in the admin shell.
      *
      * @param array{ok?:string,error?:string} $flash
@@ -778,10 +839,7 @@ final class admin_dashboard {
         if ($modname === 'resource') {
             $filesummary = self::resource_files_editor_context($course, $cmid);
         }
-        $filelist = [];
-        foreach ($filesummary['file_names'] as $fname) {
-            $filelist[] = ['filename' => $fname];
-        }
+        $filelist = $filesummary['file_cards'] ?? [];
 
         return [
             'has_activity' => true,
@@ -814,12 +872,28 @@ final class admin_dashboard {
             'file_status_label' => (string) ($filesummary['file_status_label'] ?? ''),
             'file_list' => $filelist,
             'has_file_list' => $filelist !== [],
+            'choose_files_label' => (string) ($filesummary['choose_files_label']
+                ?? get_string('admin_activity_choose_files', 'local_launchpad')),
+            'picker_empty_label' => (string) ($filesummary['picker_empty_label']
+                ?? get_string('admin_activity_picker_empty', 'local_launchpad')),
+            'remove_file_label' => (string) ($filesummary['remove_file_label']
+                ?? get_string('admin_activity_remove_file', 'local_launchpad')),
+            'pending_heading' => (string) ($filesummary['pending_heading']
+                ?? get_string('admin_activity_pending_heading', 'local_launchpad')),
             'maxbytes_display' => (string) ($filesummary['maxbytes_display'] ?? ''),
             'has_maxbytes' => !empty($filesummary['maxbytes_display']),
             'form_enctype_multipart' => $modname === 'resource',
             'quiz_hint' => get_string('admin_activity_quiz_hint', 'local_launchpad'),
             'assign_hint' => get_string('admin_activity_assign_hint', 'local_launchpad'),
             'save_label' => get_string('admin_activity_save', 'local_launchpad'),
+            'cancel_label' => get_string('admin_activity_cancel', 'local_launchpad'),
+            'delete_label' => get_string('admin_manage_delete_activity', 'local_launchpad'),
+            'delete_confirm' => get_string('admin_manage_delete_confirm', 'local_launchpad'),
+            'delete_form_action' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'manage',
+                'trackid' => $trackid,
+                'section' => $sectionnum,
+            ]))->out(false),
             'advanced_url' => (new \moodle_url('/course/modedit.php', [
                 'update' => $cmid,
                 'return' => 1,
@@ -849,6 +923,7 @@ final class admin_dashboard {
      * File activities accept optional multipart uploads into mod_resource content.
      *
      * @param array|null $uploadfiles Optional $_FILES['resourcefiles'] payload
+     * @param list<string> $removefiles Filenames to delete from an existing resource (ignored if upload replaces all)
      * @return array{ok:string}|array{error:string}
      */
     public static function save_activity_settings(
@@ -860,7 +935,8 @@ final class admin_dashboard {
         string $content = '',
         ?float $grade = null,
         ?bool $trackcompletion = null,
-        ?array $uploadfiles = null
+        ?array $uploadfiles = null,
+        array $removefiles = []
     ): array {
         global $CFG, $DB;
 
@@ -937,15 +1013,23 @@ final class admin_dashboard {
                 }
                 self::set_cm_completion_tracking($cm, $modname, $trackcompletion);
             }
-            if ($modname === 'resource' && is_array($uploadfiles)) {
-                $fileresult = self::save_resource_files_from_upload(
-                    $course,
-                    $cmid,
-                    (int) $instance->id,
-                    $uploadfiles
-                );
-                if (!empty($fileresult['error'])) {
-                    return ['error' => (string) $fileresult['error']];
+            if ($modname === 'resource') {
+                $uploaded = false;
+                if (is_array($uploadfiles)) {
+                    $fileresult = self::save_resource_files_from_upload(
+                        $course,
+                        $cmid,
+                        (int) $instance->id,
+                        $uploadfiles
+                    );
+                    if (!empty($fileresult['error'])) {
+                        return ['error' => (string) $fileresult['error']];
+                    }
+                    $uploaded = empty($fileresult['skipped']);
+                }
+                // New upload replaces the whole area; only apply removals when not replacing.
+                if (!$uploaded && $removefiles !== []) {
+                    self::remove_resource_files_by_name($cmid, (int) $instance->id, $removefiles);
                 }
             }
             rebuild_course_cache($trackcourseid, true);
@@ -1016,21 +1100,54 @@ final class admin_dashboard {
     }
 
     /**
-     * Short status for manage list / settings banner.
+     * Short status for manage list / settings banner (+ card rows for settings UI).
      *
-     * @return array{has_file:bool,file_count:int,file_status_label:string,file_names:list<string>}
+     * @return array{
+     *   has_file:bool,
+     *   file_count:int,
+     *   file_status_label:string,
+     *   file_names:list<string>,
+     *   file_cards:list<array<string,mixed>>
+     * }
      */
     public static function resource_files_summary(int $cmid): array {
         $files = self::resource_stored_files($cmid);
         $names = [];
+        $cards = [];
+        $modcontext = null;
+        try {
+            $modcontext = \context_module::instance($cmid);
+        } catch (\Throwable $e) {
+            $modcontext = null;
+        }
         foreach ($files as $file) {
             $names[] = $file->get_filename();
+            if ($modcontext) {
+                $card = activity_portal::describe_resource_file($file, $modcontext);
+                $preview = '';
+                if (!empty($card['isimage'])) {
+                    $preview = \moodle_url::make_pluginfile_url(
+                        $modcontext->id,
+                        'mod_resource',
+                        'content',
+                        $file->get_itemid(),
+                        $file->get_filepath(),
+                        $file->get_filename(),
+                        false
+                    )->out(false);
+                }
+                $cards[] = array_merge($card, [
+                    'previewurl' => $preview,
+                    'has_preview' => $preview !== '',
+                ]);
+            }
         }
         $count = count($names);
         if ($count === 0) {
             $label = get_string('admin_activity_file_status_empty', 'local_launchpad');
         } else if ($count === 1) {
-            $label = get_string('admin_activity_file_status_one', 'local_launchpad', $names[0]);
+            $friendly = $cards[0]['displayname'] ?? $names[0];
+            $label = get_string('admin_activity_file_status_one', 'local_launchpad', $friendly);
         } else {
             $label = get_string('admin_activity_file_status_many', 'local_launchpad', $count);
         }
@@ -1039,13 +1156,14 @@ final class admin_dashboard {
             'file_count' => $count,
             'file_status_label' => $label,
             'file_names' => $names,
+            'file_cards' => $cards,
         ];
     }
 
     /**
      * Current file status for File activity settings (native upload input — admin shell has no Moodle filemanager JS).
      *
-     * @return array{has_file:bool,file_count:int,file_status_label:string,file_names:list<string>,maxbytes:int,maxbytes_display:string}
+     * @return array<string,mixed>
      */
     public static function resource_files_editor_context(\stdClass $course, int $cmid): array {
         $summary = self::resource_files_summary($cmid);
@@ -1054,6 +1172,48 @@ final class admin_dashboard {
         return array_merge($summary, [
             'maxbytes' => $maxbytes,
             'maxbytes_display' => $maxbytes > 0 ? display_size($maxbytes) : '',
+            'choose_files_label' => get_string('admin_activity_choose_files', 'local_launchpad'),
+            'picker_empty_label' => get_string('admin_activity_picker_empty', 'local_launchpad'),
+            'remove_file_label' => get_string('admin_activity_remove_file', 'local_launchpad'),
+            'pending_heading' => get_string('admin_activity_pending_heading', 'local_launchpad'),
+        ]);
+    }
+
+    /**
+     * Delete named files from a resource CM content area and bump revision.
+     *
+     * @param list<string> $filenames
+     */
+    public static function remove_resource_files_by_name(int $cmid, int $resourceid, array $filenames): void {
+        global $DB;
+
+        $want = [];
+        foreach ($filenames as $name) {
+            $clean = clean_param((string) $name, PARAM_FILE);
+            if ($clean !== '') {
+                $want[$clean] = true;
+            }
+        }
+        if ($want === [] || $cmid <= 0 || $resourceid <= 0) {
+            return;
+        }
+
+        $deleted = 0;
+        foreach (self::resource_stored_files($cmid) as $file) {
+            if (isset($want[$file->get_filename()])) {
+                $file->delete();
+                $deleted++;
+            }
+        }
+        if ($deleted <= 0) {
+            return;
+        }
+
+        $revision = (int) $DB->get_field('resource', 'revision', ['id' => $resourceid]);
+        $DB->update_record('resource', (object) [
+            'id' => $resourceid,
+            'revision' => $revision + 1,
+            'timemodified' => time(),
         ]);
     }
 
