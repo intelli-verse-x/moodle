@@ -2402,11 +2402,29 @@
         });
     });
 
-    // Admin announcements: All tracks toggles individual track checkboxes.
+    // Admin announcements: All tracks + edit/delete helpers.
+    var annPage = shell.querySelector('[data-lp-ann-page]');
     var annForm = shell.querySelector('[data-lp-ann-form]');
     if (annForm) {
         var allTracks = annForm.querySelector('[data-lp-ann-all-tracks]');
         var trackBoxes = annForm.querySelectorAll('[data-lp-ann-track]');
+        var tracksWrap = annForm.querySelector('[data-lp-ann-tracks-wrap]');
+        var actionEl = annForm.querySelector('[data-lp-ann-action]');
+        var discussionEl = annForm.querySelector('[data-lp-ann-discussionid]');
+        var subjectEl = annForm.querySelector('[data-lp-ann-subject]');
+        var messageEl = annForm.querySelector('[data-lp-ann-message]');
+        var customTagEl = annForm.querySelector('[data-lp-ann-customtag]');
+        var submitEl = annForm.querySelector('[data-lp-ann-submit]');
+        var cancelEditEl = annForm.querySelector('[data-lp-ann-cancel-edit]');
+        var formTitleEl = shell.querySelector('[data-lp-ann-form-title]');
+        var strSubmit = annPage ? (annPage.getAttribute('data-str-submit') || 'Post announcement') : 'Post announcement';
+        var strSave = annPage ? (annPage.getAttribute('data-str-save') || 'Save changes') : 'Save changes';
+        var strEditing = annPage ? (annPage.getAttribute('data-str-editing') || 'Edit announcement') : 'Edit announcement';
+        var strCompose = annPage ? (annPage.getAttribute('data-str-compose') || 'Compose') : 'Compose';
+        var strDeleteConfirm = annPage
+            ? (annPage.getAttribute('data-str-delete-confirm') || 'Delete this announcement?')
+            : 'Delete this announcement?';
+
         function syncAnnTracks() {
             var on = !!(allTracks && allTracks.checked);
             trackBoxes.forEach(function (box) {
@@ -2414,11 +2432,122 @@
                 box.disabled = on;
             });
         }
+        function clearAnnTagChecks() {
+            annForm.querySelectorAll('[data-lp-ann-tag]').forEach(function (box) {
+                box.checked = false;
+            });
+            if (customTagEl) {
+                customTagEl.value = '';
+            }
+        }
+        function setAnnTagChecks(csv) {
+            clearAnnTagChecks();
+            var known = {};
+            annForm.querySelectorAll('[data-lp-ann-tag]').forEach(function (box) {
+                known[String(box.value || '').toLowerCase()] = box;
+            });
+            var extras = [];
+            String(csv || '').split(',').forEach(function (raw) {
+                var name = String(raw || '').trim();
+                if (!name) {
+                    return;
+                }
+                var box = known[name.toLowerCase()];
+                if (box) {
+                    box.checked = true;
+                } else {
+                    extras.push(name);
+                }
+            });
+            if (customTagEl && extras.length) {
+                customTagEl.value = extras.join(', ');
+            }
+        }
+        function resetAnnCompose() {
+            if (actionEl) {
+                actionEl.value = 'post_announcement';
+            }
+            if (discussionEl) {
+                discussionEl.value = '';
+            }
+            if (subjectEl) {
+                subjectEl.value = '';
+            }
+            if (messageEl) {
+                messageEl.value = '';
+            }
+            clearAnnTagChecks();
+            if (tracksWrap) {
+                tracksWrap.removeAttribute('hidden');
+            }
+            if (allTracks) {
+                allTracks.checked = false;
+                allTracks.disabled = false;
+            }
+            trackBoxes.forEach(function (box) {
+                box.checked = false;
+                box.disabled = false;
+            });
+            if (submitEl) {
+                submitEl.textContent = strSubmit;
+            }
+            if (cancelEditEl) {
+                cancelEditEl.setAttribute('hidden', 'hidden');
+            }
+            if (formTitleEl) {
+                formTitleEl.textContent = strCompose;
+            }
+            annForm.classList.remove('is-editing');
+        }
+        function startAnnEdit(item) {
+            if (!item) {
+                return;
+            }
+            if (actionEl) {
+                actionEl.value = 'update_announcement';
+            }
+            if (discussionEl) {
+                discussionEl.value = item.getAttribute('data-id') || '';
+            }
+            if (subjectEl) {
+                subjectEl.value = item.getAttribute('data-subject') || '';
+            }
+            if (messageEl) {
+                messageEl.value = item.getAttribute('data-message') || '';
+            }
+            setAnnTagChecks(item.getAttribute('data-tags') || '');
+            if (tracksWrap) {
+                tracksWrap.setAttribute('hidden', 'hidden');
+            }
+            if (submitEl) {
+                submitEl.textContent = strSave;
+            }
+            if (cancelEditEl) {
+                cancelEditEl.removeAttribute('hidden');
+            }
+            if (formTitleEl) {
+                formTitleEl.textContent = strEditing;
+            }
+            annForm.classList.add('is-editing');
+            if (subjectEl) {
+                subjectEl.focus();
+            }
+            annForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         if (allTracks) {
             allTracks.addEventListener('change', syncAnnTracks);
             syncAnnTracks();
         }
+        if (cancelEditEl) {
+            cancelEditEl.addEventListener('click', function () {
+                resetAnnCompose();
+            });
+        }
         annForm.addEventListener('submit', function (e) {
+            if (actionEl && actionEl.value === 'update_announcement') {
+                return;
+            }
             var any = allTracks && allTracks.checked;
             if (!any) {
                 trackBoxes.forEach(function (box) {
@@ -2432,29 +2561,44 @@
                 window.alert('Select at least one track, or choose All tracks.');
             }
         });
+        shell.addEventListener('click', function (e) {
+            var editBtn = e.target.closest('[data-lp-ann-edit]');
+            if (editBtn) {
+                e.preventDefault();
+                startAnnEdit(editBtn.closest('[data-lp-ann-item]'));
+                return;
+            }
+            var moreAnn = e.target.closest('[data-lp-ann-more]');
+            if (!moreAnn) {
+                return;
+            }
+            var annList = shell.querySelector('[data-lp-ann-list]');
+            if (!annList) {
+                return;
+            }
+            var pageSize = parseInt(annList.getAttribute('data-page-size') || '8', 10) || 8;
+            var hidden = annList.querySelectorAll('li.is-paged-out[hidden]');
+            var show = Math.min(pageSize, hidden.length);
+            for (var ai = 0; ai < show; ai++) {
+                hidden[ai].removeAttribute('hidden');
+                hidden[ai].classList.remove('is-paged-out');
+            }
+            var left = annList.querySelectorAll('li.is-paged-out[hidden]').length;
+            if (left === 0) {
+                moreAnn.setAttribute('hidden', 'hidden');
+            } else {
+                moreAnn.setAttribute('data-remaining', String(left));
+                moreAnn.textContent = 'Show more (' + left + ')';
+            }
+        });
+        shell.addEventListener('submit', function (e) {
+            var delForm = e.target.closest('[data-lp-ann-delete-form]');
+            if (!delForm) {
+                return;
+            }
+            if (!window.confirm(strDeleteConfirm)) {
+                e.preventDefault();
+            }
+        });
     }
-    shell.addEventListener('click', function (e) {
-        var moreAnn = e.target.closest('[data-lp-ann-more]');
-        if (!moreAnn) {
-            return;
-        }
-        var annList = shell.querySelector('[data-lp-ann-list]');
-        if (!annList) {
-            return;
-        }
-        var pageSize = parseInt(annList.getAttribute('data-page-size') || '8', 10) || 8;
-        var hidden = annList.querySelectorAll('li.is-paged-out[hidden]');
-        var show = Math.min(pageSize, hidden.length);
-        for (var ai = 0; ai < show; ai++) {
-            hidden[ai].removeAttribute('hidden');
-            hidden[ai].classList.remove('is-paged-out');
-        }
-        var left = annList.querySelectorAll('li.is-paged-out[hidden]').length;
-        if (left === 0) {
-            moreAnn.setAttribute('hidden', 'hidden');
-        } else {
-            moreAnn.setAttribute('data-remaining', String(left));
-            moreAnn.textContent = 'Show more (' + left + ')';
-        }
-    });
 })();

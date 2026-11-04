@@ -79,10 +79,33 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $trackids = optional_param_array('trackids', [], PARAM_INT);
         $tags = optional_param_array('tags', [], PARAM_TEXT);
         $customtag = optional_param('customtag', '', PARAM_TEXT);
-        if (trim($customtag) !== '') {
-            $tags[] = $customtag;
+        foreach (preg_split('/\s*,\s*/', trim($customtag)) ?: [] as $extra) {
+            if ($extra !== '') {
+                $tags[] = $extra;
+            }
         }
         $flash = announcement_service::post($USER, $subject, $message, $trackids, $alltracks, $tags);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
+    }
+    if ($view === 'announcements' && $action === 'update_announcement') {
+        $discussionid = optional_param('discussionid', 0, PARAM_INT);
+        $subject = optional_param('subject', '', PARAM_TEXT);
+        $message = optional_param('message', '', PARAM_RAW);
+        $tags = optional_param_array('tags', [], PARAM_TEXT);
+        $customtag = optional_param('customtag', '', PARAM_TEXT);
+        foreach (preg_split('/\s*,\s*/', trim($customtag)) ?: [] as $extra) {
+            if ($extra !== '') {
+                $tags[] = $extra;
+            }
+        }
+        $flash = announcement_service::update($USER, $discussionid, $subject, $message, $tags);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
+    }
+    if ($view === 'announcements' && $action === 'delete_announcement') {
+        $discussionid = optional_param('discussionid', 0, PARAM_INT);
+        $flash = announcement_service::delete($USER, $discussionid);
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
     }

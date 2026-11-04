@@ -30,6 +30,7 @@ require_once(__DIR__ . '/classes/messaging.php');
 require_once(__DIR__ . '/classes/calendar_service.php');
 
 use local_launchpad\activity_portal;
+use local_launchpad\announcement_service;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\messaging;
@@ -146,6 +147,11 @@ $progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'phases']))
 $notificationsurl = messaging::moodle_notifications_url();
 $messagesurl = messaging::messages_url(null, 'fellow');
 $msgunread = messaging::conversation_unread_count($userid);
+// Opening Announcements clears the news badge (Messages use Moodle read state; Feedback stays until revise).
+if ($view === 'news') {
+    announcement_service::mark_seen($userid);
+}
+$newsunread = announcement_service::unread_count_for_courses($userid, $courses);
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -219,6 +225,8 @@ $nav = [
                 'current' => $view === 'news',
                 'key' => 'news',
                 'icon_svg' => $icon('news'),
+                'has_badge' => $newsunread > 0,
+                'badge' => $newsunread > 0 ? (string) $newsunread : '',
             ],
             [
                 'label' => $lpstr('fellowship_nav_calendar', null, 'Calendar'),

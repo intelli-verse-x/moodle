@@ -7408,9 +7408,45 @@ body.lp-portal-mismatch-lock {
   padding: 2px 8px;
   font-size: 11px;
 }
-.lp-ann-item-open {
-  flex: none;
-  align-self: start;
+.lp-ann-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 2px;
+}
+.lp-ann-link {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lp-blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lp-ann-link:hover {
+  text-decoration: underline;
+}
+.lp-ann-link.is-danger {
+  color: #b42318;
+}
+.lp-ann-delete-form {
+  display: inline;
+  margin: 0;
+}
+.lp-ann-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.lp-ann-form.is-editing {
+  outline: 2px solid rgba(26, 97, 242, 0.18);
+  outline-offset: 6px;
+  border-radius: 12px;
 }
 .lp-ann-more-wrap {
   margin: 10px 0 0;
