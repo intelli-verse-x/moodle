@@ -6633,6 +6633,47 @@ body.lp-portal-mismatch-lock {
 }
 .lp-manage.is-editing .lp-actrow {
   border-color: #c5d4f5;
+  align-items: flex-start;
+}
+.lp-manage-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+.lp-manage-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  margin-top: 4px;
+}
+.lp-manage-rename input[type="text"] {
+  flex: 1 1 180px;
+  min-width: 0;
+  font: inherit;
+  color: var(--lp-ink);
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: #fff;
+}
+.lp-manage-rename input[type="text"]:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.25);
+  border-color: #2563eb;
+}
+.lp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .lp-actrow.is-cm-hidden {

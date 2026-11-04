@@ -100,43 +100,81 @@
                 <span class="lp-chip line">{{hidden_badge}}</span>
               {{/cm_hidden}}
               <div class="lp-manage-edit-only" hidden>
-                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{settings_url}}">{{settings_label}}</a>
-                {{#cm_visible}}
+                <div class="lp-manage-row-actions">
+                  {{#can_move_up}}
+                    <form method="post" action="{{form_action}}" class="lp-inline-form">
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="move_cm">
+                      <input type="hidden" name="trackid" value="{{trackid}}">
+                      <input type="hidden" name="cmid" value="{{cmid}}">
+                      <input type="hidden" name="direction" value="up">
+                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm" title="{{move_up_label}}">↑</button>
+                    </form>
+                  {{/can_move_up}}
+                  {{#can_move_down}}
+                    <form method="post" action="{{form_action}}" class="lp-inline-form">
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="move_cm">
+                      <input type="hidden" name="trackid" value="{{trackid}}">
+                      <input type="hidden" name="cmid" value="{{cmid}}">
+                      <input type="hidden" name="direction" value="down">
+                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm" title="{{move_down_label}}">↓</button>
+                    </form>
+                  {{/can_move_down}}
+                  <a class="lp-btn lp-btn-light lp-btn-sm" href="{{settings_url}}">{{settings_label}}</a>
                   <form method="post" action="{{form_action}}" class="lp-inline-form">
                     <input type="hidden" name="sesskey" value="{{sesskey}}">
-                    <input type="hidden" name="action" value="toggle_cm">
+                    <input type="hidden" name="action" value="duplicate_cm">
                     <input type="hidden" name="trackid" value="{{trackid}}">
                     <input type="hidden" name="cmid" value="{{cmid}}">
-                    <input type="hidden" name="show" value="0">
-                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
+                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{duplicate_label}}</button>
                   </form>
-                {{/cm_visible}}
-                {{#cm_hidden}}
-                  <form method="post" action="{{form_action}}" class="lp-inline-form">
+                  {{#cm_visible}}
+                    <form method="post" action="{{form_action}}" class="lp-inline-form">
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="toggle_cm">
+                      <input type="hidden" name="trackid" value="{{trackid}}">
+                      <input type="hidden" name="cmid" value="{{cmid}}">
+                      <input type="hidden" name="show" value="0">
+                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
+                    </form>
+                  {{/cm_visible}}
+                  {{#cm_hidden}}
+                    <form method="post" action="{{form_action}}" class="lp-inline-form">
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="toggle_cm">
+                      <input type="hidden" name="trackid" value="{{trackid}}">
+                      <input type="hidden" name="cmid" value="{{cmid}}">
+                      <input type="hidden" name="show" value="1">
+                      <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_cm_label}}</button>
+                    </form>
+                  {{/cm_hidden}}
+                  {{#is_draft}}
+                    <form method="post" action="{{form_action}}" class="lp-inline-form">
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="mark_reviewed">
+                      <input type="hidden" name="trackid" value="{{trackid}}">
+                      <input type="hidden" name="cmid" value="{{cmid}}">
+                      <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
+                    </form>
+                  {{/is_draft}}
+                  <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{delete_confirm}}">
                     <input type="hidden" name="sesskey" value="{{sesskey}}">
-                    <input type="hidden" name="action" value="toggle_cm">
+                    <input type="hidden" name="action" value="delete_cm">
                     <input type="hidden" name="trackid" value="{{trackid}}">
                     <input type="hidden" name="cmid" value="{{cmid}}">
-                    <input type="hidden" name="show" value="1">
-                    <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_cm_label}}</button>
+                    <input type="hidden" name="section" value="{{sectionnum}}">
+                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{delete_label}}</button>
                   </form>
-                {{/cm_hidden}}
-                {{#is_draft}}
-                  <form method="post" action="{{form_action}}" class="lp-inline-form">
-                    <input type="hidden" name="sesskey" value="{{sesskey}}">
-                    <input type="hidden" name="action" value="mark_reviewed">
-                    <input type="hidden" name="trackid" value="{{trackid}}">
-                    <input type="hidden" name="cmid" value="{{cmid}}">
-                    <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
-                  </form>
-                {{/is_draft}}
-                <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{delete_confirm}}">
+                </div>
+                <form method="post" action="{{form_action}}" class="lp-manage-rename">
                   <input type="hidden" name="sesskey" value="{{sesskey}}">
-                  <input type="hidden" name="action" value="delete_cm">
+                  <input type="hidden" name="action" value="rename_cm">
                   <input type="hidden" name="trackid" value="{{trackid}}">
                   <input type="hidden" name="cmid" value="{{cmid}}">
-                  <input type="hidden" name="section" value="{{sectionnum}}">
-                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{delete_label}}</button>
+                  <label class="lp-sr-only" for="lp-rename-{{cmid}}">{{rename_label}}</label>
+                  <input id="lp-rename-{{cmid}}" type="text" name="name" maxlength="255" value="{{name_raw}}" required autocomplete="off">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{rename_label}}</button>
                 </form>
               </div>
             </div>

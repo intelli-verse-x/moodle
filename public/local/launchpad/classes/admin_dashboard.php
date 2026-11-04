@@ -433,7 +433,12 @@ final class admin_dashboard {
         $hiddenbadge = get_string('admin_manage_hidden_badge', 'local_launchpad');
         $deletelabel = get_string('admin_manage_delete_activity', 'local_launchpad');
         $deleteconfirm = get_string('admin_manage_delete_confirm', 'local_launchpad');
-        foreach ($activities as &$act) {
+        $duplicatelabel = get_string('admin_manage_duplicate', 'local_launchpad');
+        $renamelabel = get_string('admin_manage_rename', 'local_launchpad');
+        $moveuplabel = get_string('admin_manage_move_up', 'local_launchpad');
+        $movedownlabel = get_string('admin_manage_move_down', 'local_launchpad');
+        $actcount = count($activities);
+        foreach ($activities as $idx => &$act) {
             $act['form_action'] = $formaction;
             $act['sesskey'] = $sesskey;
             $act['trackid'] = $trackid;
@@ -445,6 +450,12 @@ final class admin_dashboard {
             $act['hidden_badge'] = $hiddenbadge;
             $act['delete_label'] = $deletelabel;
             $act['delete_confirm'] = $deleteconfirm;
+            $act['duplicate_label'] = $duplicatelabel;
+            $act['rename_label'] = $renamelabel;
+            $act['move_up_label'] = $moveuplabel;
+            $act['move_down_label'] = $movedownlabel;
+            $act['can_move_up'] = $idx > 0;
+            $act['can_move_down'] = $idx < ($actcount - 1);
             $act['settings_url'] = (new \moodle_url(persona_home::ADMIN_PATH, [
                 'view' => 'activity',
                 'trackid' => $trackid,
@@ -717,6 +728,191 @@ final class admin_dashboard {
         return [
             'ok' => get_string('admin_manage_ok_cm_deleted', 'local_launchpad', $title),
         ];
+    }
+
+    /**
+     * Duplicate a LaunchPad track activity in the same phase (Moodle backup/restore copy).
+     *
+     * @return array{ok:string,cmid?:int}|array{error:string}
+     */
+    public static function duplicate_activity(\stdClass $actor, int $trackcourseid, int $cmid): array {
+        global $CFG;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        $gate = self::require_track_activity($trackcourseid, $cmid, true);
+        if (isset($gate['error'])) {
+            return $gate;
+        }
+        ['course' => $course, 'cm' => $cm] = $gate;
+
+        try {
+            $newcm = \core_courseformat\formatactions::cm($course)->duplicate((int) $cm->id);
+            rebuild_course_cache($trackcourseid, true);
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!$newcm) {
+            return ['error' => get_string('admin_manage_err_duplicate', 'local_launchpad')];
+        }
+
+        return [
+            'ok' => get_string('admin_manage_ok_cm_duplicated', 'local_launchpad', format_string($newcm->name)),
+            'cmid' => (int) $newcm->id,
+        ];
+    }
+
+    /**
+     * Move an activity up or down within its phase section.
+     *
+     * @param string $direction up|down
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function move_activity(
+        \stdClass $actor,
+        int $trackcourseid,
+        int $cmid,
+        string $direction
+    ): array {
+        global $CFG, $DB;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        $direction = strtolower(trim($direction));
+        if ($direction !== 'up' && $direction !== 'down') {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+
+        $gate = self::require_track_activity($trackcourseid, $cmid, true);
+        if (isset($gate['error'])) {
+            return $gate;
+        }
+        ['course' => $course, 'cm' => $cm] = $gate;
+
+        $section = $DB->get_record('course_sections', ['id' => (int) $cm->section], '*', IGNORE_MISSING);
+        if (!$section || empty($section->sequence)) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+        $cmids = array_values(array_filter(array_map('intval', explode(',', $section->sequence))));
+        $index = array_search($cmid, $cmids, true);
+        if ($index === false) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+
+        $actions = \core_courseformat\formatactions::cm($course);
+        try {
+            if ($direction === 'up') {
+                if ($index <= 0) {
+                    return ['ok' => get_string('admin_manage_ok_cm_moved', 'local_launchpad', format_string($cm->name))];
+                }
+                $beforeid = $cmids[$index - 1];
+                $actions->move_before($cmid, $beforeid);
+            } else {
+                if ($index >= count($cmids) - 1) {
+                    return ['ok' => get_string('admin_manage_ok_cm_moved', 'local_launchpad', format_string($cm->name))];
+                }
+                $nextid = $cmids[$index + 1];
+                // Moving next before current pushes current down one slot.
+                $actions->move_before($nextid, $cmid);
+            }
+            rebuild_course_cache($trackcourseid, true);
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        return [
+            'ok' => get_string('admin_manage_ok_cm_moved', 'local_launchpad', format_string($cm->name)),
+        ];
+    }
+
+    /**
+     * Rename an activity from the Manage list (instance name only).
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function rename_activity(
+        \stdClass $actor,
+        int $trackcourseid,
+        int $cmid,
+        string $name
+    ): array {
+        global $CFG;
+
+        unset($actor);
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        $gate = self::require_track_activity($trackcourseid, $cmid, true);
+        if (isset($gate['error'])) {
+            return $gate;
+        }
+        ['course' => $course, 'cm' => $cm] = $gate;
+
+        $name = trim($name);
+        if ($name === '') {
+            return ['error' => get_string('admin_activity_err_name', 'local_launchpad')];
+        }
+
+        try {
+            $ok = \core_courseformat\formatactions::cm($course)->rename($cmid, $name);
+            rebuild_course_cache($trackcourseid, true);
+        } catch (\Throwable $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!$ok) {
+            // Same name — treat as success (no-op).
+            return [
+                'ok' => get_string('admin_manage_ok_cm_renamed', 'local_launchpad', format_string($name)),
+            ];
+        }
+
+        return [
+            'ok' => get_string('admin_manage_ok_cm_renamed', 'local_launchpad', format_string($name)),
+        ];
+    }
+
+    /**
+     * Shared gate for Manage activity mutations.
+     *
+     * @return array{course:\stdClass,cm:\stdClass}|array{error:string}
+     */
+    private static function require_track_activity(
+        int $trackcourseid,
+        int $cmid,
+        bool $needmanage
+    ): array {
+        if ($trackcourseid <= 0 || $cmid <= 0) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
+        }
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+
+        $context = \context_course::instance($trackcourseid);
+        try {
+            if ($needmanage) {
+                require_capability('moodle/course:manageactivities', $context);
+            }
+        } catch (\required_capability_exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $cm = get_coursemodule_from_id('', $cmid, $trackcourseid, false, IGNORE_MISSING);
+        if (!$cm) {
+            return ['error' => get_string('admin_builder_err_cm', 'local_launchpad')];
+        }
+        $modname = (string) $cm->modname;
+        if (!in_array($modname, ['page', 'resource', 'quiz', 'assign'], true)) {
+            return ['error' => get_string('admin_manage_err_mod', 'local_launchpad')];
+        }
+
+        return ['course' => $course, 'cm' => $cm];
     }
 
     /**
@@ -1613,6 +1809,7 @@ final class admin_dashboard {
                 'modname' => $modname,
                 'kind' => self::builder_mod_kind($modname),
                 'title' => format_string($instancename !== '' ? $instancename : $modname),
+                'name_raw' => $instancename !== '' ? $instancename : $modname,
                 'state' => $state,
                 'state_label' => get_string('admin_builder_state_' . $state, 'local_launchpad'),
                 'state_chip' => $statechip,

@@ -101,6 +101,20 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $cmid = optional_param('cmid', 0, PARAM_INT);
         $show = (bool) optional_param('show', 0, PARAM_BOOL);
         $flash = admin_dashboard::set_activity_visible($USER, $trackid, $cmid, $show);
+    } else if ($view === 'manage' && $action === 'duplicate_cm') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        $flash = admin_dashboard::duplicate_activity($USER, $trackid, $cmid);
+    } else if ($view === 'manage' && $action === 'move_cm') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        $direction = optional_param('direction', '', PARAM_ALPHA);
+        $flash = admin_dashboard::move_activity($USER, $trackid, $cmid, $direction);
+    } else if ($view === 'manage' && $action === 'rename_cm') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        $name = optional_param('name', '', PARAM_TEXT);
+        $flash = admin_dashboard::rename_activity($USER, $trackid, $cmid, $name);
     } else if (($view === 'manage' || $view === 'activity') && $action === 'delete_cm') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
