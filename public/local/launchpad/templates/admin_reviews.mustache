@@ -14,6 +14,13 @@
   </div>
 </section>
 
+{{#flash_ok}}
+  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+{{/flash_ok}}
+{{#flash_err}}
+  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+{{/flash_err}}
+
 <div class="lp-atiles lp-atiles-3" role="list" style="margin-top:16px">
   {{#tiles}}
     <div class="lp-atile" role="listitem">
@@ -53,7 +60,21 @@
               <td class="lp-sm">{{submitted}}</td>
               <td class="lp-sm">{{teacher}}</td>
               <td><span class="lp-chip warn">{{state}}</span></td>
-              <td><a class="lp-btn lp-btn-solid" href="{{grader_url}}">{{open_label}}</a></td>
+              <td class="lp-reviews-actions">
+                <a class="lp-btn lp-btn-solid" href="{{grader_url}}">{{open_label}}</a>
+                {{#can_ping}}
+                  <form method="post" action="{{ping_action_url}}" class="lp-reviews-ping-form">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="ping_review">
+                    <input type="hidden" name="submissionid" value="{{submissionid}}">
+                    <input type="hidden" name="teacherid" value="{{teacherid}}">
+                    <button type="submit" class="lp-btn lp-btn-light">{{ping_label}}</button>
+                  </form>
+                {{/can_ping}}
+                {{#ping_cooled}}
+                  <span class="lp-btn lp-btn-light is-disabled" aria-disabled="true">{{ping_cooled_label}}</span>
+                {{/ping_cooled}}
+              </td>
             </tr>
           {{/pending}}
         </tbody>

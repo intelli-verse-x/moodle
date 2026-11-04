@@ -2051,6 +2051,22 @@ body.local-launchpad-mentor {
   text-transform: uppercase;
   letter-spacing: .04em;
 }
+.lp-reviews-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.lp-reviews-ping-form {
+  display: inline;
+  margin: 0;
+}
+.lp-reviews-actions .lp-btn.is-disabled {
+  opacity: .55;
+  pointer-events: none;
+  cursor: default;
+}
 
 .lp-card {
   background: var(--lp-surface);

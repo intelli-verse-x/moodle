@@ -296,6 +296,28 @@ $string['admin_reviews_col_state'] = 'State';
 $string['admin_reviews_state_pending'] = 'Pending';
 $string['admin_reviews_empty'] = 'No pending assign reviews on LaunchPad tracks right now.';
 $string['admin_reviews_open'] = 'Open grader';
+$string['admin_reviews_ping'] = 'Ping mentor';
+$string['admin_reviews_ping_cooled'] = 'Pinged';
+$string['admin_reviews_ping_ok'] = 'Reminder sent to {$a}.';
+$string['admin_reviews_ping_message'] = 'LaunchPad reminder: {$a->fellow} submitted “{$a->assign}” on {$a->track} ({$a->submitted}). Please review when you can. Grader: {$a->graderurl}';
+$string['admin_reviews_ping_email_subject'] = 'Review needed: {$a->fellow} — {$a->assign}';
+$string['admin_reviews_ping_email_body'] = 'Hi,
+
+{$a->fellow} has a submission waiting on {$a->track}:
+
+Activity: {$a->assign}
+Submitted: {$a->submitted}
+
+Please review when you can:
+{$a->graderurl}
+
+— LaunchPad admin';
+$string['admin_reviews_ping_err_permission'] = 'You do not have permission to ping mentors from Review oversight.';
+$string['admin_reviews_ping_err_params'] = 'Could not ping — missing submission or teacher.';
+$string['admin_reviews_ping_err_cooled'] = 'Already pinged recently. Wait a bit before sending again.';
+$string['admin_reviews_ping_err_gone'] = 'That submission is no longer waiting for review.';
+$string['admin_reviews_ping_err_teacher'] = 'That person is not a teacher on this track.';
+$string['admin_reviews_ping_err_send'] = 'Could not send the reminder. Try again or open Messages.';
 $string['admin_skip_to_content'] = 'Skip to content';
 $string['admin_mentors_eyebrow'] = 'People';
 $string['admin_mentors_heading'] = 'Mentors & capacity';
@@ -886,6 +908,7 @@ $string['fellowship_messages_disabled_title'] = 'Messaging is off';
 $string['fellowship_messages_disabled_body'] = 'Site messaging is disabled in Moodle. Ask an admin to enable it.';
 $string['fellowship_messages_unavailable'] = 'Cannot message this person';
 $string['fellowship_messages_unavailable_body'] = 'You do not have permission to message them, or messaging is unavailable.';
+$string['fellowship_messages_readonly'] = 'You can read this conversation, but you cannot reply from LaunchPad.';
 $string['fellowship_messages_err_empty'] = 'Write a message before sending.';
 $string['fellowship_messages_err_permission'] = 'You cannot message this person.';
 $string['fellowship_messages_err_save'] = 'Could not send the message. Try again.';
