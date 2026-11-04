@@ -6693,6 +6693,29 @@ body.lp-portal-mismatch-lock {
   width: auto;
   margin: 0;
 }
+.lp-activity .lp-admin-files {
+  gap: 8px;
+}
+.lp-activity .lp-admin-files input[type="file"] {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.lp-activity .lp-admin-files .lp-warn {
+  color: #b45309;
+  font-weight: 600;
+}
+.lp-activity .lp-admin-file-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--lp-ink);
+  font-size: 13px;
+}
+.lp-actrow .lp-chip.ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
 
 /* Fellow activity consume (LaunchPad shell over Moodle CM) */
 .lp-activity-page {

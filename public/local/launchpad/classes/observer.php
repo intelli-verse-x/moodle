@@ -77,7 +77,11 @@ class observer {
             return;
         }
         // Login form portal field (employer/fellowship/mentor) must win over /my/ defaults.
-        login_portal::maybe_pin_wantsurl_from_request();
+        // Do not rewrite a pinned gate URL — wrong persona must hit employee/fellow/mentor.php
+        // so portal_gate can stash the mismatch modal on the real home.
+        if (login_portal::maybe_pin_wantsurl_from_request()) {
+            return;
+        }
         persona_home::maybe_set_wantsurl($userid);
     }
 }

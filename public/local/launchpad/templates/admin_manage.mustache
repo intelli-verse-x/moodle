@@ -93,6 +93,9 @@
               <span class="lp-kd">{{kind}}</span>
               <span class="lp-act-title">{{title}}</span>
               <span class="lp-chip {{state_chip}}">{{state_label}}</span>
+              {{#is_resource}}
+                <span class="lp-chip{{#file_missing}} line{{/file_missing}}{{#has_file}} ok{{/has_file}}" title="{{file_status_label}}">{{file_status_label}}</span>
+              {{/is_resource}}
               {{#cm_hidden}}
                 <span class="lp-chip line">{{hidden_badge}}</span>
               {{/cm_hidden}}

@@ -96,6 +96,14 @@ final class persona_home_test extends \basic_testcase {
         $this->assertTrue(persona_home::should_rewrite_wantsurl(0, null));
     }
 
+    public function test_should_not_rewrite_wrong_persona_shell(): void {
+        // Login portal tab pins employee.php for a fellow — must reach the gate.
+        $this->assertFalse(persona_home::should_rewrite_wantsurl(1, '/local/launchpad/employee.php'));
+        $this->assertFalse(persona_home::should_rewrite_wantsurl(1, '/local/launchpad/fellow.php'));
+        $this->assertFalse(persona_home::should_rewrite_wantsurl(1, '/local/launchpad/mentor.php'));
+        $this->assertTrue(persona_home::should_rewrite_wantsurl(1, '/my/'));
+    }
+
     public function test_should_honor_noredirect_policy(): void {
         // No persona home may keep stock /my/.
         $this->assertTrue(persona_home::should_honor_noredirect(null));

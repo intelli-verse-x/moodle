@@ -767,6 +767,22 @@ final class admin_dashboard {
             $grade = (string) (float) $instance->grade;
         }
 
+        $filesummary = [
+            'has_file' => false,
+            'file_count' => 0,
+            'file_status_label' => '',
+            'file_names' => [],
+            'maxbytes' => 0,
+            'maxbytes_display' => '',
+        ];
+        if ($modname === 'resource') {
+            $filesummary = self::resource_files_editor_context($course, $cmid);
+        }
+        $filelist = [];
+        foreach ($filesummary['file_names'] as $fname) {
+            $filelist[] = ['filename' => $fname];
+        }
+
         return [
             'has_activity' => true,
             'eyebrow' => get_string('admin_activity_eyebrow', 'local_launchpad'),
@@ -790,7 +806,17 @@ final class admin_dashboard {
             'grade_label' => get_string('admin_activity_grade', 'local_launchpad'),
             'track_completion_label' => get_string('admin_activity_track_completion', 'local_launchpad'),
             'track_completion_hint' => get_string('admin_activity_track_completion_hint', 'local_launchpad'),
+            'files_label' => get_string('admin_activity_files', 'local_launchpad'),
             'file_hint' => get_string('admin_activity_file_hint', 'local_launchpad'),
+            'file_replace_hint' => get_string('admin_activity_file_replace_hint', 'local_launchpad'),
+            'file_empty_warn' => get_string('admin_activity_file_empty_warn', 'local_launchpad'),
+            'has_file' => !empty($filesummary['has_file']),
+            'file_status_label' => (string) ($filesummary['file_status_label'] ?? ''),
+            'file_list' => $filelist,
+            'has_file_list' => $filelist !== [],
+            'maxbytes_display' => (string) ($filesummary['maxbytes_display'] ?? ''),
+            'has_maxbytes' => !empty($filesummary['maxbytes_display']),
+            'form_enctype_multipart' => $modname === 'resource',
             'quiz_hint' => get_string('admin_activity_quiz_hint', 'local_launchpad'),
             'assign_hint' => get_string('admin_activity_assign_hint', 'local_launchpad'),
             'save_label' => get_string('admin_activity_save', 'local_launchpad'),
@@ -818,9 +844,11 @@ final class admin_dashboard {
     }
 
     /**
-     * Save slim activity settings (name / intro / page content / grade).
-     * Uses direct instance updates so we skip Moodle editor draft plumbing.
+     * Save slim activity settings (name / intro / page content / grade / file draft).
+     * Uses direct instance updates so we skip Moodle editor draft plumbing for text.
+     * File activities accept optional multipart uploads into mod_resource content.
      *
+     * @param array|null $uploadfiles Optional $_FILES['resourcefiles'] payload
      * @return array{ok:string}|array{error:string}
      */
     public static function save_activity_settings(
@@ -831,13 +859,15 @@ final class admin_dashboard {
         string $intro,
         string $content = '',
         ?float $grade = null,
-        ?bool $trackcompletion = null
+        ?bool $trackcompletion = null,
+        ?array $uploadfiles = null
     ): array {
         global $CFG, $DB;
 
         unset($actor);
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->libdir . '/completionlib.php');
+        require_once($CFG->libdir . '/filelib.php');
 
         if ($trackcourseid <= 0 || $cmid <= 0) {
             return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
@@ -907,14 +937,240 @@ final class admin_dashboard {
                 }
                 self::set_cm_completion_tracking($cm, $modname, $trackcompletion);
             }
+            if ($modname === 'resource' && is_array($uploadfiles)) {
+                $fileresult = self::save_resource_files_from_upload(
+                    $course,
+                    $cmid,
+                    (int) $instance->id,
+                    $uploadfiles
+                );
+                if (!empty($fileresult['error'])) {
+                    return ['error' => (string) $fileresult['error']];
+                }
+            }
             rebuild_course_cache($trackcourseid, true);
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
         }
 
+        $ok = get_string('admin_activity_ok_saved', 'local_launchpad', format_string($name));
+        if ($modname === 'resource') {
+            $summary = self::resource_files_summary($cmid);
+            if (empty($summary['has_file'])) {
+                $ok .= ' ' . get_string('admin_activity_file_empty_warn', 'local_launchpad');
+            }
+        }
+
+        return ['ok' => $ok];
+    }
+
+    /**
+     * File picker options for LaunchPad File (mod_resource) settings.
+     *
+     * @return array<string,mixed>
+     */
+    public static function resource_file_options(\stdClass $course): array {
+        global $CFG;
+
+        require_once($CFG->libdir . '/filelib.php');
+
+        $coursebytes = (int) ($course->maxbytes ?? 0);
+        $maxbytes = get_user_max_upload_file_size(
+            \context_course::instance((int) $course->id),
+            $CFG->maxbytes,
+            $coursebytes
+        );
+
         return [
-            'ok' => get_string('admin_activity_ok_saved', 'local_launchpad', format_string($name)),
+            'subdirs' => 0,
+            'maxbytes' => $maxbytes,
+            'maxfiles' => -1,
+            'accepted_types' => '*',
         ];
+    }
+
+    /**
+     * Attached files for a resource CM (non-directories).
+     *
+     * @return list<\stored_file>
+     */
+    public static function resource_stored_files(int $cmid): array {
+        if ($cmid <= 0) {
+            return [];
+        }
+        try {
+            $context = \context_module::instance($cmid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $fs = get_file_storage();
+        $stored = $fs->get_area_files($context->id, 'mod_resource', 'content', 0, 'sortorder DESC, id ASC', false);
+        $out = [];
+        foreach ($stored as $file) {
+            if ($file->is_directory()) {
+                continue;
+            }
+            $out[] = $file;
+        }
+        return $out;
+    }
+
+    /**
+     * Short status for manage list / settings banner.
+     *
+     * @return array{has_file:bool,file_count:int,file_status_label:string,file_names:list<string>}
+     */
+    public static function resource_files_summary(int $cmid): array {
+        $files = self::resource_stored_files($cmid);
+        $names = [];
+        foreach ($files as $file) {
+            $names[] = $file->get_filename();
+        }
+        $count = count($names);
+        if ($count === 0) {
+            $label = get_string('admin_activity_file_status_empty', 'local_launchpad');
+        } else if ($count === 1) {
+            $label = get_string('admin_activity_file_status_one', 'local_launchpad', $names[0]);
+        } else {
+            $label = get_string('admin_activity_file_status_many', 'local_launchpad', $count);
+        }
+        return [
+            'has_file' => $count > 0,
+            'file_count' => $count,
+            'file_status_label' => $label,
+            'file_names' => $names,
+        ];
+    }
+
+    /**
+     * Current file status for File activity settings (native upload input — admin shell has no Moodle filemanager JS).
+     *
+     * @return array{has_file:bool,file_count:int,file_status_label:string,file_names:list<string>,maxbytes:int,maxbytes_display:string}
+     */
+    public static function resource_files_editor_context(\stdClass $course, int $cmid): array {
+        $summary = self::resource_files_summary($cmid);
+        $options = self::resource_file_options($course);
+        $maxbytes = (int) ($options['maxbytes'] ?? 0);
+        return array_merge($summary, [
+            'maxbytes' => $maxbytes,
+            'maxbytes_display' => $maxbytes > 0 ? display_size($maxbytes) : '',
+        ]);
+    }
+
+    /**
+     * Store uploaded $_FILES onto the resource CM (replaces existing content files) and bump revision.
+     *
+     * @param array $fileinfo PHP $_FILES['resourcefiles'] shape (name/tmp_name/error/size arrays or scalars)
+     * @return array{ok:true,count:int}|array{error:string}|array{skipped:true}
+     */
+    public static function save_resource_files_from_upload(
+        \stdClass $course,
+        int $cmid,
+        int $resourceid,
+        array $fileinfo
+    ): array {
+        global $CFG, $DB, $USER;
+
+        require_once($CFG->libdir . '/filelib.php');
+
+        if ($cmid <= 0 || $resourceid <= 0) {
+            return ['skipped' => true];
+        }
+
+        $names = $fileinfo['name'] ?? null;
+        if ($names === null) {
+            return ['skipped' => true];
+        }
+        // Normalise single-file uploads to arrays.
+        if (!is_array($names)) {
+            $fileinfo = [
+                'name' => [$fileinfo['name'] ?? ''],
+                'type' => [$fileinfo['type'] ?? ''],
+                'tmp_name' => [$fileinfo['tmp_name'] ?? ''],
+                'error' => [$fileinfo['error'] ?? UPLOAD_ERR_NO_FILE],
+                'size' => [$fileinfo['size'] ?? 0],
+            ];
+        }
+
+        $pending = [];
+        $count = count($fileinfo['name']);
+        for ($i = 0; $i < $count; $i++) {
+            $err = (int) ($fileinfo['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($err === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+            if ($err !== UPLOAD_ERR_OK) {
+                return ['error' => get_string('admin_activity_file_err_upload', 'local_launchpad')];
+            }
+            $tmp = (string) ($fileinfo['tmp_name'][$i] ?? '');
+            $filename = clean_param((string) ($fileinfo['name'][$i] ?? ''), PARAM_FILE);
+            if ($tmp === '' || !is_uploaded_file($tmp) || $filename === '') {
+                return ['error' => get_string('admin_activity_file_err_upload', 'local_launchpad')];
+            }
+            $options = self::resource_file_options($course);
+            $maxbytes = (int) ($options['maxbytes'] ?? 0);
+            $size = (int) ($fileinfo['size'][$i] ?? 0);
+            if ($maxbytes > 0 && $size > $maxbytes) {
+                return ['error' => get_string('admin_activity_file_err_size', 'local_launchpad', display_size($maxbytes))];
+            }
+            $pending[] = [
+                'tmp' => $tmp,
+                'filename' => $filename,
+            ];
+        }
+        if ($pending === []) {
+            return ['skipped' => true];
+        }
+
+        $modcontext = \context_module::instance($cmid);
+        $fs = get_file_storage();
+        $fs->delete_area_files($modcontext->id, 'mod_resource', 'content');
+
+        $sort = 1;
+        foreach ($pending as $item) {
+            $record = [
+                'contextid' => $modcontext->id,
+                'component' => 'mod_resource',
+                'filearea' => 'content',
+                'itemid' => 0,
+                'filepath' => '/',
+                'filename' => $item['filename'],
+                'userid' => (int) $USER->id,
+                'source' => $item['filename'],
+            ];
+            $stored = $fs->create_file_from_pathname($record, $item['tmp']);
+            if (count($pending) === 1) {
+                file_set_sortorder(
+                    $modcontext->id,
+                    'mod_resource',
+                    'content',
+                    0,
+                    $stored->get_filepath(),
+                    $stored->get_filename(),
+                    1
+                );
+            } else {
+                file_set_sortorder(
+                    $modcontext->id,
+                    'mod_resource',
+                    'content',
+                    0,
+                    $stored->get_filepath(),
+                    $stored->get_filename(),
+                    $sort
+                );
+                $sort++;
+            }
+        }
+
+        $revision = (int) $DB->get_field('resource', 'revision', ['id' => $resourceid]);
+        $DB->update_record('resource', (object) [
+            'id' => $resourceid,
+            'revision' => $revision + 1,
+            'timemodified' => time(),
+        ]);
+
+        return ['ok' => true, 'count' => count($pending)];
     }
 
     /**
@@ -1184,6 +1440,14 @@ final class admin_dashboard {
 
             $cmid = (int) $cm->id;
             $cmvisible = (int) $cm->visible === 1;
+            $isresource = $modname === 'resource';
+            $hasfile = false;
+            $filestatus = '';
+            if ($isresource) {
+                $filesummary = self::resource_files_summary($cmid);
+                $hasfile = !empty($filesummary['has_file']);
+                $filestatus = (string) $filesummary['file_status_label'];
+            }
             $out[] = [
                 'cmid' => $cmid,
                 'modname' => $modname,
@@ -1195,6 +1459,10 @@ final class admin_dashboard {
                 'is_draft' => $isdraft,
                 'cm_visible' => $cmvisible,
                 'cm_hidden' => !$cmvisible,
+                'is_resource' => $isresource,
+                'has_file' => $hasfile,
+                'file_missing' => $isresource && !$hasfile,
+                'file_status_label' => $filestatus,
                 'manage_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
                     'view' => 'manage',
                     'trackid' => $courseid,

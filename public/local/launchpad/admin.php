@@ -110,6 +110,10 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $gradeparam = optional_param('grade', null, PARAM_RAW_TRIMMED);
         $grade = ($gradeparam === null || $gradeparam === '') ? null : (float) $gradeparam;
         $trackcompletion = (bool) optional_param('trackcompletion', 0, PARAM_BOOL);
+        $uploadfiles = null;
+        if (!empty($_FILES['resourcefiles'])) {
+            $uploadfiles = $_FILES['resourcefiles'];
+        }
         $flash = admin_dashboard::save_activity_settings(
             $USER,
             $trackid,
@@ -118,7 +122,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $intro,
             $content,
             $grade,
-            $trackcompletion
+            $trackcompletion,
+            $uploadfiles
         );
     }
 }

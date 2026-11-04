@@ -134,41 +134,24 @@ final class persona_home {
     /**
      * Whether login should rewrite wantsurl for this user.
      *
-     * Overrides default homes and wrong persona shells (e.g. employee still
-     * holding fellow.php from an older priority bug). Keeps same-shell deep
-     * links (fellow.php?view=track) and all non-shell Moodle URLs.
+     * Overrides default Moodle homes (/my/, site root). Does not rewrite
+     * persona shells — wrong-shell URLs must reach the gated PHP page so
+     * portal_gate can show the mismatch modal on the user's real home.
+     * Keeps same-shell deep links and all non-shell Moodle URLs.
      *
-     * @param int $userid
+     * @param int $userid Kept for call-site compatibility.
      * @param string|null $wantsurl
      */
     public static function should_rewrite_wantsurl(int $userid, ?string $wantsurl): bool {
+        unset($userid); // Signature stable; default-home policy does not need persona.
         if (self::should_override_default_home($wantsurl)) {
             return true;
         }
         if ($wantsurl === null || trim($wantsurl) === '') {
             return true;
         }
-
-        $home = self::home_url_for($userid);
-        if ($home === null) {
-            return false;
-        }
-
-        $path = self::path_of(trim($wantsurl));
-        if ($path === null) {
-            return false;
-        }
-        $path = rtrim($path, '/') ?: '/';
-        if (!self::is_persona_shell_path($path)) {
-            return false;
-        }
-
-        $homepath = self::local_path_of_url($home);
-        if ($homepath === null) {
-            return false;
-        }
-        // Same shell (possibly with ?view=) — keep the deep link.
-        return $path !== $homepath;
+        // Persona shells (including a login-tab pin to the "wrong" portal) stay as-is.
+        return false;
     }
 
     /**
