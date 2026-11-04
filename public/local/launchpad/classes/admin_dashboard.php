@@ -1033,6 +1033,11 @@ final class admin_dashboard {
                 break;
             case 'quiz':
                 require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+                $moduleinfo->introeditor = [
+                    'text' => get_string('admin_manage_new_quiz_intro', 'local_launchpad'),
+                    'format' => FORMAT_HTML,
+                    'itemid' => 0,
+                ];
                 $moduleinfo->timeopen = 0;
                 $moduleinfo->timeclose = 0;
                 $moduleinfo->timelimit = 0;

@@ -164,6 +164,7 @@ final class activity_portal {
         $needsengine = !$isinportal;
         $callouttext = '';
         $assignbrief = self::empty_assign_brief();
+        $quizbrief = self::empty_quiz_brief();
 
         if ($modname === 'page') {
             require_capability('mod/page:view', $context);
@@ -271,6 +272,12 @@ final class activity_portal {
             $needsengine = true;
             $isinportal = false;
             $assignbrief = self::build_assign_brief($cm, $course, $context, (int) $user->id);
+        } else if ($modname === 'quiz') {
+            // E8: LaunchPad quiz intro chrome; attempt UI stays in Moodle.
+            require_capability('mod/quiz:view', $context);
+            $needsengine = true;
+            $isinportal = false;
+            $quizbrief = self::build_quiz_brief($cm, $course, $context, (int) $user->id);
         } else {
             // Interactive Moodle engines — keep completion for the native mod view.
             $needsengine = true;
@@ -350,8 +357,178 @@ final class activity_portal {
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
                 'is_lesson' => $islesson,
-            ], $lesson, $assignbrief),
+            ], $lesson, $assignbrief, $quizbrief),
         ];
+    }
+
+    /**
+     * Empty quiz brief context (non-quiz activities).
+     *
+     * @return array<string,mixed>
+     */
+    public static function empty_quiz_brief(): array {
+        return [
+            'is_quiz' => false,
+            'quiz_brief_html' => '',
+            'quiz_has_brief' => false,
+            'quiz_practice_note' => '',
+            'quiz_attempts_label' => '',
+            'quiz_has_attempts' => false,
+            'quiz_timelimit' => '',
+            'quiz_has_timelimit' => false,
+            'quiz_opens' => '',
+            'quiz_has_opens' => false,
+            'quiz_closes' => '',
+            'quiz_has_closes' => false,
+            'quiz_grade_max' => '',
+            'quiz_has_grade' => false,
+            'quiz_questions' => '',
+            'quiz_has_questions' => false,
+            'quiz_attempt_status' => '',
+            'quiz_attempt_status_key' => '',
+            'quiz_has_attempt_status' => false,
+            'quiz_best_grade' => '',
+            'quiz_has_best_grade' => false,
+            'quiz_track_label' => '',
+            'quiz_phase_label' => '',
+            'quiz_has_phase' => false,
+        ];
+    }
+
+    /**
+     * Fellow-facing quiz intro for LaunchPad chrome (attempt stays in Moodle).
+     *
+     * @return array<string,mixed>
+     */
+    public static function build_quiz_brief(
+        \cm_info $cm,
+        \stdClass $course,
+        \context_module $context,
+        int $userid
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $quiz = $DB->get_record('quiz', ['id' => $cm->instance], '*', MUST_EXIST);
+
+        $introhtml = '';
+        if (!empty($quiz->intro)) {
+            $introhtml = format_module_intro('quiz', $quiz, $cm->id);
+        }
+        $parts = self::parse_quiz_intro_sections((string) ($quiz->intro ?? ''));
+        $briefhtml = $parts['brief_html'];
+        if ($briefhtml === '' && $introhtml !== '') {
+            $briefhtml = $introhtml;
+        } else if ($briefhtml !== '') {
+            $briefhtml = format_text($briefhtml, FORMAT_HTML, ['context' => $context, 'para' => true]);
+        }
+
+        $maxattempts = (int) ($quiz->attempts ?? 0); // 0 = unlimited.
+        $finished = quiz_get_user_attempts((int) $quiz->id, $userid, 'finished', true);
+        $unfinished = quiz_get_user_attempts((int) $quiz->id, $userid, 'unfinished', true);
+        $finishedcount = count($finished);
+        $hasinprogress = $unfinished !== [];
+
+        if ($maxattempts === 0) {
+            $attemptslabel = get_string('fellowship_quiz_attempts_unlimited', 'local_launchpad', $finishedcount);
+        } else {
+            $attemptslabel = get_string('fellowship_quiz_attempts_of', 'local_launchpad', (object) [
+                'used' => $finishedcount,
+                'max' => $maxattempts,
+            ]);
+        }
+
+        $statuskey = 'none';
+        if ($hasinprogress) {
+            $statuskey = 'inprogress';
+        } else if ($finishedcount > 0) {
+            $statuskey = 'finished';
+        }
+        if ($maxattempts > 0 && $finishedcount >= $maxattempts && !$hasinprogress) {
+            $statuskey = 'exhausted';
+        }
+        $statuslabel = get_string('fellowship_quiz_status_' . $statuskey, 'local_launchpad');
+
+        $bestgrade = '';
+        $hasbest = false;
+        if ($finished !== []) {
+            $grades = grade_get_grades($course->id, 'mod', 'quiz', (int) $quiz->id, $userid);
+            $gg = $grades->items[0]->grades[$userid] ?? null;
+            if ($gg && $gg->grade !== null) {
+                $bestgrade = format_float((float) $gg->grade, 1);
+                $hasbest = true;
+            }
+        }
+
+        $timelimit = (int) ($quiz->timelimit ?? 0);
+        $timeopen = (int) ($quiz->timeopen ?? 0);
+        $timeclose = (int) ($quiz->timeclose ?? 0);
+        $grademax = (float) ($quiz->grade ?? 0);
+
+        $qcount = (int) $DB->count_records('quiz_slots', ['quizid' => (int) $quiz->id]);
+
+        $sectionname = '';
+        if ((int) $cm->sectionnum > 0) {
+            $sectionname = get_section_name($course, (int) $cm->sectionnum);
+        }
+
+        return [
+            'is_quiz' => true,
+            'quiz_brief_html' => $briefhtml,
+            'quiz_has_brief' => trim(strip_tags($briefhtml)) !== '',
+            'quiz_practice_note' => get_string('fellowship_quiz_practice_note', 'local_launchpad'),
+            'quiz_attempts_label' => $attemptslabel,
+            'quiz_has_attempts' => true,
+            'quiz_timelimit' => $timelimit > 0
+                ? format_time($timelimit)
+                : get_string('fellowship_quiz_timelimit_none', 'local_launchpad'),
+            'quiz_has_timelimit' => true,
+            'quiz_timelimit_set' => $timelimit > 0,
+            'quiz_opens' => $timeopen > 0
+                ? userdate($timeopen, get_string('strftimedatetimeshort', 'langconfig'))
+                : '',
+            'quiz_has_opens' => $timeopen > 0,
+            'quiz_closes' => $timeclose > 0
+                ? userdate($timeclose, get_string('strftimedatetimeshort', 'langconfig'))
+                : get_string('fellowship_quiz_closes_none', 'local_launchpad'),
+            'quiz_has_closes' => true,
+            'quiz_closes_set' => $timeclose > 0,
+            'quiz_grade_max' => $grademax > 0 ? format_float($grademax, 0) : '',
+            'quiz_has_grade' => $grademax > 0,
+            'quiz_questions' => $qcount > 0
+                ? get_string('fellowship_quiz_questions_n', 'local_launchpad', $qcount)
+                : get_string('fellowship_quiz_questions_none', 'local_launchpad'),
+            'quiz_has_questions' => true,
+            'quiz_attempt_status' => $statuslabel,
+            'quiz_attempt_status_key' => $statuskey,
+            'quiz_has_attempt_status' => true,
+            'quiz_best_grade' => $bestgrade,
+            'quiz_has_best_grade' => $hasbest,
+            'quiz_track_label' => format_string($course->fullname),
+            'quiz_phase_label' => format_string($sectionname),
+            'quiz_has_phase' => $sectionname !== '',
+        ];
+    }
+
+    /**
+     * Optional structured quiz intro markers.
+     *
+     * @return array{brief_html:string}
+     */
+    public static function parse_quiz_intro_sections(string $raw): array {
+        $out = ['brief_html' => ''];
+        $raw = trim($raw);
+        if ($raw === '') {
+            return $out;
+        }
+        if (preg_match('/\[LP-BRIEF\]/i', $raw)) {
+            $parts = preg_split('/\[LP-BRIEF\]/i', $raw, 2);
+            $out['brief_html'] = self::cleanup_lesson_chunk(trim($parts[1] ?? ''));
+            return $out;
+        }
+        return $out;
     }
 
     /**

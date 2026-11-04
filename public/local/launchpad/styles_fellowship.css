@@ -3402,9 +3402,12 @@ body.lp-portal-mismatch-lock {
   font-size: 14.5px;
   color: var(--lp-ink);
 }
-.lp-chip.is-submitted { background: #E7F6EE; color: #0F6B3A; }
-.lp-chip.is-draft { background: #FFF8E8; color: #8A6A12; }
-.lp-chip.is-reopened { background: #FFF1E8; color: #9A3412; }
+.lp-chip.is-submitted,
+.lp-chip.is-finished { background: #E7F6EE; color: #0F6B3A; }
+.lp-chip.is-draft,
+.lp-chip.is-inprogress { background: #FFF8E8; color: #8A6A12; }
+.lp-chip.is-reopened,
+.lp-chip.is-exhausted { background: #FFF1E8; color: #9A3412; }
 .lp-chip.is-none { background: #F2F4F7; color: #475467; }
 .lp-activity-callout {
   display: flex;

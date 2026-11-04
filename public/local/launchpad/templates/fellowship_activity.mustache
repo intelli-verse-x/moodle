@@ -163,6 +163,84 @@
           {{/hasfiles}}
         {{/isinportal}}
 
+        {{#is_quiz}}
+          <div class="lp-assign-layout" data-region="quiz-brief">
+            <p class="lp-lesson-meta">
+              <span>{{quiz_track_label}}</span>
+              {{#quiz_has_phase}}
+                <span aria-hidden="true">·</span>
+                <span>{{quiz_phase_label}}</span>
+              {{/quiz_has_phase}}
+            </p>
+
+            <aside class="lp-judge-note" aria-label="{{strings.quizpractice}}">
+              <b>{{strings.quizpractice}}</b>
+              <p>{{quiz_practice_note}}</p>
+            </aside>
+
+            <section class="lp-lesson-block">
+              <h3 class="lp-lesson-block-title">{{strings.quizbrief}}</h3>
+              {{#quiz_has_brief}}
+                <div class="lp-lesson-block-body">{{{quiz_brief_html}}}</div>
+              {{/quiz_has_brief}}
+              {{^quiz_has_brief}}
+                <p class="lp-muted lp-sm">{{strings.quizbriefmissing}}</p>
+              {{/quiz_has_brief}}
+            </section>
+
+            <dl class="lp-assign-meta">
+              {{#quiz_has_questions}}
+                <div>
+                  <dt>{{strings.quizquestions}}</dt>
+                  <dd>{{quiz_questions}}</dd>
+                </div>
+              {{/quiz_has_questions}}
+              {{#quiz_has_attempts}}
+                <div>
+                  <dt>{{strings.quizattempts}}</dt>
+                  <dd>{{quiz_attempts_label}}</dd>
+                </div>
+              {{/quiz_has_attempts}}
+              {{#quiz_has_timelimit}}
+                <div>
+                  <dt>{{strings.quiztimelimit}}</dt>
+                  <dd{{^quiz_timelimit_set}} class="lp-muted"{{/quiz_timelimit_set}}>{{quiz_timelimit}}</dd>
+                </div>
+              {{/quiz_has_timelimit}}
+              {{#quiz_has_opens}}
+                <div>
+                  <dt>{{strings.quizopens}}</dt>
+                  <dd>{{quiz_opens}}</dd>
+                </div>
+              {{/quiz_has_opens}}
+              {{#quiz_has_closes}}
+                <div>
+                  <dt>{{strings.quizcloses}}</dt>
+                  <dd{{^quiz_closes_set}} class="lp-muted"{{/quiz_closes_set}}>{{quiz_closes}}</dd>
+                </div>
+              {{/quiz_has_closes}}
+              {{#quiz_has_grade}}
+                <div>
+                  <dt>{{strings.quizgrade}}</dt>
+                  <dd>{{quiz_grade_max}}</dd>
+                </div>
+              {{/quiz_has_grade}}
+              {{#quiz_has_best_grade}}
+                <div>
+                  <dt>{{strings.quizbest}}</dt>
+                  <dd>{{quiz_best_grade}}</dd>
+                </div>
+              {{/quiz_has_best_grade}}
+              {{#quiz_has_attempt_status}}
+                <div>
+                  <dt>{{strings.quizstatus}}</dt>
+                  <dd><span class="lp-chip is-{{quiz_attempt_status_key}}">{{quiz_attempt_status}}</span></dd>
+                </div>
+              {{/quiz_has_attempt_status}}
+            </dl>
+          </div>
+        {{/is_quiz}}
+
         {{#is_assign}}
           <div class="lp-assign-layout" data-region="assign-brief">
             <p class="lp-lesson-meta">
@@ -233,9 +311,9 @@
         {{#needsengine}}
           <div class="lp-activity-callout" role="status">
             <div class="lp-activity-callout-text">
-              <b>{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}</b>
-              <p>{{#is_assign}}{{strings.assignenginehelp}}{{/is_assign}}{{^is_assign}}{{strings.activityenginehelp}}{{/is_assign}}</p>
-              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}</a>
+              <b>{{#is_quiz}}{{strings.quizcontinue}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}{{/is_quiz}}</b>
+              <p>{{#is_quiz}}{{strings.quizenginehelp}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assignenginehelp}}{{/is_assign}}{{^is_assign}}{{strings.activityenginehelp}}{{/is_assign}}{{/is_quiz}}</p>
+              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{#is_quiz}}{{strings.quizcontinue}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}{{/is_quiz}}</a>
             </div>
           </div>
         {{/needsengine}}
