@@ -28,7 +28,9 @@ require(__DIR__ . '/../../config.php');
 
 require_once(__DIR__ . '/classes/calendar_service.php');
 require_once(__DIR__ . '/classes/mentor_dashboard.php');
+require_once(__DIR__ . '/classes/admin_dashboard.php');
 
+use local_launchpad\admin_dashboard;
 use local_launchpad\calendar_service;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\mentor_dashboard;
@@ -40,7 +42,9 @@ header('Content-Type: application/json; charset=utf-8');
 
 $userid = (int) $USER->id;
 $portal = optional_param('portal', 'fellow', PARAM_ALPHA);
-if ($portal === 'mentor') {
+if ($portal === 'admin') {
+    $allowed = admin_dashboard::can_access($userid) || is_siteadmin();
+} else if ($portal === 'mentor') {
     $allowed = mentor_dashboard::can_access($userid) || is_siteadmin();
 } else {
     $allowed = fellowship_dashboard::can_access($userid) || is_siteadmin();

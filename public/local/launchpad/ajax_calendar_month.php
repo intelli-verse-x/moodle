@@ -28,7 +28,9 @@ require(__DIR__ . '/../../config.php');
 
 require_once(__DIR__ . '/classes/calendar_service.php');
 require_once(__DIR__ . '/classes/mentor_dashboard.php');
+require_once(__DIR__ . '/classes/admin_dashboard.php');
 
+use local_launchpad\admin_dashboard;
 use local_launchpad\calendar_service;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\mentor_dashboard;
@@ -39,11 +41,18 @@ require_sesskey();
 
 $userid = (int) $USER->id;
 $portal = optional_param('portal', 'fellow', PARAM_ALPHA);
-if ($portal !== 'mentor') {
+if (!in_array($portal, ['fellow', 'mentor', 'admin'], true)) {
     $portal = 'fellow';
 }
 
-if ($portal === 'mentor') {
+if ($portal === 'admin') {
+    if (!admin_dashboard::can_access($userid) && !is_siteadmin()) {
+        throw new \moodle_exception('nopermissions', 'error', '', get_string('fellowship_nav_calendar', 'local_launchpad'));
+    }
+    $courses = admin_dashboard::list_track_courses();
+    $basepath = persona_home::ADMIN_PATH;
+    $ctxfn = 'admin_context';
+} else if ($portal === 'mentor') {
     if (!mentor_dashboard::can_access($userid) && !is_siteadmin()) {
         throw new \moodle_exception('nopermissions', 'error', '', get_string('fellowship_nav_calendar', 'local_launchpad'));
     }

@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks, Builder, Cohorts, People, Mentors, Reviews.
+ * Admin portal — Overview, Tracks, Builder, Calendar, Cohorts, People, Mentors, Reviews.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -24,7 +24,10 @@
 
 require(__DIR__ . '/../../config.php');
 
+require_once(__DIR__ . '/classes/calendar_service.php');
+
 use local_launchpad\admin_dashboard;
+use local_launchpad\calendar_service;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\messaging;
@@ -40,7 +43,7 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'builder', 'manage', 'activity', 'cohorts', 'people', 'mentors', 'reviews'];
+$allowedviews = ['home', 'tracks', 'builder', 'manage', 'activity', 'calendar', 'cohorts', 'people', 'mentors', 'reviews'];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
@@ -166,12 +169,21 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
     }
 }
 
+$calmode = optional_param('cal', 'month', PARAM_ALPHA);
+$calfilter = optional_param('filter', 'all', PARAM_ALPHA);
+$caltime = optional_param('time', 0, PARAM_INT);
+$calyear = optional_param('year', 0, PARAM_INT);
+$calmonth = optional_param('month', 0, PARAM_INT);
+
 $urlparams = array_filter([
     'view' => $view !== 'home' ? $view : null,
     'tab' => ($view === 'people' && $peopletab !== 'all') ? $peopletab : null,
     'trackid' => (($view === 'builder' || $view === 'manage' || $view === 'activity') && $trackid > 0) ? $trackid : null,
     'section' => ($view === 'manage' && $sectionnum > 0) ? $sectionnum : null,
     'cmid' => ($view === 'activity' && $cmid > 0) ? $cmid : null,
+    'cal' => ($view === 'calendar' && $calmode !== 'month') ? $calmode : null,
+    'filter' => ($view === 'calendar' && ($calfilter === 'course' || $calfilter === 'personal')) ? $calfilter : null,
+    'time' => ($view === 'calendar' && $caltime > 0) ? $caltime : null,
 ]);
 
 $context = context_system::instance();
@@ -197,6 +209,7 @@ $cohortsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))-
 $peopleurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'people']))->out(false);
 $mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
 $reviewsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
+$calendarurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'calendar']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 
 $firstname = format_string($USER->firstname);
@@ -232,11 +245,21 @@ $nav = [
             [
                 'label' => get_string('admin_nav_builder', 'local_launchpad'),
                 'url' => $builderurl,
-                'current' => $view === 'builder',
+                'current' => ($view === 'builder' || $view === 'manage' || $view === 'activity'),
                 'key' => 'builder',
                 'icon_svg' => $icon(
                     '<path d="M14 5l5 5-9.5 9.5H5v-4.5L14 5z"/>'
                     . '<path d="M12 7l5 5"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_nav_calendar', 'local_launchpad'),
+                'url' => $calendarurl,
+                'current' => $view === 'calendar',
+                'key' => 'calendar',
+                'icon_svg' => $icon(
+                    '<rect x="3" y="5" width="18" height="16" rx="2"/>'
+                    . '<path d="M3 10h18M8 3v4M16 3v4"/>'
                 ),
             ],
             [
@@ -334,6 +357,23 @@ if ($view === 'tracks') {
         'local_launchpad/admin_activity',
         admin_dashboard::activity_settings_context($USER, $trackid, $cmid, $flash)
     );
+} else if ($view === 'calendar') {
+    $pagetitle = get_string('admin_nav_calendar', 'local_launchpad');
+    $resolved = calendar_service::resolve_month(
+        $caltime > 0 ? $caltime : null,
+        $calyear > 0 ? $calyear : null,
+        $calmonth > 0 ? $calmonth : null
+    );
+    $caldata = calendar_service::admin_context(
+        $userid,
+        admin_dashboard::list_track_courses(),
+        (int) $resolved['year'],
+        (int) $resolved['month'],
+        $calmode,
+        $calfilter,
+        $caltime > 0 ? $caltime : null
+    );
+    $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', $caldata);
 } else if ($view === 'cohorts') {
     $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');
     $content = $OUTPUT->render_from_template(

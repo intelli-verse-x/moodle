@@ -456,12 +456,40 @@ final class calendar_service {
     }
 
     /**
+     * Admin calendar page context (all LaunchPad tracks; course + personal events).
+     *
+     * @param list<\stdClass> $courses
+     * @param string $mode month|upcoming|day|week
+     */
+    public static function admin_context(
+        int $userid,
+        array $courses,
+        int $year,
+        int $month,
+        string $mode = 'month',
+        string $filter = 'all',
+        ?int $daytime = null
+    ): array {
+        return self::page_context(
+            $userid,
+            $courses,
+            $year,
+            $month,
+            $mode,
+            persona_home::ADMIN_PATH,
+            'admin',
+            $filter,
+            $daytime
+        );
+    }
+
+    /**
      * Shared Calendar page context (month grid + upcoming + day + nav URLs).
      *
      * @param list<\stdClass> $courses
      * @param string $mode month|upcoming|day
      * @param string $basepath Persona home path for calendar URLs
-     * @param string $portal fellow|mentor
+     * @param string $portal fellow|mentor|admin
      * @param string $filter all|course|personal
      */
     public static function page_context(
@@ -484,7 +512,7 @@ final class calendar_service {
         if ($basepath === '') {
             $basepath = persona_home::FELLOW_PATH;
         }
-        if ($portal !== 'mentor') {
+        if (!in_array($portal, ['fellow', 'mentor', 'admin'], true)) {
             $portal = 'fellow';
         }
         [$tstart, $tend] = self::month_range($year, $month);
@@ -574,12 +602,13 @@ final class calendar_service {
         $canaddpersonal = self::user_can_add_personal($userid);
         $canaddcourse = $manageable !== [];
         // Fellowship calendar is personal-first (study reminders, meetings). Mentors
-        // still prefer course deadlines when they can manage course calendars.
+        // and admins can also add course events when they have manageentries.
         if ($portal === 'fellow') {
             $canaddcourse = false;
             $manageable = [];
         }
         $canaddevent = $canaddpersonal || $canaddcourse;
+        $staffcalendar = ($portal === 'mentor' || $portal === 'admin');
 
         $navparams = static function (array $extra) use ($filter): array {
             if ($filter !== 'all') {
@@ -705,13 +734,14 @@ final class calendar_service {
                 'sesskey' => sesskey(),
             ]))->out(false),
             'portal' => $portal,
-            'is_mentor_calendar' => $portal === 'mentor',
+            'is_mentor_calendar' => $staffcalendar,
+            'is_admin_calendar' => $portal === 'admin',
             'sesskey' => sesskey(),
             'can_add_personal' => $canaddpersonal,
             'can_add_course' => $canaddcourse,
             'can_add_event' => $canaddevent,
             'has_scope_choice' => $canaddpersonal && $canaddcourse,
-            'default_scope' => ($portal === 'mentor' && $canaddcourse)
+            'default_scope' => ($staffcalendar && $canaddcourse)
                 ? 'course'
                 : ($canaddcourse && !$canaddpersonal ? 'course' : 'personal'),
             'manageable_courses' => $manageable,
