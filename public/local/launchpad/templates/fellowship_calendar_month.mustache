@@ -7,12 +7,18 @@
   data-ajax-url="{{ajax_url}}"
   data-sesskey="{{sesskey}}"
   data-time="{{current_time}}">
+  <div class="lp-cal-panel">
   <div class="lp-cal-month-head">
-    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{prev_url}}" data-lp-cal-nav data-time="{{prev_time}}"
-      aria-label="{{#str}} fellowship_calendar_prev_month, local_launchpad {{/str}}">←</a>
-    <h3 class="lp-cal-month-label">{{month_label}}</h3>
-    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{next_url}}" data-lp-cal-nav data-time="{{next_time}}"
-      aria-label="{{#str}} fellowship_calendar_next_month, local_launchpad {{/str}}">→</a>
+    <div class="lp-cal-month-nav">
+      <a class="lp-btn lp-btn-light lp-btn-sm lp-cal-nav-btn" href="{{prev_url}}" data-lp-cal-nav data-time="{{prev_time}}"
+        aria-label="{{#str}} fellowship_calendar_prev_month, local_launchpad {{/str}}">‹</a>
+      <h3 class="lp-cal-month-label">{{month_label}}</h3>
+      <a class="lp-btn lp-btn-light lp-btn-sm lp-cal-nav-btn" href="{{next_url}}" data-lp-cal-nav data-time="{{next_time}}"
+        aria-label="{{#str}} fellowship_calendar_next_month, local_launchpad {{/str}}">›</a>
+    </div>
+    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{today_url}}" data-lp-cal-nav data-time="{{today_time}}">
+      {{#str}} fellowship_calendar_today, local_launchpad {{/str}}
+    </a>
   </div>
   <div class="lp-cal-grid" role="grid" aria-label="{{month_label}}">
     <div class="lp-cal-weekdays" role="row">
@@ -72,6 +78,7 @@
         {{/days}}
       </div>
     {{/weeks}}
+  </div>
   </div>
   {{^has_month_events}}
     <p class="lp-muted lp-sm lp-cal-month-empty">{{#str}} fellowship_calendar_month_empty, local_launchpad {{/str}}</p>

@@ -24,6 +24,9 @@
 
 require(__DIR__ . '/../../config.php');
 
+// New class from main — load explicitly so a stale Moodle classmap cannot 404 it.
+require_once(__DIR__ . '/classes/portal_gate.php');
+
 use local_launchpad\account_persona;
 use local_launchpad\employer_dashboard;
 use local_launchpad\login_portal;

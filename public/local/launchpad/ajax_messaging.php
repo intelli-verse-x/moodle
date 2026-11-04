@@ -26,6 +26,9 @@ define('AJAX_SCRIPT', true);
 
 require(__DIR__ . '/../../config.php');
 
+require_once(__DIR__ . '/classes/messaging.php');
+require_once(__DIR__ . '/classes/mentor_dashboard.php');
+
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\mentor_dashboard;
 use local_launchpad\messaging;

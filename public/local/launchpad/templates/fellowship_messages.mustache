@@ -1,235 +1,343 @@
 {{!
     @template local_launchpad/fellowship_messages
 
-    LaunchPad messages: conversation list + 1:1 thread (Moodle-backed).
+    Fellowship messages — Capstone hero + Project Meta panel + messenger workspace.
 }}
-{{#has_crumbs}}
-  <nav class="lp-crumbs" aria-label="{{#str}} fellowship_breadcrumb, local_launchpad {{/str}}">
-    {{#crumbs}}
-      {{#url}}<a href="{{url}}">{{label}}</a><span aria-hidden="true">/</span>{{/url}}
-      {{^url}}<span aria-current="page">{{label}}</span>{{/url}}
-    {{/crumbs}}
-  </nav>
-{{/has_crumbs}}
-
-<div class="lp-ach-head">
-  <div class="lp-row-sb">
-    <div>
-      <span class="lp-eyebrow">{{#str}} fellowship_messages, local_launchpad {{/str}}</span>
-      <h2>{{#has_thread}}{{{other_name}}}{{/has_thread}}{{^has_thread}}{{#str}} fellowship_messages_heading, local_launchpad {{/str}}{{/has_thread}}</h2>
-      <p class="lp-muted">{{#is_fellow_portal}}{{#str}} fellowship_messages_intro_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{#str}} fellowship_messages_intro, local_launchpad {{/str}}{{/is_fellow_portal}}</p>
-    </div>
-    <a class="lp-btn lp-btn-light" href="{{moodle_messages_url}}">{{#str}} fellowship_messages_open_moodle, local_launchpad {{/str}}</a>
-  </div>
-</div>
-
+<div class="lp-tools-page lp-reveal" data-region="fellowship-messages" style="--lp-d:0">
 {{^messaging_enabled}}
   <div class="lp-empty" role="status">
-    <div class="lp-empty-mark" aria-hidden="true">··</div>
-    <h2>{{#str}} fellowship_messages_disabled_title, local_launchpad {{/str}}</h2>
-    <p>{{#str}} fellowship_messages_disabled_body, local_launchpad {{/str}}</p>
+    <div class="lp-empty-mark" aria-hidden="true">
+      <iconify-icon icon="hugeicons:message-01" width="26" height="26"></iconify-icon>
+    </div>
+    <h2>{{strings.disabled_title}}</h2>
+    <p>{{strings.disabled_body}}</p>
   </div>
 {{/messaging_enabled}}
 
 {{#messaging_enabled}}
-  <div class="lp-msg-layout{{#has_thread}} has-thread{{/has_thread}}"
+  {{! Capstone + Project Meta (same system as My track aside) }}
+  <div class="lp-msg-system">
+    <section class="lp-card lift lp-theme-hero lp-msg-overview">
+      <div class="lp-theme-hero-main">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:message-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <div class="lp-theme-hero-heading">
+              <h3>{{strings.inbox_heading}}</h3>
+            </div>
+            <p>{{#is_fellow_portal}}{{#str}} fellowship_messages_intro_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{strings.intro}}{{/is_fellow_portal}}</p>
+          </div>
+        </div>
+        <p class="lp-sm lp-theme-hero-body">{{#str}} fellowship_messages_inbox_lead, local_launchpad {{/str}}</p>
+      </div>
+      <div class="lp-theme-hero-art" aria-hidden="true">
+        <span class="lp-theme-hero-orb"></span>
+        <iconify-icon icon="hugeicons:message-01" width="88" height="88"></iconify-icon>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-msg-stats">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:inbox" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{#str}} fellowship_messages_meta_heading, local_launchpad {{/str}}</h3>
+          </div>
+        </div>
+      </div>
+      <dl class="lp-theme-kv lp-msg-overview-kv">
+        <div class="lp-theme-kv-row">
+          <dt>{{strings.total_label}}</dt>
+          <dd><b class="lp-num">{{conversation_count}}</b></dd>
+        </div>
+        <div class="lp-theme-kv-row{{#has_unread_conversations}} is-hot{{/has_unread_conversations}}">
+          <dt>{{strings.unread_label}}</dt>
+          <dd><b class="lp-num">{{unread_conversations}}</b></dd>
+        </div>
+      </dl>
+    </section>
+  </div>
+
+  <section class="lp-card lift lp-msg-workspace"
     data-lp-msg-root
     data-ajax-url="{{ajax_url}}"
     data-sesskey="{{sesskey}}"
     data-portal="{{portal}}"
     data-other-id="{{other_id}}"
     data-can-delete="{{#can_delete_messages}}1{{/can_delete_messages}}{{^can_delete_messages}}0{{/can_delete_messages}}">
-    <aside class="lp-msg-inbox" aria-label="{{#str}} fellowship_messages_inbox, local_launchpad {{/str}}">
-      {{#has_conversations}}
-        <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_inbox, local_launchpad {{/str}}</h3>
-        <ul class="lp-msg-list">
-          {{#conversations}}
-            <li>
-              <a class="lp-msg-row{{#has_unread}} is-unread{{/has_unread}}" href="{{url}}">
-                <span class="lp-av lp-av-sm" aria-hidden="true">{{other_initials}}</span>
-                <span class="lp-msg-row-body">
-                  <b>{{{other_name}}}</b>
-                  {{#has_role_label}}<span class="lp-msg-role">{{role_label}}</span>{{/has_role_label}}
-                  <span class="lp-xs lp-muted">{{preview}}</span>
-                </span>
-                {{#has_unread}}
-                  <span class="lp-msg-unread">{{unread}}</span>
-                {{/has_unread}}
-              </a>
-            </li>
-          {{/conversations}}
-        </ul>
-      {{/has_conversations}}
-      {{^has_conversations}}
-        <p class="lp-sm lp-muted lp-msg-empty">{{#str}} fellowship_messages_inbox_empty, local_launchpad {{/str}}</p>
-      {{/has_conversations}}
 
-      {{#is_fellow_portal}}
-        {{#has_classmates}}
-          <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_classmates, local_launchpad {{/str}}</h3>
-          <ul class="lp-msg-list lp-msg-people">
-            {{#classmates}}
-              <li>
-                {{#can_message}}
-                  <a class="lp-msg-row" href="{{url}}">
-                    <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
-                    <span class="lp-msg-row-body">
-                      <b>{{{name}}}</b>
-                      <span class="lp-msg-role">{{role_label}}</span>
-                      <span class="lp-xs lp-muted">{{{course_label}}}</span>
-                    </span>
-                  </a>
-                {{/can_message}}
-                {{^can_message}}
-                  <div class="lp-msg-row is-disabled" title="{{#str}} fellowship_messages_err_permission, local_launchpad {{/str}}">
-                    <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
-                    <span class="lp-msg-row-body">
-                      <b>{{{name}}}</b>
-                      <span class="lp-xs lp-muted">{{{course_label}}}</span>
-                    </span>
-                  </div>
-                {{/can_message}}
-              </li>
-            {{/classmates}}
-          </ul>
-        {{/has_classmates}}
-        {{#has_mentors}}
-          <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_mentors, local_launchpad {{/str}}</h3>
-          <ul class="lp-msg-list lp-msg-people">
-            {{#mentors}}
-              <li>
-                {{#can_message}}
-                  <a class="lp-msg-row" href="{{url}}">
-                    <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
-                    <span class="lp-msg-row-body">
-                      <b>{{{name}}}</b>
-                      <span class="lp-msg-role">{{role_label}}</span>
-                      <span class="lp-xs lp-muted">{{{course_label}}}</span>
-                    </span>
-                  </a>
-                {{/can_message}}
-              </li>
-            {{/mentors}}
-          </ul>
-        {{/has_mentors}}
-        {{^has_people}}
-          {{^has_conversations}}
-            <p class="lp-sm lp-muted lp-msg-empty">{{#str}} fellowship_messages_people_empty, local_launchpad {{/str}}</p>
-          {{/has_conversations}}
-        {{/has_people}}
-      {{/is_fellow_portal}}
-    </aside>
-
-    <section class="lp-msg-thread" aria-label="{{#str}} fellowship_messages_thread, local_launchpad {{/str}}">
-      {{#thread_denied}}
-        <div class="lp-empty" role="status">
-          <div class="lp-empty-mark" aria-hidden="true">··</div>
-          <h2>{{#str}} fellowship_messages_unavailable, local_launchpad {{/str}}</h2>
-          <p>{{#str}} fellowship_messages_unavailable_body, local_launchpad {{/str}}</p>
-          <a class="lp-btn lp-btn-light" href="{{inbox_url}}">{{#str}} fellowship_messages_back, local_launchpad {{/str}}</a>
+    <div class="lp-msg-layout{{#has_thread}} is-split has-thread{{/has_thread}}">
+      <aside class="lp-msg-inbox lp-scroll" aria-label="{{strings.inbox_heading}}">
+        <div class="lp-tabs lp-tabs-block lp-msg-tabs" role="tablist" aria-label="{{strings.inbox_heading}}">
+          <a class="lp-tab{{#mtab_all}} is-on{{/mtab_all}}"
+             role="tab"
+             href="{{tab_all_url}}"
+             aria-selected="{{#mtab_all}}true{{/mtab_all}}{{^mtab_all}}false{{/mtab_all}}">
+            {{strings.tab_all}}
+          </a>
+          <a class="lp-tab{{#mtab_starred}} is-on{{/mtab_starred}}"
+             role="tab"
+             href="{{tab_starred_url}}"
+             aria-selected="{{#mtab_starred}}true{{/mtab_starred}}{{^mtab_starred}}false{{/mtab_starred}}">
+            {{strings.tab_starred}}
+          </a>
+          <a class="lp-tab{{#mtab_private}} is-on{{/mtab_private}}"
+             role="tab"
+             href="{{tab_private_url}}"
+             aria-selected="{{#mtab_private}}true{{/mtab_private}}{{^mtab_private}}false{{/mtab_private}}">
+            {{strings.tab_private}}
+          </a>
+          <a class="lp-tab{{#mtab_group}} is-on{{/mtab_group}}"
+             role="tab"
+             href="{{tab_group_url}}"
+             aria-selected="{{#mtab_group}}true{{/mtab_group}}{{^mtab_group}}false{{/mtab_group}}">
+            {{strings.tab_group}}
+          </a>
         </div>
-      {{/thread_denied}}
 
-      {{^thread_denied}}
-        {{#has_thread}}
-          <div class="lp-msg-thread-head" data-lp-msg-thread-head>
-            <div class="lp-fellow-who">
-              <div class="lp-av" aria-hidden="true">{{other_initials}}</div>
-              <div>
-                <b>{{{other_name}}}</b>
-                <div class="lp-xs lp-muted">{{#str}} fellowship_messages_private, local_launchpad {{/str}}</div>
-              </div>
-            </div>
-            <a class="lp-link-sm" href="{{inbox_url}}" data-lp-msg-back>{{#str}} fellowship_messages_back, local_launchpad {{/str}}</a>
+        {{#has_conversations}}
+          <ul class="lp-msg-list">
+            {{#conversations}}
+              <li>
+                <a class="lp-msg-row{{#is_selected}} is-selected{{/is_selected}}{{#has_unread}} is-unread{{/has_unread}}"
+                   href="{{url}}">
+                  <span class="lp-msg-avatar" aria-hidden="true">
+                    {{#has_image}}
+                      <img src="{{imageurl}}" alt="" width="44" height="44">
+                    {{/has_image}}
+                    {{^has_image}}
+                      <span class="lp-msg-initials">{{other_initials}}</span>
+                    {{/has_image}}
+                  </span>
+                  <span class="lp-msg-body">
+                    <span class="lp-msg-top">
+                      <b class="lp-msg-name">{{{other_name}}}</b>
+                      {{#has_when}}<time class="lp-msg-when">{{when}}</time>{{/has_when}}
+                    </span>
+                    {{#has_preview}}
+                      <span class="lp-msg-preview">
+                        {{#has_preview_prefix}}<em>{{preview_prefix}}</em> {{/has_preview_prefix}}{{preview}}
+                      </span>
+                    {{/has_preview}}
+                    <span class="lp-msg-meta-row">
+                      <span class="lp-msg-type">{{type_label}}</span>
+                      {{#isfavourite}}<span class="lp-msg-star" title="{{strings.tab_starred}}" aria-label="{{strings.tab_starred}}">★</span>{{/isfavourite}}
+                      {{#has_unread}}<span class="lp-msg-unread">{{unread}}</span>{{/has_unread}}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            {{/conversations}}
+          </ul>
+        {{/has_conversations}}
+        {{^has_conversations}}
+          <div class="lp-msg-inbox-empty" role="status">
+            <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+              <iconify-icon icon="hugeicons:mail-01" width="18" height="18"></iconify-icon>
+            </span>
+            {{#has_filter_empty}}
+              <h3>{{strings.empty_filter_title}}</h3>
+              <p>{{strings.empty_filter_body}}</p>
+            {{/has_filter_empty}}
+            {{^has_filter_empty}}
+              <h3>{{strings.inbox_empty_title}}</h3>
+              <p>{{strings.inbox_empty_body}}</p>
+            {{/has_filter_empty}}
           </div>
+        {{/has_conversations}}
 
-          {{#can_delete_messages}}
-            <div class="lp-msg-select-bar" data-lp-msg-select-bar hidden
-              data-count-tpl="{{#str}} fellowship_messages_delete_selected, local_launchpad, __N__ {{/str}}">
-              <span class="lp-sm" data-lp-msg-select-count>{{#str}} fellowship_messages_delete_selected, local_launchpad, 0 {{/str}}</span>
-              <div class="lp-msg-select-actions">
-                <button type="button" class="lp-btn lp-btn-light" data-lp-msg-select-cancel>{{#str}} fellowship_messages_delete_cancel, local_launchpad {{/str}}</button>
-                <button type="button" class="lp-btn lp-btn-primary" data-lp-msg-select-delete disabled>{{#str}} fellowship_messages_delete, local_launchpad {{/str}}</button>
-              </div>
+        {{#is_fellow_portal}}
+          {{#has_classmates}}
+            <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_classmates, local_launchpad {{/str}}</h3>
+            <ul class="lp-msg-list lp-msg-people">
+              {{#classmates}}
+                <li>
+                  {{#can_message}}
+                    <a class="lp-msg-row" href="{{url}}">
+                      <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                      <span class="lp-msg-row-body">
+                        <b>{{{name}}}</b>
+                        <span class="lp-msg-role">{{role_label}}</span>
+                        <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                      </span>
+                    </a>
+                  {{/can_message}}
+                  {{^can_message}}
+                    <div class="lp-msg-row is-disabled" title="{{#str}} fellowship_messages_err_permission, local_launchpad {{/str}}">
+                      <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                      <span class="lp-msg-row-body">
+                        <b>{{{name}}}</b>
+                        <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                      </span>
+                    </div>
+                  {{/can_message}}
+                </li>
+              {{/classmates}}
+            </ul>
+          {{/has_classmates}}
+          {{#has_mentors}}
+            <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_mentors, local_launchpad {{/str}}</h3>
+            <ul class="lp-msg-list lp-msg-people">
+              {{#mentors}}
+                <li>
+                  {{#can_message}}
+                    <a class="lp-msg-row" href="{{url}}">
+                      <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                      <span class="lp-msg-row-body">
+                        <b>{{{name}}}</b>
+                        <span class="lp-msg-role">{{role_label}}</span>
+                        <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                      </span>
+                    </a>
+                  {{/can_message}}
+                </li>
+              {{/mentors}}
+            </ul>
+          {{/has_mentors}}
+          {{^has_people}}
+            {{^has_conversations}}
+              <p class="lp-sm lp-muted lp-msg-empty">{{#str}} fellowship_messages_people_empty, local_launchpad {{/str}}</p>
+            {{/has_conversations}}
+          {{/has_people}}
+        {{/is_fellow_portal}}
+      </aside>
+
+      <div class="lp-msg-thread" aria-label="{{strings.thread_heading}}">
+        {{#thread_denied}}
+          <div class="lp-msg-thread-empty" role="status">
+            <div class="lp-empty-mark" aria-hidden="true">
+              <iconify-icon icon="hugeicons:square-lock-02" width="26" height="26"></iconify-icon>
             </div>
-            <form id="lp-msg-delete-form" class="lp-msg-delete-form" method="post" action="{{form_action}}" data-lp-msg-delete-form hidden>
-              <input type="hidden" name="sesskey" value="{{sesskey}}">
-              <input type="hidden" name="view" value="messages">
-              <input type="hidden" name="id" value="{{other_id}}">
-              <input type="hidden" name="msgaction" value="delete">
-              <div data-lp-msg-delete-ids></div>
-            </form>
-            <div class="lp-msg-confirm" data-lp-msg-confirm hidden role="presentation">
-              <div class="lp-msg-confirm-scrim" data-lp-msg-confirm-cancel aria-hidden="true"></div>
-              <div class="lp-msg-confirm-card" role="dialog" aria-modal="true"
-                aria-labelledby="lp-msg-confirm-title" aria-describedby="lp-msg-confirm-body">
-                <h2 id="lp-msg-confirm-title">{{#str}} fellowship_messages_delete_confirm_title, local_launchpad {{/str}}</h2>
-                <p id="lp-msg-confirm-body" class="lp-sm">{{#str}} fellowship_messages_delete_confirm, local_launchpad {{/str}}</p>
-                <div class="lp-msg-confirm-actions">
-                  <button type="button" class="lp-btn lp-btn-light" data-lp-msg-confirm-cancel>{{#str}} fellowship_messages_delete_cancel, local_launchpad {{/str}}</button>
-                  <button type="button" class="lp-btn lp-btn-primary" data-lp-msg-confirm-ok>{{#str}} fellowship_messages_delete, local_launchpad {{/str}}</button>
+            <h2>{{strings.unavailable_title}}</h2>
+            <p>{{strings.unavailable_body}}</p>
+            <a class="lp-btn lp-btn-light" href="{{inbox_url}}">{{strings.back}}</a>
+          </div>
+        {{/thread_denied}}
+
+        {{^thread_denied}}
+          {{#has_thread}}
+            <div class="lp-msg-thread-head" data-lp-msg-thread-head>
+              <div class="lp-msg-thread-who">
+                <span class="lp-msg-avatar" aria-hidden="true">
+                  {{#other_has_image}}
+                    <img src="{{other_imageurl}}" alt="" width="44" height="44">
+                  {{/other_has_image}}
+                  {{^other_has_image}}
+                    <span class="lp-msg-initials">{{other_initials}}</span>
+                  {{/other_has_image}}
+                </span>
+                <div class="lp-msg-thread-meta">
+                  <div class="lp-theme-hero-heading">
+                    <h3>{{{other_name}}}</h3>
+                    <span class="lp-chip">{{thread_type_label}}</span>
+                  </div>
                 </div>
               </div>
+              <a class="lp-btn lp-btn-light lp-msg-back" href="{{inbox_url}}" data-lp-msg-back>{{strings.back}}</a>
             </div>
-            <p class="lp-xs lp-muted lp-msg-select-hint" data-lp-msg-select-hint>{{#str}} fellowship_messages_select_hint, local_launchpad {{/str}}</p>
-          {{/can_delete_messages}}
 
-          <div class="lp-msg-bubbles{{#can_delete_messages}} is-selectable{{/can_delete_messages}}" data-lp-msg-scroll data-lp-msg-bubbles>
-            {{#has_messages}}
-              {{#messages}}
-                <div class="lp-msg-bubble{{#is_mine}} is-mine{{/is_mine}}{{^is_mine}} is-theirs{{/is_mine}}{{#can_delete}} is-selectable{{/can_delete}}"
-                  data-lp-msg-bubble
-                  data-id="{{id}}"
-                  {{#can_delete}}tabindex="0" role="button" aria-pressed="false"{{/can_delete}}>
-                  {{#can_delete}}
-                    <span class="lp-msg-check" aria-hidden="true"></span>
-                  {{/can_delete}}
-                  <div class="lp-msg-bubble-text">{{{text}}}</div>
-                  {{#when}}<div class="lp-xs lp-muted">{{when}}</div>{{/when}}
+            {{#can_delete_messages}}
+              <div class="lp-msg-select-bar" data-lp-msg-select-bar hidden
+                data-count-tpl="{{#str}} fellowship_messages_delete_selected, local_launchpad, __N__ {{/str}}">
+                <span class="lp-sm" data-lp-msg-select-count>{{#str}} fellowship_messages_delete_selected, local_launchpad, 0 {{/str}}</span>
+                <div class="lp-msg-select-actions">
+                  <button type="button" class="lp-btn lp-btn-light" data-lp-msg-select-cancel>{{strings.delete_cancel}}</button>
+                  <button type="button" class="lp-btn lp-btn-primary" data-lp-msg-select-delete disabled>{{strings.delete}}</button>
                 </div>
-              {{/messages}}
-            {{/has_messages}}
-            {{^has_messages}}
-              <p class="lp-sm lp-muted lp-msg-empty">{{#str}} fellowship_messages_thread_empty, local_launchpad {{/str}}</p>
-            {{/has_messages}}
-          </div>
+              </div>
+              <form id="lp-msg-delete-form" class="lp-msg-delete-form" method="post" action="{{form_action}}" data-lp-msg-delete-form hidden>
+                <input type="hidden" name="sesskey" value="{{sesskey}}">
+                <input type="hidden" name="view" value="messages">
+                <input type="hidden" name="id" value="{{other_id}}">
+                <input type="hidden" name="mtab" value="{{mtab}}">
+                <input type="hidden" name="msgaction" value="delete">
+                <div data-lp-msg-delete-ids></div>
+              </form>
+              <div class="lp-msg-confirm" data-lp-msg-confirm hidden role="presentation">
+                <div class="lp-msg-confirm-scrim" data-lp-msg-confirm-cancel aria-hidden="true"></div>
+                <div class="lp-msg-confirm-card" role="dialog" aria-modal="true"
+                  aria-labelledby="lp-msg-confirm-title" aria-describedby="lp-msg-confirm-body">
+                  <h2 id="lp-msg-confirm-title">{{strings.delete_confirm_title}}</h2>
+                  <p id="lp-msg-confirm-body" class="lp-sm">{{strings.delete_confirm}}</p>
+                  <div class="lp-msg-confirm-actions">
+                    <button type="button" class="lp-btn lp-btn-light" data-lp-msg-confirm-cancel>{{strings.delete_cancel}}</button>
+                    <button type="button" class="lp-btn lp-btn-primary" data-lp-msg-confirm-ok>{{strings.delete}}</button>
+                  </div>
+                </div>
+              </div>
+              <p class="lp-xs lp-muted lp-msg-select-hint" data-lp-msg-select-hint>{{strings.select_hint}}</p>
+            {{/can_delete_messages}}
 
-          {{#can_send}}
-            <form class="lp-msg-compose" method="post" action="{{form_action}}" data-lp-msg-compose>
-              <input type="hidden" name="sesskey" value="{{sesskey}}">
-              <input type="hidden" name="view" value="messages">
-              <input type="hidden" name="id" value="{{other_id}}">
-              <input type="hidden" name="msgaction" value="send">
-              <label class="lp-msg-label" for="lp-msg-body">{{#str}} fellowship_messages_compose, local_launchpad {{/str}}</label>
-              <div class="lp-msg-compose-row">
+            <div class="lp-msg-scroll lp-msg-bubbles lp-scroll{{#can_delete_messages}} is-selectable{{/can_delete_messages}}"
+              data-lp-msg-scroll data-lp-msg-bubbles>
+              {{#has_messages}}
+                {{#messages}}
+                  <article class="lp-msg-bubble{{#is_mine}} is-mine{{/is_mine}}{{^is_mine}} is-theirs{{/is_mine}}{{#can_delete}} is-selectable{{/can_delete}}"
+                    data-lp-msg-bubble
+                    data-id="{{id}}"
+                    {{#can_delete}}tabindex="0" role="button" aria-pressed="false"{{/can_delete}}>
+                    {{#can_delete}}
+                      <span class="lp-msg-check" aria-hidden="true"></span>
+                    {{/can_delete}}
+                    {{^is_mine}}
+                      <div class="lp-msg-meta">{{from_label}}</div>
+                    {{/is_mine}}
+                    <div class="lp-msg-bubble-text">{{{text}}}</div>
+                    {{#when}}<time class="lp-msg-bubble-when">{{when}}</time>{{/when}}
+                  </article>
+                {{/messages}}
+              {{/has_messages}}
+              {{^has_messages}}
+                <p class="lp-sm lp-muted lp-msg-empty">{{strings.thread_empty}}</p>
+              {{/has_messages}}
+            </div>
+
+            {{#can_send}}
+              <form class="lp-msg-composer lp-msg-compose" method="post" action="{{form_action}}" data-lp-msg-compose>
+                <input type="hidden" name="sesskey" value="{{sesskey}}">
+                <input type="hidden" name="view" value="messages">
+                <input type="hidden" name="id" value="{{other_id}}">
+                <input type="hidden" name="mtab" value="{{mtab}}">
+                <input type="hidden" name="msgaction" value="send">
+                <label class="visually-hidden" for="lp-msg-body">{{strings.compose}}</label>
                 <div class="lp-msg-compose-tools">
                   <button type="button" class="lp-msg-emoji-btn" data-lp-msg-emoji-toggle
                     aria-expanded="false" aria-controls="lp-msg-emoji-panel"
-                    title="{{#str}} fellowship_messages_emoji, local_launchpad {{/str}}"
-                    aria-label="{{#str}} fellowship_messages_emoji, local_launchpad {{/str}}">☺</button>
+                    title="{{strings.emoji}}"
+                    aria-label="{{strings.emoji}}">☺</button>
                   <div id="lp-msg-emoji-panel" class="lp-msg-emoji-panel" data-lp-msg-emoji-panel hidden role="dialog"
-                    aria-label="{{#str}} fellowship_messages_emoji, local_launchpad {{/str}}"></div>
+                    aria-label="{{strings.emoji}}"></div>
                 </div>
-                <textarea id="lp-msg-body" name="message" rows="2" maxlength="4000" required
-                  placeholder="{{#str}} fellowship_messages_compose_placeholder, local_launchpad {{/str}}"
+                <textarea id="lp-msg-body" name="message" rows="1" maxlength="4000" required
+                  placeholder="{{strings.compose_placeholder}}"
                   data-lp-msg-body></textarea>
-                <button type="submit" class="lp-btn lp-btn-primary" data-lp-msg-send>{{#str}} fellowship_messages_send, local_launchpad {{/str}}</button>
+                <button type="submit" class="lp-btn lp-btn-primary" data-lp-msg-send>{{strings.send}}</button>
+              </form>
+            {{/can_send}}
+            {{^can_send}}
+              <div class="lp-msg-composer lp-msg-composer-cta">
+                <p class="lp-sm lp-muted">{{#other_id}}{{strings.permission}}{{/other_id}}{{^other_id}}{{strings.cannot_reply}}{{/other_id}}</p>
+                <a class="lp-btn lp-btn-light" href="{{moodle_messages_url}}">{{strings.open_thread}}</a>
               </div>
-            </form>
-          {{/can_send}}
-          {{^can_send}}
-            <p class="lp-sm lp-muted">{{#str}} fellowship_messages_err_permission, local_launchpad {{/str}}</p>
-          {{/can_send}}
-        {{/has_thread}}
+            {{/can_send}}
+          {{/has_thread}}
 
-        {{^has_thread}}
-          <div class="lp-empty lp-msg-pick" role="status">
-            <div class="lp-empty-mark" aria-hidden="true">··</div>
-            <h2>{{#str}} fellowship_messages_pick_title, local_launchpad {{/str}}</h2>
-            <p>{{#is_fellow_portal}}{{#str}} fellowship_messages_pick_body_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{#str}} fellowship_messages_pick_body, local_launchpad {{/str}}{{/is_fellow_portal}}</p>
-          </div>
-        {{/has_thread}}
-      {{/thread_denied}}
-    </section>
-  </div>
+          {{^has_thread}}
+            <div class="lp-msg-thread-empty" role="status">
+              <div class="lp-empty-mark" aria-hidden="true">
+                <iconify-icon icon="hugeicons:message-01" width="26" height="26"></iconify-icon>
+              </div>
+              <h2>{{strings.pick_title}}</h2>
+              <p>{{#is_fellow_portal}}{{#str}} fellowship_messages_pick_body_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{strings.pick_body}}{{/is_fellow_portal}}</p>
+            </div>
+          {{/has_thread}}
+        {{/thread_denied}}
+      </div>
+    </div>
+  </section>
 {{/messaging_enabled}}
+</div>
