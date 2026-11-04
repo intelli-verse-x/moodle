@@ -1,0 +1,118 @@
+{{!
+    @template local_launchpad/admin_announcements
+
+    Admin Announcements — compose to track news forums + recent posted list.
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-announcements">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+    </div>
+  </div>
+</section>
+
+{{#flash_ok}}
+  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+{{/flash_ok}}
+{{#flash_err}}
+  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+{{/flash_err}}
+
+<div class="lp-grid-2 lp-ann-layout" style="margin-top:16px">
+  <section class="lp-card lift lp-stack-lg">
+    <div class="lp-card-head">
+      <h3>{{form_title}}</h3>
+    </div>
+    {{^has_tracks}}
+      {{> local_launchpad/admin_empty}}
+    {{/has_tracks}}
+    {{#has_tracks}}
+      <form method="post" action="{{form_action}}" class="lp-stack lp-ann-form" data-lp-ann-form>
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="action" value="post_announcement">
+
+        <label class="lp-field">
+          <span>{{subject_label}}</span>
+          <input type="text" name="subject" required maxlength="200" autocomplete="off">
+        </label>
+
+        <label class="lp-field">
+          <span>{{message_label}}</span>
+          <textarea name="message" rows="6" required maxlength="10000"></textarea>
+        </label>
+
+        <fieldset class="lp-ann-fieldset">
+          <legend>{{tags_label}}</legend>
+          <div class="lp-ann-tag-row">
+            {{#tag_options}}
+              <label class="lp-ann-tag">
+                <input type="checkbox" name="tags[]" value="{{value}}">
+                <span>{{name}}</span>
+              </label>
+            {{/tag_options}}
+          </div>
+          <label class="lp-field" style="margin-top:10px">
+            <span>{{custom_tag_label}}</span>
+            <input type="text" name="customtag" maxlength="50" placeholder="{{custom_tag_placeholder}}" autocomplete="off">
+          </label>
+        </fieldset>
+
+        <fieldset class="lp-ann-fieldset">
+          <legend>{{tracks_label}}</legend>
+          <label class="lp-check-row lp-ann-all-tracks">
+            <input type="checkbox" name="all_tracks" value="1" data-lp-ann-all-tracks>
+            <span>{{all_tracks_label}}</span>
+          </label>
+          <div class="lp-ann-track-list" data-lp-ann-track-list>
+            {{#track_options}}
+              <label class="lp-check-row">
+                <input type="checkbox" name="trackids[]" value="{{id}}" data-lp-ann-track>
+                <span>{{label}}</span>
+              </label>
+            {{/track_options}}
+          </div>
+        </fieldset>
+
+        <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{submit_label}}</button>
+      </form>
+    {{/has_tracks}}
+  </section>
+
+  <section class="lp-card lift">
+    <div class="lp-card-head">
+      <h3>{{list_title}}</h3>
+    </div>
+    {{#has_items}}
+      <ul class="lp-ann-list" data-lp-ann-list data-page-size="{{list_page_size}}">
+        {{#items}}
+          <li class="lp-ann-item{{#paged_out}} is-paged-out{{/paged_out}}"{{#paged_out}} hidden{{/paged_out}}>
+            <div class="lp-ann-item-main">
+              <a class="lp-ann-item-title" href="{{url}}">{{{subject}}}</a>
+              <div class="lp-ann-item-meta">
+                <span class="lp-ann-item-track">{{{course_name}}}</span>
+                <span class="lp-ann-item-when">{{when}}</span>
+              </div>
+              {{#has_tags}}
+                <div class="lp-ann-chips">
+                  {{#tags}}<span class="lp-chip line">{{name}}</span>{{/tags}}
+                </div>
+              {{/has_tags}}
+            </div>
+            <a class="lp-btn lp-btn-light lp-btn-sm lp-ann-item-open" href="{{url}}">{{open_label}}</a>
+          </li>
+        {{/items}}
+      </ul>
+      {{#list_has_more}}
+        <p class="lp-ann-more-wrap">
+          <button type="button" class="lp-btn lp-btn-light" data-lp-ann-more
+            data-remaining="{{list_more_count}}">{{show_more_label}}</button>
+        </p>
+      {{/list_has_more}}
+    {{/has_items}}
+    {{^has_items}}
+      {{> local_launchpad/admin_empty}}
+    {{/has_items}}
+  </section>
+</div>

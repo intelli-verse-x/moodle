@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks, Builder, Calendar, Cohorts, People, Mentors, Reviews.
+ * Admin portal — Overview, Tracks, Builder, Calendar, Announcements, Cohorts, People, Mentors, Reviews.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -25,8 +25,10 @@
 require(__DIR__ . '/../../config.php');
 
 require_once(__DIR__ . '/classes/calendar_service.php');
+require_once(__DIR__ . '/classes/announcement_service.php');
 
 use local_launchpad\admin_dashboard;
+use local_launchpad\announcement_service;
 use local_launchpad\calendar_service;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
@@ -43,7 +45,10 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
-$allowedviews = ['home', 'tracks', 'builder', 'manage', 'activity', 'calendar', 'cohorts', 'people', 'mentors', 'reviews'];
+$allowedviews = [
+    'home', 'tracks', 'builder', 'manage', 'activity', 'calendar',
+    'announcements', 'cohorts', 'people', 'mentors', 'reviews',
+];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
 }
@@ -63,9 +68,24 @@ if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
     unset($SESSION->lp_admin_flash);
 }
 
-if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage' || $view === 'activity')
+if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage'
+            || $view === 'activity' || $view === 'announcements')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'announcements' && $action === 'post_announcement') {
+        $subject = optional_param('subject', '', PARAM_TEXT);
+        $message = optional_param('message', '', PARAM_RAW);
+        $alltracks = (bool) optional_param('all_tracks', 0, PARAM_BOOL);
+        $trackids = optional_param_array('trackids', [], PARAM_INT);
+        $tags = optional_param_array('tags', [], PARAM_TEXT);
+        $customtag = optional_param('customtag', '', PARAM_TEXT);
+        if (trim($customtag) !== '') {
+            $tags[] = $customtag;
+        }
+        $flash = announcement_service::post($USER, $subject, $message, $trackids, $alltracks, $tags);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
+    }
     if ($view === 'cohorts' && $action === 'enrol_fellow') {
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);
@@ -220,6 +240,7 @@ $peopleurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'people']))->o
 $mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
 $reviewsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
 $calendarurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'calendar']))->out(false);
+$announcementsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']))->out(false);
 $notificationsurl = messaging::moodle_notifications_url();
 
 $firstname = format_string($USER->firstname);
@@ -270,6 +291,17 @@ $nav = [
                 'icon_svg' => $icon(
                     '<rect x="3" y="5" width="18" height="16" rx="2"/>'
                     . '<path d="M3 10h18M8 3v4M16 3v4"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_nav_announcements', 'local_launchpad'),
+                'url' => $announcementsurl,
+                'current' => $view === 'announcements',
+                'key' => 'announcements',
+                'icon_svg' => $icon(
+                    '<path d="M4 5h12v10H4z"/>'
+                    . '<path d="M16 9l4-2v8l-4-2"/>'
+                    . '<path d="M7 19h6"/>'
                 ),
             ],
             [
@@ -398,6 +430,12 @@ if ($view === 'tracks') {
         ]
     );
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_calendar', $caldata);
+} else if ($view === 'announcements') {
+    $pagetitle = get_string('admin_nav_announcements', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_announcements',
+        announcement_service::admin_context($USER, $flash)
+    );
 } else if ($view === 'cohorts') {
     $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');
     $content = $OUTPUT->render_from_template(

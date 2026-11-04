@@ -2401,4 +2401,60 @@
             renderPending();
         });
     });
+
+    // Admin announcements: All tracks toggles individual track checkboxes.
+    var annForm = shell.querySelector('[data-lp-ann-form]');
+    if (annForm) {
+        var allTracks = annForm.querySelector('[data-lp-ann-all-tracks]');
+        var trackBoxes = annForm.querySelectorAll('[data-lp-ann-track]');
+        function syncAnnTracks() {
+            var on = !!(allTracks && allTracks.checked);
+            trackBoxes.forEach(function (box) {
+                box.checked = on;
+                box.disabled = on;
+            });
+        }
+        if (allTracks) {
+            allTracks.addEventListener('change', syncAnnTracks);
+            syncAnnTracks();
+        }
+        annForm.addEventListener('submit', function (e) {
+            var any = allTracks && allTracks.checked;
+            if (!any) {
+                trackBoxes.forEach(function (box) {
+                    if (box.checked) {
+                        any = true;
+                    }
+                });
+            }
+            if (!any) {
+                e.preventDefault();
+                window.alert('Select at least one track, or choose All tracks.');
+            }
+        });
+    }
+    shell.addEventListener('click', function (e) {
+        var moreAnn = e.target.closest('[data-lp-ann-more]');
+        if (!moreAnn) {
+            return;
+        }
+        var annList = shell.querySelector('[data-lp-ann-list]');
+        if (!annList) {
+            return;
+        }
+        var pageSize = parseInt(annList.getAttribute('data-page-size') || '8', 10) || 8;
+        var hidden = annList.querySelectorAll('li.is-paged-out[hidden]');
+        var show = Math.min(pageSize, hidden.length);
+        for (var ai = 0; ai < show; ai++) {
+            hidden[ai].removeAttribute('hidden');
+            hidden[ai].classList.remove('is-paged-out');
+        }
+        var left = annList.querySelectorAll('li.is-paged-out[hidden]').length;
+        if (left === 0) {
+            moreAnn.setAttribute('hidden', 'hidden');
+        } else {
+            moreAnn.setAttribute('data-remaining', String(left));
+            moreAnn.textContent = 'Show more (' + left + ')';
+        }
+    });
 })();
