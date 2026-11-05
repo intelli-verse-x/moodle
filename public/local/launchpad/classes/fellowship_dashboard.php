@@ -2236,7 +2236,7 @@ final class fellowship_dashboard {
             'xp_log' => array_map(static function (array $row): array {
                 return [
                     'at' => $row['at'],
-                    'title' => $row['title'],
+                    'title' => self::display_label((string) ($row['title'] ?? '')),
                     'xp' => $row['xp'],
                 ];
             }, $xplog),
