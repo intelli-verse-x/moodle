@@ -69,6 +69,19 @@ final class admin_dashboard {
         $visibility = self::visibility_context($tracks);
         $attention = self::needs_attention($tracks);
 
+        $ready = (int) $kpis['tracks_ready'];
+        $total = (int) $kpis['tracks_total'];
+        $pendingsetup = max(0, $total - $ready);
+        $trackspct = $total > 0 ? (int) round(($ready / $total) * 100) : 0;
+        $reviewspending = (int) $kpis['reviews_pending'];
+        $fellows = (int) $kpis['fellows'];
+        $teachers = (int) $kpis['teachers'];
+
+        $kpiicon = static function (string $paths): string {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+                . $paths . '</svg>';
+        };
+
         return [
             'firstname' => $firstname,
             'welcome_back' => get_string('admin_welcome_back', 'local_launchpad', $firstname),
@@ -79,11 +92,14 @@ final class admin_dashboard {
             'moodle_admin_label' => get_string('admin_open_moodle_admin', 'local_launchpad'),
             'tracks_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false),
             'tracks_cta_label' => get_string('admin_overview_tracks_cta', 'local_launchpad'),
-            'kpi_tracks_ready' => $kpis['tracks_ready'],
-            'kpi_tracks_total' => $kpis['tracks_total'],
-            'kpi_fellows' => $kpis['fellows'],
-            'kpi_teachers' => $kpis['teachers'],
-            'kpi_reviews_pending' => $kpis['reviews_pending'],
+            'reviews_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false),
+            'kpi_tracks_ready' => $ready,
+            'kpi_tracks_total' => $total,
+            'kpi_tracks_pct' => $trackspct,
+            'kpi_tracks_pending' => $pendingsetup,
+            'kpi_fellows' => $fellows,
+            'kpi_teachers' => $teachers,
+            'kpi_reviews_pending' => $reviewspending,
             'kpi_tracks_label' => get_string('admin_kpi_tracks_ready', 'local_launchpad'),
             'kpi_fellows_label' => get_string('admin_kpi_fellows', 'local_launchpad'),
             'kpi_teachers_label' => get_string('admin_kpi_teachers', 'local_launchpad'),
@@ -91,7 +107,37 @@ final class admin_dashboard {
             'kpi_tracks_meta' => get_string(
                 'admin_kpi_tracks_meta',
                 'local_launchpad',
-                (object) ['ready' => $kpis['tracks_ready'], 'total' => $kpis['tracks_total']]
+                (object) ['ready' => $ready, 'total' => $total]
+            ),
+            'kpi_tracks_sub' => $pendingsetup > 0
+                ? get_string('admin_kpi_tracks_pending_sub', 'local_launchpad', $pendingsetup)
+                : get_string('admin_kpi_tracks_ready_sub', 'local_launchpad'),
+            'kpi_fellows_sub' => get_string('admin_kpi_fellows_sub', 'local_launchpad'),
+            'kpi_teachers_sub' => get_string('admin_kpi_teachers_sub', 'local_launchpad'),
+            'kpi_reviews_sub' => $reviewspending > 0
+                ? get_string('admin_kpi_reviews_sub', 'local_launchpad', $reviewspending)
+                : get_string('admin_kpi_reviews_sub_clear', 'local_launchpad'),
+            'kpi_reviews_needs_action' => $reviewspending > 0,
+            'kpi_reviews_badge' => get_string('admin_kpi_reviews_badge', 'local_launchpad'),
+            'kpi_icon_tracks' => $kpiicon(
+                '<polygon points="12 2 2 7 12 12 22 7 12 2"/>'
+                . '<polyline points="2 17 12 22 22 17"/>'
+                . '<polyline points="2 12 12 17 22 12"/>'
+            ),
+            'kpi_icon_fellows' => $kpiicon(
+                '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+                . '<circle cx="9" cy="7" r="4"/>'
+                . '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/>'
+                . '<path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+            ),
+            'kpi_icon_teachers' => $kpiicon(
+                '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
+                . '<circle cx="12" cy="7" r="4"/>'
+            ),
+            'kpi_icon_reviews' => $kpiicon(
+                '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>'
+                . '<path d="M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>'
+                . '<path d="M9 14l2 2 4-4"/>'
             ),
         ] + $visibility + $attention;
     }
@@ -5032,46 +5078,60 @@ final class admin_dashboard {
     public static function visibility_context(array $tracks): array {
         $hidden = [];
         $shown = [];
+        $statushidden = get_string('admin_visibility_status_hidden', 'local_launchpad');
+        $statusshown = get_string('admin_visibility_status_shown', 'local_launchpad');
+        $badgehidden = get_string('admin_visibility_badge_hidden', 'local_launchpad');
+        $badgelive = get_string('admin_visibility_badge_live', 'local_launchpad');
+        $openlabel = get_string('admin_visibility_open_track', 'local_launchpad');
+
         foreach ($tracks as $course) {
+            $isvisible = (int) $course->visible === 1;
             $row = [
                 'id' => (int) $course->id,
                 'name' => format_string($course->fullname),
                 'idnumber' => s($course->idnumber),
-                // Slice A: Course settings → Course ops (settings lands in Slice B).
-                'edit_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
-                    'view' => 'courseops',
-                    'trackid' => (int) $course->id,
-                    'section' => 'settings',
-                ]))->out(false),
                 'view_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
                     'view' => 'courseops',
                     'trackid' => (int) $course->id,
                 ]))->out(false),
+                'is_hidden' => !$isvisible,
+                'is_shown' => $isvisible,
+                'status_label' => $isvisible ? $statusshown : $statushidden,
+                'badge_label' => $isvisible ? $badgelive : $badgehidden,
+                'open_label' => $openlabel,
             ];
-            if ((int) $course->visible === 1) {
+            if ($isvisible) {
                 $shown[] = $row;
             } else {
                 $hidden[] = $row;
             }
         }
 
+        $rows = array_merge($hidden, $shown);
+        $total = count($tracks);
+
         return [
             'visibility_title' => get_string('admin_visibility_title', 'local_launchpad'),
             'visibility_lead' => get_string('admin_visibility_lead', 'local_launchpad'),
             'visibility_hint' => get_string('admin_visibility_hint', 'local_launchpad'),
+            'visibility_card_sub' => get_string('admin_visibility_card_sub', 'local_launchpad'),
             'hidden_count' => count($hidden),
             'shown_count' => count($shown),
+            'visibility_total' => $total,
+            'visibility_total_label' => get_string('admin_visibility_total', 'local_launchpad', $total),
             'hidden_label' => get_string('admin_visibility_hidden', 'local_launchpad', count($hidden)),
             'shown_label' => get_string('admin_visibility_shown', 'local_launchpad', count($shown)),
             'has_hidden' => $hidden !== [],
             'has_shown' => $shown !== [],
             'hidden_courses' => $hidden,
             'shown_courses' => $shown,
+            'visibility_rows' => $rows,
+            'has_visibility_rows' => $rows !== [],
             'hidden_list_label' => get_string('admin_visibility_hidden_list', 'local_launchpad'),
             'shown_list_label' => get_string('admin_visibility_shown_list', 'local_launchpad'),
-            'settings_label' => get_string('admin_visibility_course_settings', 'local_launchpad'),
             'visibility_empty' => $tracks === [],
             'visibility_empty_body' => get_string('admin_visibility_empty', 'local_launchpad'),
+            'visibility_footer_tip' => get_string('admin_visibility_footer_tip', 'local_launchpad'),
         ];
     }
 
@@ -5101,6 +5161,9 @@ final class admin_dashboard {
                     'hint' => get_string('admin_attention_no_teacher_hint', 'local_launchpad'),
                     'url' => self::assign_teacher_url($courseid)->out(false),
                     'cta' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
+                    'badge' => get_string('admin_attention_badge_no_teacher', 'local_launchpad'),
+                    'is_teacher_gap' => true,
+                    'is_activity_gap' => false,
                 ];
             }
             if ($activities === 0) {
@@ -5111,16 +5174,24 @@ final class admin_dashboard {
                     'hint' => get_string('admin_attention_no_activities_hint', 'local_launchpad'),
                     'url' => $coursehomeurl,
                     'cta' => get_string('admin_attention_open_course', 'local_launchpad'),
+                    'badge' => get_string('admin_attention_badge_no_activities', 'local_launchpad'),
+                    'is_teacher_gap' => false,
+                    'is_activity_gap' => true,
                 ];
             }
         }
 
+        $count = count($items);
         return [
             'attention_title' => get_string('admin_attention_title', 'local_launchpad'),
             'attention_lead' => get_string('admin_attention_lead', 'local_launchpad'),
+            'attention_card_sub' => get_string('admin_attention_card_sub', 'local_launchpad'),
             'has_attention' => $items !== [],
             'attention_items' => $items,
+            'attention_count' => $count,
+            'attention_count_label' => get_string('admin_attention_count', 'local_launchpad', $count),
             'attention_empty' => get_string('admin_attention_empty', 'local_launchpad'),
+            'attention_footer_tip' => get_string('admin_attention_footer_tip', 'local_launchpad'),
         ];
     }
 

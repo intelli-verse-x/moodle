@@ -1,114 +1,182 @@
 {{!
     @template local_launchpad/admin_overview
 
-    Admin Overview — live KPIs, visibility, needs attention.
-    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+    Admin Overview — Stitch-inspired balanced layout.
+    Navbar stays in admin_shell. All copy from PHP context.
 }}
-<section class="lp-hero" data-region="local-launchpad-admin-overview">
-  <div class="lp-hero-row">
-    <div class="lp-hero-main">
-      <span class="lp-eyebrow">{{eyebrow}}</span>
-      <h2>{{welcome_back}}</h2>
-      <p class="lp-hero-lead">{{lead}}</p>
-      <div class="lp-quest">
-        <div>
-          <p class="lp-quest-title">{{heading}}</p>
-          <p class="lp-muted">{{visibility_hint}}</p>
-        </div>
-        <div class="lp-quest-actions">
-          <a class="lp-btn lp-btn-primary" href="{{tracks_url}}">{{tracks_cta_label}}</a>
-          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{moodle_admin_url}}">{{moodle_admin_label}}</a>
+<div class="lp-ov" data-region="local-launchpad-admin-overview">
+  <section class="lp-hero lp-ov-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{welcome_back}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+        <div class="lp-quest lp-ov-quest">
+          <div class="lp-quest-body">
+            <p class="lp-quest-title">{{heading}}</p>
+            <p class="lp-muted">{{visibility_hint}}</p>
+          </div>
+          <div class="lp-quest-actions lp-ov-quest-actions">
+            <a class="lp-btn lp-btn-primary lp-ov-btn-tracks" href="{{tracks_url}}">{{tracks_cta_label}}</a>
+            <a class="lp-btn lp-ov-btn-moodle" href="{{moodle_admin_url}}" target="_blank" rel="noopener">{{moodle_admin_label}}</a>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</section>
-
-<div class="lp-stats lp-stats-4" role="list" style="margin-top:16px">
-  <div class="lp-stat" role="listitem" title="{{kpi_tracks_meta}}">
-    <b>{{kpi_tracks_ready}}<span class="lp-stat-gate"> / {{kpi_tracks_total}}</span></b>
-    <span>{{kpi_tracks_label}}</span>
-  </div>
-  <div class="lp-stat" role="listitem">
-    <b>{{kpi_fellows}}</b>
-    <span>{{kpi_fellows_label}}</span>
-  </div>
-  <div class="lp-stat" role="listitem">
-    <b>{{kpi_teachers}}</b>
-    <span>{{kpi_teachers_label}}</span>
-  </div>
-  <div class="lp-stat" role="listitem">
-    <b>{{kpi_reviews_pending}}</b>
-    <span>{{kpi_reviews_label}}</span>
-  </div>
-</div>
-
-<div class="lp-grid-2" style="margin-top:16px">
-  <section class="lp-card lift">
-    <div class="lp-card-head">
-      <h3>{{visibility_title}}</h3>
-    </div>
-    <p class="lp-muted">{{visibility_lead}}</p>
-    <p class="lp-sm" style="margin-top:10px">
-      <span class="lp-chip warn">{{hidden_label}}</span>
-      <span class="lp-chip ok">{{shown_label}}</span>
-    </p>
-    {{#visibility_empty}}
-      <p class="lp-muted" style="margin-top:12px">{{visibility_empty_body}}</p>
-    {{/visibility_empty}}
-    {{#has_hidden}}
-      <p class="lp-eyebrow" style="margin-top:16px">{{hidden_list_label}}</p>
-      <ul class="lp-course-list">
-        {{#hidden_courses}}
-          <li>
-            <a href="{{view_url}}">
-              <b>{{{name}}}</b>
-              <span class="lp-muted">{{idnumber}}</span>
-            </a>
-            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{edit_url}}">{{settings_label}}</a>
-          </li>
-        {{/hidden_courses}}
-      </ul>
-    {{/has_hidden}}
-    {{#has_shown}}
-      <p class="lp-eyebrow" style="margin-top:16px">{{shown_list_label}}</p>
-      <ul class="lp-course-list">
-        {{#shown_courses}}
-          <li>
-            <a href="{{view_url}}">
-              <b>{{{name}}}</b>
-              <span class="lp-muted">{{idnumber}}</span>
-            </a>
-            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{edit_url}}">{{settings_label}}</a>
-          </li>
-        {{/shown_courses}}
-      </ul>
-    {{/has_shown}}
   </section>
 
-  <section class="lp-card soft">
-    <div class="lp-card-head">
-      <h3>{{attention_title}}</h3>
-    </div>
-    <p class="lp-muted">{{attention_lead}}</p>
-    {{#has_attention}}
-      <ul class="lp-course-list" style="margin-top:12px">
-        {{#attention_items}}
-          <li>
-            <div>
-              <b>{{{course_name}}}</b>
-              <span class="lp-muted">{{issue}} · {{idnumber}}</span>
-              {{#hint}}
-                <span class="lp-muted lp-xs" style="display:block;margin-top:4px">{{hint}}</span>
-              {{/hint}}
-            </div>
-            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{url}}">{{cta}}</a>
-          </li>
-        {{/attention_items}}
-      </ul>
-    {{/has_attention}}
-    {{^has_attention}}
-      <p class="lp-muted" style="margin-top:12px">{{attention_empty}}</p>
-    {{/has_attention}}
-  </section>
+  <div class="lp-ov-kpis" role="list">
+    <article class="lp-ov-kpi" role="listitem" title="{{kpi_tracks_meta}}">
+      <div class="lp-ov-kpi-top">
+        <span class="lp-ov-kpi-label">{{kpi_tracks_label}}</span>
+        <span class="lp-ov-kpi-ico tone-blue" aria-hidden="true">{{{kpi_icon_tracks}}}</span>
+      </div>
+      <div class="lp-ov-kpi-value">
+        <b>{{kpi_tracks_ready}}</b>
+        <span class="lp-ov-kpi-gate">/ {{kpi_tracks_total}}</span>
+      </div>
+      <div class="lp-ov-kpi-bar" aria-hidden="true">
+        <i style="width:{{kpi_tracks_pct}}%"></i>
+      </div>
+      <p class="lp-ov-kpi-sub">{{kpi_tracks_sub}}</p>
+    </article>
+
+    <article class="lp-ov-kpi" role="listitem">
+      <div class="lp-ov-kpi-top">
+        <span class="lp-ov-kpi-label">{{kpi_fellows_label}}</span>
+        <span class="lp-ov-kpi-ico tone-green" aria-hidden="true">{{{kpi_icon_fellows}}}</span>
+      </div>
+      <div class="lp-ov-kpi-value">
+        <b>{{kpi_fellows}}</b>
+      </div>
+      <p class="lp-ov-kpi-sub">{{kpi_fellows_sub}}</p>
+    </article>
+
+    <article class="lp-ov-kpi" role="listitem">
+      <div class="lp-ov-kpi-top">
+        <span class="lp-ov-kpi-label">{{kpi_teachers_label}}</span>
+        <span class="lp-ov-kpi-ico tone-violet" aria-hidden="true">{{{kpi_icon_teachers}}}</span>
+      </div>
+      <div class="lp-ov-kpi-value">
+        <b>{{kpi_teachers}}</b>
+      </div>
+      <p class="lp-ov-kpi-sub">{{kpi_teachers_sub}}</p>
+    </article>
+
+    <article class="lp-ov-kpi{{#kpi_reviews_needs_action}} is-warn{{/kpi_reviews_needs_action}}" role="listitem">
+      <div class="lp-ov-kpi-top">
+        <span class="lp-ov-kpi-label">{{kpi_reviews_label}}</span>
+        <span class="lp-ov-kpi-ico tone-amber" aria-hidden="true">{{{kpi_icon_reviews}}}</span>
+      </div>
+      <div class="lp-ov-kpi-value">
+        <b>{{kpi_reviews_pending}}</b>
+        {{#kpi_reviews_needs_action}}
+          <span class="lp-ov-pill warn">{{kpi_reviews_badge}}</span>
+        {{/kpi_reviews_needs_action}}
+      </div>
+      <p class="lp-ov-kpi-sub">
+        {{#kpi_reviews_needs_action}}
+          <a class="lp-ov-kpi-link" href="{{reviews_url}}">{{kpi_reviews_sub}}</a>
+        {{/kpi_reviews_needs_action}}
+        {{^kpi_reviews_needs_action}}
+          {{kpi_reviews_sub}}
+        {{/kpi_reviews_needs_action}}
+      </p>
+    </article>
+  </div>
+
+  <div class="lp-ov-ops">
+    <section class="lp-ov-card">
+      <div class="lp-ov-card-head">
+        <div class="lp-ov-card-title-row">
+          <span class="lp-ov-card-ico tone-blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <div>
+            <h3>{{visibility_title}}</h3>
+            <p class="lp-ov-card-sub">{{visibility_card_sub}}</p>
+          </div>
+        </div>
+        {{^visibility_empty}}
+          <div class="lp-ov-filter-pills">
+            <span class="lp-ov-pill mute">{{visibility_total_label}}</span>
+            <span class="lp-ov-pill warn">{{hidden_label}}</span>
+            <span class="lp-ov-pill ok">{{shown_label}}</span>
+          </div>
+        {{/visibility_empty}}
+      </div>
+
+      {{#visibility_empty}}
+        <p class="lp-muted lp-ov-empty">{{visibility_empty_body}}</p>
+      {{/visibility_empty}}
+
+      {{#has_visibility_rows}}
+        <ul class="lp-ov-track-list">
+          {{#visibility_rows}}
+            <li class="lp-ov-track-row{{#is_shown}} is-live{{/is_shown}}">
+              <a class="lp-ov-track-main" href="{{view_url}}">
+                <span class="lp-ov-dot{{#is_hidden}} is-warn{{/is_hidden}}{{#is_shown}} is-ok{{/is_shown}}" aria-hidden="true"></span>
+                <span class="lp-ov-track-copy">
+                  <b>{{{name}}}</b>
+                  <span class="lp-ov-track-meta">
+                    {{#idnumber}}<code>{{idnumber}}</code>{{/idnumber}}
+                    {{#idnumber}}<span class="lp-ov-sep" aria-hidden="true">·</span>{{/idnumber}}
+                    <span class="{{#is_hidden}}is-warn{{/is_hidden}}{{#is_shown}}is-ok{{/is_shown}}">{{status_label}}</span>
+                  </span>
+                </span>
+              </a>
+              {{#is_shown}}
+                <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{view_url}}">{{open_label}}</a>
+              {{/is_shown}}
+              {{#is_hidden}}
+                <span class="lp-ov-status-chip">{{badge_label}}</span>
+              {{/is_hidden}}
+            </li>
+          {{/visibility_rows}}
+        </ul>
+        <p class="lp-ov-card-foot">{{visibility_footer_tip}}</p>
+      {{/has_visibility_rows}}
+    </section>
+
+    <section class="lp-ov-card">
+      <div class="lp-ov-card-head">
+        <div class="lp-ov-card-title-row">
+          <span class="lp-ov-card-ico tone-amber" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+          </span>
+          <div>
+            <h3>{{attention_title}}</h3>
+            <p class="lp-ov-card-sub">{{attention_card_sub}}</p>
+          </div>
+        </div>
+        {{#has_attention}}
+          <span class="lp-ov-pill danger">{{attention_count_label}}</span>
+        {{/has_attention}}
+      </div>
+
+      {{#has_attention}}
+        <ul class="lp-ov-attention-list">
+          {{#attention_items}}
+            <li class="lp-ov-attention-row">
+              <div class="lp-ov-attention-copy">
+                <div class="lp-ov-attention-title-row">
+                  <b>{{{course_name}}}</b>
+                  <span class="lp-ov-pill danger tight">{{badge}}</span>
+                </div>
+                <span class="lp-muted lp-sm">{{issue}}{{#idnumber}} · {{idnumber}}{{/idnumber}}</span>
+                {{#hint}}
+                  <span class="lp-muted lp-xs lp-ov-hint">{{hint}}</span>
+                {{/hint}}
+              </div>
+              <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{url}}">{{cta}}</a>
+            </li>
+          {{/attention_items}}
+        </ul>
+        <p class="lp-ov-card-foot">{{attention_footer_tip}}</p>
+      {{/has_attention}}
+      {{^has_attention}}
+        <p class="lp-muted lp-ov-empty">{{attention_empty}}</p>
+      {{/has_attention}}
+    </section>
+  </div>
 </div>

@@ -636,6 +636,10 @@ if ($view === 'tracks') {
 
 $unread = messaging::notification_unread_count($userid);
 $notificationslabel = messaging::notifications_label($unread);
+$pagesub = '';
+if ($view === 'home') {
+    $pagesub = get_string('admin_overview_page_sub', 'local_launchpad');
+}
 
 $mismatch = portal_gate::consume_modal_context();
 $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merge([
@@ -646,6 +650,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'nav_groups' => $nav,
     'content' => $content,
     'pagetitle' => $pagetitle,
+    'pagesub' => $pagesub,
     'home_url' => $homeurl,
     'logout_url' => $logouturl,
     'profile_url' => $profileurl,
