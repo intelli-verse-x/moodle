@@ -59,13 +59,14 @@
     <section class="lp-card lift lp-news-workspace" aria-label="{{#str}} fellowship_nav_news, local_launchpad {{/str}}">
       <ul class="lp-news-list">
         {{#items}}
-          <li class="lp-news-item">
+          <li class="lp-news-item{{#is_pinned}} is-pinned{{/is_pinned}}">
             <div class="lp-news-item-main">
               <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
                 <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
               </span>
               <div class="lp-news-item-copy">
                 {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
+                {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
                 <h3><a href="{{url}}">{{{subject}}}</a></h3>
                 {{#excerpt}}<p class="lp-sm lp-muted">{{{excerpt}}}</p>{{/excerpt}}
                 {{#has_tags}}

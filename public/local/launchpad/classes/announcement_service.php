@@ -46,6 +46,9 @@ final class announcement_service {
     /** When no preference yet, ignore news older than this (avoid ancient backlog badges). */
     public const UNREAD_LOOKBACK = 14 * DAYSECS;
 
+    /** Max pinned news discussions per track (news forum). */
+    public const PIN_LIMIT = 3;
+
     /**
      * Mark LaunchPad news as read for the fellow (clears sidebar badge).
      */
@@ -164,6 +167,8 @@ final class announcement_service {
             'all_tracks_label' => get_string('admin_announcements_all_tracks', 'local_launchpad'),
             'custom_tag_label' => get_string('admin_announcements_custom_tag', 'local_launchpad'),
             'custom_tag_placeholder' => get_string('admin_announcements_custom_tag_ph', 'local_launchpad'),
+            'pin_label' => get_string('admin_announcements_pin', 'local_launchpad'),
+            'pin_help' => get_string('admin_announcements_pin_help', 'local_launchpad'),
             'submit_label' => get_string('admin_announcements_submit', 'local_launchpad'),
             'save_label' => get_string('admin_announcements_save', 'local_launchpad'),
             'cancel_edit_label' => get_string('admin_announcements_cancel_edit', 'local_launchpad'),
@@ -216,7 +221,8 @@ final class announcement_service {
         string $message,
         array $trackids,
         bool $alltracks,
-        array $tagnames
+        array $tagnames,
+        bool $pinned = false
     ): array {
         global $CFG;
 
@@ -255,6 +261,22 @@ final class announcement_service {
                     $failures[] = $label . ': ' . get_string('admin_announcements_err_cap', 'local_launchpad');
                     continue;
                 }
+                $pinvalue = FORUM_DISCUSSION_UNPINNED;
+                if ($pinned) {
+                    if (!has_capability('mod/forum:pindiscussions', $modcontext, $user)) {
+                        $failures[] = $label . ': ' . get_string('admin_announcements_err_cap_pin', 'local_launchpad');
+                        continue;
+                    }
+                    if (self::count_pinned_in_forum((int) $forum->id) >= self::PIN_LIMIT) {
+                        $failures[] = $label . ': ' . get_string(
+                            'admin_announcements_err_pin_limit',
+                            'local_launchpad',
+                            self::PIN_LIMIT
+                        );
+                        continue;
+                    }
+                    $pinvalue = FORUM_DISCUSSION_PINNED;
+                }
 
                 $discussion = new \stdClass();
                 $discussion->course = $cid;
@@ -266,7 +288,7 @@ final class announcement_service {
                 $discussion->mailnow = 0;
                 $discussion->timestart = 0;
                 $discussion->timeend = 0;
-                $discussion->pinned = FORUM_DISCUSSION_UNPINNED;
+                $discussion->pinned = $pinvalue;
                 $discussion->groupid = -1;
                 if ($tags !== []) {
                     $discussion->tags = $tags;
@@ -308,8 +330,17 @@ final class announcement_service {
      * @param list<string> $tagnames
      * @return array{ok?:string,error?:string}
      */
-    public static function update(\stdClass $user, int $discussionid, string $subject, string $message, array $tagnames): array {
-        global $DB;
+    public static function update(
+        \stdClass $user,
+        int $discussionid,
+        string $subject,
+        string $message,
+        array $tagnames,
+        bool $pinned = false
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/forum/lib.php');
 
         $subject = trim($subject);
         $message = trim($message);
@@ -328,6 +359,25 @@ final class announcement_service {
             return ['error' => get_string('admin_announcements_err_cap_edit', 'local_launchpad')];
         }
 
+        $currentpinned = (int) ($bundle['discussion']->pinned ?? FORUM_DISCUSSION_UNPINNED) === FORUM_DISCUSSION_PINNED;
+        $pinvalue = $currentpinned ? FORUM_DISCUSSION_PINNED : FORUM_DISCUSSION_UNPINNED;
+        if ($pinned !== $currentpinned) {
+            if (!has_capability('mod/forum:pindiscussions', $bundle['modcontext'], $user)) {
+                return ['error' => get_string('admin_announcements_err_cap_pin', 'local_launchpad')];
+            }
+            if ($pinned && self::count_pinned_in_forum(
+                    (int) $bundle['forum']->id,
+                    (int) $bundle['discussion']->id
+            ) >= self::PIN_LIMIT) {
+                return ['error' => get_string(
+                    'admin_announcements_err_pin_limit',
+                    'local_launchpad',
+                    self::PIN_LIMIT
+                )];
+            }
+            $pinvalue = $pinned ? FORUM_DISCUSSION_PINNED : FORUM_DISCUSSION_UNPINNED;
+        }
+
         $clean = clean_text($message, FORMAT_HTML);
         $now = time();
         $postupdate = (object) [
@@ -344,6 +394,7 @@ final class announcement_service {
             'name' => $subject,
             'timemodified' => $now,
             'usermodified' => (int) $user->id,
+            'pinned' => $pinvalue,
         ]);
 
         $tags = self::normalize_tags($tagnames);
@@ -444,6 +495,7 @@ final class announcement_service {
                 ), 0, false));
                 $canedit = self::user_can_edit($USER, $modcontext, $post);
                 $candelete = self::user_can_delete($USER, $modcontext, $post);
+                $ispinned = (int) ($discussion->pinned ?? 0) === 1;
                 $items[] = [
                     'id' => (int) $discussion->id,
                     'subject' => format_string($discussion->name),
@@ -461,6 +513,10 @@ final class announcement_service {
                     'tags' => $tagrows,
                     'has_tags' => $tagrows !== [],
                     'tags_csv' => implode(',', $tagnames),
+                    'is_pinned' => $ispinned,
+                    'pinned_badge' => $ispinned
+                        ? get_string('admin_announcements_pinned_badge', 'local_launchpad')
+                        : '',
                     'can_edit' => $canedit,
                     'can_delete' => $candelete,
                     'has_actions' => $canedit || $candelete,
@@ -468,8 +524,51 @@ final class announcement_service {
             }
         }
 
-        usort($items, static fn(array $a, array $b): int => ($b['timemodified'] <=> $a['timemodified']));
+        usort($items, [self::class, 'sort_announcement_items']);
         return array_slice($items, 0, $limit);
+    }
+
+    /**
+     * Pinned first, then newest timemodified.
+     *
+     * @param array<string,mixed> $a
+     * @param array<string,mixed> $b
+     */
+    public static function sort_announcement_items(array $a, array $b): int {
+        $pa = !empty($a['is_pinned']) ? 1 : 0;
+        $pb = !empty($b['is_pinned']) ? 1 : 0;
+        if ($pa !== $pb) {
+            return $pb <=> $pa;
+        }
+        return ((int) ($b['timemodified'] ?? 0)) <=> ((int) ($a['timemodified'] ?? 0));
+    }
+
+    /**
+     * How many pinned discussions already exist in a news forum.
+     *
+     * @param int $exclude discussion id to ignore (when re-pinning / already pinned edit)
+     */
+    private static function count_pinned_in_forum(int $forumid, int $exclude = 0): int {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/mod/forum/lib.php');
+
+        if ($forumid <= 0) {
+            return 0;
+        }
+        $params = [
+            'forum' => $forumid,
+            'pinned' => FORUM_DISCUSSION_PINNED,
+        ];
+        $sql = "SELECT COUNT(1)
+                  FROM {forum_discussions}
+                 WHERE forum = :forum
+                   AND pinned = :pinned";
+        if ($exclude > 0) {
+            $sql .= " AND id <> :exclude";
+            $params['exclude'] = $exclude;
+        }
+        return (int) $DB->count_records_sql($sql, $params);
     }
 
     /**

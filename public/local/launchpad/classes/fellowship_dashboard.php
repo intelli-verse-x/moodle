@@ -2345,6 +2345,7 @@ final class fellowship_dashboard {
                     $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
                     $authorname = $author ? fullname($author) : '';
                     $tagrows = announcement_service::tag_chips_for_post((int) $post->id);
+                    $ispinned = (int) ($discussion->pinned ?? 0) === 1;
                     $items[] = [
                         'id' => (int) $discussion->id,
                         'subject' => format_string($discussion->name),
@@ -2363,12 +2364,16 @@ final class fellowship_dashboard {
                         'icon' => 'news',
                         'tags' => $tagrows,
                         'has_tags' => $tagrows !== [],
+                        'is_pinned' => $ispinned,
+                        'pinned_badge' => $ispinned
+                            ? get_string('admin_announcements_pinned_badge', 'local_launchpad')
+                            : '',
                     ];
                 }
             }
         }
 
-        usort($items, static fn(array $a, array $b): int => ($b['timemodified'] <=> $a['timemodified']));
+        usort($items, [announcement_service::class, 'sort_announcement_items']);
         $items = array_slice($items, 0, 15);
 
         $coursenames = [];

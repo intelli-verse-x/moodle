@@ -82,6 +82,14 @@
           </div>
         </fieldset>
 
+        <label class="lp-check-row lp-ann-pin-row">
+          <input type="checkbox" name="pinned" value="1" data-lp-ann-pinned>
+          <span>
+            <strong>{{pin_label}}</strong>
+            <span class="lp-muted lp-sm">{{pin_help}}</span>
+          </span>
+        </label>
+
         <div class="lp-ann-form-actions">
           <button type="submit" class="lp-btn lp-btn-solid" data-lp-ann-submit>{{submit_label}}</button>
           <button type="button" class="lp-btn lp-btn-light" data-lp-ann-cancel-edit hidden>{{cancel_edit_label}}</button>
@@ -97,15 +105,17 @@
     {{#has_items}}
       <ul class="lp-ann-list" data-lp-ann-list data-page-size="{{list_page_size}}">
         {{#items}}
-          <li class="lp-ann-item{{#paged_out}} is-paged-out{{/paged_out}}"{{#paged_out}} hidden{{/paged_out}}
+          <li class="lp-ann-item{{#is_pinned}} is-pinned{{/is_pinned}}{{#paged_out}} is-paged-out{{/paged_out}}"{{#paged_out}} hidden{{/paged_out}}
             data-lp-ann-item
             data-id="{{id}}"
             data-subject="{{subject_raw}}"
             data-message="{{message_plain}}"
-            data-tags="{{tags_csv}}">
+            data-tags="{{tags_csv}}"
+            data-pinned="{{#is_pinned}}1{{/is_pinned}}{{^is_pinned}}0{{/is_pinned}}">
             <div class="lp-ann-item-main">
               <a class="lp-ann-item-title" href="{{url}}">{{{subject}}}</a>
               <div class="lp-ann-item-meta">
+                {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
                 <span class="lp-ann-item-track">{{{course_name}}}</span>
                 <span class="lp-ann-item-when">{{when}}</span>
               </div>

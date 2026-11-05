@@ -2488,6 +2488,10 @@
                 box.checked = false;
                 box.disabled = false;
             });
+            var pinElReset = annForm.querySelector('[data-lp-ann-pinned]');
+            if (pinElReset) {
+                pinElReset.checked = false;
+            }
             if (submitEl) {
                 submitEl.textContent = strSubmit;
             }
@@ -2516,6 +2520,10 @@
                 messageEl.value = item.getAttribute('data-message') || '';
             }
             setAnnTagChecks(item.getAttribute('data-tags') || '');
+            var pinEl = annForm.querySelector('[data-lp-ann-pinned]');
+            if (pinEl) {
+                pinEl.checked = item.getAttribute('data-pinned') === '1';
+            }
             if (tracksWrap) {
                 tracksWrap.setAttribute('hidden', 'hidden');
             }

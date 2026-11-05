@@ -83,6 +83,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $subject = optional_param('subject', '', PARAM_TEXT);
         $message = optional_param('message', '', PARAM_RAW);
         $alltracks = (bool) optional_param('all_tracks', 0, PARAM_BOOL);
+        $pinned = (bool) optional_param('pinned', 0, PARAM_BOOL);
         $trackids = optional_param_array('trackids', [], PARAM_INT);
         $tags = optional_param_array('tags', [], PARAM_TEXT);
         $customtag = optional_param('customtag', '', PARAM_TEXT);
@@ -91,7 +92,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
                 $tags[] = $extra;
             }
         }
-        $flash = announcement_service::post($USER, $subject, $message, $trackids, $alltracks, $tags);
+        $flash = announcement_service::post($USER, $subject, $message, $trackids, $alltracks, $tags, $pinned);
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
     }
@@ -99,6 +100,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $discussionid = optional_param('discussionid', 0, PARAM_INT);
         $subject = optional_param('subject', '', PARAM_TEXT);
         $message = optional_param('message', '', PARAM_RAW);
+        $pinned = (bool) optional_param('pinned', 0, PARAM_BOOL);
         $tags = optional_param_array('tags', [], PARAM_TEXT);
         $customtag = optional_param('customtag', '', PARAM_TEXT);
         foreach (preg_split('/\s*,\s*/', trim($customtag)) ?: [] as $extra) {
@@ -106,7 +108,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
                 $tags[] = $extra;
             }
         }
-        $flash = announcement_service::update($USER, $discussionid, $subject, $message, $tags);
+        $flash = announcement_service::update($USER, $discussionid, $subject, $message, $tags, $pinned);
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
     }
