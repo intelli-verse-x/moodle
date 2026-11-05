@@ -1,133 +1,215 @@
 {{!
     @template local_launchpad/admin_reviews
 
-    Admin Review oversight — pending assign reviews across tracks, oldest first.
-    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+    Admin Review oversight — Stitch-inspired refined layout.
+    Navbar stays in admin_shell. Pending queue + soft ping only (no fake filters/export).
 }}
-<section class="lp-hero" data-region="local-launchpad-admin-reviews">
-  <div class="lp-hero-row">
-    <div class="lp-hero-main">
-      <span class="lp-eyebrow">{{eyebrow}}</span>
-      <h2>{{heading}}</h2>
-      <p class="lp-hero-lead">{{lead}}</p>
-      <p class="lp-sm lp-muted lp-reviews-ping-help">{{ping_target_help}}</p>
-    </div>
-  </div>
-</section>
-
-{{#flash_ok}}
-  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
-{{/flash_ok}}
-{{#flash_err}}
-  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
-{{/flash_err}}
-
-<div class="lp-atiles lp-atiles-3" role="list" style="margin-top:16px">
-  {{#tiles}}
-    <div class="lp-atile{{#tone}} is-{{tone}}{{/tone}}" role="listitem">
-      <div class="lp-atile-top">
-        <span class="lp-atile-ico" aria-hidden="true">{{{icon_svg}}}</span>
-        <span class="lp-atile-lbl">{{label}}</span>
-      </div>
-      <div class="lp-atile-val">{{value}}</div>
-      <div class="lp-atile-sub">{{sub}}</div>
-    </div>
-  {{/tiles}}
-</div>
-
-<div class="lp-card lift" style="margin-top:18px"
+<div class="lp-ro" data-region="local-launchpad-admin-reviews"
   data-lp-reviews-page
   data-ping-action-url="{{ping_action_url}}"
   data-sesskey="{{sesskey}}">
-  <div class="lp-table-wrap">
-    {{#has_pending}}
-      <table class="lp-table">
-        <thead>
-          <tr>
-            <th>{{col_fellow}}</th>
-            <th>{{col_track}}</th>
-            <th>{{col_submitted}}</th>
-            <th>{{col_teacher}}</th>
-            <th>{{col_state}}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {{#pending}}
-            <tr class="{{#is_overdue}}is-overdue{{/is_overdue}}" data-lp-review-row data-submissionid="{{submissionid}}">
-              <td>
-                <div class="lp-people-name"><b>{{fellow}}</b></div>
-                <div class="lp-sm">{{email}}</div>
-                <div class="lp-sm">{{assign}}</div>
-              </td>
-              <td class="lp-sm">{{track}}</td>
-              <td class="lp-sm">
-                <div>{{submitted}}</div>
-                {{#has_age}}<div class="lp-reviews-age{{#is_overdue}} is-overdue{{/is_overdue}}">{{age_label}}</div>{{/has_age}}
-              </td>
-              <td class="lp-sm">
-                {{#has_teacher_choice}}
-                  <div class="lp-reviews-target">
-                    <div class="lp-select lp-select-compact" data-lp-select data-lp-ping-target>
-                      <button type="button" class="lp-select-trigger" data-lp-select-trigger
-                        aria-haspopup="listbox" aria-expanded="false"
-                        aria-label="{{col_teacher}}">
-                        <span class="lp-select-value" data-lp-select-label>{{teacher}}</span>
-                        <iconify-icon icon="hugeicons:arrow-down-01" width="16" height="16" aria-hidden="true"></iconify-icon>
-                      </button>
-                      <ul class="lp-select-menu" data-lp-select-menu hidden role="listbox">
-                        {{#teacher_options}}
-                          <li role="option"
-                            class="lp-select-option{{#selected}} is-selected{{/selected}}"
-                            data-lp-select-option
-                            data-value="{{id}}"
-                            data-cooled="{{#cooled}}1{{/cooled}}{{^cooled}}0{{/cooled}}"
-                            tabindex="-1"
-                            {{#selected}}aria-selected="true"{{/selected}}>{{name}}</li>
-                        {{/teacher_options}}
-                      </ul>
-                      <select name="teacherid" form="lp-ping-{{submissionid}}"
-                        class="lp-select-native" data-lp-select-input data-lp-ping-teacher
-                        tabindex="-1" aria-hidden="true">
-                        {{#teacher_options}}
-                          <option value="{{id}}"{{#selected}} selected{{/selected}}
-                            data-cooled="{{#cooled}}1{{/cooled}}{{^cooled}}0{{/cooled}}">{{name}}</option>
-                        {{/teacher_options}}
-                      </select>
-                    </div>
-                    <div class="lp-reviews-target-hint">{{ping_target_scope}}</div>
-                  </div>
-                {{/has_teacher_choice}}
-                {{^has_teacher_choice}}
-                  <div class="lp-reviews-target-single">{{teacher}}</div>
-                {{/has_teacher_choice}}
-              </td>
-              <td>
-                <span class="lp-chip {{state_chip_class}}">{{state}}</span>
-                {{#is_overdue}}<span class="lp-chip is-overdue">{{overdue_badge}}</span>{{/is_overdue}}
-              </td>
-              <td class="lp-reviews-actions">
-                <a class="lp-btn lp-btn-solid" href="{{grader_url}}">{{open_label}}</a>
-                {{#has_teachers}}
-                  <form method="post" action="{{ping_action_url}}" class="lp-reviews-ping-form" id="lp-ping-{{submissionid}}" data-lp-ping-form>
-                    <input type="hidden" name="sesskey" value="{{sesskey}}">
-                    <input type="hidden" name="action" value="ping_review">
-                    <input type="hidden" name="submissionid" value="{{submissionid}}">
-                    {{^has_teacher_choice}}
-                      <input type="hidden" name="teacherid" value="{{teacherid}}">
-                    {{/has_teacher_choice}}
-                    <button type="submit" class="lp-btn lp-btn-light" data-lp-ping-btn{{#ping_cooled}} hidden{{/ping_cooled}}>{{ping_label}}</button>
-                    <span class="lp-btn lp-btn-light is-disabled" aria-disabled="true" data-lp-ping-cooled{{^ping_cooled}} hidden{{/ping_cooled}}>{{ping_cooled_label}}</span>
-                  </form>
-                {{/has_teachers}}
-              </td>
-            </tr>
-          {{/pending}}
-        </tbody>
-      </table>
-    {{/has_pending}}
-    {{^has_pending}}
-      {{> local_launchpad/admin_empty}}
-    {{/has_pending}}
+
+  <section class="lp-hero lp-ro-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <div class="lp-ro-hero-meta">
+          <span class="lp-eyebrow">{{eyebrow}}</span>
+          <span class="lp-ro-sla-badge"><span class="lp-ro-sla-dot" aria-hidden="true"></span>{{sla_badge}}</span>
+          {{#has_action_required}}
+            <span class="lp-ro-action-chip">{{action_required}}</span>
+          {{/has_action_required}}
+        </div>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+        <p class="lp-sm lp-muted lp-reviews-ping-help">{{ping_target_help}}</p>
+      </div>
+    </div>
+  </section>
+
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
+
+  <div class="lp-ro-kpis" role="list">
+    {{#tiles}}
+      <article class="lp-ro-kpi{{#tone}} is-{{tone}}{{/tone}}" role="listitem">
+        <div class="lp-ro-kpi-top">
+          <div>
+            <span class="lp-ro-kpi-label">{{label}}</span>
+            <div class="lp-ro-kpi-value">
+              <b>{{value}}</b>
+              {{#badge}}
+                <span class="lp-ro-pill {{badge_tone}}">{{badge}}</span>
+              {{/badge}}
+            </div>
+          </div>
+          <span class="lp-ro-kpi-ico" aria-hidden="true">{{{icon_svg}}}</span>
+        </div>
+        <div class="lp-ro-kpi-foot">
+          <span class="lp-ro-kpi-sub">{{sub}}</span>
+          {{#foot}}<span class="lp-ro-kpi-meta">{{foot}}</span>{{/foot}}
+        </div>
+      </article>
+    {{/tiles}}
   </div>
+
+  <section class="lp-ro-queue lp-card">
+    <div class="lp-ro-queue-head">
+      <div>
+        <h3>{{queue_title}}</h3>
+        <p class="lp-muted lp-sm" data-lp-ro-count>{{queue_count_label}}</p>
+      </div>
+    </div>
+
+    <div class="lp-ro-toolbar" data-lp-ro-filters>
+      <div class="lp-ro-tabs" role="tablist" aria-label="{{queue_title}}">
+        <button type="button" class="lp-ro-tab is-active" role="tab" aria-selected="true" data-lp-ro-state="all">{{filter_all_label}}</button>
+        <button type="button" class="lp-ro-tab" role="tab" aria-selected="false" data-lp-ro-state="pending">{{filter_pending_label}}</button>
+        <button type="button" class="lp-ro-tab" role="tab" aria-selected="false" data-lp-ro-state="overdue">{{filter_overdue_label}}</button>
+        <button type="button" class="lp-ro-tab" role="tab" aria-selected="false" data-lp-ro-state="released">{{filter_released_label}}</button>
+      </div>
+      <div class="lp-ro-toolbar-right">
+        {{#has_track_filter}}
+          <label class="lp-ro-track-filter">
+            <span class="lp-sr-only">{{track_filter_label}}</span>
+            <select data-lp-ro-track aria-label="{{track_filter_label}}">
+              <option value="">{{track_filter_all}}</option>
+              {{#track_filter_options}}
+                <option value="{{id}}">{{label}}</option>
+              {{/track_filter_options}}
+            </select>
+          </label>
+        {{/has_track_filter}}
+        <label class="lp-ro-search">
+          <span class="lp-sr-only">{{search_placeholder}}</span>
+          <input type="search" data-lp-ro-search placeholder="{{search_placeholder}}" autocomplete="off">
+        </label>
+      </div>
+    </div>
+
+    <div class="lp-table-wrap">
+      {{#has_pending}}
+        <table class="lp-table lp-ro-table">
+          <thead>
+            <tr>
+              <th>{{col_fellow}}</th>
+              <th>{{col_track}}</th>
+              <th>{{col_submitted}}</th>
+              <th>{{col_teacher}}</th>
+              <th>{{col_state}}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#pending}}
+              <tr class="{{#is_overdue}}is-overdue{{/is_overdue}}{{#is_released}} is-released{{/is_released}}"
+                data-lp-review-row
+                data-submissionid="{{submissionid}}"
+                data-lp-ro-state="{{filter_state}}"
+                data-lp-ro-track="{{courseid}}"
+                data-lp-ro-search="{{search_blob}}">
+                <td>
+                  <div class="lp-people-name"><b>{{fellow}}</b></div>
+                  <div class="lp-sm lp-muted">{{email}}</div>
+                  <span class="lp-ro-assign-pill">{{assign}}</span>
+                </td>
+                <td class="lp-sm">{{track}}</td>
+                <td class="lp-sm lp-ro-sla-cell">
+                  <div>{{submitted}}</div>
+                  {{#has_age}}
+                    <div class="lp-reviews-age{{#is_overdue}} is-overdue{{/is_overdue}}">{{age_label}}</div>
+                  {{/has_age}}
+                  {{#has_sla_bar}}
+                    <div class="lp-ro-sla-bar{{#is_overdue}} is-overdue{{/is_overdue}}" aria-hidden="true">
+                      <i style="width:{{sla_pct}}%"></i>
+                    </div>
+                    <div class="lp-ro-sla-bar-label">{{sla_bar_label}}</div>
+                  {{/has_sla_bar}}
+                </td>
+                <td class="lp-sm">
+                  {{#is_released}}
+                    <div class="lp-reviews-target-single">{{teacher}}</div>
+                    <div class="lp-reviews-target-hint">{{released_done_label}}</div>
+                  {{/is_released}}
+                  {{^is_released}}
+                    {{#has_teacher_choice}}
+                      <div class="lp-reviews-target">
+                        <div class="lp-select lp-select-compact" data-lp-select data-lp-ping-target>
+                          <button type="button" class="lp-select-trigger" data-lp-select-trigger
+                            aria-haspopup="listbox" aria-expanded="false"
+                            aria-label="{{col_teacher}}">
+                            <span class="lp-select-value" data-lp-select-label>{{teacher}}</span>
+                            <iconify-icon icon="hugeicons:arrow-down-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+                          </button>
+                          <ul class="lp-select-menu" data-lp-select-menu hidden role="listbox">
+                            {{#teacher_options}}
+                              <li role="option"
+                                class="lp-select-option{{#selected}} is-selected{{/selected}}"
+                                data-lp-select-option
+                                data-value="{{id}}"
+                                data-cooled="{{#cooled}}1{{/cooled}}{{^cooled}}0{{/cooled}}"
+                                tabindex="-1"
+                                {{#selected}}aria-selected="true"{{/selected}}>{{name}}</li>
+                            {{/teacher_options}}
+                          </ul>
+                          <select name="teacherid" form="lp-ping-{{submissionid}}"
+                            class="lp-select-native" data-lp-select-input data-lp-ping-teacher
+                            tabindex="-1" aria-hidden="true">
+                            {{#teacher_options}}
+                              <option value="{{id}}"{{#selected}} selected{{/selected}}
+                                data-cooled="{{#cooled}}1{{/cooled}}{{^cooled}}0{{/cooled}}">{{name}}</option>
+                            {{/teacher_options}}
+                          </select>
+                        </div>
+                        <div class="lp-reviews-target-hint">{{ping_target_scope}}</div>
+                      </div>
+                    {{/has_teacher_choice}}
+                    {{^has_teacher_choice}}
+                      <div class="lp-reviews-target-single">{{teacher}}</div>
+                    {{/has_teacher_choice}}
+                  {{/is_released}}
+                </td>
+                <td>
+                  <span class="lp-chip {{state_chip_class}}">{{state}}</span>
+                  {{#is_overdue}}<span class="lp-chip is-overdue">{{overdue_badge}}</span>{{/is_overdue}}
+                </td>
+                <td class="lp-reviews-actions">
+                  <a class="lp-btn lp-btn-solid" href="{{grader_url}}">{{open_label}}</a>
+                  {{#has_teachers}}
+                    <form method="post" action="{{ping_action_url}}" class="lp-reviews-ping-form" id="lp-ping-{{submissionid}}" data-lp-ping-form>
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="ping_review">
+                      <input type="hidden" name="submissionid" value="{{submissionid}}">
+                      {{^has_teacher_choice}}
+                        <input type="hidden" name="teacherid" value="{{teacherid}}">
+                      {{/has_teacher_choice}}
+                      <button type="submit" class="lp-btn lp-btn-light" data-lp-ping-btn{{#ping_cooled}} hidden{{/ping_cooled}}>{{ping_label}}</button>
+                      <span class="lp-btn lp-btn-light is-disabled" aria-disabled="true" data-lp-ping-cooled{{^ping_cooled}} hidden{{/ping_cooled}}>{{ping_cooled_label}}</span>
+                    </form>
+                  {{/has_teachers}}
+                </td>
+              </tr>
+            {{/pending}}
+          </tbody>
+        </table>
+        <p class="lp-muted lp-sm lp-ro-filter-empty" data-lp-ro-empty hidden>{{filter_empty}}</p>
+      {{/has_pending}}
+      {{^has_pending}}
+        {{> local_launchpad/admin_empty}}
+      {{/has_pending}}
+    </div>
+  </section>
+
+  <aside class="lp-ro-protocol" aria-label="{{protocol_title}}">
+    <div class="lp-ro-protocol-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    </div>
+    <div>
+      <h3>{{protocol_title}}</h3>
+      <p>{{protocol_body}}</p>
+    </div>
+  </aside>
 </div>

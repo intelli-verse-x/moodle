@@ -2888,7 +2888,7 @@
         });
     }
 
-    // Admin reviews: soft ping-target (track-scoped lp-select + cooldown).
+    // Admin reviews: queue filters (state / track / search) + soft ping-target.
     (function initReviewPingTargets() {
         var page = shell.querySelector('[data-lp-reviews-page]');
         if (!page) {
@@ -2896,6 +2896,62 @@
         }
         var actionUrl = page.getAttribute('data-ping-action-url') || '';
         var sesskey = page.getAttribute('data-sesskey') || '';
+
+        (function initReviewQueueFilters() {
+            var tabs = page.querySelectorAll('[data-lp-ro-state]');
+            var trackSel = page.querySelector('[data-lp-ro-track]');
+            var searchInput = page.querySelector('[data-lp-ro-search]');
+            var rows = page.querySelectorAll('[data-lp-review-row]');
+            var emptyEl = page.querySelector('[data-lp-ro-empty]');
+            var countEl = page.querySelector('[data-lp-ro-count]');
+            if (!tabs.length || !rows.length) {
+                return;
+            }
+            var state = 'all';
+
+            function applyFilters() {
+                var track = trackSel ? String(trackSel.value || '') : '';
+                var q = searchInput ? String(searchInput.value || '').toLowerCase().trim() : '';
+                var shown = 0;
+                rows.forEach(function (row) {
+                    var rowState = row.getAttribute('data-lp-ro-state') || '';
+                    var rowTrack = row.getAttribute('data-lp-ro-track') || '';
+                    var blob = row.getAttribute('data-lp-ro-search') || '';
+                    var okState = state === 'all' || rowState === state;
+                    var okTrack = !track || rowTrack === track;
+                    var okSearch = !q || blob.indexOf(q) !== -1;
+                    var show = okState && okTrack && okSearch;
+                    row.hidden = !show;
+                    if (show) {
+                        shown += 1;
+                    }
+                });
+                if (emptyEl) {
+                    emptyEl.hidden = shown > 0;
+                }
+                if (countEl) {
+                    countEl.textContent = 'Showing ' + shown;
+                }
+            }
+
+            tabs.forEach(function (tab) {
+                tab.addEventListener('click', function () {
+                    state = tab.getAttribute('data-lp-ro-state') || 'all';
+                    tabs.forEach(function (t) {
+                        var on = t === tab;
+                        t.classList.toggle('is-active', on);
+                        t.setAttribute('aria-selected', on ? 'true' : 'false');
+                    });
+                    applyFilters();
+                });
+            });
+            if (trackSel) {
+                trackSel.addEventListener('change', applyFilters);
+            }
+            if (searchInput) {
+                searchInput.addEventListener('input', applyFilters);
+            }
+        })();
 
         function placeReviewMenu(root) {
             var menu = root ? root.querySelector('[data-lp-select-menu]') : null;

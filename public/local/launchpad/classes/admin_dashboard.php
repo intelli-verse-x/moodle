@@ -4193,11 +4193,32 @@ final class admin_dashboard {
         };
 
         $sladays = (int) max(1, (int) round(self::REVIEW_SLA_SECONDS / DAYSECS));
+        $slahours = (int) max(1, (int) round(self::REVIEW_SLA_SECONDS / HOURSECS));
+        $releasedrows = self::list_released_reviews(25);
+        $pendingnotoverdue = 0;
+        $pendingoverdue = 0;
+        foreach ($pending as $row) {
+            if (!empty($row['is_overdue'])) {
+                $pendingoverdue++;
+            } else {
+                $pendingnotoverdue++;
+            }
+        }
+        $queuerows = array_merge($pending, $releasedrows);
+        $trackoptions = self::reviews_track_filter_options($queuerows, $tracks);
+        $allcount = count($queuerows);
+        $releasedlisted = count($releasedrows);
         $tiles = [
             [
                 'label' => get_string('admin_reviews_tile_pending', 'local_launchpad'),
                 'value' => (string) $pendingtotal,
                 'sub' => $toptrack,
+                'foot' => get_string('admin_reviews_tile_pending_foot', 'local_launchpad', $pendingtotal),
+                'badge' => $pendingtotal > 0
+                    ? get_string('admin_reviews_tile_badge_action', 'local_launchpad')
+                    : get_string('admin_reviews_tile_badge_clear', 'local_launchpad'),
+                'badge_tone' => $pendingtotal > 0 ? 'warn' : 'ok',
+                'tone' => $pendingtotal > 0 ? 'warn' : '',
                 'icon_svg' => $icon(
                     '<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/>'
                 ),
@@ -4206,6 +4227,15 @@ final class admin_dashboard {
                 'label' => get_string('admin_reviews_tile_overdue', 'local_launchpad'),
                 'value' => (string) $overduetotal,
                 'sub' => get_string('admin_reviews_tile_overdue_sub', 'local_launchpad', $sladays),
+                'foot' => get_string(
+                    'admin_reviews_tile_overdue_foot',
+                    'local_launchpad',
+                    (object) ['days' => $sladays, 'count' => $overduetotal]
+                ),
+                'badge' => $overduetotal > 0
+                    ? get_string('admin_reviews_tile_badge_overdue', 'local_launchpad')
+                    : get_string('admin_reviews_tile_badge_within', 'local_launchpad'),
+                'badge_tone' => $overduetotal > 0 ? 'danger' : 'ok',
                 'tone' => $overduetotal > 0 ? 'warn' : '',
                 'icon_svg' => $icon(
                     '<circle cx="12" cy="12" r="9"/>'
@@ -4216,6 +4246,10 @@ final class admin_dashboard {
                 'label' => get_string('admin_reviews_tile_released', 'local_launchpad'),
                 'value' => (string) $released,
                 'sub' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
+                'foot' => get_string('admin_reviews_tile_released_foot', 'local_launchpad'),
+                'badge' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
+                'badge_tone' => 'info',
+                'tone' => '',
                 'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),
             ],
         ];
@@ -4224,14 +4258,44 @@ final class admin_dashboard {
             'eyebrow' => get_string('admin_reviews_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_reviews_heading', 'local_launchpad'),
             'lead' => get_string('admin_reviews_lead', 'local_launchpad', $sladays),
+            'sla_badge' => get_string('admin_reviews_sla_badge', 'local_launchpad', $slahours),
+            'has_action_required' => $pendingtotal > 0,
+            'action_required' => get_string('admin_reviews_action_required', 'local_launchpad', $pendingtotal),
+            'queue_title' => get_string('admin_reviews_queue_title', 'local_launchpad'),
+            'queue_count_label' => get_string(
+                'admin_reviews_queue_count',
+                'local_launchpad',
+                (object) ['shown' => $allcount, 'pending' => $pendingtotal]
+            ),
+            'filter_all_label' => get_string('admin_reviews_filter_all', 'local_launchpad', $allcount),
+            'filter_pending_label' => get_string('admin_reviews_filter_pending', 'local_launchpad', $pendingnotoverdue),
+            'filter_overdue_label' => get_string('admin_reviews_filter_overdue', 'local_launchpad', $pendingoverdue),
+            'filter_released_label' => get_string('admin_reviews_filter_released', 'local_launchpad', $releasedlisted),
+            'filter_all_count' => $allcount,
+            'filter_pending_count' => $pendingnotoverdue,
+            'filter_overdue_count' => $pendingoverdue,
+            'filter_released_count' => $releasedlisted,
+            'track_filter_label' => get_string('admin_reviews_track_filter', 'local_launchpad'),
+            'track_filter_all' => get_string('admin_reviews_track_filter_all', 'local_launchpad'),
+            'track_filter_options' => $trackoptions,
+            'has_track_filter' => count($trackoptions) > 1,
+            'search_placeholder' => get_string('admin_reviews_search_placeholder', 'local_launchpad'),
+            'filter_empty' => get_string('admin_reviews_filter_empty', 'local_launchpad'),
+            'protocol_title' => get_string('admin_reviews_protocol_title', 'local_launchpad'),
+            'protocol_body' => get_string(
+                'admin_reviews_protocol_body',
+                'local_launchpad',
+                (object) ['hours' => $slahours, 'days' => $sladays]
+            ),
             'tiles' => $tiles,
             'col_fellow' => get_string('admin_reviews_col_fellow', 'local_launchpad'),
             'col_track' => get_string('admin_reviews_col_track', 'local_launchpad'),
             'col_submitted' => get_string('admin_reviews_col_submitted', 'local_launchpad'),
             'col_teacher' => get_string('admin_reviews_col_teacher', 'local_launchpad'),
             'col_state' => get_string('admin_reviews_col_state', 'local_launchpad'),
-            'pending' => $pending,
-            'has_pending' => $pending !== [],
+            'pending' => $queuerows,
+            'has_pending' => $queuerows !== [],
+            'released_done_label' => get_string('admin_reviews_released_done', 'local_launchpad'),
             'open_label' => get_string('admin_reviews_open', 'local_launchpad'),
             'ping_label' => get_string('admin_reviews_ping', 'local_launchpad'),
             'ping_cooled_label' => get_string('admin_reviews_ping_cooled', 'local_launchpad'),
@@ -4247,6 +4311,35 @@ final class admin_dashboard {
             'admin_reviews_empty',
             'admin_reviews_empty_title'
         ));
+    }
+
+    /**
+     * Track options for the Review oversight queue filter.
+     *
+     * @param list<array<string, mixed>> $queuerows
+     * @param list<\stdClass> $tracks
+     * @return list<array{id:int,label:string}>
+     */
+    private static function reviews_track_filter_options(array $queuerows, array $tracks): array {
+        $seen = [];
+        foreach ($queuerows as $row) {
+            $cid = (int) ($row['courseid'] ?? 0);
+            if ($cid > 0) {
+                $seen[$cid] = true;
+            }
+        }
+        $options = [];
+        foreach ($tracks as $course) {
+            $cid = (int) $course->id;
+            if (!isset($seen[$cid])) {
+                continue;
+            }
+            $options[] = [
+                'id' => $cid,
+                'label' => format_string($course->fullname),
+            ];
+        }
+        return $options;
     }
 
     /**
@@ -4330,6 +4423,21 @@ final class admin_dashboard {
             $submitted = (int) ($row->timemodified ?: $row->timecreated);
             $age = $submitted > 0 ? max(0, $now - $submitted) : 0;
             $isoverdue = $submitted > 0 && $age >= self::REVIEW_SLA_SECONDS;
+            $slaseconds = self::REVIEW_SLA_SECONDS;
+            $slahours = (int) max(1, (int) round($slaseconds / HOURSECS));
+            $slapct = $submitted > 0
+                ? (int) min(100, max(0, round(($age / $slaseconds) * 100)))
+                : 0;
+            $slabarlabel = '';
+            if ($submitted > 0) {
+                $slabarlabel = $isoverdue
+                    ? get_string('admin_reviews_sla_bar_overdue', 'local_launchpad', $slapct)
+                    : get_string(
+                        'admin_reviews_sla_bar_ontrack',
+                        'local_launchpad',
+                        (object) ['pct' => $slapct, 'hours' => $slahours]
+                    );
+            }
             $out[] = [
                 'submissionid' => $submissionid,
                 'courseid' => $courseid,
@@ -4346,6 +4454,9 @@ final class admin_dashboard {
                     ? get_string('admin_reviews_age', 'local_launchpad', format_time($age))
                     : '',
                 'has_age' => $submitted > 0,
+                'sla_pct' => $slapct,
+                'sla_bar_label' => $slabarlabel,
+                'has_sla_bar' => $submitted > 0,
                 'is_overdue' => $isoverdue,
                 'overdue_badge' => $isoverdue
                     ? get_string('admin_reviews_overdue_badge', 'local_launchpad')
@@ -4361,6 +4472,11 @@ final class admin_dashboard {
                     ? get_string('admin_reviews_state_overdue', 'local_launchpad')
                     : get_string('admin_reviews_state_pending', 'local_launchpad'),
                 'state_chip_class' => $isoverdue ? 'is-overdue' : 'warn',
+                'filter_state' => $isoverdue ? 'overdue' : 'pending',
+                'is_released' => false,
+                'search_blob' => s(\core_text::strtolower(
+                    fullname($row) . ' ' . $row->email . ' ' . $row->assignname . ' ' . $row->coursefullname
+                )),
                 'grader_url' => (new \moodle_url('/mod/assign/view.php', [
                     'id' => (int) $row->cmid,
                     'action' => 'grader',
@@ -4384,6 +4500,109 @@ final class admin_dashboard {
         });
 
         return array_slice($out, 0, max(1, min(100, $limit)));
+    }
+
+    /**
+     * Recently released (graded) assign submissions on LaunchPad tracks.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function list_released_reviews(int $limit = 25): array {
+        global $DB;
+
+        $tracks = self::list_track_courses();
+        $ids = array_map(static fn($c) => (int) $c->id, $tracks);
+        $ids = array_values(array_filter($ids));
+        if ($ids === []) {
+            return [];
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        $params['status'] = 'submitted';
+        $fetch = max(1, min(50, $limit));
+
+        $sql = "SELECT s.id, s.userid, s.timemodified, s.timecreated, a.id AS assignid, a.name AS assignname,
+                       a.course AS courseid, c.fullname AS coursefullname,
+                       u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email,
+                       cm.id AS cmid,
+                       g.timemodified AS graded_ts, g.grader AS graderid
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+                  JOIN {user} u ON u.id = s.userid AND u.deleted = 0
+                  JOIN {modules} m ON m.name = 'assign'
+                  JOIN {course_modules} cm ON cm.module = m.id AND cm.instance = a.id AND cm.course = a.course
+                  JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.latest = 1
+                   AND s.status = :status
+                   AND c.id {$insql}
+              ORDER BY g.timemodified DESC, s.id DESC";
+
+        $rows = $DB->get_records_sql($sql, $params, 0, $fetch);
+        $out = [];
+        foreach ($rows as $row) {
+            $submitted = (int) ($row->timemodified ?: $row->timecreated);
+            $graded = (int) ($row->graded_ts ?: 0);
+            $turnaround = ($submitted > 0 && $graded > $submitted) ? ($graded - $submitted) : 0;
+            $gradername = '';
+            if (!empty($row->graderid)) {
+                $grader = \core_user::get_user((int) $row->graderid);
+                if ($grader) {
+                    $gradername = fullname($grader);
+                }
+            }
+            $out[] = [
+                'submissionid' => (int) $row->id,
+                'courseid' => (int) $row->courseid,
+                'fellow' => fullname($row),
+                'email' => s($row->email),
+                'track' => format_string($row->coursefullname),
+                'assign' => format_string($row->assignname),
+                'submitted_ts' => $submitted,
+                'submitted' => $graded > 0
+                    ? userdate($graded, get_string('strftimedatetimeshort', 'langconfig'))
+                    : '—',
+                'age_seconds' => $turnaround,
+                'age_label' => $turnaround > 0
+                    ? get_string('admin_reviews_released_age', 'local_launchpad', format_time($turnaround))
+                    : '',
+                'has_age' => $turnaround > 0,
+                'sla_pct' => 0,
+                'sla_bar_label' => '',
+                'has_sla_bar' => false,
+                'is_overdue' => false,
+                'overdue_badge' => '',
+                'teacher' => $gradername !== ''
+                    ? $gradername
+                    : get_string('admin_reviews_released_grader_unknown', 'local_launchpad'),
+                'teacherid' => 0,
+                'teacher_options' => [],
+                'has_teacher_choice' => false,
+                'has_teachers' => false,
+                'can_ping' => false,
+                'ping_cooled' => false,
+                'state' => get_string('admin_reviews_state_released', 'local_launchpad'),
+                'state_chip_class' => 'ok',
+                'filter_state' => 'released',
+                'is_released' => true,
+                'search_blob' => s(\core_text::strtolower(
+                    fullname($row) . ' ' . $row->email . ' ' . $row->assignname . ' ' . $row->coursefullname
+                )),
+                'grader_url' => (new \moodle_url('/mod/assign/view.php', [
+                    'id' => (int) $row->cmid,
+                    'action' => 'grader',
+                    'userid' => (int) $row->userid,
+                ]))->out(false),
+            ];
+        }
+
+        return $out;
     }
 
     /** Pending review older than this is overdue (3 days). */
