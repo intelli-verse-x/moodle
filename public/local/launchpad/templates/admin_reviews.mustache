@@ -23,7 +23,7 @@
 
 <div class="lp-atiles lp-atiles-3" role="list" style="margin-top:16px">
   {{#tiles}}
-    <div class="lp-atile" role="listitem">
+    <div class="lp-atile{{#tone}} is-{{tone}}{{/tone}}" role="listitem">
       <div class="lp-atile-top">
         <span class="lp-atile-ico" aria-hidden="true">{{{icon_svg}}}</span>
         <span class="lp-atile-lbl">{{label}}</span>
@@ -50,16 +50,22 @@
         </thead>
         <tbody>
           {{#pending}}
-            <tr>
+            <tr class="{{#is_overdue}}is-overdue{{/is_overdue}}">
               <td>
                 <div class="lp-people-name"><b>{{fellow}}</b></div>
                 <div class="lp-sm">{{email}}</div>
                 <div class="lp-sm">{{assign}}</div>
               </td>
               <td class="lp-sm">{{track}}</td>
-              <td class="lp-sm">{{submitted}}</td>
+              <td class="lp-sm">
+                <div>{{submitted}}</div>
+                {{#has_age}}<div class="lp-reviews-age{{#is_overdue}} is-overdue{{/is_overdue}}">{{age_label}}</div>{{/has_age}}
+              </td>
               <td class="lp-sm">{{teacher}}</td>
-              <td><span class="lp-chip warn">{{state}}</span></td>
+              <td>
+                <span class="lp-chip {{state_chip_class}}">{{state}}</span>
+                {{#is_overdue}}<span class="lp-chip is-overdue">{{overdue_badge}}</span>{{/is_overdue}}
+              </td>
               <td class="lp-reviews-actions">
                 <a class="lp-btn lp-btn-solid" href="{{grader_url}}">{{open_label}}</a>
                 {{#can_ping}}

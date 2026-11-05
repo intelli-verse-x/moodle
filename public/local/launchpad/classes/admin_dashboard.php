@@ -2550,15 +2550,10 @@ final class admin_dashboard {
         unset($user);
         $pending = self::list_pending_reviews(50);
         $pendingtotal = self::count_reviews_pending();
+        $overduetotal = self::count_reviews_overdue();
         $released = self::count_reviews_released();
         $tracks = self::list_track_courses();
         $bytrackpending = self::pending_counts_by_course($tracks);
-        $other = 0;
-        foreach ($tracks as $course) {
-            if (empty($bytrackpending[(int) $course->id])) {
-                $other++;
-            }
-        }
 
         $toptrack = get_string('admin_reviews_tile_pending_sub_none', 'local_launchpad');
         if ($bytrackpending !== []) {
@@ -2577,6 +2572,7 @@ final class admin_dashboard {
                 . $paths . '</svg>';
         };
 
+        $sladays = (int) max(1, (int) round(self::REVIEW_SLA_SECONDS / DAYSECS));
         $tiles = [
             [
                 'label' => get_string('admin_reviews_tile_pending', 'local_launchpad'),
@@ -2587,26 +2583,27 @@ final class admin_dashboard {
                 ),
             ],
             [
+                'label' => get_string('admin_reviews_tile_overdue', 'local_launchpad'),
+                'value' => (string) $overduetotal,
+                'sub' => get_string('admin_reviews_tile_overdue_sub', 'local_launchpad', $sladays),
+                'tone' => $overduetotal > 0 ? 'warn' : '',
+                'icon_svg' => $icon(
+                    '<circle cx="12" cy="12" r="9"/>'
+                    . '<path d="M12 7v6l4 2"/>'
+                ),
+            ],
+            [
                 'label' => get_string('admin_reviews_tile_released', 'local_launchpad'),
                 'value' => (string) $released,
                 'sub' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
                 'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),
-            ],
-            [
-                'label' => get_string('admin_reviews_tile_other', 'local_launchpad'),
-                'value' => (string) $other,
-                'sub' => get_string('admin_reviews_tile_other_sub', 'local_launchpad'),
-                'icon_svg' => $icon(
-                    '<path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/>'
-                    . '<path d="M8 12h8M12 8v8"/>'
-                ),
             ],
         ];
 
         return array_merge([
             'eyebrow' => get_string('admin_reviews_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_reviews_heading', 'local_launchpad'),
-            'lead' => get_string('admin_reviews_lead', 'local_launchpad'),
+            'lead' => get_string('admin_reviews_lead', 'local_launchpad', $sladays),
             'tiles' => $tiles,
             'col_fellow' => get_string('admin_reviews_col_fellow', 'local_launchpad'),
             'col_track' => get_string('admin_reviews_col_track', 'local_launchpad'),
@@ -2631,7 +2628,7 @@ final class admin_dashboard {
     }
 
     /**
-     * Pending assign submissions on LaunchPad courses (oldest first).
+     * Pending assign submissions on LaunchPad courses (overdue first, then oldest).
      *
      * @return list<array<string, mixed>>
      */
@@ -2647,7 +2644,8 @@ final class admin_dashboard {
 
         [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
         $params['status'] = 'submitted';
-        $limit = max(1, min(100, $limit));
+        // Fetch a bit more than the page limit so overdue-first sort is meaningful.
+        $fetch = max(1, min(100, $limit * 2));
 
         $sql = "SELECT s.id, s.userid, s.timemodified, s.timecreated, a.id AS assignid, a.name AS assignname,
                        a.course AS courseid, c.fullname AS coursefullname,
@@ -2672,9 +2670,10 @@ final class admin_dashboard {
                    AND c.id {$insql}
               ORDER BY s.timemodified ASC, s.id ASC";
 
-        $rows = $DB->get_records_sql($sql, $params, 0, $limit);
+        $rows = $DB->get_records_sql($sql, $params, 0, $fetch);
         $teachercache = [];
         $out = [];
+        $now = time();
         foreach ($rows as $row) {
             $courseid = (int) $row->courseid;
             if (!isset($teachercache[$courseid])) {
@@ -2689,6 +2688,8 @@ final class admin_dashboard {
             $submissionid = (int) $row->id;
             $cooled = $teacherid > 0 && self::review_ping_is_cooled($submissionid, $teacherid);
             $submitted = (int) ($row->timemodified ?: $row->timecreated);
+            $age = $submitted > 0 ? max(0, $now - $submitted) : 0;
+            $isoverdue = $submitted > 0 && $age >= self::REVIEW_SLA_SECONDS;
             $out[] = [
                 'submissionid' => $submissionid,
                 'courseid' => $courseid,
@@ -2696,14 +2697,27 @@ final class admin_dashboard {
                 'email' => s($row->email),
                 'track' => format_string($row->coursefullname),
                 'assign' => format_string($row->assignname),
+                'submitted_ts' => $submitted,
                 'submitted' => $submitted > 0
                     ? userdate($submitted, get_string('strftimedatetimeshort', 'langconfig'))
                     : '—',
+                'age_seconds' => $age,
+                'age_label' => $submitted > 0
+                    ? get_string('admin_reviews_age', 'local_launchpad', format_time($age))
+                    : '',
+                'has_age' => $submitted > 0,
+                'is_overdue' => $isoverdue,
+                'overdue_badge' => $isoverdue
+                    ? get_string('admin_reviews_overdue_badge', 'local_launchpad')
+                    : '',
                 'teacher' => $teacherlabel,
                 'teacherid' => $teacherid,
                 'can_ping' => $teacherid > 0 && !$cooled,
                 'ping_cooled' => $cooled,
-                'state' => get_string('admin_reviews_state_pending', 'local_launchpad'),
+                'state' => $isoverdue
+                    ? get_string('admin_reviews_state_overdue', 'local_launchpad')
+                    : get_string('admin_reviews_state_pending', 'local_launchpad'),
+                'state_chip_class' => $isoverdue ? 'is-overdue' : 'warn',
                 'grader_url' => (new \moodle_url('/mod/assign/view.php', [
                     'id' => (int) $row->cmid,
                     'action' => 'grader',
@@ -2711,8 +2725,26 @@ final class admin_dashboard {
                 ]))->out(false),
             ];
         }
-        return $out;
+
+        usort($out, static function (array $a, array $b): int {
+            $oa = !empty($a['is_overdue']) ? 1 : 0;
+            $ob = !empty($b['is_overdue']) ? 1 : 0;
+            if ($oa !== $ob) {
+                return $ob <=> $oa;
+            }
+            $ta = (int) ($a['submitted_ts'] ?? 0);
+            $tb = (int) ($b['submitted_ts'] ?? 0);
+            if ($ta !== $tb) {
+                return $ta <=> $tb;
+            }
+            return ((int) ($a['submissionid'] ?? 0)) <=> ((int) ($b['submissionid'] ?? 0));
+        });
+
+        return array_slice($out, 0, max(1, min(100, $limit)));
     }
+
+    /** Pending review older than this is overdue (3 days). */
+    public const REVIEW_SLA_SECONDS = 259200;
 
     /** Seconds before the same admin→teacher review ping may fire again. */
     public const REVIEW_PING_COOLDOWN = 1800;
@@ -3544,6 +3576,36 @@ final class admin_dashboard {
         return (int) $DB->count_records_sql($sql, [
             'status' => 'submitted',
             'idn' => $DB->sql_like_escape(account_persona::COURSE_IDNUMBER_PREFIX) . '%',
+        ]);
+    }
+
+    /**
+     * Pending LaunchPad reviews older than {@see REVIEW_SLA_SECONDS}.
+     */
+    public static function count_reviews_overdue(): int {
+        global $DB;
+
+        $like = $DB->sql_like('c.idnumber', ':idn', false);
+        $sql = "SELECT COUNT(1)
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+             LEFT JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.latest = 1
+                   AND s.status = :status
+                   AND g.id IS NULL
+                   AND {$like}
+                   AND COALESCE(NULLIF(s.timemodified, 0), s.timecreated) > 0
+                   AND COALESCE(NULLIF(s.timemodified, 0), s.timecreated) <= :cutoff";
+        return (int) $DB->count_records_sql($sql, [
+            'status' => 'submitted',
+            'idn' => $DB->sql_like_escape(account_persona::COURSE_IDNUMBER_PREFIX) . '%',
+            'cutoff' => time() - self::REVIEW_SLA_SECONDS,
         ]);
     }
 

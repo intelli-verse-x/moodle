@@ -2051,6 +2051,17 @@ body.local-launchpad-mentor {
   text-transform: uppercase;
   letter-spacing: .04em;
 }
+.lp-atiles-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.lp-atile.is-warn {
+  border-color: rgba(185, 28, 28, 0.28);
+  background: linear-gradient(180deg, #fff7f5 0%, #fff 55%);
+}
+.lp-atile.is-warn .lp-atile-ico {
+  background: #fef2f2;
+  color: #b91c1c;
+}
 .lp-reviews-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2066,6 +2077,23 @@ body.local-launchpad-mentor {
   opacity: .55;
   pointer-events: none;
   cursor: default;
+}
+.lp-reviews-age {
+  margin-top: 2px;
+  color: var(--lp-muted);
+  font-size: 12px;
+}
+.lp-reviews-age.is-overdue {
+  color: #b42318;
+  font-weight: 600;
+}
+.lp-chip.is-overdue {
+  background: #fef2f2;
+  color: #b42318;
+  border-color: rgba(180, 35, 24, 0.22);
+}
+.lp-table tr.is-overdue td {
+  background: rgba(254, 242, 242, 0.35);
 }
 
 .lp-card {
