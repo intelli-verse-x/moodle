@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Employer portal actions — Moodle-backed write handlers (messages, etc.).
+ * Employer portal actions — Moodle-backed write handlers (messages, notifications).
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -37,6 +37,10 @@ $action = required_param('action', PARAM_ALPHAEXT);
 $mtab = optional_param('mtab', 'all', PARAM_ALPHA);
 if (!in_array($mtab, ['all', 'starred', 'private', 'group'], true)) {
     $mtab = 'all';
+}
+$ntab = optional_param('ntab', 'all', PARAM_ALPHA);
+if (!in_array($ntab, ['all', 'unread'], true)) {
+    $ntab = 'all';
 }
 
 if ($action === 'send_message') {
@@ -73,6 +77,84 @@ if ($action === 'send_message') {
     }
 
     redirect(new moodle_url('/local/launchpad/employee.php', array_filter($returnparams + ['msgsent' => 1])));
+}
+
+if ($action === 'mark_all_notifications_read') {
+    $returnparams = [
+        'view' => 'notifications',
+        'ntab' => $ntab !== 'all' ? $ntab : null,
+    ];
+    try {
+        \core_message\api::mark_all_notifications_as_read((int) $USER->id);
+    } catch (\Throwable $e) {
+        debugging('employee_action mark_all_notifications_read: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        redirect(new moodle_url('/local/launchpad/employee.php', array_filter($returnparams + ['notiferr' => 'failed'])));
+    }
+    redirect(new moodle_url('/local/launchpad/employee.php', array_filter($returnparams + ['notifdone' => 1])));
+}
+
+if ($action === 'update_profile') {
+    $payload = \local_launchpad\employer_tools::profile_post_payload();
+    $err = \local_launchpad\employer_tools::save_profile($USER, $payload);
+    if ($err !== '') {
+        redirect(new moodle_url('/local/launchpad/employee.php', [
+            'view' => 'profile',
+            'ptab' => 'edit',
+            'profileerr' => $err,
+        ]));
+    }
+    redirect(new moodle_url('/local/launchpad/employee.php', [
+        'view' => 'profile',
+        'ptab' => 'overview',
+        'profilesaved' => 1,
+    ]));
+}
+
+if ($action === 'update_preference') {
+    $prefkey = optional_param('pref', '', PARAM_ALPHAEXT);
+    $payload = \local_launchpad\employer_tools::preference_post_payload($prefkey);
+    $err = \local_launchpad\employer_tools::save_preference($USER, $prefkey, $payload);
+    if ($err !== '') {
+        redirect(new moodle_url('/local/launchpad/employee.php', array_filter([
+            'view' => 'profile',
+            'ptab' => 'preferences',
+            'pref' => $prefkey !== '' ? $prefkey : null,
+            'preferr' => $err,
+        ])));
+    }
+    redirect(new moodle_url('/local/launchpad/employee.php', array_filter([
+        'view' => 'profile',
+        'ptab' => 'preferences',
+        'pref' => $prefkey !== '' ? $prefkey : null,
+        'prefsaved' => 1,
+    ])));
+}
+
+if ($action === 'mark_notification_read') {
+    $notifid = required_param('notifid', PARAM_INT);
+    $returnparams = [
+        'view' => 'notifications',
+        'ntab' => $ntab !== 'all' ? $ntab : null,
+        'notifid' => $notifid > 0 ? $notifid : null,
+    ];
+    if ($notifid <= 0) {
+        redirect(new moodle_url('/local/launchpad/employee.php', array_filter($returnparams + ['notiferr' => 'denied'])));
+    }
+    try {
+        $notification = $DB->get_record('notifications', ['id' => $notifid], '*', MUST_EXIST);
+        if ((int) $notification->useridto !== (int) $USER->id) {
+            redirect(new moodle_url('/local/launchpad/employee.php', array_filter([
+                'view' => 'notifications',
+                'ntab' => $ntab !== 'all' ? $ntab : null,
+                'notiferr' => 'denied',
+            ])));
+        }
+        \core_message\api::mark_notification_as_read($notification);
+    } catch (\Throwable $e) {
+        debugging('employee_action mark_notification_read: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        redirect(new moodle_url('/local/launchpad/employee.php', array_filter($returnparams + ['notiferr' => 'failed'])));
+    }
+    redirect(new moodle_url('/local/launchpad/employee.php', array_filter($returnparams)));
 }
 
 throw new \moodle_exception('invalidaction', 'error');

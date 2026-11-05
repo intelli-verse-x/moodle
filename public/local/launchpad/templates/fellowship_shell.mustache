@@ -33,9 +33,7 @@
             <span class="lp-notif-dot">{{unread_notifications}}</span>
           {{/has_unread_notifications}}
         </a>
-        <a class="lp-profile-icon" href="{{profile_url}}" aria-label="{{#str}} fellowship_nav_account, local_launchpad {{/str}}" title="{{#str}} fellowship_nav_account, local_launchpad {{/str}}">
-          <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
-        </a>
+        {{> local_launchpad/profile_menu }}
       </div>
     </header>
     <main class="lp-main" id="lp-main" tabindex="-1">

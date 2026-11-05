@@ -186,8 +186,78 @@
             }, {passive: true});
         })();
     }
+    // Account menus (topbar avatar + sidebar foot).
+    var profileMenus = Array.prototype.slice.call(shell.querySelectorAll('[data-lp-profile-menu]'));
+
+    function setProfileOpen(menu, open) {
+        if (!menu) {
+            return;
+        }
+        var toggle = menu.querySelector('[data-lp-profile-toggle]');
+        var panel = menu.querySelector('[data-lp-profile-panel]');
+        if (!toggle || !panel) {
+            return;
+        }
+        menu.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+            panel.removeAttribute('hidden');
+        } else {
+            panel.setAttribute('hidden', 'hidden');
+        }
+    }
+
+    function closeAllProfileMenus(except) {
+        profileMenus.forEach(function (menu) {
+            if (except && menu === except) {
+                return;
+            }
+            setProfileOpen(menu, false);
+        });
+    }
+
+    profileMenus.forEach(function (menu) {
+        var toggle = menu.querySelector('[data-lp-profile-toggle]');
+        var panel = menu.querySelector('[data-lp-profile-panel]');
+        if (!toggle || !panel) {
+            return;
+        }
+        toggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var willOpen = !menu.classList.contains('is-open');
+            closeAllProfileMenus(menu);
+            setProfileOpen(menu, willOpen);
+        });
+    });
+
+    if (profileMenus.length) {
+        document.addEventListener('click', function (e) {
+            var openMenu = profileMenus.find(function (menu) {
+                return menu.classList.contains('is-open');
+            });
+            if (!openMenu) {
+                return;
+            }
+            if (!openMenu.contains(e.target)) {
+                setProfileOpen(openMenu, false);
+            }
+        });
+    }
+
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            var openMenu = profileMenus.find(function (menu) {
+                return menu.classList.contains('is-open');
+            });
+            if (openMenu) {
+                setProfileOpen(openMenu, false);
+                var openToggle = openMenu.querySelector('[data-lp-profile-toggle]');
+                if (openToggle) {
+                    openToggle.focus();
+                }
+                return;
+            }
             setOpen(false);
         }
     });
@@ -407,5 +477,150 @@
             }
         });
     })();
+
+    // Custom selects (profile Country / Timezone / Language).
+    function closeLpSelect(root) {
+        if (!root) {
+            return;
+        }
+        var menu = root.querySelector('[data-lp-select-menu]');
+        var trigger = root.querySelector('[data-lp-select-trigger]');
+        root.classList.remove('is-open');
+        if (menu) {
+            menu.setAttribute('hidden', 'hidden');
+        }
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+    }
+    function closeAllLpSelects(except) {
+        shell.querySelectorAll('[data-lp-select]').forEach(function (root) {
+            if (except && root === except) {
+                return;
+            }
+            closeLpSelect(root);
+        });
+    }
+    function setLpSelectValue(root, value) {
+        if (!root) {
+            return;
+        }
+        var options = root.querySelectorAll('[data-lp-select-option]');
+        var labelEl = root.querySelector('[data-lp-select-label]');
+        var input = root.querySelector('[data-lp-select-input]');
+        var matched = null;
+        options.forEach(function (opt) {
+            var on = opt.getAttribute('data-value') === String(value);
+            opt.classList.toggle('is-selected', on);
+            if (on) {
+                opt.setAttribute('aria-selected', 'true');
+                matched = opt;
+            } else {
+                opt.removeAttribute('aria-selected');
+            }
+        });
+        if (!matched && options.length) {
+            matched = options[0];
+            matched.classList.add('is-selected');
+            matched.setAttribute('aria-selected', 'true');
+            value = matched.getAttribute('data-value');
+        }
+        if (labelEl && matched) {
+            labelEl.textContent = (matched.textContent || '').replace(/\s+/g, ' ').trim();
+        }
+        if (input) {
+            input.value = String(value);
+        }
+    }
+    function openLpSelect(root) {
+        if (!root || root.classList.contains('is-locked')) {
+            return;
+        }
+        closeAllLpSelects(root);
+        var menu = root.querySelector('[data-lp-select-menu]');
+        var trigger = root.querySelector('[data-lp-select-trigger]');
+        root.classList.add('is-open');
+        if (menu) {
+            menu.removeAttribute('hidden');
+        }
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'true');
+        }
+        var selected = root.querySelector('[data-lp-select-option].is-selected')
+            || root.querySelector('[data-lp-select-option]');
+        if (selected) {
+            selected.focus();
+        }
+    }
+    shell.querySelectorAll('[data-lp-select]').forEach(function (root) {
+        if (root.getAttribute('data-lp-select-ready') === '1') {
+            return;
+        }
+        root.setAttribute('data-lp-select-ready', '1');
+        var trigger = root.querySelector('[data-lp-select-trigger]');
+        var menu = root.querySelector('[data-lp-select-menu]');
+        var input = root.querySelector('[data-lp-select-input]');
+        if (input) {
+            setLpSelectValue(root, input.value || '');
+        }
+        if (trigger) {
+            trigger.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (trigger.disabled || root.classList.contains('is-locked')) {
+                    return;
+                }
+                if (root.classList.contains('is-open')) {
+                    closeLpSelect(root);
+                } else {
+                    openLpSelect(root);
+                }
+            });
+        }
+        if (menu) {
+            menu.addEventListener('click', function (e) {
+                var opt = e.target.closest('[data-lp-select-option]');
+                if (!opt || !menu.contains(opt)) {
+                    return;
+                }
+                setLpSelectValue(root, opt.getAttribute('data-value') || '');
+                closeLpSelect(root);
+                if (trigger) {
+                    trigger.focus();
+                }
+            });
+            menu.addEventListener('keydown', function (e) {
+                var options = Array.prototype.slice.call(menu.querySelectorAll('[data-lp-select-option]'));
+                if (!options.length) {
+                    return;
+                }
+                var current = document.activeElement;
+                var idx = options.indexOf(current);
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    options[Math.min(options.length - 1, Math.max(0, idx) + 1)].focus();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    options[Math.max(0, (idx < 0 ? 0 : idx) - 1)].focus();
+                } else if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (current && current.hasAttribute('data-lp-select-option')) {
+                        current.click();
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeLpSelect(root);
+                    if (trigger) {
+                        trigger.focus();
+                    }
+                }
+            });
+        }
+    });
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('[data-lp-select]')) {
+            return;
+        }
+        closeAllLpSelects(null);
+    });
 
 })();

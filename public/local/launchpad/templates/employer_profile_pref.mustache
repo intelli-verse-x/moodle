@@ -1,0 +1,135 @@
+{{!
+    @template local_launchpad/employer_profile_pref
+
+    Preference subpage (form or Moodle handoff) under Profile → Preferences.
+}}
+<div class="lp-profile-pref-page">
+  <div class="lp-profile-pref-back">
+    <a class="lp-btn lp-btn-light" href="{{pref_hub_url}}">
+      <iconify-icon icon="hugeicons:arrow-left-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+      {{strings.pref_back}}
+    </a>
+  </div>
+
+  {{#pref_has_flash}}
+    <div class="lp-flash{{#pref_flash.ok}} is-ok{{/pref_flash.ok}}{{^pref_flash.ok}} is-err{{/pref_flash.ok}}" role="status">
+      {{pref_flash.text}}
+    </div>
+  {{/pref_has_flash}}
+
+  {{#pref_is_form}}
+    <form class="lp-card lift lp-profile-form lp-profile-pref-form" method="post" action="{{pref_action_url}}">
+      <input type="hidden" name="sesskey" value="{{sesskey}}">
+      <input type="hidden" name="action" value="update_preference">
+      <input type="hidden" name="pref" value="{{pref_key}}">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:{{pref_icon}}" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{pref_title}}</h3>
+            <p>{{pref_help}}</p>
+          </div>
+        </div>
+        {{#pref_has_advanced}}
+          <a class="lp-btn lp-btn-light" href="{{pref_advanced_url}}">{{strings.pref_advanced_moodle}}</a>
+        {{/pref_has_advanced}}
+      </div>
+
+      {{#pref_password_policy}}
+        <p class="lp-sm lp-muted lp-profile-pref-policy">{{pref_password_policy}}</p>
+      {{/pref_password_policy}}
+
+      <div class="lp-profile-form-grid">
+        {{#pref_fields}}
+          {{#is_checkbox}}
+            <label class="lp-field lp-field-check">
+              <span class="lp-field-check-row">
+                <input type="checkbox" name="{{name}}" value="1" {{#checked}}checked{{/checked}}>
+                <span>{{label}}</span>
+              </span>
+            </label>
+          {{/is_checkbox}}
+          {{^is_checkbox}}
+            <label class="lp-field">
+              <span>{{label}}{{#required}} *{{/required}}</span>
+              {{#is_password}}
+                <input type="password"
+                       name="{{name}}"
+                       value=""
+                       autocomplete="{{#name}}{{name}}{{/name}}"
+                       {{#required}}required{{/required}}>
+              {{/is_password}}
+              {{#is_number}}
+                <input type="number" name="{{name}}" value="{{value}}" min="1" max="365">
+              {{/is_number}}
+              {{#is_select}}
+                <div class="lp-select" data-lp-select>
+                  <button type="button"
+                          class="lp-select-trigger"
+                          data-lp-select-trigger
+                          aria-haspopup="listbox"
+                          aria-expanded="false">
+                    <span class="lp-select-value" data-lp-select-label>{{selected_label}}</span>
+                    <iconify-icon icon="hugeicons:arrow-down-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+                  </button>
+                  <ul class="lp-select-menu" data-lp-select-menu hidden role="listbox">
+                    {{#options}}
+                      <li role="option"
+                          class="lp-select-option{{#selected}} is-selected{{/selected}}"
+                          data-lp-select-option
+                          data-value="{{value}}"
+                          aria-selected="{{#selected}}true{{/selected}}{{^selected}}false{{/selected}}">
+                        {{label}}
+                      </li>
+                    {{/options}}
+                  </ul>
+                  <select class="lp-select-native" name="{{name}}" data-lp-select-native hidden tabindex="-1" aria-hidden="true">
+                    {{#options}}
+                      <option value="{{value}}" {{#selected}}selected{{/selected}}>{{label}}</option>
+                    {{/options}}
+                  </select>
+                </div>
+              {{/is_select}}
+            </label>
+          {{/is_checkbox}}
+        {{/pref_fields}}
+      </div>
+
+      <div class="lp-profile-form-actions">
+        <button type="submit" class="lp-btn lp-btn-primary">{{strings.pref_save}}</button>
+        <a class="lp-btn lp-btn-light" href="{{pref_cancel_url}}">{{strings.pref_cancel}}</a>
+      </div>
+    </form>
+  {{/pref_is_form}}
+
+  {{#pref_is_handoff}}
+    <section class="lp-card lift lp-profile-pref-handoff">
+      <div class="lp-card-head">
+        <div class="lp-grade-progress-title">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:{{pref_icon}}" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{pref_title}}</h3>
+            <p>{{pref_help}}</p>
+          </div>
+        </div>
+      </div>
+      <p class="lp-sm">{{pref_handoff_body}}</p>
+      <div class="lp-profile-form-actions">
+        {{#pref_has_portal_edit}}
+          <a class="lp-btn lp-btn-primary" href="{{pref_portal_edit_url}}">{{strings.pref_open_portal_edit}}</a>
+        {{/pref_has_portal_edit}}
+        <a class="lp-btn{{#pref_has_portal_edit}} lp-btn-light{{/pref_has_portal_edit}}{{^pref_has_portal_edit}} lp-btn-primary{{/pref_has_portal_edit}}"
+           href="{{pref_moodle_url}}"
+           target="_blank"
+           rel="noopener">
+          {{strings.pref_open_moodle}}
+        </a>
+        <a class="lp-btn lp-btn-light" href="{{pref_cancel_url}}">{{strings.pref_cancel}}</a>
+      </div>
+    </section>
+  {{/pref_is_handoff}}
+</div>

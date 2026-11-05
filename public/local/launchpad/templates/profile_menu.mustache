@@ -1,0 +1,64 @@
+{{!
+    @template local_launchpad/profile_menu
+
+    Account menu — avatar (topbar) or side-foot row toggle with Profile / Preferences / Sign out.
+    Set profile_menu.side = true for the navy sidebar foot variant.
+}}
+{{#profile_menu}}
+<div class="lp-profile-menu{{#side}} is-side{{/side}}" data-lp-profile-menu>
+  {{#side}}
+  <button type="button"
+          class="lp-me lp-profile-side-toggle"
+          data-lp-profile-toggle
+          aria-expanded="false"
+          aria-haspopup="menu"
+          aria-label="{{label_account}}">
+    <span class="lp-av" aria-hidden="true">{{initials}}</span>
+    <span class="lp-me-text">
+      <b>{{displayname}}</b>
+      {{#role_label}}<span>{{role_label}}</span>{{/role_label}}
+      {{^role_label}}{{#has_email}}<span>{{email}}</span>{{/has_email}}{{/role_label}}
+    </span>
+    <iconify-icon class="lp-profile-side-chevron" icon="hugeicons:arrow-up-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+  </button>
+  {{/side}}
+  {{^side}}
+  <button type="button"
+          class="lp-profile-icon"
+          data-lp-profile-toggle
+          aria-expanded="false"
+          aria-haspopup="menu"
+          aria-label="{{label_account}}">
+    <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+  </button>
+  {{/side}}
+  <div class="lp-profile-dropdown"
+       data-lp-profile-panel
+       role="menu"
+       hidden>
+    <div class="lp-profile-dropdown-head">
+      <span class="lp-av" aria-hidden="true">{{initials}}</span>
+      <div class="lp-profile-dropdown-who">
+        <b>{{displayname}}</b>
+        {{#has_email}}<span>{{email}}</span>{{/has_email}}
+      </div>
+    </div>
+    <div class="lp-profile-dropdown-list">
+      <a class="lp-profile-dropdown-item" role="menuitem" href="{{profile_url}}">
+        <iconify-icon icon="hugeicons:user-circle" width="18" height="18" aria-hidden="true"></iconify-icon>
+        <span>{{label_profile}}</span>
+      </a>
+      <a class="lp-profile-dropdown-item" role="menuitem" href="{{preferences_url}}">
+        <iconify-icon icon="hugeicons:settings-01" width="18" height="18" aria-hidden="true"></iconify-icon>
+        <span>{{label_preferences}}</span>
+      </a>
+    </div>
+    <div class="lp-profile-dropdown-foot">
+      <a class="lp-profile-dropdown-item is-danger" role="menuitem" href="{{logout_url}}">
+        <iconify-icon icon="hugeicons:logout-01" width="18" height="18" aria-hidden="true"></iconify-icon>
+        <span>{{label_signout}}</span>
+      </a>
+    </div>
+  </div>
+</div>
+{{/profile_menu}}

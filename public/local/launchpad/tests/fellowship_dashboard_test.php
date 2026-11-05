@@ -51,6 +51,19 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $this->assertSame('?', fellowship_dashboard::initials($empty));
     }
 
+    public function test_display_label_strips_placeholder_suffix(): void {
+        $this->assertSame(
+            'Industry simulation brief',
+            fellowship_dashboard::display_label('Industry simulation brief [placeholder — content pending]')
+        );
+        $this->assertSame(
+            'Submitted assignment · Industry simulation submission',
+            fellowship_dashboard::display_label(
+                'Submitted assignment · Industry simulation submission [placeholder — content pending]'
+            )
+        );
+    }
+
     public function test_data_region_marker(): void {
         $this->assertSame('local-launchpad-fellowship', fellowship_dashboard::DATA_REGION);
     }
