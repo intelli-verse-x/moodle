@@ -301,90 +301,149 @@
         {{^grades_showgrades}}
           <p class="lp-sm lp-muted">{{grades_hidden_course}}</p>
         {{/grades_showgrades}}
-        <div class="lp-courseops-roster-actions">
-          <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{grades_reviews_url}}">{{grades_reviews_label}}</a>
-          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{grades_grader_url}}">{{grades_grader_label}}</a>
-        </div>
-        <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{grades_reviews_help}}</p>
-        {{#has_grade_rows}}
-          <div class="lp-courseops-stat-row">
-            <span class="lp-chip line">{{grades_stat_graded}}</span>
-            <span class="lp-chip line">{{grades_stat_avg}}</span>
+
+        {{#grades_is_user_report}}
+          <div class="lp-courseops-roster-actions">
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{grades_back_roster_url}}">{{grades_back_roster_label}}</a>
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{grades_reviews_url}}">{{grades_reviews_label}}</a>
           </div>
-        {{/has_grade_rows}}
+          {{#grades_report_ok}}
+            <div class="lp-courseops-grade-hero">
+              <div class="lp-people-name">
+                <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{grades_report_initials}}</span>
+                <b>{{grades_report_name}}</b>
+              </div>
+              <div class="lp-courseops-stat-row">
+                <span class="lp-chip line">{{grades_course_total_label}}: {{grades_report_total}}</span>
+                <span class="lp-chip line">{{col_percent}}: {{grades_report_percent}}</span>
+              </div>
+            </div>
+            <div class="lp-courseops-roster-block">
+              <h4 class="lp-courseops-roster-h">{{grades_report_heading}}</h4>
+              {{#has_grades_report_rows}}
+                <div class="lp-table-wrap">
+                  <table class="lp-table">
+                    <thead>
+                      <tr>
+                        <th>{{col_activity}}</th>
+                        <th>{{col_type}}</th>
+                        <th>{{col_item_grade}}</th>
+                        <th>{{col_percent}}</th>
+                        <th>{{col_feedback}}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {{#grades_report_rows}}
+                        <tr>
+                          <td><b>{{name}}</b></td>
+                          <td>{{type_label}}</td>
+                          <td>{{grade_display}}</td>
+                          <td>{{percent_display}}</td>
+                          <td class="lp-muted lp-sm">{{feedback_display}}</td>
+                        </tr>
+                      {{/grades_report_rows}}
+                    </tbody>
+                  </table>
+                </div>
+              {{/has_grades_report_rows}}
+              {{^has_grades_report_rows}}
+                <p class="lp-muted lp-sm">{{grades_empty_detail}}</p>
+              {{/has_grades_report_rows}}
+            </div>
+          {{/grades_report_ok}}
+          {{^grades_report_ok}}
+            <p class="lp-muted">{{grades_unknown_fellow}}</p>
+          {{/grades_report_ok}}
+        {{/grades_is_user_report}}
 
-        <div class="lp-courseops-roster-block">
-          <h4 class="lp-courseops-roster-h">{{grades_fellows_title}}</h4>
+        {{^grades_is_user_report}}
+          <div class="lp-courseops-roster-actions">
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{grades_reviews_url}}">{{grades_reviews_label}}</a>
+          </div>
+          <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{grades_reviews_help}}</p>
           {{#has_grade_rows}}
-            <div class="lp-table-wrap">
-              <table class="lp-table">
-                <thead>
-                  <tr>
-                    <th>{{col_name}}</th>
-                    <th>{{col_grade}}</th>
-                    <th>{{col_percent}}</th>
-                    <th>{{col_actions}}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {{#grade_rows}}
-                    <tr>
-                      <td>
-                        <div class="lp-people-name">
-                          <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{initials}}</span>
-                          <b>{{name}}</b>
-                        </div>
-                      </td>
-                      <td>{{grade_display}}</td>
-                      <td>{{percent_display}}</td>
-                      <td>
-                        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{user_report_url}}">{{grades_open_user_label}}</a>
-                      </td>
-                    </tr>
-                  {{/grade_rows}}
-                </tbody>
-              </table>
+            <div class="lp-courseops-stat-row">
+              <span class="lp-chip line">{{grades_stat_graded}}</span>
+              <span class="lp-chip line">{{grades_stat_avg}}</span>
             </div>
           {{/has_grade_rows}}
-          {{^has_grade_rows}}
-            <p class="lp-muted lp-sm">{{grades_empty_fellows}}</p>
-          {{/has_grade_rows}}
-        </div>
 
-        <div class="lp-courseops-roster-block">
-          <h4 class="lp-courseops-roster-h">{{grades_items_title}}</h4>
-          {{#has_item_rows}}
-            <div class="lp-table-wrap">
-              <table class="lp-table">
-                <thead>
-                  <tr>
-                    <th>{{col_activity}}</th>
-                    <th>{{col_type}}</th>
-                    <th>{{col_max}}</th>
-                    <th>{{col_actions}}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {{#item_rows}}
+          <div class="lp-courseops-roster-block">
+            <h4 class="lp-courseops-roster-h">{{grades_fellows_title}}</h4>
+            {{#has_grade_rows}}
+              <div class="lp-table-wrap">
+                <table class="lp-table">
+                  <thead>
                     <tr>
-                      <td><b>{{name}}</b></td>
-                      <td>{{type_label}}</td>
-                      <td>{{max_display}}</td>
-                      <td>
-                        {{#has_grader}}
-                          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{grader_url}}">{{grades_open_item_label}}</a>
-                        {{/has_grader}}
-                      </td>
+                      <th>{{col_name}}</th>
+                      <th>{{col_grade}}</th>
+                      <th>{{col_percent}}</th>
+                      <th>{{col_actions}}</th>
                     </tr>
-                  {{/item_rows}}
-                </tbody>
-              </table>
-            </div>
-          {{/has_item_rows}}
-          {{^has_item_rows}}
-            <p class="lp-muted lp-sm">{{grades_empty_items}}</p>
-          {{/has_item_rows}}
-        </div>
+                  </thead>
+                  <tbody>
+                    {{#grade_rows}}
+                      <tr>
+                        <td>
+                          <div class="lp-people-name">
+                            <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{initials}}</span>
+                            <b>{{name}}</b>
+                          </div>
+                        </td>
+                        <td>{{grade_display}}</td>
+                        <td>{{percent_display}}</td>
+                        <td>
+                          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{user_report_url}}">{{grades_open_user_label}}</a>
+                        </td>
+                      </tr>
+                    {{/grade_rows}}
+                  </tbody>
+                </table>
+              </div>
+            {{/has_grade_rows}}
+            {{^has_grade_rows}}
+              <p class="lp-muted lp-sm">{{grades_empty_fellows}}</p>
+            {{/has_grade_rows}}
+          </div>
+
+          <div class="lp-courseops-roster-block">
+            <h4 class="lp-courseops-roster-h">{{grades_items_title}}</h4>
+            {{#has_item_rows}}
+              <div class="lp-table-wrap">
+                <table class="lp-table">
+                  <thead>
+                    <tr>
+                      <th>{{col_activity}}</th>
+                      <th>{{col_type}}</th>
+                      <th>{{col_max}}</th>
+                      <th>{{col_actions}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {{#item_rows}}
+                      <tr>
+                        <td><b>{{name}}</b></td>
+                        <td>{{type_label}}</td>
+                        <td>{{max_display}}</td>
+                        <td>
+                          {{#is_assign}}
+                            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{reviews_url}}">{{grades_open_item_label}}</a>
+                          {{/is_assign}}
+                          {{^is_assign}}
+                            <span class="lp-muted lp-sm">—</span>
+                          {{/is_assign}}
+                        </td>
+                      </tr>
+                    {{/item_rows}}
+                  </tbody>
+                </table>
+              </div>
+            {{/has_item_rows}}
+            {{^has_item_rows}}
+              <p class="lp-muted lp-sm">{{grades_empty_items}}</p>
+            {{/has_item_rows}}
+          </div>
+        {{/grades_is_user_report}}
 
         <p class="lp-courseops-advanced">
           <a class="lp-ann-link" href="{{grades_advanced_url}}">{{grades_advanced_label}}</a>

@@ -205,7 +205,8 @@ final class admin_dashboard {
         \stdClass $user,
         int $trackid = 0,
         string $section = 'hub',
-        array $flash = []
+        array $flash = [],
+        int $reportuserid = 0
     ): array {
         global $CFG, $DB;
 
@@ -465,7 +466,10 @@ final class admin_dashboard {
             $ctx = array_merge($ctx, self::courseops_participants_context($user, $trackid, $fullcourse));
         }
         if ($isgrades) {
-            $ctx = array_merge($ctx, self::courseops_grades_context($user, $trackid, $fullcourse));
+            $ctx = array_merge(
+                $ctx,
+                self::courseops_grades_context($user, $trackid, $fullcourse, $reportuserid)
+            );
         }
         if ($iscompletion) {
             $ctx = array_merge($ctx, self::courseops_completion_context($user, $trackid, $fullcourse));
@@ -584,15 +588,17 @@ final class admin_dashboard {
     }
 
     /**
-     * Grades section: course-total overview + grader paths (Slice D).
-     * Reviews owns pending assign grading — this is not a second review queue.
+     * Grades section: course-total roster + in-shell fellow user report (LP boundary).
+     * Reviews owns pending assign grading — not a second review queue.
+     * One Advanced escape: Moodle gradebook setup (weights/scales/categories).
      *
      * @return array<string, mixed>
      */
     public static function courseops_grades_context(
         \stdClass $user,
         int $trackid,
-        \stdClass $course
+        \stdClass $course,
+        int $reportuserid = 0
     ): array {
         global $CFG;
 
@@ -603,8 +609,12 @@ final class admin_dashboard {
         $context = \context_course::instance($trackid);
         $canview = has_capability('moodle/grade:viewall', $context, $user);
         $reviewsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
-        $graderreporturl = (new \moodle_url('/grade/report/grader/index.php', ['id' => $trackid]))->out(false);
         $advancedurl = (new \moodle_url('/grade/edit/tree/index.php', ['id' => $trackid]))->out(false);
+        $rosterurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'grades',
+        ]))->out(false);
 
         $base = [
             'grades_title' => get_string('admin_courseops_nav_grades', 'local_launchpad'),
@@ -614,8 +624,6 @@ final class admin_dashboard {
             'grades_reviews_url' => $reviewsurl,
             'grades_reviews_label' => get_string('admin_courseops_grades_reviews', 'local_launchpad'),
             'grades_reviews_help' => get_string('admin_courseops_grades_reviews_help', 'local_launchpad'),
-            'grades_grader_url' => $graderreporturl,
-            'grades_grader_label' => get_string('admin_courseops_grades_open_grader', 'local_launchpad'),
             'grades_advanced_url' => $advancedurl,
             'grades_advanced_label' => get_string('admin_courseops_grades_advanced', 'local_launchpad'),
             'grades_advanced_help' => get_string('admin_courseops_grades_advanced_help', 'local_launchpad'),
@@ -623,15 +631,24 @@ final class admin_dashboard {
             'grades_items_title' => get_string('admin_courseops_grades_items_title', 'local_launchpad'),
             'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
             'col_grade' => get_string('admin_courseops_col_grade', 'local_launchpad'),
+            'col_item_grade' => get_string('admin_courseops_col_item_grade', 'local_launchpad'),
             'col_percent' => get_string('admin_courseops_col_percent', 'local_launchpad'),
             'col_actions' => get_string('admin_courseops_col_actions', 'local_launchpad'),
             'col_activity' => get_string('admin_courseops_col_activity', 'local_launchpad'),
             'col_type' => get_string('admin_courseops_col_type', 'local_launchpad'),
             'col_max' => get_string('admin_courseops_col_max', 'local_launchpad'),
+            'col_feedback' => get_string('admin_courseops_col_feedback', 'local_launchpad'),
             'grades_empty_fellows' => get_string('admin_courseops_grades_empty_fellows', 'local_launchpad'),
             'grades_empty_items' => get_string('admin_courseops_grades_empty_items', 'local_launchpad'),
             'grades_open_user_label' => get_string('admin_courseops_grades_open_user', 'local_launchpad'),
             'grades_hidden_course' => get_string('admin_courseops_grades_hidden_course', 'local_launchpad'),
+            'grades_back_roster_label' => get_string('admin_courseops_grades_back_roster', 'local_launchpad'),
+            'grades_back_roster_url' => $rosterurl,
+            'grades_report_heading' => get_string('admin_courseops_grades_report_heading', 'local_launchpad'),
+            'grades_course_total_label' => get_string('admin_courseops_grades_course_total', 'local_launchpad'),
+            'grades_not_graded' => get_string('admin_courseops_grades_not_graded', 'local_launchpad'),
+            'grades_empty_detail' => get_string('admin_courseops_grades_empty_detail', 'local_launchpad'),
+            'grades_unknown_fellow' => get_string('admin_courseops_grades_unknown_fellow', 'local_launchpad'),
             'grade_rows' => [],
             'has_grade_rows' => false,
             'item_rows' => [],
@@ -639,6 +656,15 @@ final class admin_dashboard {
             'grades_stat_graded' => '',
             'grades_stat_avg' => '',
             'grades_showgrades' => !empty($course->showgrades),
+            'grades_is_user_report' => false,
+            'grades_report_name' => '',
+            'grades_report_initials' => '',
+            'grades_report_total' => '—',
+            'grades_report_percent' => '—',
+            'grades_report_has_total' => false,
+            'grades_report_rows' => [],
+            'has_grades_report_rows' => false,
+            'grades_report_ok' => false,
         ];
 
         if (!$canview) {
@@ -646,6 +672,34 @@ final class admin_dashboard {
         }
 
         $fellows = self::list_track_fellows($trackid);
+
+        // In-shell user report for one fellow (section=grades&userid=…).
+        if ($reportuserid > 0) {
+            $fellow = null;
+            foreach ($fellows as $row) {
+                if ((int) $row['id'] === $reportuserid) {
+                    $fellow = $row;
+                    break;
+                }
+            }
+            $base['grades_is_user_report'] = true;
+            $base['grades_lead'] = get_string('admin_courseops_grades_detail_lead', 'local_launchpad');
+            if ($fellow === null) {
+                return $base;
+            }
+            $detail = self::courseops_grades_user_detail($trackid, $reportuserid);
+            return array_merge($base, [
+                'grades_report_ok' => true,
+                'grades_report_name' => $fellow['name'],
+                'grades_report_initials' => $fellow['initials'],
+                'grades_report_total' => $detail['course_total'],
+                'grades_report_percent' => $detail['course_percent'],
+                'grades_report_has_total' => $detail['has_course_total'],
+                'grades_report_rows' => $detail['rows'],
+                'has_grades_report_rows' => $detail['rows'] !== [],
+            ]);
+        }
+
         $courseitem = \grade_item::fetch_course_item($trackid);
         $graderows = [];
         $gradedcount = 0;
@@ -682,8 +736,10 @@ final class admin_dashboard {
                 'grade_display' => $display,
                 'percent_display' => $pctlabel,
                 'has_grade' => $hasgrade,
-                'user_report_url' => (new \moodle_url('/grade/report/user/index.php', [
-                    'id' => $trackid,
+                'user_report_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => $trackid,
+                    'section' => 'grades',
                     'userid' => $uid,
                 ]))->out(false),
             ];
@@ -702,24 +758,13 @@ final class admin_dashboard {
             if (!empty($item->itemmodule)) {
                 $modlabel = get_string('pluginname', 'mod_' . $item->itemmodule);
             }
-            $graderurl = '';
-            $hasgrader = false;
-            if ($item->itemmodule === 'assign' && !empty($item->iteminstance)) {
-                $cmid = self::courseops_cmid_for_mod($trackid, 'assign', (int) $item->iteminstance);
-                if ($cmid > 0) {
-                    $graderurl = (new \moodle_url('/mod/assign/view.php', [
-                        'id' => $cmid,
-                        'action' => 'grader',
-                    ]))->out(false);
-                    $hasgrader = true;
-                }
-            }
+            $isassign = $item->itemmodule === 'assign';
             $itemrows[] = [
                 'name' => $item->get_name(),
                 'type_label' => $modlabel !== '' ? $modlabel : (string) $item->itemtype,
                 'max_display' => format_float((float) $item->grademax, 2),
-                'grader_url' => $graderurl,
-                'has_grader' => $hasgrader,
+                'is_assign' => $isassign,
+                'reviews_url' => $reviewsurl,
             ];
         }
 
@@ -738,8 +783,82 @@ final class admin_dashboard {
                 (object) ['graded' => $gradedcount, 'total' => count($fellows)]
             ),
             'grades_stat_avg' => $avglabel,
-            'grades_open_item_label' => get_string('admin_courseops_grades_open_item', 'local_launchpad'),
+            'grades_open_item_label' => get_string('admin_courseops_grades_reviews', 'local_launchpad'),
         ]);
+    }
+
+    /**
+     * In-shell per-fellow grade items for Course ops Grades (grade_item / grade_grade).
+     *
+     * @return array{course_total:string,course_percent:string,has_course_total:bool,rows:array<int,array<string,mixed>>}
+     */
+    private static function courseops_grades_user_detail(int $trackid, int $userid): array {
+        $notgraded = get_string('admin_courseops_grades_not_graded', 'local_launchpad');
+        $coursetotal = '—';
+        $coursepercent = '—';
+        $hascoursetotal = false;
+        $rows = [];
+
+        $courseitem = \grade_item::fetch_course_item($trackid);
+        if ($courseitem) {
+            $grade = new \grade_grade(['itemid' => $courseitem->id, 'userid' => $userid]);
+            $grade->grade_item = $courseitem;
+            if ($grade->finalgrade !== null) {
+                $hascoursetotal = true;
+                $coursetotal = grade_format_gradevalue($grade->finalgrade, $courseitem);
+                if ($courseitem->grademax > $courseitem->grademin) {
+                    $fraction = ((float) $grade->finalgrade - (float) $courseitem->grademin)
+                        / ((float) $courseitem->grademax - (float) $courseitem->grademin);
+                    $coursepercent = ((int) round($fraction * 100)) . '%';
+                }
+            }
+        }
+
+        $items = \grade_item::fetch_all(['courseid' => $trackid]) ?: [];
+        foreach ($items as $item) {
+            if ($item->itemtype !== 'mod' || (int) $item->gradetype === GRADE_TYPE_NONE) {
+                continue;
+            }
+            if (!empty($item->outcomeid)) {
+                continue;
+            }
+            $modlabel = '';
+            if (!empty($item->itemmodule)) {
+                $modlabel = get_string('pluginname', 'mod_' . $item->itemmodule);
+            }
+            $gg = new \grade_grade(['itemid' => $item->id, 'userid' => $userid]);
+            $gg->grade_item = $item;
+            $gradedisplay = $notgraded;
+            $pctdisplay = '—';
+            $hasgrade = false;
+            if ($gg->finalgrade !== null) {
+                $hasgrade = true;
+                $gradedisplay = grade_format_gradevalue($gg->finalgrade, $item);
+                if ($item->grademax > $item->grademin) {
+                    $fraction = ((float) $gg->finalgrade - (float) $item->grademin)
+                        / ((float) $item->grademax - (float) $item->grademin);
+                    $pctdisplay = ((int) round($fraction * 100)) . '%';
+                }
+            }
+            $feedback = trim(html_to_text((string) ($gg->feedback ?? ''), 0, false));
+            $rows[] = [
+                'name' => $item->get_name(),
+                'type_label' => $modlabel !== '' ? $modlabel : (string) $item->itemtype,
+                'grade_display' => $gradedisplay,
+                'percent_display' => $pctdisplay,
+                'feedback_display' => $feedback !== '' ? $feedback : '—',
+                'has_feedback' => $feedback !== '',
+                'has_grade' => $hasgrade,
+                'is_assign' => $item->itemmodule === 'assign',
+            ];
+        }
+
+        return [
+            'course_total' => $coursetotal,
+            'course_percent' => $coursepercent,
+            'has_course_total' => $hascoursetotal,
+            'rows' => $rows,
+        ];
     }
 
     /**

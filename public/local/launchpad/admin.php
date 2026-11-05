@@ -512,9 +512,20 @@ if ($view === 'tracks') {
     );
 } else if ($view === 'courseops') {
     $pagetitle = get_string('admin_courseops_heading', 'local_launchpad');
+    // Grades user report: section=grades&userid=… (not the logged-in admin id).
+    $courseopsreportuserid = 0;
+    if ($courseopssection === 'grades') {
+        $courseopsreportuserid = optional_param('userid', 0, PARAM_INT);
+    }
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_courseops',
-        admin_dashboard::courseops_context($USER, $trackid, $courseopssection, $flash)
+        admin_dashboard::courseops_context(
+            $USER,
+            $trackid,
+            $courseopssection,
+            $flash,
+            $courseopsreportuserid
+        )
     );
 } else if ($view === 'builder') {
     $pagetitle = get_string('admin_nav_builder', 'local_launchpad');

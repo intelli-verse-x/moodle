@@ -950,6 +950,14 @@ body.local-launchpad-mentor {
   gap: 8px;
   margin-top: 14px;
 }
+.lp-courseops-grade-hero {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+.lp-courseops-grade-hero .lp-courseops-stat-row {
+  margin-top: 0;
+}
 .lp-courseops-progress {
   display: flex;
   flex-direction: column;
