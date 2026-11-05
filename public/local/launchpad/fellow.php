@@ -395,14 +395,26 @@ $nocourses = $lpstr(
 switch ($view) {
     case 'activity':
         $pagetitle = get_string('fellowship_activity_eyebrow', 'local_launchpad');
+        $trackback = new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']);
         if ($cmid <= 0) {
-            redirect(new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']));
+            redirect($trackback);
+        }
+        $cmrecord = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+        $onfellowcourse = $cmrecord && (
+            in_array((int) $cmrecord->course, $courseids, true) || is_siteadmin()
+        );
+        if (!$onfellowcourse) {
+            redirect($trackback);
         }
         $trackurl = (new moodle_url(persona_home::FELLOW_PATH, array_filter([
             'view' => 'track',
             'id' => $courseid > 0 ? $courseid : null,
         ])))->out(false);
-        $activityctx = activity_portal::export($USER, $cmid, ['courseurl' => $trackurl]);
+        try {
+            $activityctx = activity_portal::export($USER, $cmid, ['courseurl' => $trackurl]);
+        } catch (\moodle_exception $e) {
+            redirect($trackback);
+        }
         $act = $activityctx['activity'] ?? [];
         $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
         $modtype = (string) ($act['modtype'] ?? '');
