@@ -31,6 +31,7 @@ require_once(__DIR__ . '/classes/messaging.php');
 require_once(__DIR__ . '/classes/calendar_service.php');
 
 use local_launchpad\account_persona;
+use local_launchpad\employer_dashboard;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\mentor_dashboard;
@@ -362,6 +363,9 @@ $unread = messaging::notification_unread_count($userid);
 $notificationslabel = messaging::notifications_label($unread);
 
 $mismatch = portal_gate::consume_modal_context();
+$mentorinitials = fellowship_dashboard::initials($USER);
+$mentoremail = trim((string) ($USER->email ?? ''));
+$preferencesurl = (new moodle_url('/user/preferences.php'))->out(false);
 $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_merge([
     'data_region' => mentor_dashboard::DATA_REGION,
     'displayname' => $displayname,
@@ -377,7 +381,27 @@ $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_mer
     'notifications_label' => $notificationslabel,
     'unread_notifications' => $unread,
     'has_unread_notifications' => $unread > 0,
-    'initials' => fellowship_dashboard::initials($USER),
+    'initials' => $mentorinitials,
+    'profile_menu' => employer_dashboard::profile_menu_context(
+        $mentorinitials,
+        $displayname,
+        $mentoremail,
+        $profileurl,
+        $preferencesurl,
+        $logouturl
+    ),
+    'profile_menu_side' => [
+        'profile_menu' => employer_dashboard::profile_menu_context(
+            $mentorinitials,
+            $displayname,
+            $mentoremail,
+            $profileurl,
+            $preferencesurl,
+            $logouturl,
+            true,
+            get_string('mentor_role_label', 'local_launchpad')
+        ),
+    ],
 ], $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
@@ -391,6 +415,7 @@ echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
+echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '</head>' . "\n";
 $bodyclass = 'local-launchpad-fellowship local-launchpad-mentor';
 if (!empty($mismatch['show_portal_mismatch'])) {

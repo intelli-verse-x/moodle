@@ -1,9 +1,17 @@
 {{!
     @template local_launchpad/fellowship_portfolio
 
-    Fellowship portfolio — Capstone hero + stats + Moodle assign evidence list.
+    Fellowship portfolio — selected-track Moodle evidence + accurate At a glance.
 }}
 <div class="lp-tools-page lp-reveal" data-region="fellowship-portfolio" style="--lp-d:0">
+  {{#multi_course}}
+    <div class="lp-course-switch lp-home-switch lp-reveal" role="navigation" aria-label="{{#str}} fellowship_switch_courses, local_launchpad {{/str}}" style="--lp-d:0">
+      {{#course_switch}}
+        <a class="lp-chip{{#selected}} is-on{{/selected}}" href="{{url}}"{{#selected}} aria-current="page"{{/selected}}>{{{fullname}}}</a>
+      {{/course_switch}}
+    </div>
+  {{/multi_course}}
+
   <div class="lp-port-system">
     <section class="lp-card lift lp-theme-hero lp-port-overview">
       <div class="lp-theme-hero-main">
@@ -14,11 +22,20 @@
           <div class="lp-card-copy">
             <div class="lp-theme-hero-heading">
               <h3>{{#str}} fellowship_nav_portfolio, local_launchpad {{/str}}</h3>
+              <span class="lp-chip {{evidence_chip}}">{{evidence_status}}</span>
             </div>
-            <p>{{#str}} fellowship_portfolio_intro, local_launchpad {{/str}}</p>
+            {{#selected_course_name}}
+              <p class="lp-port-track">{{{selected_course_name}}}</p>
+            {{/selected_course_name}}
+            {{^selected_course_name}}
+              <p>{{#str}} fellowship_portfolio_intro, local_launchpad {{/str}}</p>
+            {{/selected_course_name}}
           </div>
         </div>
-        <p class="lp-sm lp-theme-hero-body">{{#str}} fellowship_portfolio_lead, local_launchpad {{/str}}</p>
+        <div class="lp-comp-hero-summary">
+          <h2 class="lp-port-evidence-headline">{{evidence_headline}}</h2>
+          <p class="lp-muted lp-sm">{{hero_summary}}</p>
+        </div>
       </div>
       <div class="lp-theme-hero-art" aria-hidden="true">
         <span class="lp-theme-hero-orb"></span>
@@ -38,19 +55,28 @@
         </div>
       </div>
       <dl class="lp-theme-kv lp-port-stats-kv">
-        <div class="lp-theme-kv-row{{#has_submitted}} is-hot{{/has_submitted}}">
-          <dt>{{#str}} fellowship_portfolio_stat_submitted, local_launchpad {{/str}}</dt>
-          <dd><b class="lp-num">{{count_submitted}}</b></dd>
+        <div class="lp-theme-kv-row{{#has_evidence}} is-hot{{/has_evidence}}">
+          <dt>{{#str}} fellowship_portfolio_stat_evidence, local_launchpad {{/str}}</dt>
+          <dd>
+            <b class="lp-num">{{count_evidence}}</b>
+            {{#has_total}}<span class="lp-comp-stat-of">/ {{count_total}}</span>{{/has_total}}
+          </dd>
         </div>
-        <div class="lp-theme-kv-row">
+        <div class="lp-theme-kv-row{{#has_reviewed}} is-hot{{/has_reviewed}}">
           <dt>{{#str}} fellowship_portfolio_stat_reviewed, local_launchpad {{/str}}</dt>
           <dd><b class="lp-num">{{count_reviewed}}</b></dd>
         </div>
-        <div class="lp-theme-kv-row{{#has_attention}} is-hot{{/has_attention}}">
+        <div class="lp-theme-kv-row{{#has_awaiting}} is-hot{{/has_awaiting}}">
           <dt>{{#str}} fellowship_portfolio_stat_awaiting, local_launchpad {{/str}}</dt>
           <dd><b class="lp-num">{{count_awaiting}}</b></dd>
         </div>
-        <div class="lp-theme-kv-row">
+        {{#has_attention}}
+          <div class="lp-theme-kv-row is-hot">
+            <dt>{{#str}} fellowship_portfolio_stat_attention, local_launchpad {{/str}}</dt>
+            <dd><b class="lp-num">{{count_attention}}</b></dd>
+          </div>
+        {{/has_attention}}
+        <div class="lp-theme-kv-row{{#has_open}} is-hot{{/has_open}}">
           <dt>{{#str}} fellowship_portfolio_stat_open, local_launchpad {{/str}}</dt>
           <dd><b class="lp-num">{{count_open}}</b></dd>
         </div>
@@ -59,16 +85,26 @@
   </div>
 
   {{#has_items}}
-    <section class="lp-card lift lp-port-workspace" aria-label="{{#str}} fellowship_nav_portfolio, local_launchpad {{/str}}">
+    <section class="lp-card lift lp-port-workspace" aria-label="{{list_heading}}">
+      <div class="lp-card-head lp-port-list-head">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+            <iconify-icon icon="hugeicons:task-01" width="18" height="18"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{list_heading}}</h3>
+            <p class="lp-sm lp-muted">{{#str}} fellowship_portfolio_list_lead, local_launchpad {{/str}}</p>
+          </div>
+        </div>
+      </div>
       <ul class="lp-port-list">
         {{#items}}
-          <li class="lp-port-item{{#needs_attention}} is-attention{{/needs_attention}}{{#is_open}} is-open{{/is_open}}">
+          <li class="lp-port-item{{#needs_attention}} is-attention{{/needs_attention}}">
             <div class="lp-port-item-main">
               <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
                 <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
               </span>
               <div class="lp-port-item-copy">
-                {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
                 <h3><a href="{{url}}">{{{name}}}</a></h3>
                 {{#summary}}<p class="lp-sm lp-muted">{{summary}}</p>{{/summary}}
                 <div class="lp-port-item-meta">
@@ -95,6 +131,9 @@
       </div>
       <h2>{{#str}} fellowship_portfolio_empty_title, local_launchpad {{/str}}</h2>
       <p>{{#str}} fellowship_portfolio_empty_body, local_launchpad {{/str}}</p>
+      {{#track_url}}
+        <a class="lp-btn lp-btn-light" href="{{track_url}}">{{#str}} fellowship_nav_track, local_launchpad {{/str}}</a>
+      {{/track_url}}
     </div>
   {{/has_items}}
 </div>

@@ -139,9 +139,10 @@ final class activity_portal {
         $typename = method_exists($cm, 'get_module_type_name')
             ? (string) $cm->get_module_type_name()
             : get_string('modulename', $modname);
-        $title = $cm->get_formatted_name();
+        $title = fellowship_dashboard::display_label($cm->get_formatted_name());
         // Figma card: primary title + grey subtitle in brackets.
-        $titleplain = trim(html_entity_decode(strip_tags($title), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        // Placeholder suffixes are already stripped so they never become the subtitle.
+        $titleplain = $title;
         $titlemain = $titleplain;
         $titlesub = '';
         if (preg_match('/^(.*?)\s*(\[[^\]]+\])\s*$/u', $titleplain, $m)) {
@@ -316,10 +317,10 @@ final class activity_portal {
             'is_home' => false,
             'is_courses' => false,
             'is_course' => false,
-            'pagetitle' => format_string($title),
+            'pagetitle' => $title,
             'activity' => array_merge([
                 'cmid' => (int) $cm->id,
-                'name' => format_string($title),
+                'name' => $title,
                 // Plain strings — Mustache {{ }} escapes; do not pre-s().
                 'title_main' => $titlemain !== '' ? $titlemain : $titleplain,
                 'title_sub' => $titlesub,
@@ -989,7 +990,7 @@ final class activity_portal {
             if ($found) {
                 return [
                     'cmid' => (int) $other->id,
-                    'name' => $other->get_formatted_name(),
+                    'name' => fellowship_dashboard::display_label($other->get_formatted_name()),
                     'url' => self::fellow_url((int) $other->id),
                     'modname' => (string) $other->modname,
                 ];
