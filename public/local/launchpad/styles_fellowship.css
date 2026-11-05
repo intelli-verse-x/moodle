@@ -759,9 +759,41 @@ body.local-launchpad-mentor {
   color: var(--lp-navy);
   text-decoration: underline;
 }
+.lp-courseops-settings-form {
+  gap: 14px;
+  margin-top: 4px;
+}
+.lp-courseops-date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.lp-courseops-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.lp-courseops-advanced {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--lp-line);
+}
+.lp-courseops-settings-form .lp-check-row .lp-muted {
+  display: block;
+  font-weight: 500;
+  margin-top: 2px;
+}
 @media (max-width: 900px) {
   .lp-courseops-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lp-courseops-date-row {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 560px) {

@@ -74,9 +74,37 @@ if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
 }
 
 if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage'
-            || $view === 'activity' || $view === 'announcements' || $view === 'reviews')
+            || $view === 'activity' || $view === 'announcements' || $view === 'reviews'
+            || $view === 'courseops')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'courseops' && $action === 'save_course_settings') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $fullname = optional_param('fullname', '', PARAM_TEXT);
+        $shortname = optional_param('shortname', '', PARAM_TEXT);
+        $visible = (bool) optional_param('visible', 0, PARAM_BOOL);
+        $startdate = optional_param('startdate', '', PARAM_TEXT);
+        $enddate = optional_param('enddate', '', PARAM_TEXT);
+        $enablecompletion = (bool) optional_param('enablecompletion', 0, PARAM_BOOL);
+        $summary = optional_param('summary', '', PARAM_RAW);
+        $flash = admin_dashboard::save_courseops_settings(
+            $USER,
+            $trackid,
+            $fullname,
+            $shortname,
+            $visible,
+            $startdate,
+            $enddate,
+            $enablecompletion,
+            $summary
+        );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'settings',
+        ]));
+    }
     if ($view === 'reviews' && $action === 'ping_review') {
         $submissionid = optional_param('submissionid', 0, PARAM_INT);
         $pingteacherid = optional_param('teacherid', 0, PARAM_INT);
@@ -453,7 +481,7 @@ if ($view === 'tracks') {
     $pagetitle = get_string('admin_courseops_heading', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_courseops',
-        admin_dashboard::courseops_context($USER, $trackid, $courseopssection)
+        admin_dashboard::courseops_context($USER, $trackid, $courseopssection, $flash)
     );
 } else if ($view === 'builder') {
     $pagetitle = get_string('admin_nav_builder', 'local_launchpad');

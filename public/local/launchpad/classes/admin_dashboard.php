@@ -198,9 +198,19 @@ final class admin_dashboard {
      * @param \stdClass $user
      * @param int $trackid
      * @param string $section hub|settings|participants|grades|completion|reports|qbank
+     * @param array{ok?:string,error?:string} $flash
      * @return array<string, mixed>
      */
-    public static function courseops_context(\stdClass $user, int $trackid = 0, string $section = 'hub'): array {
+    public static function courseops_context(
+        \stdClass $user,
+        int $trackid = 0,
+        string $section = 'hub',
+        array $flash = []
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/completionlib.php');
+
         unset($user);
         $allowed = ['hub', 'settings', 'participants', 'grades', 'completion', 'reports', 'qbank'];
         if (!in_array($section, $allowed, true)) {
@@ -216,6 +226,12 @@ final class admin_dashboard {
                 'lead' => get_string('admin_courseops_lead', 'local_launchpad'),
                 'has_tracks' => false,
                 'is_hub' => true,
+                'is_settings' => false,
+                'is_soon' => false,
+                'flash_ok' => !empty($flash['ok']),
+                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+                'flash_err' => !empty($flash['error']),
+                'flash_err_body' => (string) ($flash['error'] ?? ''),
             ], self::empty_state(
                 'admin_tracks_empty',
                 'admin_empty_title_no_tracks',
@@ -226,7 +242,9 @@ final class admin_dashboard {
 
         $selected = self::resolve_track_course($trackid);
         $trackid = (int) $selected->id;
-        $visible = (int) ($selected->visible ?? 0) === 1;
+        // Full row for settings (list query is slim).
+        $fullcourse = $DB->get_record('course', ['id' => $trackid], '*', MUST_EXIST);
+        $visible = (int) ($fullcourse->visible ?? 0) === 1;
         $teachers = self::teacher_names($trackid);
         $fellows = self::fellow_count($trackid);
         $foundationsready = self::foundations_ready($trackid);
@@ -317,11 +335,8 @@ final class admin_dashboard {
         }
 
         $ishub = $section === 'hub';
+        $issettings = $section === 'settings';
         $sectionmeta = [
-            'settings' => [
-                'title' => get_string('admin_courseops_nav_settings', 'local_launchpad'),
-                'body' => get_string('admin_courseops_soon_settings', 'local_launchpad'),
-            ],
             'participants' => [
                 'title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
                 'body' => get_string('admin_courseops_soon_participants', 'local_launchpad'),
@@ -344,13 +359,20 @@ final class admin_dashboard {
             ],
         ];
 
-        return [
+        $sitecompletion = !empty($CFG->enablecompletion);
+        $coursecompletion = $sitecompletion
+            && (int) ($fullcourse->enablecompletion ?? 0) === COMPLETION_ENABLED;
+        $startdate = (int) ($fullcourse->startdate ?? 0);
+        $enddate = (int) ($fullcourse->enddate ?? 0);
+        $summaryplain = trim(html_to_text((string) ($fullcourse->summary ?? ''), 0, false));
+
+        $ctx = [
             'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
             'lead' => get_string('admin_courseops_lead', 'local_launchpad'),
             'has_tracks' => true,
-            'track_name' => format_string($selected->fullname),
-            'track_idnumber' => s($selected->idnumber ?? ''),
+            'track_name' => format_string($fullcourse->fullname),
+            'track_idnumber' => s($fullcourse->idnumber ?? ''),
             'trackid' => $trackid,
             'track_tabs' => $tracktabs,
             'is_visible' => $visible,
@@ -378,12 +400,248 @@ final class admin_dashboard {
             'ops_lead' => get_string('admin_courseops_ops_lead', 'local_launchpad'),
             'primary_nav' => $primary,
             'is_hub' => $ishub,
+            'is_settings' => $issettings,
+            'is_soon' => !$ishub && !$issettings,
             'section' => $section,
-            'section_title' => $ishub ? '' : (string) ($sectionmeta[$section]['title'] ?? ''),
-            'section_body' => $ishub ? '' : (string) ($sectionmeta[$section]['body'] ?? ''),
+            'section_title' => ($ishub || $issettings)
+                ? ''
+                : (string) ($sectionmeta[$section]['title'] ?? ''),
+            'section_body' => ($ishub || $issettings)
+                ? ''
+                : (string) ($sectionmeta[$section]['body'] ?? ''),
             'soon_badge' => get_string('admin_courseops_soon_badge', 'local_launchpad'),
             'back_hub_label' => get_string('admin_courseops_back_hub', 'local_launchpad'),
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+            // Settings form (Slice B).
+            'settings_title' => get_string('admin_courseops_nav_settings', 'local_launchpad'),
+            'settings_lead' => get_string('admin_courseops_settings_lead', 'local_launchpad'),
+            'form_action' => $opsurl('settings'),
+            'sesskey' => sesskey(),
+            'fullname_label' => get_string('admin_courseops_field_fullname', 'local_launchpad'),
+            'fullname_value' => (string) $fullcourse->fullname,
+            'shortname_label' => get_string('admin_courseops_field_shortname', 'local_launchpad'),
+            'shortname_value' => (string) $fullcourse->shortname,
+            'idnumber_label' => get_string('admin_courseops_field_idnumber', 'local_launchpad'),
+            'idnumber_help' => get_string('admin_courseops_field_idnumber_help', 'local_launchpad'),
+            'visible_label' => get_string('admin_courseops_field_visible', 'local_launchpad'),
+            'visible_help' => get_string('admin_courseops_field_visible_help', 'local_launchpad'),
+            'visible_checked' => $visible,
+            'startdate_label' => get_string('admin_courseops_field_startdate', 'local_launchpad'),
+            'startdate_value' => self::format_course_date_value($startdate),
+            'enddate_label' => get_string('admin_courseops_field_enddate', 'local_launchpad'),
+            'enddate_help' => get_string('admin_courseops_field_enddate_help', 'local_launchpad'),
+            'enddate_value' => self::format_course_date_value($enddate),
+            'completion_site_on' => $sitecompletion,
+            'completion_label' => get_string('admin_courseops_field_completion', 'local_launchpad'),
+            'completion_help' => get_string('admin_courseops_field_completion_help', 'local_launchpad'),
+            'completion_checked' => $coursecompletion,
+            'completion_site_off' => get_string('admin_courseops_completion_site_off', 'local_launchpad'),
+            'summary_label' => get_string('admin_courseops_field_summary', 'local_launchpad'),
+            'summary_value' => $summaryplain,
+            'save_label' => get_string('admin_courseops_settings_save', 'local_launchpad'),
+            'advanced_url' => (new \moodle_url('/course/edit.php', ['id' => $trackid]))->out(false),
+            'advanced_label' => get_string('admin_courseops_settings_advanced', 'local_launchpad'),
+            'advanced_help' => get_string('admin_courseops_settings_advanced_help', 'local_launchpad'),
         ];
+
+        // Keep the user's draft after a failed save (validate → error → reload).
+        $posted = $flash['posted'] ?? null;
+        if (is_array($posted)) {
+            if (array_key_exists('fullname', $posted)) {
+                $ctx['fullname_value'] = (string) $posted['fullname'];
+            }
+            if (array_key_exists('shortname', $posted)) {
+                $ctx['shortname_value'] = (string) $posted['shortname'];
+            }
+            if (array_key_exists('visible', $posted)) {
+                $ctx['visible_checked'] = !empty($posted['visible']);
+            }
+            if (array_key_exists('startdate', $posted)) {
+                $ctx['startdate_value'] = (string) $posted['startdate'];
+            }
+            if (array_key_exists('enddate', $posted)) {
+                $ctx['enddate_value'] = (string) $posted['enddate'];
+            }
+            if (array_key_exists('enablecompletion', $posted)) {
+                $ctx['completion_checked'] = !empty($posted['enablecompletion']);
+            }
+            if (array_key_exists('summary', $posted)) {
+                $ctx['summary_value'] = (string) $posted['summary'];
+            }
+        }
+
+        return $ctx;
+    }
+
+    /**
+     * Save LaunchPad weekly course settings for a track (Slice B).
+     *
+     * @return array{ok?:string,error?:string,posted?:array<string,mixed>}
+     */
+    public static function save_courseops_settings(
+        \stdClass $user,
+        int $trackid,
+        string $fullname,
+        string $shortname,
+        bool $visible,
+        string $startraw,
+        string $endraw,
+        bool $enablecompletion,
+        string $summary
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $posted = self::courseops_settings_posted(
+            $fullname,
+            $shortname,
+            $visible,
+            $startraw,
+            $endraw,
+            $enablecompletion,
+            $summary
+        );
+        $fail = static function (string $error) use ($posted): array {
+            return ['error' => $error, 'posted' => $posted];
+        };
+
+        $fullname = trim($fullname);
+        $shortname = trim($shortname);
+        if ($fullname === '') {
+            return $fail(get_string('admin_courseops_err_fullname', 'local_launchpad'));
+        }
+        if ($shortname === '') {
+            return $fail(get_string('admin_courseops_err_shortname', 'local_launchpad'));
+        }
+
+        $course = self::resolve_track_course($trackid);
+        if ($course === null || (int) $course->id !== $trackid) {
+            return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
+        }
+        $full = $DB->get_record('course', ['id' => $trackid], '*', IGNORE_MISSING);
+        if (!$full || !self::is_track_idnumber((string) ($full->idnumber ?? ''))) {
+            return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
+        }
+
+        $modcontext = \context_course::instance($trackid);
+        if (!has_capability('moodle/course:update', $modcontext, $user)) {
+            return $fail(get_string('admin_courseops_err_cap', 'local_launchpad'));
+        }
+        $wantvisible = $visible ? 1 : 0;
+        if ($wantvisible !== (int) $full->visible
+                && !has_capability('moodle/course:visibility', $modcontext, $user)) {
+            return $fail(get_string('admin_courseops_err_cap_visibility', 'local_launchpad'));
+        }
+
+        $startdate = self::parse_course_date($startraw);
+        if ($startdate === null && trim($startraw) !== '') {
+            return $fail(get_string('admin_courseops_err_startdate', 'local_launchpad'));
+        }
+        if ($startdate === null) {
+            $startdate = (int) ($full->startdate ?? 0);
+        }
+
+        $enddate = self::parse_course_date($endraw);
+        if ($enddate === null && trim($endraw) !== '') {
+            return $fail(get_string('admin_courseops_err_enddate', 'local_launchpad'));
+        }
+        if (trim($endraw) === '') {
+            $enddate = 0;
+        }
+        if ($enddate > 0 && $startdate > 0 && $enddate < $startdate) {
+            return $fail(get_string('admin_courseops_err_date_order', 'local_launchpad'));
+        }
+
+        $completion = COMPLETION_DISABLED;
+        if (!empty($CFG->enablecompletion) && $enablecompletion) {
+            $completion = COMPLETION_ENABLED;
+        }
+
+        $data = (object) [
+            'id' => $trackid,
+            'fullname' => $fullname,
+            'shortname' => $shortname,
+            'visible' => $wantvisible,
+            'startdate' => $startdate,
+            'enddate' => $enddate,
+            'enablecompletion' => $completion,
+            'summary' => clean_text($summary, FORMAT_HTML),
+            'summaryformat' => FORMAT_HTML,
+        ];
+
+        try {
+            update_course($data);
+        } catch (\Throwable $e) {
+            return $fail(self::flash_error_message($e));
+        }
+
+        return ['ok' => get_string('admin_courseops_settings_ok', 'local_launchpad')];
+    }
+
+    /**
+     * Snapshot of Settings form fields to re-show after a failed save.
+     *
+     * @return array<string, mixed>
+     */
+    private static function courseops_settings_posted(
+        string $fullname,
+        string $shortname,
+        bool $visible,
+        string $startraw,
+        string $endraw,
+        bool $enablecompletion,
+        string $summary
+    ): array {
+        return [
+            'fullname' => $fullname,
+            'shortname' => $shortname,
+            'visible' => $visible,
+            'startdate' => $startraw,
+            'enddate' => $endraw,
+            'enablecompletion' => $enablecompletion,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Parse HTML date (YYYY-MM-DD) in the current user's timezone → unix midnight.
+     * Empty → null.
+     */
+    public static function parse_course_date(string $raw): ?int {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $raw, $m)) {
+            return null;
+        }
+        $year = (int) $m[1];
+        $month = (int) $m[2];
+        $day = (int) $m[3];
+        if ($year < 1970 || $month < 1 || $month > 12 || $day < 1 || $day > 31) {
+            return null;
+        }
+        return make_timestamp($year, $month, $day, 0, 0, 0);
+    }
+
+    /**
+     * Value for HTML date inputs.
+     */
+    public static function format_course_date_value(int $ts): string {
+        if ($ts <= 0) {
+            return '';
+        }
+        return sprintf(
+            '%04d-%02d-%02d',
+            (int) userdate($ts, '%Y'),
+            (int) userdate($ts, '%m'),
+            (int) userdate($ts, '%d')
+        );
     }
 
     /**
