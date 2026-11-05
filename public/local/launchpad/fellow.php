@@ -29,6 +29,8 @@ require_once(__DIR__ . '/classes/portal_gate.php');
 require_once(__DIR__ . '/classes/messaging.php');
 require_once(__DIR__ . '/classes/calendar_service.php');
 
+use local_launchpad\activity_portal;
+use local_launchpad\announcement_service;
 use local_launchpad\employer_dashboard;
 use local_launchpad\employer_tools;
 use local_launchpad\fellowship_dashboard;
@@ -50,7 +52,7 @@ $lpstr = static function (string $key, $a = null, string $fallback = ''): string
 require_login();
 
 $userid = (int) $USER->id;
-// Mentors/employees must not land here; admins may preview (can_access).
+// Mentors/employees/admins must not land here — wrong portal → their home.
 portal_gate::assert_or_redirect_home(
     fellowship_dashboard::can_access($userid),
     login_portal::FELLOWSHIP
@@ -62,6 +64,7 @@ $messageuserid = 0;
 $messageconvid = 0;
 $messagetab = 'all';
 $courseid = 0;
+$cmid = optional_param('cmid', 0, PARAM_INT);
 $ptab = optional_param('ptab', 'overview', PARAM_ALPHA);
 if (!in_array($ptab, ['overview', 'edit', 'preferences'], true)) {
     $ptab = 'overview';
@@ -138,6 +141,12 @@ if ($view === 'messages') {
     if ($messageconvid < 0) {
         $messageconvid = 0;
     }
+} else if ($view === 'activity' && $cmid > 0) {
+    // Resolve course from the CM so track nav / access checks stay coherent.
+    $cmforcourse = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+    if ($cmforcourse) {
+        $courseid = (int) $cmforcourse->course;
+    }
 } else {
     $courseid = optional_param('id', 0, PARAM_INT);
 }
@@ -163,7 +172,7 @@ if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
         $result = messaging::delete_messages($userid, $messageids);
     } else {
         $body = required_param('message', PARAM_RAW_TRIMMED);
-        $result = messaging::send($userid, $toid, $body);
+        $result = messaging::send($userid, $toid, $body, 'fellow');
     }
     if (!$result['ok']) {
         redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);
@@ -177,7 +186,8 @@ $PAGE->set_url(new moodle_url(persona_home::FELLOW_PATH, array_filter([
     'view' => $view !== 'home' ? $view : null,
     'id' => $view === 'messages'
         ? ($messageuserid > 0 ? $messageuserid : null)
-        : ($courseid > 0 ? $courseid : null),
+        : (($view !== 'activity' && $courseid > 0) ? $courseid : null),
+    'cmid' => ($view === 'activity' && $cmid > 0) ? $cmid : null,
     'convid' => ($view === 'messages' && $messageuserid <= 0 && $messageconvid > 0) ? $messageconvid : null,
     'mtab' => ($view === 'messages' && $messagetab !== 'all') ? $messagetab : null,
     'tab' => ($view === 'achievements' && $tab !== 'all') ? $tab : null,
@@ -206,6 +216,11 @@ $progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']
 $notificationsurl = messaging::moodle_notifications_url();
 $messagesurl = messaging::messages_url(null, 'fellow');
 $msgunread = messaging::conversation_unread_count($userid);
+// Opening Announcements clears the news badge (Messages use Moodle read state; Feedback stays until revise).
+if ($view === 'news') {
+    announcement_service::mark_seen($userid);
+}
+$newsunread = announcement_service::unread_count_for_courses($userid, $courses);
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -231,7 +246,7 @@ $nav = [
             [
                 'label' => $lpstr('fellowship_nav_track', null, 'My track'),
                 'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
-                'current' => $view === 'track',
+                'current' => ($view === 'track' || $view === 'activity'),
                 'key' => 'track',
                 'icon_svg' => $icon('layers-01'),
             ],
@@ -272,6 +287,8 @@ $nav = [
                 'current' => $view === 'news',
                 'key' => 'news',
                 'icon_svg' => $icon('news'),
+                'has_badge' => $newsunread > 0,
+                'badge' => $newsunread > 0 ? (string) $newsunread : '',
             ],
             [
                 'label' => $lpstr('fellowship_nav_calendar', null, 'Calendar'),
@@ -376,6 +393,74 @@ $nocourses = $lpstr(
 );
 
 switch ($view) {
+    case 'activity':
+        $pagetitle = get_string('fellowship_activity_eyebrow', 'local_launchpad');
+        if ($cmid <= 0) {
+            redirect(new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']));
+        }
+        $trackurl = (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'track',
+            'id' => $courseid > 0 ? $courseid : null,
+        ])))->out(false);
+        $activityctx = activity_portal::export($USER, $cmid, ['courseurl' => $trackurl]);
+        $act = $activityctx['activity'] ?? [];
+        $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
+        $modtype = (string) ($act['modtype'] ?? '');
+        $showjudging = in_array($modtype, ['assign', 'quiz'], true);
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_activity', [
+            'activity' => array_merge($act, [
+                'show_judging' => $showjudging,
+                'judging_title' => get_string('fellowship_judging_title', 'local_launchpad'),
+                'judging_body' => $modtype === 'assign'
+                    ? get_string('fellowship_judging_body', 'local_launchpad')
+                    : get_string('fellowship_judging_short', 'local_launchpad'),
+            ]),
+            'home_url' => $homeurl,
+            'strings' => [
+                'navhome' => get_string('fellowship_nav_home', 'local_launchpad'),
+                'navtrack' => get_string('fellowship_nav_track', 'local_launchpad'),
+                'backtotrack' => get_string('fellowship_activity_back', 'local_launchpad'),
+                'openactivity' => get_string('fellowship_activity_open', 'local_launchpad'),
+                'openlink' => get_string('fellowship_activity_open_link', 'local_launchpad'),
+                'activityempty' => get_string('fellowship_activity_empty', 'local_launchpad'),
+                'contentcomingsoon' => get_string('fellowship_activity_coming_soon', 'local_launchpad'),
+                'activityenginehelp' => get_string('fellowship_activity_engine_help', 'local_launchpad'),
+                'lessonobjective' => get_string('fellowship_lesson_objective', 'local_launchpad'),
+                'lessonexplain' => get_string('fellowship_lesson_explain', 'local_launchpad'),
+                'lessonexample' => get_string('fellowship_lesson_example', 'local_launchpad'),
+                'lessonexercise' => get_string('fellowship_lesson_exercise', 'local_launchpad'),
+                'lessonmissing' => get_string('fellowship_lesson_missing', 'local_launchpad'),
+                'lessonnext' => get_string('fellowship_lesson_next', 'local_launchpad'),
+                'lessonnextlabel' => get_string('fellowship_lesson_next_label', 'local_launchpad'),
+                'assignbrief' => get_string('fellowship_assign_brief', 'local_launchpad'),
+                'assignbriefmissing' => get_string('fellowship_assign_brief_missing', 'local_launchpad'),
+                'assigndeliverable' => get_string('fellowship_assign_deliverable', 'local_launchpad'),
+                'assigncriteria' => get_string('fellowship_assign_criteria', 'local_launchpad'),
+                'assignformats' => get_string('fellowship_assign_formats', 'local_launchpad'),
+                'assigndeadline' => get_string('fellowship_assign_deadline', 'local_launchpad'),
+                'assignopens' => get_string('fellowship_assign_opens', 'local_launchpad'),
+                'assigngrade' => get_string('fellowship_assign_grade', 'local_launchpad'),
+                'assignpassbar' => get_string('fellowship_assign_pass_bar', 'local_launchpad'),
+                'assignstatus' => get_string('fellowship_assign_status', 'local_launchpad'),
+                'assigncontinue' => get_string('fellowship_assign_continue', 'local_launchpad'),
+                'assignenginehelp' => get_string('fellowship_assign_engine_help', 'local_launchpad'),
+                'quizbrief' => get_string('fellowship_quiz_brief', 'local_launchpad'),
+                'quizbriefmissing' => get_string('fellowship_quiz_brief_missing', 'local_launchpad'),
+                'quizpractice' => get_string('fellowship_quiz_practice', 'local_launchpad'),
+                'quizquestions' => get_string('fellowship_quiz_questions', 'local_launchpad'),
+                'quizattempts' => get_string('fellowship_quiz_attempts', 'local_launchpad'),
+                'quiztimelimit' => get_string('fellowship_quiz_timelimit', 'local_launchpad'),
+                'quizopens' => get_string('fellowship_quiz_opens', 'local_launchpad'),
+                'quizcloses' => get_string('fellowship_quiz_closes', 'local_launchpad'),
+                'quizgrade' => get_string('fellowship_quiz_grade', 'local_launchpad'),
+                'quizbest' => get_string('fellowship_quiz_best', 'local_launchpad'),
+                'quizstatus' => get_string('fellowship_quiz_status', 'local_launchpad'),
+                'quizcontinue' => get_string('fellowship_quiz_continue', 'local_launchpad'),
+                'quizenginehelp' => get_string('fellowship_quiz_engine_help', 'local_launchpad'),
+            ],
+        ]);
+        break;
+
     case 'track':
         $pagetitle = $lpstr('fellowship_nav_track', null, 'My track');
         if ($selected === null) {

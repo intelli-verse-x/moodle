@@ -28,6 +28,9 @@ final class mentor_dashboard {
     /** Marker for mentor shell templates / CSS. */
     public const DATA_REGION = 'local-launchpad-mentor';
 
+    /** Prefix stored in assignfeedback_comments when Changes includes a Next step. */
+    public const NEXT_STEP_MARKER = '[LP-NEXT]';
+
     /**
      * Whether this user may open the mentor shell.
      */
@@ -35,7 +38,8 @@ final class mentor_dashboard {
         if ($userid <= 0) {
             return false;
         }
-        return account_persona::is_mentor($userid) || is_siteadmin($userid);
+        // Site admins use admin.php — do not linger on the Mentor shell.
+        return account_persona::is_mentor($userid);
     }
 
     /**
@@ -623,6 +627,7 @@ final class mentor_dashboard {
         $gradepoints = '';
         $gradepct = '';
         $comment = '';
+        $nextstep = '';
         $hasgrade = false;
         if ($grade && $grade->grade !== null && (float) $grade->grade >= 0) {
             $hasgrade = true;
@@ -635,7 +640,9 @@ final class mentor_dashboard {
                 'grade' => (int) $grade->id,
             ]);
             if ($fc) {
-                $comment = (string) $fc->commenttext;
+                $parts = self::unpack_review_comment((string) $fc->commenttext);
+                $comment = $parts['comment'];
+                $nextstep = $parts['next_step'];
             }
         }
 
@@ -670,6 +677,7 @@ final class mentor_dashboard {
             'grade_pct' => $gradepct,
             'has_grade' => $hasgrade,
             'comment' => $comment,
+            'next_step' => $nextstep,
             'pass_bar' => 70,
             'queue_url' => $queueurl,
             'moodle_grader_url' => $moodlegrader,
@@ -701,7 +709,8 @@ final class mentor_dashboard {
         int $fellowid,
         string $gradepctraw,
         string $comment,
-        string $outcome
+        string $outcome,
+        string $nextstep = ''
     ): string {
         global $CFG, $DB;
 
@@ -739,6 +748,14 @@ final class mentor_dashboard {
         if ($outcome === 'met' && $pct < 70) {
             $outcome = 'changes';
         }
+
+        $nextstep = trim(preg_replace("/[\r\n]+/", ' ', $nextstep) ?? '');
+        if ($outcome === 'changes' && $nextstep === '') {
+            throw new \moodle_exception('mentor_review_nextstep_required', 'local_launchpad');
+        }
+        // Persist Next step inside the Moodle comment (no dedicated assign field).
+        $comment = self::pack_review_comment($comment, $outcome === 'changes' ? $nextstep : '');
+
 
         // Change notes require assignfeedback_comments. Curriculum placeholders often ship with
         // that plugin disabled — enable before save_grade or Moodle silently drops the text.
@@ -781,6 +798,61 @@ final class mentor_dashboard {
         $assign->save_grade($fellowid, $data);
 
         return $outcome === 'changes' ? 'changes' : 'released';
+    }
+
+    /**
+     * Pack Next step + change note into one assignfeedback_comments body.
+     */
+    public static function pack_review_comment(string $comment, string $nextstep = ''): string {
+        $comment = trim($comment);
+        $nextstep = trim(preg_replace("/[\r\n]+/", ' ', $nextstep) ?? '');
+        if ($nextstep === '') {
+            return $comment;
+        }
+        return self::NEXT_STEP_MARKER . ' ' . $nextstep . "\n\n" . $comment;
+    }
+
+    /**
+     * Split a stored feedback comment into Next step + body.
+     *
+     * @return array{next_step: string, comment: string}
+     */
+    public static function unpack_review_comment(string $raw): array {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return ['next_step' => '', 'comment' => ''];
+        }
+
+        // Plain FORMAT_MOODLE storage from save_review.
+        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+?)(?:\r?\n\r?\n|\r?\n)(.*)$/s', $raw, $m)) {
+            return [
+                'next_step' => trim($m[1]),
+                'comment' => trim($m[2]),
+            ];
+        }
+        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+)$/s', $raw, $m)) {
+            return [
+                'next_step' => trim($m[1]),
+                'comment' => '',
+            ];
+        }
+
+        // Legacy / Moodle-formatted HTML wrappers around the same marker.
+        $plain = trim(html_entity_decode(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>'], "\n", $raw)), ENT_QUOTES | ENT_HTML5));
+        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+?)(?:\n\n|\n)(.*)$/s', $plain, $m)) {
+            return [
+                'next_step' => trim($m[1]),
+                'comment' => trim($m[2]),
+            ];
+        }
+        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+)$/s', $plain, $m)) {
+            return [
+                'next_step' => trim($m[1]),
+                'comment' => '',
+            ];
+        }
+
+        return ['next_step' => '', 'comment' => $raw];
     }
 
     /**

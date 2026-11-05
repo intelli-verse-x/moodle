@@ -1,0 +1,111 @@
+{{!
+    @template local_launchpad/admin_overview
+
+    Admin Overview — live KPIs, visibility, needs attention.
+    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-overview">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{welcome_back}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+      <div class="lp-quest">
+        <div>
+          <p class="lp-quest-title">{{heading}}</p>
+          <p class="lp-muted">{{visibility_hint}}</p>
+        </div>
+        <a class="lp-btn lp-btn-primary" href="{{moodle_admin_url}}">{{moodle_admin_label}}</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="lp-stats lp-stats-4" role="list" style="margin-top:16px">
+  <div class="lp-stat" role="listitem" title="{{kpi_tracks_meta}}">
+    <b>{{kpi_tracks_ready}}<span class="lp-stat-gate"> / {{kpi_tracks_total}}</span></b>
+    <span>{{kpi_tracks_label}}</span>
+  </div>
+  <div class="lp-stat" role="listitem">
+    <b>{{kpi_fellows}}</b>
+    <span>{{kpi_fellows_label}}</span>
+  </div>
+  <div class="lp-stat" role="listitem">
+    <b>{{kpi_teachers}}</b>
+    <span>{{kpi_teachers_label}}</span>
+  </div>
+  <div class="lp-stat" role="listitem">
+    <b>{{kpi_reviews_pending}}</b>
+    <span>{{kpi_reviews_label}}</span>
+  </div>
+</div>
+
+<div class="lp-grid-2" style="margin-top:16px">
+  <section class="lp-card lift">
+    <div class="lp-card-head">
+      <h3>{{visibility_title}}</h3>
+    </div>
+    <p class="lp-muted">{{visibility_lead}}</p>
+    <p class="lp-sm" style="margin-top:10px">
+      <span class="lp-chip warn">{{hidden_label}}</span>
+      <span class="lp-chip ok">{{shown_label}}</span>
+    </p>
+    {{#visibility_empty}}
+      <p class="lp-muted" style="margin-top:12px">{{visibility_empty_body}}</p>
+    {{/visibility_empty}}
+    {{#has_hidden}}
+      <p class="lp-eyebrow" style="margin-top:16px">{{hidden_list_label}}</p>
+      <ul class="lp-course-list">
+        {{#hidden_courses}}
+          <li>
+            <a href="{{view_url}}">
+              <b>{{{name}}}</b>
+              <span class="lp-muted">{{idnumber}}</span>
+            </a>
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{edit_url}}">{{settings_label}}</a>
+          </li>
+        {{/hidden_courses}}
+      </ul>
+    {{/has_hidden}}
+    {{#has_shown}}
+      <p class="lp-eyebrow" style="margin-top:16px">{{shown_list_label}}</p>
+      <ul class="lp-course-list">
+        {{#shown_courses}}
+          <li>
+            <a href="{{view_url}}">
+              <b>{{{name}}}</b>
+              <span class="lp-muted">{{idnumber}}</span>
+            </a>
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{edit_url}}">{{settings_label}}</a>
+          </li>
+        {{/shown_courses}}
+      </ul>
+    {{/has_shown}}
+  </section>
+
+  <section class="lp-card soft">
+    <div class="lp-card-head">
+      <h3>{{attention_title}}</h3>
+    </div>
+    <p class="lp-muted">{{attention_lead}}</p>
+    {{#has_attention}}
+      <ul class="lp-course-list" style="margin-top:12px">
+        {{#attention_items}}
+          <li>
+            <div>
+              <b>{{{course_name}}}</b>
+              <span class="lp-muted">{{issue}} · {{idnumber}}</span>
+              {{#hint}}
+                <span class="lp-muted lp-xs" style="display:block;margin-top:4px">{{hint}}</span>
+              {{/hint}}
+            </div>
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{url}}">{{cta}}</a>
+          </li>
+        {{/attention_items}}
+      </ul>
+    {{/has_attention}}
+    {{^has_attention}}
+      <p class="lp-muted" style="margin-top:12px">{{attention_empty}}</p>
+    {{/has_attention}}
+  </section>
+</div>

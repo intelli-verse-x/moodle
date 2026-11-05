@@ -1,0 +1,73 @@
+{{!
+    @template local_launchpad/admin_people
+
+    Admin People directory — tabs filter client-side (no reload).
+    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+}}
+<div data-lp-people data-lp-people-active="{{initial_tab}}">
+<section class="lp-hero" data-region="local-launchpad-admin-people">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+    </div>
+  </div>
+</section>
+
+<div class="lp-tabs lp-tabs-block lp-people-tabs" role="tablist" aria-label="{{heading}}" style="margin-top:16px">
+  {{#tabs}}
+    <a class="lp-tab{{#current}} is-on{{/current}}"
+       role="tab"
+       href="{{url}}"
+       data-lp-people-tab="{{key}}"
+       aria-selected="{{#current}}true{{/current}}{{^current}}false{{/current}}">
+      {{label}}
+      <span class="lp-tab-count">{{count}}</span>
+    </a>
+  {{/tabs}}
+</div>
+
+<div class="lp-card lift" style="margin-top:4px">
+  <div class="lp-table-wrap">
+    {{#has_people}}
+      <table class="lp-table" data-lp-people-table>
+        <thead>
+          <tr>
+            <th>{{col_name}}</th>
+            <th>{{col_email}}</th>
+            <th>{{col_role}}</th>
+            <th>{{col_reach}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#people}}
+            <tr data-lp-people-role="{{role_key}}">
+              <td>
+                <div class="lp-people-name">
+                  <span class="lp-av lp-av-sm tone-{{avatar_tone}}" aria-hidden="true">{{initials}}</span>
+                  <b>{{name}}</b>
+                </div>
+              </td>
+              <td class="lp-sm">{{email}}</td>
+              <td>
+                {{#role_chip}}
+                  <span class="lp-chip {{role_chip}}">{{role_label}}</span>
+                {{/role_chip}}
+                {{^role_chip}}
+                  <span class="lp-chip">{{role_label}}</span>
+                {{/role_chip}}
+              </td>
+              <td class="lp-sm">{{reach}}</td>
+            </tr>
+          {{/people}}
+        </tbody>
+      </table>
+    {{/has_people}}
+    <div data-lp-people-empty style="{{#has_people}}display:none{{/has_people}}" role="status">
+      {{> local_launchpad/admin_empty}}
+    </div>
+  </div>
+</div>
+<p class="lp-xs lp-muted" style="margin-top:12px">{{footnote}}</p>
+</div>

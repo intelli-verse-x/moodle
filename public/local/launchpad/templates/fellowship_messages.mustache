@@ -27,7 +27,7 @@
             <div class="lp-theme-hero-heading">
               <h3>{{strings.inbox_heading}}</h3>
             </div>
-            <p>{{strings.intro}}</p>
+            <p>{{#is_fellow_portal}}{{#str}} fellowship_messages_intro_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{strings.intro}}{{/is_fellow_portal}}</p>
           </div>
         </div>
         <p class="lp-sm lp-theme-hero-body">{{#str}} fellowship_messages_inbox_lead, local_launchpad {{/str}}</p>
@@ -149,6 +149,61 @@
             {{/has_filter_empty}}
           </div>
         {{/has_conversations}}
+
+        {{#is_fellow_portal}}
+          {{#has_classmates}}
+            <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_classmates, local_launchpad {{/str}}</h3>
+            <ul class="lp-msg-list lp-msg-people">
+              {{#classmates}}
+                <li>
+                  {{#can_message}}
+                    <a class="lp-msg-row" href="{{url}}">
+                      <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                      <span class="lp-msg-row-body">
+                        <b>{{{name}}}</b>
+                        <span class="lp-msg-role">{{role_label}}</span>
+                        <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                      </span>
+                    </a>
+                  {{/can_message}}
+                  {{^can_message}}
+                    <div class="lp-msg-row is-disabled" title="{{#str}} fellowship_messages_err_permission, local_launchpad {{/str}}">
+                      <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                      <span class="lp-msg-row-body">
+                        <b>{{{name}}}</b>
+                        <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                      </span>
+                    </div>
+                  {{/can_message}}
+                </li>
+              {{/classmates}}
+            </ul>
+          {{/has_classmates}}
+          {{#has_mentors}}
+            <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_mentors, local_launchpad {{/str}}</h3>
+            <ul class="lp-msg-list lp-msg-people">
+              {{#mentors}}
+                <li>
+                  {{#can_message}}
+                    <a class="lp-msg-row" href="{{url}}">
+                      <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
+                      <span class="lp-msg-row-body">
+                        <b>{{{name}}}</b>
+                        <span class="lp-msg-role">{{role_label}}</span>
+                        <span class="lp-xs lp-muted">{{{course_label}}}</span>
+                      </span>
+                    </a>
+                  {{/can_message}}
+                </li>
+              {{/mentors}}
+            </ul>
+          {{/has_mentors}}
+          {{^has_people}}
+            {{^has_conversations}}
+              <p class="lp-sm lp-muted lp-msg-empty">{{#str}} fellowship_messages_people_empty, local_launchpad {{/str}}</p>
+            {{/has_conversations}}
+          {{/has_people}}
+        {{/is_fellow_portal}}
       </aside>
 
       <div class="lp-msg-thread" aria-label="{{strings.thread_heading}}">
@@ -265,7 +320,7 @@
             {{/can_send}}
             {{^can_send}}
               <div class="lp-msg-composer lp-msg-composer-cta">
-                <p class="lp-sm lp-muted">{{#other_id}}{{strings.permission}}{{/other_id}}{{^other_id}}{{strings.cannot_reply}}{{/other_id}}</p>
+                <p class="lp-sm lp-muted">{{#other_id}}{{strings.readonly}}{{/other_id}}{{^other_id}}{{strings.cannot_reply}}{{/other_id}}</p>
                 <a class="lp-btn lp-btn-light" href="{{moodle_messages_url}}">{{strings.open_thread}}</a>
               </div>
             {{/can_send}}
@@ -277,7 +332,7 @@
                 <iconify-icon icon="hugeicons:message-01" width="26" height="26"></iconify-icon>
               </div>
               <h2>{{strings.pick_title}}</h2>
-              <p>{{strings.pick_body}}</p>
+              <p>{{#is_fellow_portal}}{{#str}} fellowship_messages_pick_body_peers, local_launchpad {{/str}}{{/is_fellow_portal}}{{^is_fellow_portal}}{{strings.pick_body}}{{/is_fellow_portal}}</p>
             </div>
           {{/has_thread}}
         {{/thread_denied}}

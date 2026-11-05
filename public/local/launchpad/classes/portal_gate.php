@@ -37,7 +37,7 @@ final class portal_gate {
     public static function assert_or_redirect_home(bool $allowed, string $triedportal): void {
         global $USER;
 
-        if ($allowed || is_siteadmin()) {
+        if ($allowed) {
             return;
         }
 
@@ -89,6 +89,7 @@ final class portal_gate {
 
         return [
             'show_portal_mismatch' => true,
+            'portal_mismatch_eyebrow' => get_string('portal_mismatch_eyebrow', 'local_launchpad'),
             'portal_mismatch_title' => get_string('portal_mismatch_title', 'local_launchpad'),
             'portal_mismatch_body' => get_string('portal_mismatch_body', 'local_launchpad', (object) [
                 'tried' => $triedlabel,
@@ -111,13 +112,16 @@ final class portal_gate {
     }
 
     /**
-     * Role key used in copy: fellowship|mentor|employee|guest.
+     * Role key used in copy: admin|fellowship|mentor|employee|guest.
      */
     public static function role_key_for_user(int $userid): string {
         if ($userid <= 0) {
             return 'guest';
         }
-        // Same priority as persona_home::home_url_for (mentor → fellowship → employee).
+        // Same priority as persona_home::home_url_for.
+        if (account_persona::is_admin($userid)) {
+            return 'admin';
+        }
         if (account_persona::is_mentor($userid)) {
             return 'mentor';
         }
@@ -135,6 +139,7 @@ final class portal_gate {
      */
     public static function portal_label(string $portal): string {
         return match (login_portal::normalise($portal)) {
+            login_portal::ADMIN => get_string('portal_name_admin', 'local_launchpad'),
             login_portal::FELLOWSHIP => get_string('portal_name_fellowship', 'local_launchpad'),
             login_portal::MENTOR => get_string('portal_name_mentor', 'local_launchpad'),
             default => get_string('portal_name_employer', 'local_launchpad'),
@@ -146,6 +151,7 @@ final class portal_gate {
      */
     public static function role_label(string $rolekey): string {
         return match ($rolekey) {
+            'admin' => get_string('portal_role_admin', 'local_launchpad'),
             'mentor' => get_string('portal_role_mentor', 'local_launchpad'),
             'fellowship' => get_string('portal_role_fellowship', 'local_launchpad'),
             'employee' => get_string('portal_role_employee', 'local_launchpad'),

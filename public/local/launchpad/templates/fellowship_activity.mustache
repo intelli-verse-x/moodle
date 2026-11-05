@@ -1,0 +1,334 @@
+{{!
+    @template local_launchpad/fellowship_activity
+
+    Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource in-shell;
+    quiz/assign open Moodle engine from CTA).
+}}
+{{#activity}}
+  <div class="lp-activity-page" data-region="fellowship-activity">
+    <nav class="lp-crumbs" aria-label="Breadcrumb">
+      <a href="{{home_url}}">{{strings.navhome}}</a>
+      <span aria-hidden="true">/</span>
+      <a href="{{courseurl}}">{{strings.navtrack}}</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{title_main}}</span>
+    </nav>
+
+    <article class="lp-activity-hero">
+      <div class="lp-activity-hero-copy">
+        <div class="lp-activity-badges">
+          <span class="lp-activity-badge is-type">{{modname}}</span>
+          <span class="lp-activity-badge is-status is-{{statustone}}">{{status}}</span>
+        </div>
+
+        <h2 class="lp-activity-title">{{title_main}}</h2>
+        {{#hastitlesub}}
+          <p class="lp-activity-sub">{{title_sub}}</p>
+        {{/hastitlesub}}
+
+        {{#is_lesson}}
+          <p class="lp-lesson-meta">
+            <span>{{lesson_track_label}}</span>
+            {{#hassection}}
+              <span aria-hidden="true">·</span>
+              <span>{{lesson_phase_label}}</span>
+            {{/hassection}}
+          </p>
+        {{/is_lesson}}
+
+        <div class="lp-activity-head-actions">
+          <a class="lp-btn lp-btn-light lp-activity-back" href="{{courseurl}}">{{strings.backtotrack}}</a>
+          {{#needsengine}}
+            <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
+          {{/needsengine}}
+          {{#is_lesson}}
+            {{#lesson_has_next}}
+              <a class="lp-btn lp-btn-solid" href="{{lesson_next_url}}">{{strings.lessonnext}}: {{lesson_next_name}}</a>
+            {{/lesson_has_next}}
+          {{/is_lesson}}
+        </div>
+
+        {{#show_judging}}
+          <aside class="lp-judge-note" aria-label="{{judging_title}}">
+            <b>{{judging_title}}</b>
+            <p>{{judging_body}}</p>
+          </aside>
+        {{/show_judging}}
+
+        {{#hasintro}}
+          <div class="lp-activity-intro">{{{introhtml}}}</div>
+        {{/hasintro}}
+
+        {{#isinportal}}
+          {{#is_lesson}}
+            <div class="lp-lesson-layout" data-region="lesson-layout">
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonobjective}}</h3>
+                {{#lesson_has_objective}}
+                  <div class="lp-lesson-block-body">{{{lesson_objective_html}}}</div>
+                {{/lesson_has_objective}}
+                {{^lesson_has_objective}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_objective}}
+              </section>
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonexplain}}</h3>
+                {{#lesson_has_explain}}
+                  <div class="lp-lesson-block-body">{{{lesson_explain_html}}}</div>
+                {{/lesson_has_explain}}
+                {{^lesson_has_explain}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_explain}}
+              </section>
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonexample}}</h3>
+                {{#lesson_has_example}}
+                  <div class="lp-lesson-block-body">{{{lesson_example_html}}}</div>
+                {{/lesson_has_example}}
+                {{^lesson_has_example}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_example}}
+              </section>
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.lessonexercise}}</h3>
+                {{#lesson_has_exercise}}
+                  <div class="lp-lesson-block-body">{{{lesson_exercise_html}}}</div>
+                {{/lesson_has_exercise}}
+                {{^lesson_has_exercise}}
+                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
+                {{/lesson_has_exercise}}
+              </section>
+              {{#lesson_has_next}}
+                <div class="lp-lesson-next">
+                  <span class="lp-xs lp-muted">{{strings.lessonnextlabel}}</span>
+                  <a class="lp-btn lp-btn-solid" href="{{lesson_next_url}}">{{lesson_next_name}}</a>
+                </div>
+              {{/lesson_has_next}}
+            </div>
+          {{/is_lesson}}
+
+          {{#hasbody}}
+            <div class="lp-activity-body">{{{bodyhtml}}}</div>
+          {{/hasbody}}
+
+          {{#isplaceholder}}
+            <div class="lp-activity-callout" role="status">
+              <div class="lp-activity-callout-text">
+                <b>{{strings.contentcomingsoon}}</b>
+                <p>{{strings.activityempty}}</p>
+              </div>
+            </div>
+          {{/isplaceholder}}
+
+          {{#hasvideo}}
+            <div class="lp-activity-player">
+              <video controls playsinline preload="metadata" controlslist="nodownload">
+                <source src="{{videourl}}" type="video/mp4">
+                Your browser does not support HTML5 video.
+              </video>
+            </div>
+          {{/hasvideo}}
+
+          {{#hasembed}}
+            <div class="lp-activity-embed">{{{embedhtml}}}</div>
+          {{/hasembed}}
+
+          {{#hasexternal}}
+            <div class="lp-activity-external">
+              {{^hasembed}}
+                <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                </a>
+              {{/hasembed}}
+              {{#hasembed}}
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                </a>
+              {{/hasembed}}
+              <p class="lp-muted lp-sm">{{externalurl}}</p>
+            </div>
+          {{/hasexternal}}
+
+          {{#hasfiles}}
+            <ul class="lp-activity-files">
+              {{#files}}
+                <li>
+                  <a class="lp-activity-file{{#isimage}} has-thumb{{/isimage}}" href="{{url}}" title="{{filename}} — {{download_label}}">
+                    {{#isimage}}
+                      <span class="lp-activity-file-thumb" aria-hidden="true">
+                        <img src="{{previewurl}}" alt="">
+                      </span>
+                    {{/isimage}}
+                    {{^isimage}}
+                      <span class="lp-activity-file-ico" aria-hidden="true">{{#ext}}{{ext}}{{/ext}}{{^ext}}FILE{{/ext}}</span>
+                    {{/isimage}}
+                    <span class="lp-activity-file-body">
+                      <span class="lp-activity-file-name">{{displayname}}</span>
+                      <span class="lp-activity-file-meta">{{size}} · {{download_label}}</span>
+                    </span>
+                    <span class="lp-activity-file-action" aria-hidden="true">↓</span>
+                  </a>
+                </li>
+              {{/files}}
+            </ul>
+          {{/hasfiles}}
+        {{/isinportal}}
+
+        {{#is_quiz}}
+          <div class="lp-assign-layout" data-region="quiz-brief">
+            <p class="lp-lesson-meta">
+              <span>{{quiz_track_label}}</span>
+              {{#quiz_has_phase}}
+                <span aria-hidden="true">·</span>
+                <span>{{quiz_phase_label}}</span>
+              {{/quiz_has_phase}}
+            </p>
+
+            <aside class="lp-judge-note" aria-label="{{strings.quizpractice}}">
+              <b>{{strings.quizpractice}}</b>
+              <p>{{quiz_practice_note}}</p>
+            </aside>
+
+            <section class="lp-lesson-block">
+              <h3 class="lp-lesson-block-title">{{strings.quizbrief}}</h3>
+              {{#quiz_has_brief}}
+                <div class="lp-lesson-block-body">{{{quiz_brief_html}}}</div>
+              {{/quiz_has_brief}}
+              {{^quiz_has_brief}}
+                <p class="lp-muted lp-sm">{{strings.quizbriefmissing}}</p>
+              {{/quiz_has_brief}}
+            </section>
+
+            <dl class="lp-assign-meta">
+              {{#quiz_has_questions}}
+                <div>
+                  <dt>{{strings.quizquestions}}</dt>
+                  <dd>{{quiz_questions}}</dd>
+                </div>
+              {{/quiz_has_questions}}
+              {{#quiz_has_attempts}}
+                <div>
+                  <dt>{{strings.quizattempts}}</dt>
+                  <dd>{{quiz_attempts_label}}</dd>
+                </div>
+              {{/quiz_has_attempts}}
+              {{#quiz_has_timelimit}}
+                <div>
+                  <dt>{{strings.quiztimelimit}}</dt>
+                  <dd{{^quiz_timelimit_set}} class="lp-muted"{{/quiz_timelimit_set}}>{{quiz_timelimit}}</dd>
+                </div>
+              {{/quiz_has_timelimit}}
+              {{#quiz_has_opens}}
+                <div>
+                  <dt>{{strings.quizopens}}</dt>
+                  <dd>{{quiz_opens}}</dd>
+                </div>
+              {{/quiz_has_opens}}
+              {{#quiz_has_closes}}
+                <div>
+                  <dt>{{strings.quizcloses}}</dt>
+                  <dd{{^quiz_closes_set}} class="lp-muted"{{/quiz_closes_set}}>{{quiz_closes}}</dd>
+                </div>
+              {{/quiz_has_closes}}
+              {{#quiz_has_grade}}
+                <div>
+                  <dt>{{strings.quizgrade}}</dt>
+                  <dd>{{quiz_grade_max}}</dd>
+                </div>
+              {{/quiz_has_grade}}
+              {{#quiz_has_best_grade}}
+                <div>
+                  <dt>{{strings.quizbest}}</dt>
+                  <dd>{{quiz_best_grade}}</dd>
+                </div>
+              {{/quiz_has_best_grade}}
+              {{#quiz_has_attempt_status}}
+                <div>
+                  <dt>{{strings.quizstatus}}</dt>
+                  <dd><span class="lp-chip is-{{quiz_attempt_status_key}}">{{quiz_attempt_status}}</span></dd>
+                </div>
+              {{/quiz_has_attempt_status}}
+            </dl>
+          </div>
+        {{/is_quiz}}
+
+        {{#is_assign}}
+          <div class="lp-assign-layout" data-region="assign-brief">
+            <p class="lp-lesson-meta">
+              <span>{{assign_track_label}}</span>
+              {{#assign_has_phase}}
+                <span aria-hidden="true">·</span>
+                <span>{{assign_phase_label}}</span>
+              {{/assign_has_phase}}
+            </p>
+
+            <section class="lp-lesson-block">
+              <h3 class="lp-lesson-block-title">{{strings.assignbrief}}</h3>
+              {{#assign_has_brief}}
+                <div class="lp-lesson-block-body">{{{assign_brief_html}}}</div>
+              {{/assign_has_brief}}
+              {{^assign_has_brief}}
+                <p class="lp-muted lp-sm">{{strings.assignbriefmissing}}</p>
+              {{/assign_has_brief}}
+            </section>
+
+            {{#assign_has_deliverable}}
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.assigndeliverable}}</h3>
+                <p class="lp-lesson-block-body">{{assign_deliverable}}</p>
+              </section>
+            {{/assign_has_deliverable}}
+
+            {{#assign_has_criteria}}
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.assigncriteria}}</h3>
+                <div class="lp-lesson-block-body">{{{assign_criteria_html}}}</div>
+              </section>
+            {{/assign_has_criteria}}
+
+            <dl class="lp-assign-meta">
+              {{#assign_has_formats}}
+                <div>
+                  <dt>{{strings.assignformats}}</dt>
+                  <dd>{{assign_formats}}</dd>
+                </div>
+              {{/assign_has_formats}}
+              <div>
+                <dt>{{strings.assigndeadline}}</dt>
+                <dd{{^assign_deadline_set}} class="lp-muted"{{/assign_deadline_set}}>{{assign_deadline}}</dd>
+              </div>
+              {{#assign_has_opens}}
+                <div>
+                  <dt>{{strings.assignopens}}</dt>
+                  <dd>{{assign_opens}}</dd>
+                </div>
+              {{/assign_has_opens}}
+              {{#assign_has_grade}}
+                <div>
+                  <dt>{{strings.assigngrade}}</dt>
+                  <dd>{{assign_grade_max}} · {{strings.assignpassbar}} {{assign_pass_bar}}</dd>
+                </div>
+              {{/assign_has_grade}}
+              {{#assign_has_sub_status}}
+                <div>
+                  <dt>{{strings.assignstatus}}</dt>
+                  <dd><span class="lp-chip {{#assign_sub_status_key}}is-{{assign_sub_status_key}}{{/assign_sub_status_key}}">{{assign_sub_status}}</span></dd>
+                </div>
+              {{/assign_has_sub_status}}
+            </dl>
+          </div>
+        {{/is_assign}}
+
+        {{#needsengine}}
+          <div class="lp-activity-callout" role="status">
+            <div class="lp-activity-callout-text">
+              <b>{{#is_quiz}}{{strings.quizcontinue}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}{{/is_quiz}}</b>
+              <p>{{#is_quiz}}{{strings.quizenginehelp}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assignenginehelp}}{{/is_assign}}{{^is_assign}}{{strings.activityenginehelp}}{{/is_assign}}{{/is_quiz}}</p>
+              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{#is_quiz}}{{strings.quizcontinue}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}{{/is_quiz}}</a>
+            </div>
+          </div>
+        {{/needsengine}}
+      </div>
+    </article>
+  </div>
+{{/activity}}

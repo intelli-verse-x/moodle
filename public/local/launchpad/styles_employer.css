@@ -2546,6 +2546,41 @@ a.lp-bdg {
   align-items: flex-start;
   gap: 8px;
 }
+.lp-activity-embed {
+  width: 100%;
+  max-width: 720px;
+}
+.lp-activity-player {
+  width: 100%;
+  max-width: 720px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0D1429;
+  border: 1px solid var(--lp-line);
+}
+.lp-activity-player video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(70vh, 480px);
+  background: #000;
+}
+.lp-activity-video {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0D1429;
+  border: 1px solid var(--lp-line);
+}
+.lp-activity-video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
 .lp-activity-files {
   list-style: none;
   margin: 0;

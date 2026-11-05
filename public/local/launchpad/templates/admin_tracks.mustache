@@ -1,0 +1,69 @@
+{{!
+    @template local_launchpad/admin_tracks
+
+    Admin Tracks and courses — HTML a-tracks card grid from live Moodle.
+    Track cards with Open in builder + Moodle course link.
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-tracks">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+      <p class="lp-sm">
+        {{#category_chip_ok}}
+          <span class="lp-chip ok">{{category_chip}}</span>
+        {{/category_chip_ok}}
+        {{^category_chip_ok}}
+          <span class="lp-chip line">{{category_chip}}</span>
+        {{/category_chip_ok}}
+      </p>
+    </div>
+  </div>
+</section>
+
+{{#has_tracks}}
+  <div class="lp-tgrid" style="margin-top:16px">
+    {{#tracks}}
+      <article class="lp-tcard">
+        <div class="lp-tcard-top">
+          {{#ready}}
+            <span class="lp-chip ok">{{ready_label}}</span>
+          {{/ready}}
+          {{^ready}}
+            <span class="lp-chip warn">{{ready_label}}</span>
+          {{/ready}}
+          <span class="lp-xs lp-muted">{{phases_shown_label}}</span>
+        </div>
+        <h3>{{name}}</h3>
+        <p class="lp-sm lp-muted">{{capstone}}</p>
+        <div class="lp-phdots" aria-label="{{phases_shown_label}}">
+          {{#phases}}
+            <i class="{{#on}}on{{/on}}" title="{{title}}"></i>
+          {{/phases}}
+        </div>
+        <div class="lp-tcard-meta">
+          {{#has_teacher}}
+            <span>{{teacher_label}}</span>
+          {{/has_teacher}}
+          {{^has_teacher}}
+            <span class="lp-tcard-warn">{{teacher_label}}</span>
+          {{/has_teacher}}
+          <span>{{fellows_label}}</span>
+        </div>
+        <div class="lp-tcard-actions">
+          {{^has_teacher}}
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{assign_teacher_url}}">{{assign_teacher_label}}</a>
+          {{/has_teacher}}
+          <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}">{{open_label}}</a>
+        </div>
+      </article>
+    {{/tracks}}
+  </div>
+{{/has_tracks}}
+{{^has_tracks}}
+  <div style="margin-top:16px">
+    {{> local_launchpad/admin_empty}}
+  </div>
+{{/has_tracks}}

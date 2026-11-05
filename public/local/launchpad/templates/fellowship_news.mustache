@@ -68,6 +68,11 @@
                 {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
                 <h3><a href="{{url}}">{{{subject}}}</a></h3>
                 {{#excerpt}}<p class="lp-sm lp-muted">{{{excerpt}}}</p>{{/excerpt}}
+                {{#has_tags}}
+                  <div class="lp-ann-chips">
+                    {{#tags}}<span class="lp-chip line">{{name}}</span>{{/tags}}
+                  </div>
+                {{/has_tags}}
                 <div class="lp-news-item-meta">
                   {{#has_author}}<span>{{author}}</span>{{/has_author}}
                   {{#when}}<span>{{when}}</span>{{/when}}
