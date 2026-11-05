@@ -944,6 +944,32 @@ body.local-launchpad-mentor {
 .lp-courseops-roster-block .lp-table-wrap {
   margin-top: 0;
 }
+.lp-courseops-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.lp-courseops-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 9rem;
+}
+.lp-courseops-progress-bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--lp-blue) 0 var(--lp-pct, 0%), #E8EEF7 var(--lp-pct, 0%) 100%);
+}
+.lp-courseops-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lp-courseops-completion-form {
+  margin-top: 4px;
+}
 .lp-tcard.is-highlight {
   border-color: rgba(26, 97, 242, .45);
   box-shadow: 0 0 0 3px rgba(26, 97, 242, .12);

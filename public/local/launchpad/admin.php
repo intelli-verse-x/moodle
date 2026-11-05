@@ -127,6 +127,17 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             'section' => 'participants',
         ]));
     }
+    if ($view === 'courseops' && $action === 'save_course_completion') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $enablecompletion = (bool) optional_param('enablecompletion', 0, PARAM_BOOL);
+        $flash = admin_dashboard::save_courseops_completion($USER, $trackid, $enablecompletion);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'completion',
+        ]));
+    }
     if ($view === 'reviews' && $action === 'ping_review') {
         $submissionid = optional_param('submissionid', 0, PARAM_INT);
         $pingteacherid = optional_param('teacherid', 0, PARAM_INT);
