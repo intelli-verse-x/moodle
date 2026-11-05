@@ -3,7 +3,7 @@
 
     Profile — Moodle account overview, edit form, and preferences hub.
 }}
-<div class="lp-tools-page lp-reveal" data-region="employer-profile" style="--lp-d:0">
+<div class="lp-tools-page lp-reveal" data-region="launchpad-profile" style="--lp-d:0">
   {{#has_flash}}
     {{#flash}}
       <div class="lp-flash{{#ok}} is-ok{{/ok}}{{^ok}} is-err{{/ok}}" role="status">{{text}}</div>
@@ -28,9 +28,8 @@
         </div>
       </div>
       <div class="lp-profile-hero-actions">
-        {{#can_edit}}
-          <a class="lp-btn lp-btn-primary" href="{{tab_edit_url}}">{{strings.profile_edit_cta}}</a>
-        {{/can_edit}}
+        {{! Edit tab already opens the in-portal form — only show a hero CTA when
+            editing must leave LaunchPad (IdP or full Moodle editor). }}
         {{#has_edit_external}}
           <a class="lp-btn lp-btn-primary" href="{{edit_external_url}}">{{strings.profile_edit_external}}</a>
         {{/has_edit_external}}

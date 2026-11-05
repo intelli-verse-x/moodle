@@ -6838,7 +6838,8 @@ body.lp-portal-mismatch-lock {
 
 
 /* Profile — shared with Employer (overview / edit / preferences) */
-.lp-tools-page[data-region="employer-profile"] {
+.lp-tools-page[data-region="employer-profile"],
+.lp-tools-page[data-region="launchpad-profile"] {
   display: flex;
   flex-direction: column;
   gap: 16px;

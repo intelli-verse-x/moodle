@@ -1413,7 +1413,7 @@ final class employer_tools {
             'profile_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Your Moodle account details, editable profile fields, and preference links.'
+                'Name, contact details, and preferences from your Moodle account.'
             ),
             'profile_tabs_aria' => self::str('employer_profile_tabs_aria', null, 'Profile sections'),
             'profile_tab_overview' => self::str('employer_profile_tab_overview', null, 'Overview'),
@@ -1456,12 +1456,12 @@ final class employer_tools {
             'profile_prefs_lead' => self::str(
                 'employer_profile_prefs_lead',
                 null,
-                'Account, communication, and system preferences — edited here when possible, or opened in Moodle for heavy tools.'
+                'Account, communication, and system preferences — edit here when available, or open Moodle for advanced tools.'
             ),
             'native_tools_note' => self::str(
-                'employer_native_tools_note',
+                'employer_profile_prefs_note',
                 null,
-                'Full grades, messaging, calendar editing, and notification settings stay in Moodle.'
+                'Password, tokens, and some notification channels still open in Moodle.'
             ),
             'pref_back' => self::str('employer_pref_back', null, 'Back to preferences'),
             'pref_save' => self::str('employer_pref_save', null, 'Save preferences'),
@@ -1627,7 +1627,7 @@ final class employer_tools {
             'page_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Your Moodle account details, editable profile fields, and preference links.'
+                'Name, contact details, and preferences from your Moodle account.'
             ),
             'moodle_url' => $moodleprofile,
             'moodle_edit_url' => $moodleedit,
@@ -1646,7 +1646,9 @@ final class employer_tools {
             'has_email' => $email !== '',
             'username' => (string) ($user->username ?? ''),
             'picture_url' => $pictureurl,
-            'has_picture' => $pictureurl !== '',
+            // Moodle always returns a URL for the default silhouette (u/f1) — only treat
+            // a custom uploaded picture as a real avatar.
+            'has_picture' => $pictureurl !== '' && !empty($user->picture),
             'initials' => self::conversation_initials($fullname),
             'sections' => $sections,
             'has_sections' => $sections !== [],
@@ -1871,6 +1873,8 @@ final class employer_tools {
         $lang = (string) ($user->lang ?? '');
         $translations = get_string_manager()->get_list_of_translations();
         $langlabel = ($lang !== '' && isset($translations[$lang])) ? $translations[$lang] : $lang;
+        // Moodle language pack labels may include LTR marks around the code.
+        $langlabel = trim(str_replace(["\u{200E}", "\u{200F}"], '', $langlabel));
 
         $interests = [];
         try {
@@ -2059,7 +2063,7 @@ final class employer_tools {
             self::profile_form_text('lastname', get_string('lastname'), (string) ($user->lastname ?? ''), $user, true),
             self::profile_form_text('email', get_string('email'), (string) ($user->email ?? ''), $user, true, 'email'),
             self::profile_form_text('city', get_string('city'), (string) ($user->city ?? ''), $user),
-            self::profile_form_select('country', get_string('selectacountry'), $countryoptions, $user),
+            self::profile_form_select('country', get_string('country'), $countryoptions, $user),
             self::profile_form_select('timezone', get_string('timezone'), $tzoptions, $user),
             self::profile_form_select('lang', get_string('preferredlanguage'), $langoptions, $user),
             self::profile_form_text('phone1', get_string('phone1'), (string) ($user->phone1 ?? ''), $user),

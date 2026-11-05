@@ -5045,7 +5045,8 @@ a.lp-emp-gate:focus-visible,
 .lp-msg-thread-who .lp-chip { margin-bottom: 4px; }
 
 /* Profile — overview / edit / preferences hub */
-.lp-tools-page[data-region="employer-profile"] {
+.lp-tools-page[data-region="employer-profile"],
+.lp-tools-page[data-region="launchpad-profile"] {
   display: flex;
   flex-direction: column;
   gap: 16px;

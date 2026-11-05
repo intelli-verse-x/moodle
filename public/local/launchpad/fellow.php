@@ -1041,7 +1041,17 @@ $orbittips = [
     'portfolio' => $lpstr(
         'fellowship_orbit_tip_portfolio',
         null,
-        'Portfolio here means assignment evidence already in Moodle. A dedicated case-study saver is not built yet.'
+        'Portfolio counts Moodle submissions and released mentor reviews for the <b>selected track</b>.'
+    ),
+    'profile' => $lpstr(
+        'fellowship_orbit_tip_profile',
+        null,
+        'Profile saves to your Moodle account. Use <b>Preferences</b> for messages, notifications, and language.'
+    ),
+    'messages' => $lpstr(
+        'fellowship_orbit_tip_messages',
+        null,
+        'LaunchPad messages sync with Moodle messaging. Mentors and peers you can message appear here.'
     ),
 ];
 $orbittip = $orbittips[$view] ?? $orbittips['home'];
