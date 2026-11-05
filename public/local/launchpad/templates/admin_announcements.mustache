@@ -90,6 +90,12 @@
           </span>
         </label>
 
+        <label class="lp-field lp-ann-schedule-field">
+          <span>{{schedule_label}}</span>
+          <input type="datetime-local" name="publish_at" data-lp-ann-publish-at>
+          <span class="lp-muted lp-sm">{{schedule_help}}</span>
+        </label>
+
         <div class="lp-ann-form-actions">
           <button type="submit" class="lp-btn lp-btn-solid" data-lp-ann-submit>{{submit_label}}</button>
           <button type="button" class="lp-btn lp-btn-light" data-lp-ann-cancel-edit hidden>{{cancel_edit_label}}</button>
@@ -111,11 +117,13 @@
             data-subject="{{subject_raw}}"
             data-message="{{message_plain}}"
             data-tags="{{tags_csv}}"
-            data-pinned="{{#is_pinned}}1{{/is_pinned}}{{^is_pinned}}0{{/is_pinned}}">
+            data-pinned="{{#is_pinned}}1{{/is_pinned}}{{^is_pinned}}0{{/is_pinned}}"
+            data-publish-at="{{publish_at_value}}">
             <div class="lp-ann-item-main">
               <a class="lp-ann-item-title" href="{{url}}">{{{subject}}}</a>
               <div class="lp-ann-item-meta">
                 {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
+                {{#is_scheduled}}<span class="lp-ann-sched-badge">{{scheduled_badge}}</span>{{/is_scheduled}}
                 <span class="lp-ann-item-track">{{{course_name}}}</span>
                 <span class="lp-ann-item-when">{{when}}</span>
               </div>

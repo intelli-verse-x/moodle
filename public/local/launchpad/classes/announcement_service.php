@@ -87,6 +87,9 @@ final class announcement_service {
         $params['seen'] = $seen;
         $params['uid'] = $userid;
 
+        $now = time();
+        $params['nowstart'] = $now;
+        $params['nowend'] = $now;
         $sql = "SELECT COUNT(DISTINCT d.id)
                   FROM {forum} f
                   JOIN {forum_discussions} d ON d.forum = f.id
@@ -94,7 +97,9 @@ final class announcement_service {
                  WHERE f.type = 'news'
                    AND f.course {$insql}
                    AND GREATEST(p.created, p.modified) > :seen
-                   AND p.userid <> :uid";
+                   AND p.userid <> :uid
+                   AND (d.timestart = 0 OR d.timestart <= :nowstart)
+                   AND (d.timeend = 0 OR d.timeend > :nowend)";
 
         return (int) $DB->count_records_sql($sql, $params);
     }
@@ -169,6 +174,8 @@ final class announcement_service {
             'custom_tag_placeholder' => get_string('admin_announcements_custom_tag_ph', 'local_launchpad'),
             'pin_label' => get_string('admin_announcements_pin', 'local_launchpad'),
             'pin_help' => get_string('admin_announcements_pin_help', 'local_launchpad'),
+            'schedule_label' => get_string('admin_announcements_schedule', 'local_launchpad'),
+            'schedule_help' => get_string('admin_announcements_schedule_help', 'local_launchpad'),
             'submit_label' => get_string('admin_announcements_submit', 'local_launchpad'),
             'save_label' => get_string('admin_announcements_save', 'local_launchpad'),
             'cancel_edit_label' => get_string('admin_announcements_cancel_edit', 'local_launchpad'),
@@ -222,7 +229,8 @@ final class announcement_service {
         array $trackids,
         bool $alltracks,
         array $tagnames,
-        bool $pinned = false
+        bool $pinned = false,
+        string $publishat = ''
     ): array {
         global $CFG;
 
@@ -235,6 +243,14 @@ final class announcement_service {
         }
         if ($message === '') {
             return ['error' => get_string('admin_announcements_err_message', 'local_launchpad')];
+        }
+
+        $timestart = self::parse_publish_at($publishat);
+        if ($timestart === null && trim($publishat) !== '') {
+            return ['error' => get_string('admin_announcements_err_publish_at', 'local_launchpad')];
+        }
+        if ($timestart === null) {
+            $timestart = 0;
         }
 
         $targets = self::resolve_tracks($trackids, $alltracks);
@@ -286,7 +302,7 @@ final class announcement_service {
                 $discussion->messageformat = FORMAT_HTML;
                 $discussion->messagetrust = trusttext_trusted($modcontext) ? 1 : 0;
                 $discussion->mailnow = 0;
-                $discussion->timestart = 0;
+                $discussion->timestart = $timestart;
                 $discussion->timeend = 0;
                 $discussion->pinned = $pinvalue;
                 $discussion->groupid = -1;
@@ -336,7 +352,8 @@ final class announcement_service {
         string $subject,
         string $message,
         array $tagnames,
-        bool $pinned = false
+        bool $pinned = false,
+        string $publishat = ''
     ): array {
         global $CFG, $DB;
 
@@ -349,6 +366,14 @@ final class announcement_service {
         }
         if ($message === '') {
             return ['error' => get_string('admin_announcements_err_message', 'local_launchpad')];
+        }
+
+        $timestart = self::parse_publish_at($publishat);
+        if ($timestart === null && trim($publishat) !== '') {
+            return ['error' => get_string('admin_announcements_err_publish_at', 'local_launchpad')];
+        }
+        if ($timestart === null) {
+            $timestart = 0;
         }
 
         $bundle = self::load_news_discussion($discussionid);
@@ -395,6 +420,7 @@ final class announcement_service {
             'timemodified' => $now,
             'usermodified' => (int) $user->id,
             'pinned' => $pinvalue,
+            'timestart' => $timestart,
         ]);
 
         $tags = self::normalize_tags($tagnames);
@@ -496,6 +522,8 @@ final class announcement_service {
                 $canedit = self::user_can_edit($USER, $modcontext, $post);
                 $candelete = self::user_can_delete($USER, $modcontext, $post);
                 $ispinned = (int) ($discussion->pinned ?? 0) === 1;
+                $timestart = (int) ($discussion->timestart ?? 0);
+                $isscheduled = $timestart > time();
                 $items[] = [
                     'id' => (int) $discussion->id,
                     'subject' => format_string($discussion->name),
@@ -517,6 +545,15 @@ final class announcement_service {
                     'pinned_badge' => $ispinned
                         ? get_string('admin_announcements_pinned_badge', 'local_launchpad')
                         : '',
+                    'is_scheduled' => $isscheduled,
+                    'scheduled_badge' => $isscheduled
+                        ? get_string(
+                            'admin_announcements_scheduled_badge',
+                            'local_launchpad',
+                            userdate($timestart, get_string('strftimedatetimeshort', 'langconfig'))
+                        )
+                        : '',
+                    'publish_at_value' => $timestart > 0 ? self::format_publish_at_value($timestart) : '',
                     'can_edit' => $canedit,
                     'can_delete' => $candelete,
                     'has_actions' => $canedit || $candelete,
@@ -711,5 +748,62 @@ final class announcement_service {
             $out[] = $name;
         }
         return $out;
+    }
+
+    /**
+     * Parse datetime-local (YYYY-MM-DDTHH:MM) in the current user's timezone.
+     * Empty string → null (caller treats as publish now / timestart 0).
+     */
+    public static function parse_publish_at(string $raw): ?int {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::\d{2})?$/', $raw, $m)) {
+            return null;
+        }
+        $year = (int) $m[1];
+        $month = (int) $m[2];
+        $day = (int) $m[3];
+        $hour = (int) $m[4];
+        $minute = (int) $m[5];
+        if ($year < 1970 || $month < 1 || $month > 12 || $day < 1 || $day > 31
+                || $hour < 0 || $hour > 23 || $minute < 0 || $minute > 59) {
+            return null;
+        }
+        return make_timestamp($year, $month, $day, $hour, $minute, 0);
+    }
+
+    /**
+     * Value for HTML datetime-local inputs.
+     */
+    public static function format_publish_at_value(int $timestart): string {
+        if ($timestart <= 0) {
+            return '';
+        }
+        return sprintf(
+            '%04d-%02d-%02dT%02d:%02d',
+            (int) userdate($timestart, '%Y'),
+            (int) userdate($timestart, '%m'),
+            (int) userdate($timestart, '%d'),
+            (int) userdate($timestart, '%H'),
+            (int) userdate($timestart, '%M')
+        );
+    }
+
+    /**
+     * Whether a discussion is visible to fellows right now.
+     */
+    public static function discussion_is_live(\stdClass $discussion, ?int $now = null): bool {
+        $now = $now ?? time();
+        $start = (int) ($discussion->timestart ?? 0);
+        $end = (int) ($discussion->timeend ?? 0);
+        if ($start > 0 && $start > $now) {
+            return false;
+        }
+        if ($end > 0 && $end <= $now) {
+            return false;
+        }
+        return true;
     }
 }

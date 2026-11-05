@@ -2335,6 +2335,9 @@ final class fellowship_dashboard {
                     'forum' => (int) $forum->id,
                 ], 'timemodified DESC', '*', 0, 20);
                 foreach ($discussions as $discussion) {
+                    if (!announcement_service::discussion_is_live($discussion)) {
+                        continue;
+                    }
                     $post = $DB->get_record('forum_posts', [
                         'discussion' => (int) $discussion->id,
                         'parent' => 0,

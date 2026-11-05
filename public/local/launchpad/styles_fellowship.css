@@ -7407,7 +7407,8 @@ body.lp-portal-mismatch-lock {
   font-weight: 500;
   margin-top: 2px;
 }
-.lp-ann-pin-badge {
+.lp-ann-pin-badge,
+.lp-ann-sched-badge {
   display: inline-flex;
   align-items: center;
   padding: 1px 7px;
@@ -7419,6 +7420,18 @@ body.lp-portal-mismatch-lock {
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+.lp-ann-sched-badge {
+  border-color: rgba(91, 107, 140, 0.35);
+  background: #f3f5f9;
+  color: var(--lp-muted);
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.lp-ann-schedule-field .lp-muted {
+  display: block;
+  margin-top: 4px;
 }
 .lp-ann-item.is-pinned,
 .lp-news-item.is-pinned {

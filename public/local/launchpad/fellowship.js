@@ -2492,6 +2492,10 @@
             if (pinElReset) {
                 pinElReset.checked = false;
             }
+            var publishElReset = annForm.querySelector('[data-lp-ann-publish-at]');
+            if (publishElReset) {
+                publishElReset.value = '';
+            }
             if (submitEl) {
                 submitEl.textContent = strSubmit;
             }
@@ -2523,6 +2527,10 @@
             var pinEl = annForm.querySelector('[data-lp-ann-pinned]');
             if (pinEl) {
                 pinEl.checked = item.getAttribute('data-pinned') === '1';
+            }
+            var publishEl = annForm.querySelector('[data-lp-ann-publish-at]');
+            if (publishEl) {
+                publishEl.value = item.getAttribute('data-publish-at') || '';
             }
             if (tracksWrap) {
                 tracksWrap.setAttribute('hidden', 'hidden');
