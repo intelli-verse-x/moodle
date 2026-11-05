@@ -1,0 +1,96 @@
+{{!
+    @template local_launchpad/admin_courseops
+
+    M5 Slice A — Track Course ops hub (in-shell nav; related tabs reused).
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-courseops">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+      {{#has_tracks}}
+        <div class="lp-courseops-hero-actions">
+          <a class="lp-btn lp-btn-light" href="{{back_tracks_url}}">{{back_tracks_label}}</a>
+          <a class="lp-btn lp-btn-light" href="{{preview_url}}">{{preview_label}}</a>
+        </div>
+      {{/has_tracks}}
+    </div>
+  </div>
+</section>
+
+{{^has_tracks}}
+  <div style="margin-top:16px">
+    {{> local_launchpad/admin_empty}}
+  </div>
+{{/has_tracks}}
+
+{{#has_tracks}}
+  <div class="lp-tabs lp-tabs-block lp-courseops-tabs" role="tablist" aria-label="{{heading}}" style="margin-top:16px">
+    {{#track_tabs}}
+      <a class="lp-tab{{#current}} is-on{{/current}}" href="{{url}}"{{#current}} aria-current="page"{{/current}} title="{{title}}">{{label}}</a>
+    {{/track_tabs}}
+  </div>
+
+  <section class="lp-card lift lp-courseops-status" style="margin-top:16px">
+    <div class="lp-card-head">
+      <h3>{{status_title}}</h3>
+    </div>
+    <div class="lp-courseops-status-row">
+      <div>
+        <p class="lp-courseops-track-name">{{{track_name}}}</p>
+        <p class="lp-sm lp-muted">{{track_idnumber}}</p>
+      </div>
+      <div class="lp-courseops-chips">
+        <span class="lp-chip {{#is_visible}}ok{{/is_visible}}{{^is_visible}}warn{{/is_visible}}">{{visibility_chip}}</span>
+        <span class="lp-chip {{#ready_ok}}ok{{/ready_ok}}{{^ready_ok}}warn{{/ready_ok}}">{{ready_chip}}</span>
+      </div>
+    </div>
+    <dl class="lp-theme-kv lp-courseops-kv">
+      <div class="lp-theme-kv-row">
+        <dt>{{teacher_kv_label}}</dt>
+        <dd class="{{^has_teacher}}is-warn{{/has_teacher}}">{{teacher_summary}}</dd>
+      </div>
+      <div class="lp-theme-kv-row">
+        <dt>{{fellows_kv_label}}</dt>
+        <dd>{{fellows_summary}}</dd>
+      </div>
+    </dl>
+  </section>
+
+  {{#is_hub}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{ops_title}}</h3>
+        <p class="lp-muted">{{ops_lead}}</p>
+      </div>
+      <div class="lp-courseops-grid">
+        {{#primary_nav}}
+          <a class="lp-courseops-tile{{#current}} is-current{{/current}}" href="{{url}}">
+            <span class="lp-courseops-tile-ico" aria-hidden="true">{{{icon_svg}}}</span>
+            <span class="lp-courseops-tile-label">{{label}}</span>
+            <span class="lp-courseops-tile-blurb">{{blurb}}</span>
+          </a>
+        {{/primary_nav}}
+      </div>
+    </section>
+  {{/is_hub}}
+
+  {{^is_hub}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head">
+        <h3>{{section_title}}</h3>
+        <span class="lp-chip line">{{soon_badge}}</span>
+      </div>
+      <p class="lp-muted">{{section_body}}</p>
+      <div class="lp-courseops-hero-actions" style="margin-top:14px">
+        <a class="lp-btn lp-btn-solid" href="{{hub_url}}">{{back_hub_label}}</a>
+      </div>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_hub}}
+{{/has_tracks}}

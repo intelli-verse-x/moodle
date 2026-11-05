@@ -77,6 +77,8 @@ final class admin_dashboard {
             'lead' => get_string('admin_overview_lead', 'local_launchpad'),
             'moodle_admin_url' => (new \moodle_url('/admin/search.php'))->out(false),
             'moodle_admin_label' => get_string('admin_open_moodle_admin', 'local_launchpad'),
+            'tracks_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false),
+            'tracks_cta_label' => get_string('admin_overview_tracks_cta', 'local_launchpad'),
             'kpi_tracks_ready' => $kpis['tracks_ready'],
             'kpi_tracks_total' => $kpis['tracks_total'],
             'kpi_fellows' => $kpis['fellows'],
@@ -170,6 +172,218 @@ final class admin_dashboard {
             $builderurl,
             'admin_empty_cta_builder'
         ));
+    }
+
+    /**
+     * Resolve a LaunchPad track course by id (0 / invalid → first track or null).
+     */
+    public static function resolve_track_course(int $trackid): ?\stdClass {
+        $tracks = self::list_track_courses();
+        if ($tracks === []) {
+            return null;
+        }
+        if ($trackid > 0) {
+            foreach ($tracks as $course) {
+                if ((int) $course->id === $trackid) {
+                    return $course;
+                }
+            }
+        }
+        return $tracks[0];
+    }
+
+    /**
+     * M5 Course ops hub — track-scoped in-shell home (not a Moodle link farm).
+     *
+     * @param \stdClass $user
+     * @param int $trackid
+     * @param string $section hub|settings|participants|grades|completion|reports|qbank
+     * @return array<string, mixed>
+     */
+    public static function courseops_context(\stdClass $user, int $trackid = 0, string $section = 'hub'): array {
+        unset($user);
+        $allowed = ['hub', 'settings', 'participants', 'grades', 'completion', 'reports', 'qbank'];
+        if (!in_array($section, $allowed, true)) {
+            $section = 'hub';
+        }
+
+        $tracks = self::list_track_courses();
+        if ($tracks === []) {
+            $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+            return array_merge([
+                'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
+                'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
+                'lead' => get_string('admin_courseops_lead', 'local_launchpad'),
+                'has_tracks' => false,
+                'is_hub' => true,
+            ], self::empty_state(
+                'admin_tracks_empty',
+                'admin_empty_title_no_tracks',
+                $builderurl,
+                'admin_empty_cta_builder'
+            ));
+        }
+
+        $selected = self::resolve_track_course($trackid);
+        $trackid = (int) $selected->id;
+        $visible = (int) ($selected->visible ?? 0) === 1;
+        $teachers = self::teacher_names($trackid);
+        $fellows = self::fellow_count($trackid);
+        $foundationsready = self::foundations_ready($trackid);
+
+        $opsurl = static function (string $sec) use ($trackid): string {
+            return (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'courseops',
+                'trackid' => $trackid,
+                'section' => $sec,
+            ]))->out(false);
+        };
+
+        $icon = static function (string $paths): string {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+                . $paths . '</svg>';
+        };
+
+        $primary = [
+            [
+                'key' => 'settings',
+                'label' => get_string('admin_courseops_nav_settings', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_settings_blurb', 'local_launchpad'),
+                'url' => $opsurl('settings'),
+                'current' => $section === 'settings',
+                'icon_svg' => $icon('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>'),
+            ],
+            [
+                'key' => 'participants',
+                'label' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_participants_blurb', 'local_launchpad'),
+                'url' => $opsurl('participants'),
+                'current' => $section === 'participants',
+                'icon_svg' => $icon(
+                    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>'
+                    . '<circle cx="9" cy="7" r="4"/>'
+                    . '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>'
+                    . '<path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+                ),
+            ],
+            [
+                'key' => 'grades',
+                'label' => get_string('admin_courseops_nav_grades', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_grades_blurb', 'local_launchpad'),
+                'url' => $opsurl('grades'),
+                'current' => $section === 'grades',
+                'icon_svg' => $icon('<path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>'),
+            ],
+            [
+                'key' => 'completion',
+                'label' => get_string('admin_courseops_nav_completion', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_completion_blurb', 'local_launchpad'),
+                'url' => $opsurl('completion'),
+                'current' => $section === 'completion',
+                'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),
+            ],
+            [
+                'key' => 'reports',
+                'label' => get_string('admin_courseops_nav_reports', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_reports_blurb', 'local_launchpad'),
+                'url' => $opsurl('reports'),
+                'current' => $section === 'reports',
+                'icon_svg' => $icon('<path d="M4 19V5h4v14H4zM10 19V9h4v10h-4zM16 19v-6h4v6h-4z"/>'),
+            ],
+            [
+                'key' => 'qbank',
+                'label' => get_string('admin_courseops_nav_qbank', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_qbank_blurb', 'local_launchpad'),
+                'url' => $opsurl('qbank'),
+                'current' => $section === 'qbank',
+                'icon_svg' => $icon('<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/><circle cx="17" cy="16" r="1.5"/>'),
+            ],
+        ];
+
+        $tracktabs = [];
+        foreach ($tracks as $course) {
+            $cid = (int) $course->id;
+            $tracktabs[] = [
+                'id' => $cid,
+                'label' => self::builder_track_tab_label($course),
+                'title' => format_string($course->fullname),
+                'url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => $cid,
+                    'section' => $section === 'hub' ? 'hub' : $section,
+                ]))->out(false),
+                'current' => $cid === $trackid,
+            ];
+        }
+
+        $ishub = $section === 'hub';
+        $sectionmeta = [
+            'settings' => [
+                'title' => get_string('admin_courseops_nav_settings', 'local_launchpad'),
+                'body' => get_string('admin_courseops_soon_settings', 'local_launchpad'),
+            ],
+            'participants' => [
+                'title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
+                'body' => get_string('admin_courseops_soon_participants', 'local_launchpad'),
+            ],
+            'grades' => [
+                'title' => get_string('admin_courseops_nav_grades', 'local_launchpad'),
+                'body' => get_string('admin_courseops_soon_grades', 'local_launchpad'),
+            ],
+            'completion' => [
+                'title' => get_string('admin_courseops_nav_completion', 'local_launchpad'),
+                'body' => get_string('admin_courseops_soon_completion', 'local_launchpad'),
+            ],
+            'reports' => [
+                'title' => get_string('admin_courseops_nav_reports', 'local_launchpad'),
+                'body' => get_string('admin_courseops_soon_reports', 'local_launchpad'),
+            ],
+            'qbank' => [
+                'title' => get_string('admin_courseops_nav_qbank', 'local_launchpad'),
+                'body' => get_string('admin_courseops_soon_qbank', 'local_launchpad'),
+            ],
+        ];
+
+        return [
+            'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
+            'lead' => get_string('admin_courseops_lead', 'local_launchpad'),
+            'has_tracks' => true,
+            'track_name' => format_string($selected->fullname),
+            'track_idnumber' => s($selected->idnumber ?? ''),
+            'trackid' => $trackid,
+            'track_tabs' => $tracktabs,
+            'is_visible' => $visible,
+            'visibility_chip' => $visible
+                ? get_string('admin_courseops_visible', 'local_launchpad')
+                : get_string('admin_courseops_hidden', 'local_launchpad'),
+            'ready_chip' => $foundationsready
+                ? get_string('admin_tracks_foundations_ready', 'local_launchpad')
+                : get_string('admin_tracks_outline_only', 'local_launchpad'),
+            'ready_ok' => $foundationsready,
+            'teacher_kv_label' => get_string('admin_builder_kv_teacher', 'local_launchpad'),
+            'teacher_summary' => $teachers !== []
+                ? implode(', ', $teachers)
+                : get_string('admin_tracks_no_teacher', 'local_launchpad'),
+            'has_teacher' => $teachers !== [],
+            'fellows_kv_label' => get_string('admin_builder_kv_enrolled', 'local_launchpad'),
+            'fellows_summary' => get_string('admin_tracks_fellows', 'local_launchpad', $fellows),
+            'hub_url' => $opsurl('hub'),
+            'back_tracks_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false),
+            'back_tracks_label' => get_string('admin_courseops_back_tracks', 'local_launchpad'),
+            'preview_url' => (new \moodle_url('/course/view.php', ['id' => $trackid]))->out(false),
+            'preview_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
+            'status_title' => get_string('admin_courseops_status_title', 'local_launchpad'),
+            'ops_title' => get_string('admin_courseops_ops_title', 'local_launchpad'),
+            'ops_lead' => get_string('admin_courseops_ops_lead', 'local_launchpad'),
+            'primary_nav' => $primary,
+            'is_hub' => $ishub,
+            'section' => $section,
+            'section_title' => $ishub ? '' : (string) ($sectionmeta[$section]['title'] ?? ''),
+            'section_body' => $ishub ? '' : (string) ($sectionmeta[$section]['body'] ?? ''),
+            'soon_badge' => get_string('admin_courseops_soon_badge', 'local_launchpad'),
+            'back_hub_label' => get_string('admin_courseops_back_hub', 'local_launchpad'),
+        ];
     }
 
     /**
@@ -3285,6 +3499,11 @@ final class admin_dashboard {
             'fellows_label' => get_string('admin_tracks_fellows', 'local_launchpad', $fellows),
             'course_url' => (new \moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
             'open_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
+            'courseops_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'courseops',
+                'trackid' => $courseid,
+            ]))->out(false),
+            'courseops_label' => get_string('admin_tracks_course_ops', 'local_launchpad'),
             'builder_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
                 'view' => 'builder',
                 'trackid' => $courseid,
@@ -3455,8 +3674,16 @@ final class admin_dashboard {
                 'id' => (int) $course->id,
                 'name' => format_string($course->fullname),
                 'idnumber' => s($course->idnumber),
-                'edit_url' => (new \moodle_url('/course/edit.php', ['id' => (int) $course->id]))->out(false),
-                'view_url' => (new \moodle_url('/course/view.php', ['id' => (int) $course->id]))->out(false),
+                // Slice A: Course settings → Course ops (settings lands in Slice B).
+                'edit_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => (int) $course->id,
+                    'section' => 'settings',
+                ]))->out(false),
+                'view_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => (int) $course->id,
+                ]))->out(false),
             ];
             if ((int) $course->visible === 1) {
                 $shown[] = $row;

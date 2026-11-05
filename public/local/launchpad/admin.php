@@ -46,11 +46,16 @@ portal_gate::assert_or_redirect_home(
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
 $allowedviews = [
-    'home', 'tracks', 'builder', 'manage', 'activity', 'calendar',
+    'home', 'tracks', 'courseops', 'builder', 'manage', 'activity', 'calendar',
     'announcements', 'cohorts', 'people', 'mentors', 'reviews',
 ];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+
+$courseopssection = optional_param('section', 'hub', PARAM_ALPHANUMEXT);
+if (!in_array($courseopssection, ['hub', 'settings', 'participants', 'grades', 'completion', 'reports', 'qbank'], true)) {
+    $courseopssection = 'hub';
 }
 
 $peopletab = optional_param('tab', 'all', PARAM_ALPHA);
@@ -277,11 +282,19 @@ if ($view === 'calendar') {
     $calincludeorient = false;
 }
 
+$coursopssectionparam = null;
+if ($view === 'courseops' && $courseopssection !== 'hub') {
+    $coursopssectionparam = $courseopssection;
+} else if ($view === 'manage' && $sectionnum > 0) {
+    $coursopssectionparam = $sectionnum;
+}
+
 $urlparams = array_filter([
     'view' => $view !== 'home' ? $view : null,
     'tab' => ($view === 'people' && $peopletab !== 'all') ? $peopletab : null,
-    'trackid' => (($view === 'builder' || $view === 'manage' || $view === 'activity') && $trackid > 0) ? $trackid : null,
-    'section' => ($view === 'manage' && $sectionnum > 0) ? $sectionnum : null,
+    'trackid' => (($view === 'builder' || $view === 'manage' || $view === 'activity' || $view === 'courseops')
+        && $trackid > 0) ? $trackid : null,
+    'section' => $coursopssectionparam,
     'cmid' => ($view === 'activity' && $cmid > 0) ? $cmid : null,
     'cal' => ($view === 'calendar' && $calmode !== 'month') ? $calmode : null,
     'filter' => ($view === 'calendar' && ($calfilter === 'course' || $calfilter === 'personal')) ? $calfilter : null,
@@ -341,7 +354,7 @@ $nav = [
             [
                 'label' => get_string('admin_nav_tracks', 'local_launchpad'),
                 'url' => $tracksurl,
-                'current' => $view === 'tracks',
+                'current' => ($view === 'tracks' || $view === 'courseops'),
                 'key' => 'tracks',
                 'icon_svg' => $icon(
                     '<path d="M4 6h16M4 12h10M4 18h14"/>'
@@ -435,6 +448,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_tracks',
         admin_dashboard::tracks_context($USER)
+    );
+} else if ($view === 'courseops') {
+    $pagetitle = get_string('admin_courseops_heading', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_courseops',
+        admin_dashboard::courseops_context($USER, $trackid, $courseopssection)
     );
 } else if ($view === 'builder') {
     $pagetitle = get_string('admin_nav_builder', 'local_launchpad');
