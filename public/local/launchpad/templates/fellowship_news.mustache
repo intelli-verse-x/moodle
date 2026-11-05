@@ -67,6 +67,7 @@
               <div class="lp-news-item-copy">
                 {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
                 {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
+                {{#has_attachments}}<span class="lp-ann-attach-badge">{{attach_badge}}</span>{{/has_attachments}}
                 <h3><a href="{{url}}">{{{subject}}}</a></h3>
                 {{#excerpt}}<p class="lp-sm lp-muted">{{{excerpt}}}</p>{{/excerpt}}
                 {{#has_tags}}
@@ -74,6 +75,25 @@
                     {{#tags}}<span class="lp-chip line">{{name}}</span>{{/tags}}
                   </div>
                 {{/has_tags}}
+                {{#has_attachments}}
+                  <ul class="lp-admin-file-cards lp-ann-file-cards">
+                    {{#attachments}}
+                      <li class="lp-admin-file-card{{#has_preview}} has-thumb{{/has_preview}}">
+                        {{#has_preview}}
+                          <span class="lp-admin-file-thumb" aria-hidden="true"><img src="{{previewurl}}" alt=""></span>
+                        {{/has_preview}}
+                        {{^has_preview}}
+                          <span class="lp-admin-file-ico" aria-hidden="true">{{#ext}}{{ext}}{{/ext}}{{^ext}}FILE{{/ext}}</span>
+                        {{/has_preview}}
+                        <span class="lp-admin-file-body">
+                          <span class="lp-admin-file-name">{{displayname}}</span>
+                          <span class="lp-admin-file-meta">{{size}}</span>
+                        </span>
+                        <a class="lp-btn lp-btn-light lp-ann-file-dl" href="{{url}}" target="_blank" rel="noopener">{{download_label}}</a>
+                      </li>
+                    {{/attachments}}
+                  </ul>
+                {{/has_attachments}}
                 <div class="lp-news-item-meta">
                   {{#has_author}}<span>{{author}}</span>{{/has_author}}
                   {{#when}}<span>{{when}}</span>{{/when}}

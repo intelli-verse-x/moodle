@@ -35,7 +35,7 @@
       {{> local_launchpad/admin_empty}}
     {{/has_tracks}}
     {{#has_tracks}}
-      <form method="post" action="{{form_action}}" class="lp-stack lp-ann-form" data-lp-ann-form>
+      <form method="post" action="{{form_action}}" class="lp-stack lp-ann-form" data-lp-ann-form enctype="multipart/form-data">
         <input type="hidden" name="sesskey" value="{{sesskey}}">
         <input type="hidden" name="action" value="post_announcement" data-lp-ann-action>
         <input type="hidden" name="discussionid" value="" data-lp-ann-discussionid>
@@ -96,6 +96,28 @@
           <span class="lp-muted lp-sm">{{schedule_help}}</span>
         </label>
 
+        <div class="lp-field lp-admin-files lp-ann-attach-field"
+          data-lp-file-picker
+          data-lp-ann-file-picker
+          data-lp-remove-name="removeannfiles[]"
+          data-lp-remove-label="{{remove_file_label}}">
+          <span>{{attach_label}}</span>
+          <span class="lp-muted lp-sm">{{attach_help}}</span>
+          <ul class="lp-admin-file-cards" data-lp-attached-files hidden></ul>
+          <div data-lp-remove-inputs></div>
+          <div class="lp-file-picker">
+            <label class="lp-file-picker-trigger">
+              <span class="lp-btn lp-btn-light lp-file-picker-btn">{{choose_files_label}}</span>
+              <input class="lp-file-picker-input" type="file" name="annfiles[]" multiple data-lp-file-input data-lp-ann-files>
+            </label>
+            <span class="lp-file-picker-status lp-sm lp-muted" data-lp-file-status>{{picker_empty_label}}</span>
+          </div>
+          <div class="lp-admin-pending" data-lp-pending-wrap hidden>
+            <span class="lp-sm" style="font-weight:600">{{pending_heading}}</span>
+            <ul class="lp-admin-file-cards" data-lp-pending-list></ul>
+          </div>
+        </div>
+
         <div class="lp-ann-form-actions">
           <button type="submit" class="lp-btn lp-btn-solid" data-lp-ann-submit>{{submit_label}}</button>
           <button type="button" class="lp-btn lp-btn-light" data-lp-ann-cancel-edit hidden>{{cancel_edit_label}}</button>
@@ -118,12 +140,14 @@
             data-message="{{message_plain}}"
             data-tags="{{tags_csv}}"
             data-pinned="{{#is_pinned}}1{{/is_pinned}}{{^is_pinned}}0{{/is_pinned}}"
-            data-publish-at="{{publish_at_value}}">
+            data-publish-at="{{publish_at_value}}"
+            data-attachments="{{attachments_json}}">
             <div class="lp-ann-item-main">
               <a class="lp-ann-item-title" href="{{url}}">{{{subject}}}</a>
               <div class="lp-ann-item-meta">
                 {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
                 {{#is_scheduled}}<span class="lp-ann-sched-badge">{{scheduled_badge}}</span>{{/is_scheduled}}
+                {{#has_attachments}}<span class="lp-ann-attach-badge">{{attach_badge}}</span>{{/has_attachments}}
                 <span class="lp-ann-item-track">{{{course_name}}}</span>
                 <span class="lp-ann-item-when">{{when}}</span>
               </div>
@@ -132,6 +156,25 @@
                   {{#tags}}<span class="lp-chip line">{{name}}</span>{{/tags}}
                 </div>
               {{/has_tags}}
+              {{#has_attachments}}
+                <ul class="lp-admin-file-cards lp-ann-file-cards">
+                  {{#attachments}}
+                    <li class="lp-admin-file-card{{#has_preview}} has-thumb{{/has_preview}}">
+                      {{#has_preview}}
+                        <span class="lp-admin-file-thumb" aria-hidden="true"><img src="{{previewurl}}" alt=""></span>
+                      {{/has_preview}}
+                      {{^has_preview}}
+                        <span class="lp-admin-file-ico" aria-hidden="true">{{#ext}}{{ext}}{{/ext}}{{^ext}}FILE{{/ext}}</span>
+                      {{/has_preview}}
+                      <span class="lp-admin-file-body">
+                        <span class="lp-admin-file-name">{{displayname}}</span>
+                        <span class="lp-admin-file-meta">{{size}}</span>
+                      </span>
+                      <a class="lp-btn lp-btn-light lp-ann-file-dl" href="{{url}}" target="_blank" rel="noopener">{{download_label}}</a>
+                    </li>
+                  {{/attachments}}
+                </ul>
+              {{/has_attachments}}
               <div class="lp-ann-item-actions">
                 {{#can_edit}}
                   <button type="button" class="lp-ann-link" data-lp-ann-edit>{{edit_label}}</button>

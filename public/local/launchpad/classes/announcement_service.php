@@ -176,6 +176,13 @@ final class announcement_service {
             'pin_help' => get_string('admin_announcements_pin_help', 'local_launchpad'),
             'schedule_label' => get_string('admin_announcements_schedule', 'local_launchpad'),
             'schedule_help' => get_string('admin_announcements_schedule_help', 'local_launchpad'),
+            'attach_label' => get_string('admin_announcements_attach', 'local_launchpad'),
+            'attach_help' => get_string('admin_announcements_attach_help', 'local_launchpad'),
+            'choose_files_label' => get_string('admin_activity_choose_files', 'local_launchpad'),
+            'picker_empty_label' => get_string('admin_activity_picker_empty', 'local_launchpad'),
+            'pending_heading' => get_string('admin_activity_pending_heading', 'local_launchpad'),
+            'remove_file_label' => get_string('admin_activity_remove_file', 'local_launchpad'),
+            'download_label' => get_string('activity_file_download', 'local_launchpad'),
             'submit_label' => get_string('admin_announcements_submit', 'local_launchpad'),
             'save_label' => get_string('admin_announcements_save', 'local_launchpad'),
             'cancel_edit_label' => get_string('admin_announcements_cancel_edit', 'local_launchpad'),
@@ -230,11 +237,13 @@ final class announcement_service {
         bool $alltracks,
         array $tagnames,
         bool $pinned = false,
-        string $publishat = ''
+        string $publishat = '',
+        ?array $uploadfiles = null
     ): array {
-        global $CFG;
+        global $CFG, $DB;
 
         require_once($CFG->dirroot . '/mod/forum/lib.php');
+        require_once($CFG->libdir . '/filelib.php');
 
         $subject = trim($subject);
         $message = trim($message);
@@ -251,6 +260,11 @@ final class announcement_service {
         }
         if ($timestart === null) {
             $timestart = 0;
+        }
+
+        $pendingfiles = self::normalize_upload_files($uploadfiles);
+        if (isset($pendingfiles['error'])) {
+            return ['error' => (string) $pendingfiles['error']];
         }
 
         $targets = self::resolve_tracks($trackids, $alltracks);
@@ -310,10 +324,48 @@ final class announcement_service {
                     $discussion->tags = $tags;
                 }
 
+                if ($pendingfiles !== [] && !forum_can_create_attachment($forum, $modcontext)) {
+                    $failures[] = $label . ': ' . get_string('admin_announcements_err_cap_attach', 'local_launchpad');
+                    continue;
+                }
+                if ($pendingfiles !== []) {
+                    $maxfiles = (int) ($forum->maxattachments ?? 0);
+                    if ($maxfiles > 0 && count($pendingfiles) > $maxfiles) {
+                        $failures[] = $label . ': ' . get_string(
+                            'admin_announcements_err_attach_max',
+                            'local_launchpad',
+                            $maxfiles
+                        );
+                        continue;
+                    }
+                    $sizeerr = self::validate_upload_sizes($pendingfiles, $forum, $course);
+                    if ($sizeerr !== null) {
+                        $failures[] = $label . ': ' . $sizeerr;
+                        continue;
+                    }
+                }
+
                 $discussionid = forum_add_discussion($discussion, null, null, (int) $user->id);
                 if (!$discussionid) {
                     $failures[] = $label . ': ' . get_string('admin_announcements_err_save', 'local_launchpad');
                     continue;
+                }
+                if ($pendingfiles !== []) {
+                    $discussionrec = $DB->get_record('forum_discussions', ['id' => $discussionid]);
+                    $firstpost = (int) ($discussionrec->firstpost ?? 0);
+                    $saved = $firstpost > 0 && self::store_attachments_on_post(
+                        $modcontext,
+                        $firstpost,
+                        $pendingfiles,
+                        (int) $user->id
+                    );
+                    if (!$saved) {
+                        if ($discussionrec) {
+                            forum_delete_discussion($discussionrec, false, $course, $cm, $forum);
+                        }
+                        $failures[] = $label . ': ' . get_string('admin_announcements_err_attach', 'local_launchpad');
+                        continue;
+                    }
                 }
                 $ok++;
             } catch (\Throwable $e) {
@@ -353,11 +405,14 @@ final class announcement_service {
         string $message,
         array $tagnames,
         bool $pinned = false,
-        string $publishat = ''
+        string $publishat = '',
+        ?array $uploadfiles = null,
+        array $removefiles = []
     ): array {
         global $CFG, $DB;
 
         require_once($CFG->dirroot . '/mod/forum/lib.php');
+        require_once($CFG->libdir . '/filelib.php');
 
         $subject = trim($subject);
         $message = trim($message);
@@ -376,6 +431,11 @@ final class announcement_service {
             $timestart = 0;
         }
 
+        $pendingfiles = self::normalize_upload_files($uploadfiles);
+        if (isset($pendingfiles['error'])) {
+            return ['error' => (string) $pendingfiles['error']];
+        }
+
         $bundle = self::load_news_discussion($discussionid);
         if ($bundle === null) {
             return ['error' => get_string('admin_announcements_err_missing', 'local_launchpad')];
@@ -384,14 +444,48 @@ final class announcement_service {
             return ['error' => get_string('admin_announcements_err_cap_edit', 'local_launchpad')];
         }
 
+        $modcontext = $bundle['modcontext'];
+        $forum = $bundle['forum'];
+        $course = $bundle['course'];
+        $postid = (int) $bundle['post']->id;
+        if (($pendingfiles !== [] || $removefiles !== [])
+                && !forum_can_create_attachment($forum, $modcontext)) {
+            return ['error' => get_string('admin_announcements_err_cap_attach', 'local_launchpad')];
+        }
+
+        $existing = self::attachment_rows_for_post($modcontext, $postid);
+        $removekeys = [];
+        foreach ($removefiles as $raw) {
+            $name = clean_param((string) $raw, PARAM_FILE);
+            if ($name !== '') {
+                $removekeys[$name] = true;
+            }
+        }
+        $keptcount = 0;
+        foreach ($existing as $row) {
+            if (!isset($removekeys[$row['name']])) {
+                $keptcount++;
+            }
+        }
+        $maxfiles = (int) ($forum->maxattachments ?? 0);
+        if ($pendingfiles !== [] && $maxfiles > 0 && ($keptcount + count($pendingfiles)) > $maxfiles) {
+            return ['error' => get_string('admin_announcements_err_attach_max', 'local_launchpad', $maxfiles)];
+        }
+        if ($pendingfiles !== []) {
+            $sizeerr = self::validate_upload_sizes($pendingfiles, $forum, $course);
+            if ($sizeerr !== null) {
+                return ['error' => $sizeerr];
+            }
+        }
+
         $currentpinned = (int) ($bundle['discussion']->pinned ?? FORUM_DISCUSSION_UNPINNED) === FORUM_DISCUSSION_PINNED;
         $pinvalue = $currentpinned ? FORUM_DISCUSSION_PINNED : FORUM_DISCUSSION_UNPINNED;
         if ($pinned !== $currentpinned) {
-            if (!has_capability('mod/forum:pindiscussions', $bundle['modcontext'], $user)) {
+            if (!has_capability('mod/forum:pindiscussions', $modcontext, $user)) {
                 return ['error' => get_string('admin_announcements_err_cap_pin', 'local_launchpad')];
             }
             if ($pinned && self::count_pinned_in_forum(
-                    (int) $bundle['forum']->id,
+                    (int) $forum->id,
                     (int) $bundle['discussion']->id
             ) >= self::PIN_LIMIT) {
                 return ['error' => get_string(
@@ -406,11 +500,11 @@ final class announcement_service {
         $clean = clean_text($message, FORMAT_HTML);
         $now = time();
         $postupdate = (object) [
-            'id' => (int) $bundle['post']->id,
+            'id' => $postid,
             'subject' => $subject,
             'message' => $clean,
             'messageformat' => FORMAT_HTML,
-            'messagetrust' => trusttext_trusted($bundle['modcontext']) ? 1 : 0,
+            'messagetrust' => trusttext_trusted($modcontext) ? 1 : 0,
             'modified' => $now,
         ];
         $DB->update_record('forum_posts', $postupdate);
@@ -427,10 +521,21 @@ final class announcement_service {
         \core_tag_tag::set_item_tags(
             'mod_forum',
             'forum_posts',
-            (int) $bundle['post']->id,
-            $bundle['modcontext'],
+            $postid,
+            $modcontext,
             $tags
         );
+
+        if ($removekeys !== []) {
+            self::delete_attachments_by_name($modcontext, $postid, array_keys($removekeys));
+        }
+        if ($pendingfiles !== []) {
+            if (!self::store_attachments_on_post($modcontext, $postid, $pendingfiles, (int) $user->id)) {
+                return ['error' => get_string('admin_announcements_err_attach', 'local_launchpad')];
+            }
+        } else if ($removekeys !== []) {
+            self::sync_post_attachment_flag($modcontext, $postid);
+        }
 
         return ['ok' => get_string('admin_announcements_updated', 'local_launchpad')];
     }
@@ -524,6 +629,8 @@ final class announcement_service {
                 $ispinned = (int) ($discussion->pinned ?? 0) === 1;
                 $timestart = (int) ($discussion->timestart ?? 0);
                 $isscheduled = $timestart > time();
+                $attachments = self::attachment_rows_for_post($modcontext, (int) $post->id);
+                $attachcount = count($attachments);
                 $items[] = [
                     'id' => (int) $discussion->id,
                     'subject' => format_string($discussion->name),
@@ -554,6 +661,14 @@ final class announcement_service {
                         )
                         : '',
                     'publish_at_value' => $timestart > 0 ? self::format_publish_at_value($timestart) : '',
+                    'has_attachments' => $attachcount > 0,
+                    'attachment_count' => $attachcount,
+                    'attachments' => $attachments,
+                    'attachments_json' => json_encode($attachments, JSON_UNESCAPED_UNICODE),
+                    'download_label' => get_string('activity_file_download', 'local_launchpad'),
+                    'attach_badge' => $attachcount > 0
+                        ? get_string('admin_announcements_attach_badge', 'local_launchpad', $attachcount)
+                        : '',
                     'can_edit' => $canedit,
                     'can_delete' => $candelete,
                     'has_actions' => $canedit || $candelete,
@@ -805,5 +920,217 @@ final class announcement_service {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Attachment cards for a forum first post (admin + fellow lists / edit restore).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function attachment_rows_for_post(\context $modcontext, int $postid): array {
+        if ($postid <= 0) {
+            return [];
+        }
+        $fs = get_file_storage();
+        $files = $fs->get_area_files(
+            $modcontext->id,
+            'mod_forum',
+            'attachment',
+            $postid,
+            'filename',
+            false
+        );
+        $out = [];
+        foreach ($files as $file) {
+            $filename = $file->get_filename();
+            if ($filename === '' || $filename === '.') {
+                continue;
+            }
+            $card = activity_portal::describe_resource_file($file, $modcontext);
+            $preview = '';
+            if (!empty($card['isimage'])) {
+                $preview = \moodle_url::make_pluginfile_url(
+                    $modcontext->id,
+                    'mod_forum',
+                    'attachment',
+                    $postid,
+                    $file->get_filepath(),
+                    $filename,
+                    false
+                )->out(false);
+            }
+            $download = \moodle_url::make_pluginfile_url(
+                $modcontext->id,
+                'mod_forum',
+                'attachment',
+                $postid,
+                $file->get_filepath(),
+                $filename,
+                true
+            )->out(false);
+            $out[] = array_merge($card, [
+                'name' => $filename,
+                'url' => $download,
+                'filesize' => $card['size'],
+                'previewurl' => $preview,
+                'has_preview' => $preview !== '',
+            ]);
+        }
+        return $out;
+    }
+
+    /**
+     * Normalise $_FILES['annfiles'] into pending rows, or ['error' => string].
+     *
+     * @return list<array{filename:string,content:string,size:int}>|array{error:string}
+     */
+    private static function normalize_upload_files(?array $fileinfo): array {
+        if ($fileinfo === null || !isset($fileinfo['name'])) {
+            return [];
+        }
+        if (!is_array($fileinfo['name'])) {
+            $fileinfo = [
+                'name' => [$fileinfo['name'] ?? ''],
+                'type' => [$fileinfo['type'] ?? ''],
+                'tmp_name' => [$fileinfo['tmp_name'] ?? ''],
+                'error' => [$fileinfo['error'] ?? UPLOAD_ERR_NO_FILE],
+                'size' => [$fileinfo['size'] ?? 0],
+            ];
+        }
+
+        $pending = [];
+        $count = count($fileinfo['name']);
+        for ($i = 0; $i < $count; $i++) {
+            $err = (int) ($fileinfo['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($err === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+            if ($err !== UPLOAD_ERR_OK) {
+                return ['error' => get_string('admin_announcements_err_attach', 'local_launchpad')];
+            }
+            $tmp = (string) ($fileinfo['tmp_name'][$i] ?? '');
+            $filename = clean_param((string) ($fileinfo['name'][$i] ?? ''), PARAM_FILE);
+            if ($tmp === '' || !is_uploaded_file($tmp) || $filename === '') {
+                return ['error' => get_string('admin_announcements_err_attach', 'local_launchpad')];
+            }
+            $content = @file_get_contents($tmp);
+            if ($content === false) {
+                return ['error' => get_string('admin_announcements_err_attach', 'local_launchpad')];
+            }
+            $pending[] = [
+                'filename' => $filename,
+                'content' => $content,
+                'size' => (int) ($fileinfo['size'][$i] ?? strlen($content)),
+            ];
+        }
+        return $pending;
+    }
+
+    /**
+     * @param list<array{filename:string,content:string,size:int}> $pending
+     */
+    private static function validate_upload_sizes(array $pending, \stdClass $forum, \stdClass $course): ?string {
+        global $CFG;
+
+        $maxbytes = get_user_max_upload_file_size(
+            \context_course::instance((int) $course->id),
+            $CFG->maxbytes,
+            $course->maxbytes ?? 0,
+            $forum->maxbytes ?? 0
+        );
+        if ($maxbytes <= 0) {
+            return null;
+        }
+        foreach ($pending as $item) {
+            if ((int) ($item['size'] ?? 0) > $maxbytes) {
+                return get_string(
+                    'admin_announcements_err_attach_size',
+                    'local_launchpad',
+                    display_size($maxbytes)
+                );
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param list<array{filename:string,content:string,size?:int}> $pending
+     */
+    private static function store_attachments_on_post(
+        \context $modcontext,
+        int $postid,
+        array $pending,
+        int $userid
+    ): bool {
+        if ($postid <= 0 || $pending === []) {
+            return false;
+        }
+        $fs = get_file_storage();
+        foreach ($pending as $item) {
+            $filename = (string) ($item['filename'] ?? '');
+            $content = (string) ($item['content'] ?? '');
+            if ($filename === '' || $content === '') {
+                return false;
+            }
+            $existing = $fs->get_file($modcontext->id, 'mod_forum', 'attachment', $postid, '/', $filename);
+            if ($existing) {
+                $existing->delete();
+            }
+            $record = [
+                'contextid' => $modcontext->id,
+                'component' => 'mod_forum',
+                'filearea' => 'attachment',
+                'itemid' => $postid,
+                'filepath' => '/',
+                'filename' => $filename,
+                'userid' => $userid,
+                'source' => $filename,
+            ];
+            $stored = $fs->create_file_from_string($record, $content);
+            if (!$stored) {
+                return false;
+            }
+        }
+        self::sync_post_attachment_flag($modcontext, $postid);
+        return true;
+    }
+
+    /**
+     * @param list<string> $filenames
+     */
+    private static function delete_attachments_by_name(\context $modcontext, int $postid, array $filenames): void {
+        if ($postid <= 0 || $filenames === []) {
+            return;
+        }
+        $fs = get_file_storage();
+        foreach ($filenames as $filename) {
+            $filename = clean_param((string) $filename, PARAM_FILE);
+            if ($filename === '') {
+                continue;
+            }
+            $file = $fs->get_file($modcontext->id, 'mod_forum', 'attachment', $postid, '/', $filename);
+            if ($file) {
+                $file->delete();
+            }
+        }
+        self::sync_post_attachment_flag($modcontext, $postid);
+    }
+
+    private static function sync_post_attachment_flag(\context $modcontext, int $postid): void {
+        global $DB;
+
+        if ($postid <= 0) {
+            return;
+        }
+        $files = get_file_storage()->get_area_files(
+            $modcontext->id,
+            'mod_forum',
+            'attachment',
+            $postid,
+            'filename',
+            false
+        );
+        $present = $files !== [] ? '1' : '';
+        $DB->set_field('forum_posts', 'attachment', $present, ['id' => $postid]);
     }
 }

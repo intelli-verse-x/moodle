@@ -93,6 +93,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
                 $tags[] = $extra;
             }
         }
+        $annfiles = (isset($_FILES['annfiles']) && is_array($_FILES['annfiles'])) ? $_FILES['annfiles'] : null;
         $flash = announcement_service::post(
             $USER,
             $subject,
@@ -101,7 +102,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $alltracks,
             $tags,
             $pinned,
-            $publishat
+            $publishat,
+            $annfiles
         );
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
@@ -119,6 +121,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
                 $tags[] = $extra;
             }
         }
+        $annfiles = (isset($_FILES['annfiles']) && is_array($_FILES['annfiles'])) ? $_FILES['annfiles'] : null;
+        $removefiles = optional_param_array('removeannfiles', [], PARAM_FILE);
         $flash = announcement_service::update(
             $USER,
             $discussionid,
@@ -126,7 +130,9 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $message,
             $tags,
             $pinned,
-            $publishat
+            $publishat,
+            $annfiles,
+            $removefiles
         );
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));

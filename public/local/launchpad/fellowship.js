@@ -2296,8 +2296,11 @@
         var pendingWrap = root.querySelector('[data-lp-pending-wrap]');
         var pendingList = root.querySelector('[data-lp-pending-list]');
         var removeBox = root.querySelector('[data-lp-remove-inputs]');
-        var removeLabel = root.querySelector('[data-lp-attached-remove]');
-        var removeAria = removeLabel ? (removeLabel.getAttribute('aria-label') || 'Remove file') : 'Remove file';
+        var removeName = root.getAttribute('data-lp-remove-name') || 'removeresourcefiles[]';
+        var removeAria = root.getAttribute('data-lp-remove-label')
+            || (root.querySelector('[data-lp-attached-remove]')
+                ? (root.querySelector('[data-lp-attached-remove]').getAttribute('aria-label') || 'Remove file')
+                : 'Remove file');
         if (!input || !status) {
             return;
         }
@@ -2315,21 +2318,24 @@
                 }
                 var hidden = document.createElement('input');
                 hidden.type = 'hidden';
-                hidden.name = 'removeresourcefiles[]';
+                hidden.name = removeName;
                 hidden.value = name;
                 removeBox.appendChild(hidden);
             });
         }
 
-        root.querySelectorAll('[data-lp-attached-remove]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var card = btn.closest('[data-lp-attached-card]');
-                if (!card) {
-                    return;
-                }
-                card.classList.toggle('is-removing');
-                syncRemoveInputs();
-            });
+        root.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-lp-attached-remove]');
+            if (!btn || !root.contains(btn)) {
+                return;
+            }
+            e.preventDefault();
+            var card = btn.closest('[data-lp-attached-card]');
+            if (!card) {
+                return;
+            }
+            card.classList.toggle('is-removing');
+            syncRemoveInputs();
         });
 
         function setInputFiles(fileList) {
@@ -2417,6 +2423,17 @@
         var submitEl = annForm.querySelector('[data-lp-ann-submit]');
         var cancelEditEl = annForm.querySelector('[data-lp-ann-cancel-edit]');
         var formTitleEl = shell.querySelector('[data-lp-ann-form-title]');
+        var filesEl = annForm.querySelector('[data-lp-ann-files]');
+        var annFilePicker = annForm.querySelector('[data-lp-ann-file-picker]');
+        var attachedList = annFilePicker ? annFilePicker.querySelector('[data-lp-attached-files]') : null;
+        var removeBox = annFilePicker ? annFilePicker.querySelector('[data-lp-remove-inputs]') : null;
+        var pendingWrap = annFilePicker ? annFilePicker.querySelector('[data-lp-pending-wrap]') : null;
+        var pendingList = annFilePicker ? annFilePicker.querySelector('[data-lp-pending-list]') : null;
+        var fileStatus = annFilePicker ? annFilePicker.querySelector('[data-lp-file-status]') : null;
+        var removeAria = annFilePicker
+            ? (annFilePicker.getAttribute('data-lp-remove-label') || 'Remove file')
+            : 'Remove file';
+        var pickerEmpty = fileStatus ? fileStatus.textContent : 'No new file chosen';
         var strSubmit = annPage ? (annPage.getAttribute('data-str-submit') || 'Post announcement') : 'Post announcement';
         var strSave = annPage ? (annPage.getAttribute('data-str-save') || 'Save changes') : 'Save changes';
         var strEditing = annPage ? (annPage.getAttribute('data-str-editing') || 'Edit announcement') : 'Edit announcement';
@@ -2424,6 +2441,96 @@
         var strDeleteConfirm = annPage
             ? (annPage.getAttribute('data-str-delete-confirm') || 'Delete this announcement?')
             : 'Delete this announcement?';
+
+        function clearAnnFiles() {
+            if (filesEl) {
+                filesEl.value = '';
+            }
+            if (attachedList) {
+                attachedList.innerHTML = '';
+                attachedList.setAttribute('hidden', 'hidden');
+            }
+            if (removeBox) {
+                removeBox.innerHTML = '';
+            }
+            if (pendingList) {
+                pendingList.innerHTML = '';
+            }
+            if (pendingWrap) {
+                pendingWrap.hidden = true;
+            }
+            if (fileStatus) {
+                fileStatus.textContent = pickerEmpty;
+            }
+        }
+        function renderExistingFiles(raw) {
+            if (!attachedList) {
+                return;
+            }
+            attachedList.innerHTML = '';
+            if (removeBox) {
+                removeBox.innerHTML = '';
+            }
+            var rows = [];
+            try {
+                rows = JSON.parse(raw || '[]') || [];
+            } catch (err) {
+                rows = [];
+            }
+            if (!Array.isArray(rows) || !rows.length) {
+                attachedList.setAttribute('hidden', 'hidden');
+                return;
+            }
+            rows.forEach(function (row) {
+                var name = String((row && (row.name || row.filename)) || '').trim();
+                if (!name) {
+                    return;
+                }
+                var display = String((row && row.displayname) || name);
+                var size = String((row && row.size) || (row && row.filesize) || '');
+                var ext = String((row && row.ext) || '').toUpperCase() || 'FILE';
+                if (ext.length > 5) {
+                    ext = 'FILE';
+                }
+                var preview = String((row && row.previewurl) || '');
+                var li = document.createElement('li');
+                li.className = 'lp-admin-file-card' + (preview ? ' has-thumb' : '');
+                li.title = name;
+                li.setAttribute('data-lp-attached-card', '');
+                li.setAttribute('data-filename', name);
+                if (preview) {
+                    li.innerHTML =
+                        '<span class="lp-admin-file-thumb" aria-hidden="true"><img alt=""></span>' +
+                        '<span class="lp-admin-file-body">' +
+                        '<span class="lp-admin-file-name"></span>' +
+                        '<span class="lp-admin-file-meta"></span>' +
+                        '</span>' +
+                        '<button type="button" class="lp-file-remove" data-lp-attached-remove></button>';
+                    li.querySelector('img').src = preview;
+                } else {
+                    li.innerHTML =
+                        '<span class="lp-admin-file-ico" aria-hidden="true"></span>' +
+                        '<span class="lp-admin-file-body">' +
+                        '<span class="lp-admin-file-name"></span>' +
+                        '<span class="lp-admin-file-meta"></span>' +
+                        '</span>' +
+                        '<button type="button" class="lp-file-remove" data-lp-attached-remove></button>';
+                    li.querySelector('.lp-admin-file-ico').textContent = ext;
+                }
+                li.querySelector('.lp-admin-file-name').textContent = display;
+                li.querySelector('.lp-admin-file-meta').textContent = size;
+                var rm = li.querySelector('[data-lp-attached-remove]');
+                rm.setAttribute('aria-label', removeAria);
+                rm.title = removeAria;
+                rm.textContent = '×';
+                attachedList.appendChild(li);
+            });
+            if (attachedList.children.length) {
+                attachedList.removeAttribute('hidden');
+            } else {
+                attachedList.setAttribute('hidden', 'hidden');
+            }
+        }
 
         function syncAnnTracks() {
             var on = !!(allTracks && allTracks.checked);
@@ -2496,6 +2603,7 @@
             if (publishElReset) {
                 publishElReset.value = '';
             }
+            clearAnnFiles();
             if (submitEl) {
                 submitEl.textContent = strSubmit;
             }
@@ -2532,6 +2640,8 @@
             if (publishEl) {
                 publishEl.value = item.getAttribute('data-publish-at') || '';
             }
+            clearAnnFiles();
+            renderExistingFiles(item.getAttribute('data-attachments') || '[]');
             if (tracksWrap) {
                 tracksWrap.setAttribute('hidden', 'hidden');
             }

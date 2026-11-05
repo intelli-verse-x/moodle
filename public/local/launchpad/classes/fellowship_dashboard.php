@@ -2349,13 +2349,16 @@ final class fellowship_dashboard {
                     $authorname = $author ? fullname($author) : '';
                     $tagrows = announcement_service::tag_chips_for_post((int) $post->id);
                     $ispinned = (int) ($discussion->pinned ?? 0) === 1;
+                    $modcontext = \context_module::instance((int) $cm->id);
+                    $attachments = announcement_service::attachment_rows_for_post($modcontext, (int) $post->id);
+                    $attachcount = count($attachments);
                     $items[] = [
                         'id' => (int) $discussion->id,
                         'subject' => format_string($discussion->name),
                         'excerpt' => shorten_text(format_text(
                             $post->message,
                             (int) $post->messageformat,
-                            ['context' => \context_module::instance((int) $cm->id), 'para' => false]
+                            ['context' => $modcontext, 'para' => false]
                         ), 180),
                         'author' => $authorname,
                         'has_author' => $authorname !== '',
@@ -2370,6 +2373,11 @@ final class fellowship_dashboard {
                         'is_pinned' => $ispinned,
                         'pinned_badge' => $ispinned
                             ? get_string('admin_announcements_pinned_badge', 'local_launchpad')
+                            : '',
+                        'has_attachments' => $attachcount > 0,
+                        'attachments' => $attachments,
+                        'attach_badge' => $attachcount > 0
+                            ? get_string('admin_announcements_attach_badge', 'local_launchpad', $attachcount)
                             : '',
                     ];
                 }

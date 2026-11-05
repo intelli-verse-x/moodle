@@ -6968,6 +6968,7 @@ body.lp-portal-mismatch-lock {
   gap: 10px;
 }
 .lp-file-picker-trigger {
+  position: relative;
   display: inline-flex;
   cursor: pointer;
   margin: 0;
@@ -7429,9 +7430,35 @@ body.lp-portal-mismatch-lock {
   font-weight: 600;
   letter-spacing: 0;
 }
-.lp-ann-schedule-field .lp-muted {
+.lp-ann-schedule-field .lp-muted,
+.lp-ann-attach-field .lp-muted {
   display: block;
   margin-top: 4px;
+}
+.lp-ann-attach-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(91, 107, 140, 0.35);
+  background: #f3f5f9;
+  color: var(--lp-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.lp-ann-attach-field.lp-admin-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp-ann-file-cards {
+  margin-top: 6px;
+}
+.lp-ann-file-dl {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .lp-ann-item.is-pinned,
 .lp-news-item.is-pinned {
