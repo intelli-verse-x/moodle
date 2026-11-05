@@ -147,9 +147,13 @@ final class fellowship_dashboard {
                     'complete' => $iscomplete,
                     'icon_class' => self::mod_icon_class($cm->modname),
                 ];
+                // Evidence-first chips so phase Met never sits next to activity "Not tracked".
+                $item = array_merge($item, self::activity_row_status($cm, $userid, $tracked, $iscomplete));
+                // Open in Fellowship activity shell (page/file in-shell; quiz/assign CTA → Moodle).
+                $item = activity_portal::rewrite_fellow_row($item);
                 $activities[] = $item;
 
-                if ($next === null && (!$tracked || !$iscomplete)) {
+                if ($next === null && empty($item['complete'])) {
                     $next = $item;
                 }
             }
@@ -209,6 +213,146 @@ final class fellowship_dashboard {
             'forum' => 'forum',
             default => 'activity',
         };
+    }
+
+    /**
+     * Activity list chip for My track / home — assigns use mentor evidence; others use completion.
+     *
+     * Never returns the confusing "Not tracked" chip beside a phase that can show Met.
+     *
+     * @return array{
+     *   show_status:bool,
+     *   status_label:string,
+     *   status_chip:string,
+     *   tracked:bool,
+     *   complete:bool
+     * }
+     */
+    public static function activity_row_status(
+        \cm_info $cm,
+        int $userid,
+        bool $completiontracked,
+        bool $completioncomplete
+    ): array {
+        global $DB;
+
+        if ($cm->modname === 'assign') {
+            $instanceid = (int) $cm->instance;
+            $latest = $DB->get_record('assign_submission', [
+                'assignment' => $instanceid,
+                'userid' => $userid,
+                'latest' => 1,
+            ], '*', IGNORE_MISSING);
+            $substatus = $latest ? (string) $latest->status : '';
+            $attemptnumber = $latest ? (int) $latest->attemptnumber : -1;
+            $submittedcount = (int) $DB->count_records('assign_submission', [
+                'assignment' => $instanceid,
+                'userid' => $userid,
+                'status' => 'submitted',
+            ]);
+
+            $agrade = false;
+            if ($attemptnumber >= 0) {
+                $agrade = $DB->get_record('assign_grades', [
+                    'assignment' => $instanceid,
+                    'userid' => $userid,
+                    'attemptnumber' => $attemptnumber,
+                ], '*', IGNORE_MISSING);
+                if (!$agrade || $agrade->grade === null || (float) $agrade->grade < 0) {
+                    $agrade = false;
+                }
+            }
+            if (!$agrade && $latest && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
+                $prior = $DB->get_records_select(
+                    'assign_grades',
+                    'assignment = :assignment AND userid = :userid AND grade >= 0 AND attemptnumber < :attempt',
+                    [
+                        'assignment' => $instanceid,
+                        'userid' => $userid,
+                        'attempt' => max(0, $attemptnumber),
+                    ],
+                    'attemptnumber DESC, timemodified DESC',
+                    '*',
+                    0,
+                    1
+                );
+                $agrade = $prior ? reset($prior) : false;
+            }
+
+            $gradepct = null;
+            if ($agrade && $agrade->grade !== null && (float) $agrade->grade >= 0) {
+                $assignmax = (float) ($DB->get_field('assign', 'grade', ['id' => $instanceid]) ?: 0);
+                if ($assignmax > 0) {
+                    $gradepct = (((float) $agrade->grade) / $assignmax) * 100;
+                }
+            }
+
+            if ($gradepct !== null && $gradepct >= 70 && !in_array($substatus, ['reopened', 'draft', 'new'], true)) {
+                return [
+                    'show_status' => true,
+                    'status_label' => get_string('fellowship_act_met', 'local_launchpad'),
+                    'status_chip' => 'ok',
+                    'tracked' => true,
+                    'complete' => true,
+                ];
+            }
+            if ($gradepct !== null && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
+                return [
+                    'show_status' => true,
+                    'status_label' => get_string('fellowship_act_changes', 'local_launchpad'),
+                    'status_chip' => 'warn',
+                    'tracked' => true,
+                    'complete' => false,
+                ];
+            }
+            if ($gradepct !== null) {
+                // Graded below 70, still submitted — not Met yet.
+                return [
+                    'show_status' => true,
+                    'status_label' => get_string('fellowship_act_not_met', 'local_launchpad'),
+                    'status_chip' => 'warn',
+                    'tracked' => true,
+                    'complete' => false,
+                ];
+            }
+            if ($substatus === 'submitted' || $submittedcount > 0) {
+                return [
+                    'show_status' => true,
+                    'status_label' => get_string('fellowship_act_pending', 'local_launchpad'),
+                    'status_chip' => '',
+                    'tracked' => true,
+                    'complete' => false,
+                ];
+            }
+            return [
+                'show_status' => true,
+                'status_label' => get_string('fellowship_act_todo', 'local_launchpad'),
+                'status_chip' => 'line',
+                'tracked' => true,
+                'complete' => false,
+            ];
+        }
+
+        if ($completiontracked) {
+            return [
+                'show_status' => true,
+                'status_label' => $completioncomplete
+                    ? get_string('fellowship_complete', 'local_launchpad')
+                    : get_string('fellowship_incomplete', 'local_launchpad'),
+                'status_chip' => $completioncomplete ? 'ok' : 'line',
+                'tracked' => true,
+                'complete' => $completioncomplete,
+            ];
+        }
+
+        // Content without completion: no misleading "Not tracked" chip.
+        return [
+            'show_status' => false,
+            'status_label' => '',
+            'status_chip' => '',
+            'tracked' => false,
+            'complete' => false,
+        ];
     }
 
     /**
@@ -554,20 +698,18 @@ final class fellowship_dashboard {
                 if ($hasgrade && $bestpct !== null) {
                     $score = (int) round($bestpct);
                     $scored = true;
-                    if ($bestpct >= 70) {
-                        $status = 'Met';
-                        $chip = 'ok';
-                        $ico = '✓';
-                    } else {
-                        $status = 'Not yet met';
-                        $chip = 'warn';
-                    }
+                }
+                if ($hasgrade && $bestpct !== null && $bestpct >= 70 && !$revising) {
+                    $status = 'Met';
+                    $chip = 'ok';
+                    $ico = '✓';
+                } else if ($revising || ($hasgrade && $bestpct !== null && $bestpct < 70)) {
+                    // Mentor asked for changes, or graded below the 70 Met bar.
+                    $status = $revising ? 'Changes requested' : 'Not yet met';
+                    $chip = 'warn';
                 } else if ($submitted) {
                     $status = 'Review pending';
                     $chip = '';
-                } else if ($revising) {
-                    $status = 'Revising';
-                    $chip = 'line';
                 } else {
                     $status = 'In progress';
                     $chip = 'line';
@@ -890,7 +1032,7 @@ final class fellowship_dashboard {
             $out[] = [
                 'id' => $mentorid,
                 'name' => fullname($user),
-                'can_message' => $viewerid > 0 && messaging::can_message($viewerid, $mentorid),
+                'can_message' => $viewerid > 0 && messaging::can_message($viewerid, $mentorid, 'fellow'),
                 'message_url' => messaging::messages_url($mentorid, 'fellow'),
             ];
         }
@@ -2202,6 +2344,7 @@ final class fellowship_dashboard {
                     }
                     $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
                     $authorname = $author ? fullname($author) : '';
+                    $tagrows = announcement_service::tag_chips_for_post((int) $post->id);
                     $items[] = [
                         'id' => (int) $discussion->id,
                         'subject' => format_string($discussion->name),
@@ -2218,6 +2361,8 @@ final class fellowship_dashboard {
                         'course_name' => format_string($course->fullname),
                         'cta_label' => $ctalabel,
                         'icon' => 'news',
+                        'tags' => $tagrows,
+                        'has_tags' => $tagrows !== [],
                     ];
                 }
             }
@@ -2488,7 +2633,7 @@ final class fellowship_dashboard {
                 $assigncount++;
                 $instanceid = (int) $cm->instance;
                 $name = $cm->get_formatted_name();
-                $url = (new \moodle_url('/mod/assign/view.php', ['id' => $cm->id]))->out(false);
+                $url = activity_portal::fellow_url((int) $cm->id);
 
                 $latest = $DB->get_record('assign_submission', [
                     'assignment' => $instanceid,
@@ -2536,6 +2681,7 @@ final class fellowship_dashboard {
                 }
 
                 $commenttext = '';
+                $nextsteptext = '';
                 $gradedat = 0;
                 $gradepct = null;
                 $gradestr = '';
@@ -2560,11 +2706,16 @@ final class fellowship_dashboard {
                     ]);
                     if ($fc && trim((string) $fc->commenttext) !== '') {
                         $hasgrade = true; // Comment released counts as feedback even if mark pending.
-                        $commenttext = format_text(
-                            $fc->commenttext,
-                            (int) $fc->commentformat,
-                            ['context' => \context_module::instance($cm->id), 'para' => false]
-                        );
+                        $parts = mentor_dashboard::unpack_review_comment((string) $fc->commenttext);
+                        $nextsteptext = $parts['next_step'];
+                        $body = $parts['comment'] !== '' ? $parts['comment'] : '';
+                        if ($body !== '') {
+                            $commenttext = format_text(
+                                $body,
+                                (int) $fc->commentformat,
+                                ['context' => \context_module::instance($cm->id), 'para' => false]
+                            );
+                        }
                     }
                 }
 
@@ -2579,12 +2730,17 @@ final class fellowship_dashboard {
                         if (!empty($gg->dategraded)) {
                             $gradedat = max($gradedat, (int) $gg->dategraded);
                         }
-                        if ($commenttext === '' && !empty($gg->feedback)) {
-                            $commenttext = format_text(
-                                $gg->feedback,
-                                (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
-                                ['context' => \context_module::instance($cm->id), 'para' => false]
-                            );
+                        if ($commenttext === '' && $nextsteptext === '' && !empty($gg->feedback)) {
+                            $parts = mentor_dashboard::unpack_review_comment((string) $gg->feedback);
+                            $nextsteptext = $parts['next_step'];
+                            $body = $parts['comment'] !== '' ? $parts['comment'] : '';
+                            if ($body !== '') {
+                                $commenttext = format_text(
+                                    $body,
+                                    (int) ($gg->feedbackformat ?? FORMAT_MOODLE),
+                                    ['context' => \context_module::instance($cm->id), 'para' => false]
+                                );
+                            }
                         }
                     }
                 }
@@ -2666,6 +2822,8 @@ final class fellowship_dashboard {
                     'summary' => $summary,
                     'has_grade' => $hasgrade && $gradestr !== '',
                     'grade_display' => $gradestr,
+                    'has_next_step' => $nextsteptext !== '',
+                    'next_step' => $nextsteptext,
                     'has_comment' => $commenttext !== '',
                     'comment_html' => $commenttext,
                     'has_attempt' => $attempt > 0,
@@ -2743,10 +2901,7 @@ final class fellowship_dashboard {
         if ($userid <= 0) {
             return false;
         }
-        if (is_siteadmin($userid)) {
-            // Admins may preview; persona_home still does not force them here.
-            return true;
-        }
+        // Site admins use admin.php — do not linger on the Fellowship shell.
         return account_persona::is_fellowship($userid);
     }
 

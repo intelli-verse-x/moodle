@@ -68,6 +68,125 @@
                 }
             });
         });
+
+        // Keep #lp-side scroll + collapsed groups across full-page tab loads.
+        (function persistSide() {
+            var region = shell.getAttribute('data-region') || '';
+            var portal = 'fellow';
+            if (region.indexOf('admin') !== -1) {
+                portal = 'admin';
+            } else if (region.indexOf('mentor') !== -1) {
+                portal = 'mentor';
+            } else if (region.indexOf('employer') !== -1) {
+                portal = 'employee';
+            }
+            var key = 'lp.side.' + portal;
+
+            function readState() {
+                try {
+                    var raw = window.sessionStorage.getItem(key);
+                    return raw ? JSON.parse(raw) : {};
+                } catch (err) {
+                    return {};
+                }
+            }
+
+            function writeState(patch) {
+                try {
+                    var next = readState();
+                    Object.keys(patch).forEach(function (k) {
+                        next[k] = patch[k];
+                    });
+                    window.sessionStorage.setItem(key, JSON.stringify(next));
+                } catch (err) {
+                    // Private mode / quota — ignore.
+                }
+            }
+
+            var state = readState();
+            var groups = [];
+
+            side.querySelectorAll('.lp-nl').forEach(function (nl) {
+                var id = (nl.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!id) {
+                    return;
+                }
+                var items = [];
+                var el = nl.nextElementSibling;
+                while (el && !el.classList.contains('lp-nl')
+                        && !el.classList.contains('lp-me')
+                        && !el.classList.contains('lp-side-foot')) {
+                    if (el.classList.contains('lp-nav')) {
+                        items.push(el);
+                    }
+                    el = el.nextElementSibling;
+                }
+                groups.push({id: id, nl: nl, items: items});
+                nl.style.cursor = 'pointer';
+                nl.setAttribute('role', 'button');
+                nl.tabIndex = 0;
+            });
+
+            function setGroupCollapsed(group, collapsed) {
+                group.nl.classList.toggle('is-collapsed', collapsed);
+                group.nl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                group.items.forEach(function (item) {
+                    if (collapsed) {
+                        item.setAttribute('hidden', 'hidden');
+                    } else {
+                        item.removeAttribute('hidden');
+                    }
+                });
+            }
+
+            function saveCollapsed() {
+                var map = {};
+                groups.forEach(function (g) {
+                    if (g.nl.classList.contains('is-collapsed')) {
+                        map[g.id] = true;
+                    }
+                });
+                writeState({collapsed: map});
+            }
+
+            var collapsed = state.collapsed || {};
+            groups.forEach(function (g) {
+                var hasCurrent = g.items.some(function (item) {
+                    return item.classList.contains('is-current');
+                });
+                // Never hide the active tab's section after a navigation.
+                setGroupCollapsed(g, !hasCurrent && !!collapsed[g.id]);
+                function toggleGroup() {
+                    setGroupCollapsed(g, !g.nl.classList.contains('is-collapsed'));
+                    saveCollapsed();
+                }
+                g.nl.addEventListener('click', toggleGroup);
+                g.nl.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleGroup();
+                    }
+                });
+            });
+
+            function restoreScroll() {
+                if (typeof state.scroll === 'number') {
+                    side.scrollTop = state.scroll;
+                }
+            }
+            restoreScroll();
+            requestAnimationFrame(restoreScroll);
+
+            var scrollTimer = null;
+            side.addEventListener('scroll', function () {
+                if (scrollTimer) {
+                    window.clearTimeout(scrollTimer);
+                }
+                scrollTimer = window.setTimeout(function () {
+                    writeState({scroll: side.scrollTop});
+                }, 50);
+            }, {passive: true});
+        })();
     }
     var calRoot = shell.querySelector('[data-lp-cal-root]');
     var calDetail = shell.querySelector('[data-lp-cal-detail]');
@@ -97,16 +216,22 @@
         calStrings.network = calRoot.getAttribute('data-str-network') || calStrings.network;
         calStrings.courseRequired = calRoot.getAttribute('data-str-course-required') || calStrings.courseRequired;
     }
+    function normalizeCalScope(value) {
+        if (value === 'course' || value === 'site') {
+            return value;
+        }
+        return 'personal';
+    }
     function getCalScope() {
         var checked = calForm ? calForm.querySelector('[data-lp-cal-form-scope]:checked') : null;
         if (checked) {
-            return checked.value === 'course' ? 'course' : 'personal';
+            return normalizeCalScope(checked.value);
         }
         var fixed = calForm ? calForm.querySelector('[data-lp-cal-form-scope-fixed]') : null;
         if (fixed && fixed.value) {
-            return fixed.value === 'course' ? 'course' : 'personal';
+            return normalizeCalScope(fixed.value);
         }
-        return (calRoot && calRoot.getAttribute('data-default-scope') === 'course') ? 'course' : 'personal';
+        return normalizeCalScope(calRoot ? calRoot.getAttribute('data-default-scope') : 'personal');
     }
     function setCalScope(scope, lock) {
         var radios = calForm ? calForm.querySelectorAll('[data-lp-cal-form-scope]') : [];
@@ -127,7 +252,9 @@
         var courseWrap = calForm.querySelector('[data-lp-cal-form-course-wrap]');
         var helpPersonal = calForm.querySelector('[data-lp-cal-form-help]');
         var helpCourse = calForm.querySelector('[data-lp-cal-form-help-course]');
+        var helpSite = calForm.querySelector('[data-lp-cal-form-help-site]');
         var isCourse = scope === 'course';
+        var isSite = scope === 'site';
         if (courseWrap) {
             if (isCourse) {
                 courseWrap.removeAttribute('hidden');
@@ -136,7 +263,7 @@
             }
         }
         if (helpPersonal) {
-            if (isCourse) {
+            if (isCourse || isSite) {
                 helpPersonal.setAttribute('hidden', 'hidden');
             } else {
                 helpPersonal.removeAttribute('hidden');
@@ -149,6 +276,14 @@
                 helpCourse.setAttribute('hidden', 'hidden');
             }
         }
+        if (helpSite) {
+            if (isSite) {
+                helpSite.removeAttribute('hidden');
+            } else {
+                helpSite.setAttribute('hidden', 'hidden');
+            }
+        }
+        syncRepeatHelp(scope);
     }
     function getDurationMode() {
         var checked = calForm ? calForm.querySelector('[data-lp-cal-form-duration-mode]:checked') : null;
@@ -271,6 +406,31 @@
             }
         }
     }
+    function syncRepeatHelp(scope) {
+        if (!calForm) {
+            return;
+        }
+        var helpCourse = calForm.querySelector('[data-lp-cal-form-repeat-help]');
+        var helpSite = calForm.querySelector('[data-lp-cal-form-repeat-help-site]');
+        var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
+        var weekly = !!(repeatEl && repeatEl.checked);
+        var wrapVisible = calForm.querySelector('[data-lp-cal-form-repeat-wrap]');
+        var creating = wrapVisible && !wrapVisible.hasAttribute('hidden');
+        if (helpCourse) {
+            if (creating && weekly && scope === 'course') {
+                helpCourse.removeAttribute('hidden');
+            } else {
+                helpCourse.setAttribute('hidden', 'hidden');
+            }
+        }
+        if (helpSite) {
+            if (creating && weekly && scope === 'site') {
+                helpSite.removeAttribute('hidden');
+            } else {
+                helpSite.setAttribute('hidden', 'hidden');
+            }
+        }
+    }
     function syncRepeatUi(isCreate) {
         if (!calForm) {
             return;
@@ -283,6 +443,7 @@
         }
         if (!isCreate) {
             wrap.setAttribute('hidden', 'hidden');
+            syncRepeatHelp(getCalScope());
             return;
         }
         wrap.removeAttribute('hidden');
@@ -294,6 +455,7 @@
                 countWrap.setAttribute('hidden', 'hidden');
             }
         }
+        syncRepeatHelp(getCalScope());
     }
     function getRepeatCount() {
         if (!calForm) {
@@ -693,7 +855,7 @@
             if (durMode === 'minutes') {
                 setMinutesSelectValue(sourceBtn.getAttribute('data-duration') || '60', false);
             }
-            var editScope = sourceBtn.getAttribute('data-scope') === 'course' ? 'course' : 'personal';
+            var editScope = normalizeCalScope(sourceBtn.getAttribute('data-scope') || 'personal');
             setCalScope(editScope, true);
             if (courseEl && editScope === 'course') {
                 courseEl.value = sourceBtn.getAttribute('data-courseid') || courseEl.value;
@@ -756,6 +918,21 @@
             setCalScope(defaultScope, false);
             if (courseEl) {
                 courseEl.disabled = false;
+                var preferredCourse = calRoot
+                    ? (calRoot.getAttribute('data-preferred-courseid') || '')
+                    : '';
+                if (preferredCourse && preferredCourse !== '0') {
+                    var hasPreferred = false;
+                    for (var pi = 0; pi < courseEl.options.length; pi++) {
+                        if (courseEl.options[pi].value === preferredCourse) {
+                            hasPreferred = true;
+                            break;
+                        }
+                    }
+                    if (hasPreferred) {
+                        courseEl.value = preferredCourse;
+                    }
+                }
                 var courseSelectCreate = calForm.querySelector('[data-lp-select-course]');
                 if (courseSelectCreate) {
                     syncLpSelectFromInput(courseSelectCreate);
@@ -1056,14 +1233,23 @@
         }
     }
     shell.addEventListener('change', function (e) {
-        var filter = e.target.closest('[data-lp-cal-filter]');
-        if (!filter) {
+        var filter = e.target.closest('[data-lp-cal-filter], [data-lp-cal-track-filter]');
+        if (filter) {
+            var opt = filter.options[filter.selectedIndex];
+            var url = opt ? opt.getAttribute('data-url') : '';
+            if (url) {
+                window.location.href = url;
+            }
             return;
         }
-        var opt = filter.options[filter.selectedIndex];
-        var url = opt ? opt.getAttribute('data-url') : '';
-        if (url) {
-            window.location.href = url;
+        var orient = e.target.closest('[data-lp-cal-orient-toggle]');
+        if (orient) {
+            var orientUrl = orient.checked
+                ? orient.getAttribute('data-url-on')
+                : orient.getAttribute('data-url-off');
+            if (orientUrl) {
+                window.location.href = orientUrl;
+            }
         }
     });
     shell.addEventListener('click', function (e) {
@@ -1714,4 +1900,705 @@
             });
         }
     })();
+
+    // Admin People tabs: filter in-place (no full-page reload).
+    (function peopleTabs() {
+        var root = shell.querySelector('[data-lp-people]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-people-tab]');
+        var rows = root.querySelectorAll('[data-lp-people-role]');
+        var emptyEl = root.querySelector('[data-lp-people-empty]');
+        var table = root.querySelector('[data-lp-people-table]');
+        if (!tabs.length) {
+            return;
+        }
+
+        function applyTab(tab, pushUrl) {
+            var key = tab || 'all';
+            if (key !== 'all' && key !== 'fellow' && key !== 'mentor' && key !== 'admin') {
+                key = 'all';
+            }
+            root.setAttribute('data-lp-people-active', key);
+
+            var visible = 0;
+            rows.forEach(function (row) {
+                var show = key === 'all' || row.getAttribute('data-lp-people-role') === key;
+                row.hidden = !show;
+                if (show) {
+                    visible += 1;
+                }
+            });
+
+            tabs.forEach(function (el) {
+                var on = el.getAttribute('data-lp-people-tab') === key;
+                el.classList.toggle('is-on', on);
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+
+            if (emptyEl) {
+                emptyEl.style.display = visible === 0 ? '' : 'none';
+            }
+            if (table) {
+                table.style.display = visible === 0 ? 'none' : '';
+            }
+
+            if (pushUrl && window.history && window.history.replaceState) {
+                try {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('view', 'people');
+                    if (key === 'all') {
+                        url.searchParams.delete('tab');
+                    } else {
+                        url.searchParams.set('tab', key);
+                    }
+                    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+                } catch (err) {
+                    // Ignore URL sync failures (older browsers / file URLs).
+                }
+            }
+        }
+
+        root.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-people-tab]');
+            if (!tab || !root.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyTab(tab.getAttribute('data-lp-people-tab'), true);
+        });
+
+        applyTab(root.getAttribute('data-lp-people-active') || 'all', false);
+    })();
+
+    // Admin Course builder: switch tracks in-place (no full-page reload).
+    (function builderTabs() {
+        var root = shell.querySelector('[data-lp-builder]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-builder-tab]');
+        var panels = root.querySelectorAll('[data-lp-builder-panel]');
+        if (!tabs.length || !panels.length) {
+            return;
+        }
+
+        function applyTrack(trackId, pushUrl) {
+            var id = String(trackId || '');
+            if (!id) {
+                return;
+            }
+            root.setAttribute('data-lp-builder-active', id);
+
+            tabs.forEach(function (el) {
+                var on = el.getAttribute('data-lp-builder-tab') === id;
+                el.classList.toggle('is-on', on);
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+
+            panels.forEach(function (panel) {
+                var on = panel.getAttribute('data-lp-builder-panel') === id;
+                panel.hidden = !on;
+            });
+
+            if (pushUrl && window.history && window.history.replaceState) {
+                try {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('view', 'builder');
+                    url.searchParams.set('trackid', id);
+                    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+                } catch (err) {
+                    // Ignore URL sync failures.
+                }
+            }
+        }
+
+        root.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-builder-tab]');
+            if (!tab || !root.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyTrack(tab.getAttribute('data-lp-builder-tab'), true);
+        });
+
+        applyTrack(root.getAttribute('data-lp-builder-active') || tabs[0].getAttribute('data-lp-builder-tab'), false);
+    })();
+
+    // Admin phase manage: Edit mode toggle + add chooser + drag reorder (Save/Cancel).
+    (function manageEditMode() {
+        var root = shell.querySelector('[data-lp-manage]');
+        if (!root) {
+            return;
+        }
+        var toggle = root.querySelector('[data-lp-manage-edit-toggle]');
+        var chooser = root.querySelector('[data-lp-manage-chooser]');
+        var addOpen = root.querySelector('[data-lp-manage-add-open]');
+        var editOnly = root.querySelectorAll('.lp-manage-edit-only');
+        var actlist = root.querySelector('[data-lp-manage-actlist]');
+        var reorderForm = root.querySelector('[data-lp-manage-reorder]');
+        var reorderInputs = reorderForm ? reorderForm.querySelector('[data-lp-reorder-inputs]') : null;
+        var reorderCsv = reorderForm ? reorderForm.querySelector('[data-lp-reorder-csv]') : null;
+        var saveBtn = root.querySelector('[data-lp-reorder-save]');
+        var cancelBtn = root.querySelector('[data-lp-reorder-cancel]');
+        var dragCmid = 0;
+        var dropRow = null;
+        var dropAfter = false;
+        var savedOrder = [];
+
+        function rowByCmid(cmid) {
+            return actlist ? actlist.querySelector('[data-lp-manage-row][data-cmid="' + cmid + '"]') : null;
+        }
+
+        function currentOrder() {
+            if (!actlist) {
+                return [];
+            }
+            return Array.prototype.map.call(actlist.querySelectorAll('[data-lp-manage-row]'), function (row) {
+                return row.getAttribute('data-cmid') || '';
+            }).filter(Boolean);
+        }
+
+        function writeOrderFields(order) {
+            if (reorderCsv) {
+                reorderCsv.value = order.join(',');
+            }
+            if (!reorderInputs) {
+                return;
+            }
+            reorderInputs.innerHTML = '';
+            order.forEach(function (cmid) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'cmorder[]';
+                input.value = cmid;
+                reorderInputs.appendChild(input);
+            });
+        }
+
+        function ordersEqual(a, b) {
+            if (a.length !== b.length) {
+                return false;
+            }
+            for (var i = 0; i < a.length; i++) {
+                if (String(a[i]) !== String(b[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function setDirty(dirty) {
+            root.classList.toggle('is-reorder-dirty', dirty);
+            if (saveBtn) {
+                saveBtn.disabled = !dirty;
+            }
+            if (cancelBtn) {
+                cancelBtn.disabled = !dirty;
+            }
+        }
+
+        function syncDirty() {
+            var order = currentOrder();
+            writeOrderFields(order);
+            setDirty(!ordersEqual(order, savedOrder));
+        }
+
+        function restoreOrder() {
+            if (!actlist || !savedOrder.length) {
+                return;
+            }
+            savedOrder.forEach(function (cmid) {
+                var row = rowByCmid(cmid);
+                if (row) {
+                    actlist.appendChild(row);
+                }
+            });
+            setDirty(false);
+        }
+
+        function clearDropMarks() {
+            if (!actlist) {
+                return;
+            }
+            actlist.querySelectorAll('.lp-actrow.is-drop-before, .lp-actrow.is-drop-after').forEach(function (row) {
+                row.classList.remove('is-drop-before', 'is-drop-after');
+            });
+            dropRow = null;
+            dropAfter = false;
+        }
+
+        function setEdit(on) {
+            if (!on && root.classList.contains('is-reorder-dirty')) {
+                restoreOrder();
+            }
+            root.classList.toggle('is-editing', on);
+            if (toggle) {
+                toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+                toggle.classList.toggle('lp-btn-solid', on);
+                toggle.classList.toggle('lp-btn-light', !on);
+                var onLabel = toggle.getAttribute('data-label-on');
+                var offLabel = toggle.getAttribute('data-label-off');
+                if (onLabel && offLabel) {
+                    toggle.textContent = on ? onLabel : offLabel;
+                }
+            }
+            editOnly.forEach(function (el) {
+                el.hidden = !on;
+            });
+            if (!on && chooser) {
+                chooser.hidden = true;
+            }
+            if (!on) {
+                clearDropMarks();
+                dragCmid = 0;
+            } else {
+                savedOrder = currentOrder();
+                setDirty(false);
+            }
+        }
+
+        if (toggle) {
+            toggle.addEventListener('click', function () {
+                setEdit(!root.classList.contains('is-editing'));
+            });
+        }
+        if (addOpen && chooser) {
+            addOpen.addEventListener('click', function () {
+                chooser.hidden = !chooser.hidden;
+            });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                restoreOrder();
+                clearDropMarks();
+            });
+        }
+        if (reorderForm) {
+            reorderForm.addEventListener('submit', function (e) {
+                if (!root.classList.contains('is-reorder-dirty')) {
+                    e.preventDefault();
+                    return;
+                }
+                writeOrderFields(currentOrder());
+            });
+        }
+
+        if (actlist) {
+            actlist.addEventListener('dragstart', function (e) {
+                if (!root.classList.contains('is-editing')) {
+                    return;
+                }
+                var handle = e.target.closest('[data-lp-manage-drag]');
+                if (!handle) {
+                    e.preventDefault();
+                    return;
+                }
+                var row = handle.closest('[data-lp-manage-row]');
+                if (!row) {
+                    e.preventDefault();
+                    return;
+                }
+                dragCmid = parseInt(row.getAttribute('data-cmid') || '0', 10) || 0;
+                row.classList.add('is-dragging');
+                if (e.dataTransfer) {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(dragCmid));
+                    try {
+                        e.dataTransfer.setDragImage(row, 16, 16);
+                    } catch (err) {
+                        // Some browsers reject setDragImage; ignore.
+                    }
+                }
+            });
+
+            actlist.addEventListener('dragend', function () {
+                var dragging = actlist.querySelector('.lp-actrow.is-dragging');
+                if (dragging) {
+                    dragging.classList.remove('is-dragging');
+                }
+                clearDropMarks();
+                dragCmid = 0;
+            });
+
+            actlist.addEventListener('dragover', function (e) {
+                if (!dragCmid || !root.classList.contains('is-editing')) {
+                    return;
+                }
+                var row = e.target.closest('[data-lp-manage-row]');
+                if (!row || parseInt(row.getAttribute('data-cmid') || '0', 10) === dragCmid) {
+                    return;
+                }
+                e.preventDefault();
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = 'move';
+                }
+                var rect = row.getBoundingClientRect();
+                var after = (e.clientY - rect.top) > (rect.height / 2);
+                clearDropMarks();
+                row.classList.add(after ? 'is-drop-after' : 'is-drop-before');
+                dropRow = row;
+                dropAfter = after;
+            });
+
+            actlist.addEventListener('dragleave', function (e) {
+                var row = e.target.closest('[data-lp-manage-row]');
+                if (!row || row.contains(e.relatedTarget)) {
+                    return;
+                }
+                row.classList.remove('is-drop-before', 'is-drop-after');
+            });
+
+            actlist.addEventListener('drop', function (e) {
+                if (!dragCmid || !root.classList.contains('is-editing')) {
+                    return;
+                }
+                e.preventDefault();
+                var target = dropRow || e.target.closest('[data-lp-manage-row]');
+                var after = dropRow ? dropAfter : false;
+                clearDropMarks();
+                var dragged = rowByCmid(dragCmid);
+                if (!target || !dragged || target === dragged) {
+                    return;
+                }
+                if (after) {
+                    if (target.nextSibling) {
+                        actlist.insertBefore(dragged, target.nextSibling);
+                    } else {
+                        actlist.appendChild(dragged);
+                    }
+                } else {
+                    actlist.insertBefore(dragged, target);
+                }
+                syncDirty();
+            });
+        }
+
+        savedOrder = currentOrder();
+        setEdit(false);
+    })();
+
+    // Confirm before deleting a whole activity (Manage + activity settings).
+    document.querySelectorAll('form[data-lp-delete-confirm]').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            var msg = form.getAttribute('data-lp-delete-confirm') || '';
+            if (msg && !window.confirm(msg)) {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // Admin File settings: pending picks with ×, mark attached files for removal on Save.
+    document.querySelectorAll('[data-lp-file-picker]').forEach(function (root) {
+        var input = root.querySelector('[data-lp-file-input]');
+        var status = root.querySelector('[data-lp-file-status]');
+        var pendingWrap = root.querySelector('[data-lp-pending-wrap]');
+        var pendingList = root.querySelector('[data-lp-pending-list]');
+        var removeBox = root.querySelector('[data-lp-remove-inputs]');
+        var removeLabel = root.querySelector('[data-lp-attached-remove]');
+        var removeAria = removeLabel ? (removeLabel.getAttribute('aria-label') || 'Remove file') : 'Remove file';
+        if (!input || !status) {
+            return;
+        }
+        var emptyLabel = status.textContent;
+
+        function syncRemoveInputs() {
+            if (!removeBox) {
+                return;
+            }
+            removeBox.innerHTML = '';
+            root.querySelectorAll('[data-lp-attached-card].is-removing').forEach(function (card) {
+                var name = card.getAttribute('data-filename') || '';
+                if (!name) {
+                    return;
+                }
+                var hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'removeresourcefiles[]';
+                hidden.value = name;
+                removeBox.appendChild(hidden);
+            });
+        }
+
+        root.querySelectorAll('[data-lp-attached-remove]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var card = btn.closest('[data-lp-attached-card]');
+                if (!card) {
+                    return;
+                }
+                card.classList.toggle('is-removing');
+                syncRemoveInputs();
+            });
+        });
+
+        function setInputFiles(fileList) {
+            var dt = new DataTransfer();
+            for (var i = 0; i < fileList.length; i++) {
+                dt.items.add(fileList[i]);
+            }
+            input.files = dt.files;
+        }
+
+        function renderPending() {
+            var files = input.files ? Array.prototype.slice.call(input.files) : [];
+            if (!pendingWrap || !pendingList) {
+                if (!files.length) {
+                    status.textContent = emptyLabel;
+                } else if (files.length === 1) {
+                    status.textContent = files[0].name + ' — save to attach';
+                } else {
+                    status.textContent = files.length + ' selected — save to attach';
+                }
+                return;
+            }
+            pendingList.innerHTML = '';
+            if (!files.length) {
+                pendingWrap.hidden = true;
+                status.textContent = emptyLabel;
+                return;
+            }
+            pendingWrap.hidden = false;
+            status.textContent = files.length === 1
+                ? (files[0].name + ' — save to attach')
+                : (files.length + ' selected — save to attach');
+            files.forEach(function (file, index) {
+                var li = document.createElement('li');
+                li.className = 'lp-admin-file-card';
+                li.title = file.name;
+                var ext = (file.name.split('.').pop() || 'FILE').toUpperCase();
+                if (ext.length > 5) {
+                    ext = 'FILE';
+                }
+                li.innerHTML =
+                    '<span class="lp-admin-file-ico" aria-hidden="true"></span>' +
+                    '<span class="lp-admin-file-body">' +
+                    '<span class="lp-admin-file-name"></span>' +
+                    '<span class="lp-admin-file-meta"></span>' +
+                    '</span>' +
+                    '<button type="button" class="lp-file-remove" data-lp-pending-remove aria-label=""></button>';
+                li.querySelector('.lp-admin-file-ico').textContent = ext;
+                li.querySelector('.lp-admin-file-name').textContent = file.name;
+                li.querySelector('.lp-admin-file-meta').textContent = file.size
+                    ? (Math.max(1, Math.round(file.size / 1024)) + ' KB')
+                    : '';
+                var rm = li.querySelector('[data-lp-pending-remove]');
+                rm.setAttribute('aria-label', removeAria);
+                rm.title = removeAria;
+                rm.textContent = '×';
+                rm.addEventListener('click', function () {
+                    var next = Array.prototype.slice.call(input.files || []).filter(function (_f, i) {
+                        return i !== index;
+                    });
+                    setInputFiles(next);
+                    renderPending();
+                });
+                pendingList.appendChild(li);
+            });
+        }
+
+        input.addEventListener('change', function () {
+            renderPending();
+        });
+    });
+
+    // Admin announcements: All tracks + edit/delete helpers.
+    var annPage = shell.querySelector('[data-lp-ann-page]');
+    var annForm = shell.querySelector('[data-lp-ann-form]');
+    if (annForm) {
+        var allTracks = annForm.querySelector('[data-lp-ann-all-tracks]');
+        var trackBoxes = annForm.querySelectorAll('[data-lp-ann-track]');
+        var tracksWrap = annForm.querySelector('[data-lp-ann-tracks-wrap]');
+        var actionEl = annForm.querySelector('[data-lp-ann-action]');
+        var discussionEl = annForm.querySelector('[data-lp-ann-discussionid]');
+        var subjectEl = annForm.querySelector('[data-lp-ann-subject]');
+        var messageEl = annForm.querySelector('[data-lp-ann-message]');
+        var customTagEl = annForm.querySelector('[data-lp-ann-customtag]');
+        var submitEl = annForm.querySelector('[data-lp-ann-submit]');
+        var cancelEditEl = annForm.querySelector('[data-lp-ann-cancel-edit]');
+        var formTitleEl = shell.querySelector('[data-lp-ann-form-title]');
+        var strSubmit = annPage ? (annPage.getAttribute('data-str-submit') || 'Post announcement') : 'Post announcement';
+        var strSave = annPage ? (annPage.getAttribute('data-str-save') || 'Save changes') : 'Save changes';
+        var strEditing = annPage ? (annPage.getAttribute('data-str-editing') || 'Edit announcement') : 'Edit announcement';
+        var strCompose = annPage ? (annPage.getAttribute('data-str-compose') || 'Compose') : 'Compose';
+        var strDeleteConfirm = annPage
+            ? (annPage.getAttribute('data-str-delete-confirm') || 'Delete this announcement?')
+            : 'Delete this announcement?';
+
+        function syncAnnTracks() {
+            var on = !!(allTracks && allTracks.checked);
+            trackBoxes.forEach(function (box) {
+                box.checked = on;
+                box.disabled = on;
+            });
+        }
+        function clearAnnTagChecks() {
+            annForm.querySelectorAll('[data-lp-ann-tag]').forEach(function (box) {
+                box.checked = false;
+            });
+            if (customTagEl) {
+                customTagEl.value = '';
+            }
+        }
+        function setAnnTagChecks(csv) {
+            clearAnnTagChecks();
+            var known = {};
+            annForm.querySelectorAll('[data-lp-ann-tag]').forEach(function (box) {
+                known[String(box.value || '').toLowerCase()] = box;
+            });
+            var extras = [];
+            String(csv || '').split(',').forEach(function (raw) {
+                var name = String(raw || '').trim();
+                if (!name) {
+                    return;
+                }
+                var box = known[name.toLowerCase()];
+                if (box) {
+                    box.checked = true;
+                } else {
+                    extras.push(name);
+                }
+            });
+            if (customTagEl && extras.length) {
+                customTagEl.value = extras.join(', ');
+            }
+        }
+        function resetAnnCompose() {
+            if (actionEl) {
+                actionEl.value = 'post_announcement';
+            }
+            if (discussionEl) {
+                discussionEl.value = '';
+            }
+            if (subjectEl) {
+                subjectEl.value = '';
+            }
+            if (messageEl) {
+                messageEl.value = '';
+            }
+            clearAnnTagChecks();
+            if (tracksWrap) {
+                tracksWrap.removeAttribute('hidden');
+            }
+            if (allTracks) {
+                allTracks.checked = false;
+                allTracks.disabled = false;
+            }
+            trackBoxes.forEach(function (box) {
+                box.checked = false;
+                box.disabled = false;
+            });
+            if (submitEl) {
+                submitEl.textContent = strSubmit;
+            }
+            if (cancelEditEl) {
+                cancelEditEl.setAttribute('hidden', 'hidden');
+            }
+            if (formTitleEl) {
+                formTitleEl.textContent = strCompose;
+            }
+            annForm.classList.remove('is-editing');
+        }
+        function startAnnEdit(item) {
+            if (!item) {
+                return;
+            }
+            if (actionEl) {
+                actionEl.value = 'update_announcement';
+            }
+            if (discussionEl) {
+                discussionEl.value = item.getAttribute('data-id') || '';
+            }
+            if (subjectEl) {
+                subjectEl.value = item.getAttribute('data-subject') || '';
+            }
+            if (messageEl) {
+                messageEl.value = item.getAttribute('data-message') || '';
+            }
+            setAnnTagChecks(item.getAttribute('data-tags') || '');
+            if (tracksWrap) {
+                tracksWrap.setAttribute('hidden', 'hidden');
+            }
+            if (submitEl) {
+                submitEl.textContent = strSave;
+            }
+            if (cancelEditEl) {
+                cancelEditEl.removeAttribute('hidden');
+            }
+            if (formTitleEl) {
+                formTitleEl.textContent = strEditing;
+            }
+            annForm.classList.add('is-editing');
+            if (subjectEl) {
+                subjectEl.focus();
+            }
+            annForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        if (allTracks) {
+            allTracks.addEventListener('change', syncAnnTracks);
+            syncAnnTracks();
+        }
+        if (cancelEditEl) {
+            cancelEditEl.addEventListener('click', function () {
+                resetAnnCompose();
+            });
+        }
+        annForm.addEventListener('submit', function (e) {
+            if (actionEl && actionEl.value === 'update_announcement') {
+                return;
+            }
+            var any = allTracks && allTracks.checked;
+            if (!any) {
+                trackBoxes.forEach(function (box) {
+                    if (box.checked) {
+                        any = true;
+                    }
+                });
+            }
+            if (!any) {
+                e.preventDefault();
+                window.alert('Select at least one track, or choose All tracks.');
+            }
+        });
+        shell.addEventListener('click', function (e) {
+            var editBtn = e.target.closest('[data-lp-ann-edit]');
+            if (editBtn) {
+                e.preventDefault();
+                startAnnEdit(editBtn.closest('[data-lp-ann-item]'));
+                return;
+            }
+            var moreAnn = e.target.closest('[data-lp-ann-more]');
+            if (!moreAnn) {
+                return;
+            }
+            var annList = shell.querySelector('[data-lp-ann-list]');
+            if (!annList) {
+                return;
+            }
+            var pageSize = parseInt(annList.getAttribute('data-page-size') || '8', 10) || 8;
+            var hidden = annList.querySelectorAll('li.is-paged-out[hidden]');
+            var show = Math.min(pageSize, hidden.length);
+            for (var ai = 0; ai < show; ai++) {
+                hidden[ai].removeAttribute('hidden');
+                hidden[ai].classList.remove('is-paged-out');
+            }
+            var left = annList.querySelectorAll('li.is-paged-out[hidden]').length;
+            if (left === 0) {
+                moreAnn.setAttribute('hidden', 'hidden');
+            } else {
+                moreAnn.setAttribute('data-remaining', String(left));
+                moreAnn.textContent = 'Show more (' + left + ')';
+            }
+        });
+        shell.addEventListener('submit', function (e) {
+            var delForm = e.target.closest('[data-lp-ann-delete-form]');
+            if (!delForm) {
+                return;
+            }
+            if (!window.confirm(strDeleteConfirm)) {
+                e.preventDefault();
+            }
+        });
+    }
 })();

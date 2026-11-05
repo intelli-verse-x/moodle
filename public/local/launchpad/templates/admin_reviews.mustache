@@ -1,0 +1,87 @@
+{{!
+    @template local_launchpad/admin_reviews
+
+    Admin Review oversight — pending assign reviews across tracks, oldest first.
+    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-reviews">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+    </div>
+  </div>
+</section>
+
+{{#flash_ok}}
+  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+{{/flash_ok}}
+{{#flash_err}}
+  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+{{/flash_err}}
+
+<div class="lp-atiles lp-atiles-3" role="list" style="margin-top:16px">
+  {{#tiles}}
+    <div class="lp-atile" role="listitem">
+      <div class="lp-atile-top">
+        <span class="lp-atile-ico" aria-hidden="true">{{{icon_svg}}}</span>
+        <span class="lp-atile-lbl">{{label}}</span>
+      </div>
+      <div class="lp-atile-val">{{value}}</div>
+      <div class="lp-atile-sub">{{sub}}</div>
+    </div>
+  {{/tiles}}
+</div>
+
+<div class="lp-card lift" style="margin-top:18px">
+  <div class="lp-table-wrap">
+    {{#has_pending}}
+      <table class="lp-table">
+        <thead>
+          <tr>
+            <th>{{col_fellow}}</th>
+            <th>{{col_track}}</th>
+            <th>{{col_submitted}}</th>
+            <th>{{col_teacher}}</th>
+            <th>{{col_state}}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#pending}}
+            <tr>
+              <td>
+                <div class="lp-people-name"><b>{{fellow}}</b></div>
+                <div class="lp-sm">{{email}}</div>
+                <div class="lp-sm">{{assign}}</div>
+              </td>
+              <td class="lp-sm">{{track}}</td>
+              <td class="lp-sm">{{submitted}}</td>
+              <td class="lp-sm">{{teacher}}</td>
+              <td><span class="lp-chip warn">{{state}}</span></td>
+              <td class="lp-reviews-actions">
+                <a class="lp-btn lp-btn-solid" href="{{grader_url}}">{{open_label}}</a>
+                {{#can_ping}}
+                  <form method="post" action="{{ping_action_url}}" class="lp-reviews-ping-form">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="ping_review">
+                    <input type="hidden" name="submissionid" value="{{submissionid}}">
+                    <input type="hidden" name="teacherid" value="{{teacherid}}">
+                    <button type="submit" class="lp-btn lp-btn-light">{{ping_label}}</button>
+                  </form>
+                {{/can_ping}}
+                {{#ping_cooled}}
+                  <span class="lp-btn lp-btn-light is-disabled" aria-disabled="true">{{ping_cooled_label}}</span>
+                {{/ping_cooled}}
+              </td>
+            </tr>
+          {{/pending}}
+        </tbody>
+      </table>
+    {{/has_pending}}
+    {{^has_pending}}
+      {{> local_launchpad/admin_empty}}
+    {{/has_pending}}
+  </div>
+</div>

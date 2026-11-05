@@ -72,12 +72,32 @@
             </div>
           {{/isplaceholder}}
 
+          {{#hasvideo}}
+            <div class="lp-activity-player">
+              <video controls playsinline preload="metadata" controlslist="nodownload">
+                <source src="{{videourl}}" type="video/mp4">
+              </video>
+            </div>
+          {{/hasvideo}}
+
+          {{#hasembed}}
+            <div class="lp-activity-embed">{{{embedhtml}}}</div>
+          {{/hasembed}}
+
           {{#hasexternal}}
             <div class="lp-activity-external">
-              <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
-                {{strings.openlink}}
-                <iconify-icon icon="hugeicons:link-square-02" width="16" height="16" aria-hidden="true"></iconify-icon>
-              </a>
+              {{^hasembed}}
+                <a class="lp-btn lp-btn-solid" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                  <iconify-icon icon="hugeicons:link-square-02" width="16" height="16" aria-hidden="true"></iconify-icon>
+                </a>
+              {{/hasembed}}
+              {{#hasembed}}
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{externalurl}}" target="_blank" rel="noopener noreferrer">
+                  {{strings.openlink}}
+                  <iconify-icon icon="hugeicons:link-square-02" width="16" height="16" aria-hidden="true"></iconify-icon>
+                </a>
+              {{/hasembed}}
               <p class="lp-muted lp-sm">{{externalurl}}</p>
             </div>
           {{/hasexternal}}
@@ -86,10 +106,20 @@
             <ul class="lp-activity-files">
               {{#files}}
                 <li>
-                  <a class="lp-activity-file" href="{{url}}">
-                    <iconify-icon icon="hugeicons:file-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-                    <span>{{filename}}</span>
-                    <span class="lp-muted lp-sm">{{size}}</span>
+                  <a class="lp-activity-file{{#isimage}} has-thumb{{/isimage}}" href="{{url}}" title="{{filename}} — {{download_label}}">
+                    {{#isimage}}
+                      <span class="lp-activity-file-thumb" aria-hidden="true">
+                        <img src="{{previewurl}}" alt="">
+                      </span>
+                    {{/isimage}}
+                    {{^isimage}}
+                      <span class="lp-activity-file-ico" aria-hidden="true">{{#ext}}{{ext}}{{/ext}}{{^ext}}FILE{{/ext}}</span>
+                    {{/isimage}}
+                    <span class="lp-activity-file-body">
+                      <span class="lp-activity-file-name">{{displayname}}</span>
+                      <span class="lp-activity-file-meta">{{size}} · {{download_label}}</span>
+                    </span>
+                    <span class="lp-activity-file-action" aria-hidden="true">↓</span>
                   </a>
                 </li>
               {{/files}}

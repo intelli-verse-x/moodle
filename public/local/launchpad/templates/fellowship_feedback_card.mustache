@@ -31,6 +31,12 @@
       {{#graded_at}}<span class="lp-muted lp-sm">{{#str}} fellowship_feedback_released, local_launchpad {{/str}} {{graded_at}}</span>{{/graded_at}}
     </div>
   {{/has_grade}}
+  {{#has_next_step}}
+    <div class="lp-feedback-nextstep" role="status">
+      <span class="lp-feedback-nextstep-label">{{#str}} fellowship_feedback_nextstep_label, local_launchpad {{/str}}</span>
+      <p class="lp-feedback-nextstep-text">{{next_step}}</p>
+    </div>
+  {{/has_next_step}}
   {{#has_comment}}
     <blockquote class="lp-quote">{{{comment_html}}}</blockquote>
   {{/has_comment}}

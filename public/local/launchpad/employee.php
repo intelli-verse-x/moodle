@@ -82,7 +82,8 @@ $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('employer_area_title', 'local_launchpad'));
 $PAGE->set_heading(get_string('employer_area_heading', 'local_launchpad'));
 
-$allowed = account_persona::is_employee((int) $USER->id) || is_siteadmin();
+// Site admins use admin.php — do not linger on the Employer shell.
+$allowed = account_persona::is_employee((int) $USER->id);
 portal_gate::assert_or_redirect_home($allowed, login_portal::EMPLOYER);
 
 $mismatch = portal_gate::consume_modal_context();

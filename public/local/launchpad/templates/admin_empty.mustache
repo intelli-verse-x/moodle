@@ -1,0 +1,19 @@
+{{!
+    @template local_launchpad/admin_empty
+
+    Shared admin empty / missing-data block.
+    Context: empty_title (optional), empty_body, empty_mark (optional),
+    has_empty_cta + empty_cta_url + empty_cta_label (optional).
+}}
+<div class="lp-empty" role="status">
+  <div class="lp-empty-mark" aria-hidden="true">{{#empty_mark}}{{empty_mark}}{{/empty_mark}}{{^empty_mark}}AD{{/empty_mark}}</div>
+  {{#empty_title}}
+    <h2>{{empty_title}}</h2>
+  {{/empty_title}}
+  <p>{{empty_body}}</p>
+  {{#has_empty_cta}}
+    <p class="lp-empty-actions" style="margin-top:12px">
+      <a class="lp-btn lp-btn-solid" href="{{empty_cta_url}}">{{empty_cta_label}}</a>
+    </p>
+  {{/has_empty_cta}}
+</div>

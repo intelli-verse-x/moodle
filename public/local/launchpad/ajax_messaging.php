@@ -58,7 +58,7 @@ $toid = required_param('id', PARAM_INT);
 
 if ($action === 'send') {
     $body = required_param('message', PARAM_RAW_TRIMMED);
-    echo json_encode(messaging::send($userid, $toid, $body));
+    echo json_encode(messaging::send($userid, $toid, $body, $portal === 'mentor' ? 'mentor' : 'fellow'));
     exit;
 }
 

@@ -92,10 +92,6 @@
           <span class="lp-muted">/ 100 · {{#str}} mentor_review_pass_bar, local_launchpad {{/str}} {{pass_bar}}</span>
         </div>
 
-        <label class="lp-review-label" for="lp-comment">{{#str}} mentor_review_comment_label, local_launchpad {{/str}}</label>
-        <textarea class="lp-review-textarea" id="lp-comment" name="comment" rows="6" required
-                  placeholder="{{#str}} mentor_review_comment_placeholder, local_launchpad {{/str}}">{{comment}}</textarea>
-
         <fieldset class="lp-review-outcome">
           <legend>{{#str}} mentor_review_outcome_label, local_launchpad {{/str}}</legend>
           <label class="lp-review-radio">
@@ -108,11 +104,42 @@
           </label>
         </fieldset>
 
+        <div class="lp-review-nextstep" id="lp-nextstep-wrap"{{^outcome_changes}} hidden{{/outcome_changes}}>
+          <label class="lp-review-label" for="lp-nextstep">{{#str}} mentor_review_nextstep_label, local_launchpad {{/str}}</label>
+          <input class="lp-review-input lp-review-input-wide" id="lp-nextstep" name="nextstep" type="text"
+                 maxlength="280" value="{{next_step}}"
+                 placeholder="{{#str}} mentor_review_nextstep_placeholder, local_launchpad {{/str}}"
+                 {{#outcome_changes}}required{{/outcome_changes}}>
+          <p class="lp-xs lp-muted">{{#str}} mentor_review_nextstep_hint, local_launchpad {{/str}}</p>
+        </div>
+
+        <label class="lp-review-label" for="lp-comment">{{#str}} mentor_review_comment_label, local_launchpad {{/str}}</label>
+        <textarea class="lp-review-textarea" id="lp-comment" name="comment" rows="6" required
+                  placeholder="{{#str}} mentor_review_comment_placeholder, local_launchpad {{/str}}">{{comment}}</textarea>
+
         <div class="lp-review-actions">
           <button type="submit" class="lp-btn lp-btn-primary">{{#str}} mentor_review_submit, local_launchpad {{/str}}</button>
           <a class="lp-btn lp-btn-light" href="{{queue_url}}">{{#str}} mentor_review_back_queue, local_launchpad {{/str}}</a>
         </div>
       </form>
+      <script>
+      (function () {
+        var wrap = document.getElementById('lp-nextstep-wrap');
+        var input = document.getElementById('lp-nextstep');
+        if (!wrap || !input) { return; }
+        function sync() {
+          var changes = document.querySelector('input[name="outcome"][value="changes"]');
+          var on = !!(changes && changes.checked);
+          wrap.hidden = !on;
+          if (on) { input.setAttribute('required', 'required'); }
+          else { input.removeAttribute('required'); }
+        }
+        document.querySelectorAll('input[name="outcome"]').forEach(function (el) {
+          el.addEventListener('change', sync);
+        });
+        sync();
+      })();
+      </script>
 
       <p class="lp-xs lp-muted" style="margin-top:14px">
         {{#str}} mentor_review_moodle_note, local_launchpad {{/str}}

@@ -60,6 +60,11 @@
   {{/hasprogress}}
 </section>
 
+<aside class="lp-judge-note" aria-label="{{#str}} fellowship_judging_title, local_launchpad {{/str}}">
+  <b>{{#str}} fellowship_judging_title, local_launchpad {{/str}}</b>
+  <p>{{#str}} fellowship_judging_body, local_launchpad {{/str}}</p>
+</aside>
+
 {{#journey.has_gates}}
   <section class="lp-card lift lp-journey-card lp-home-block">
     <div class="lp-card-head">
@@ -138,7 +143,12 @@
                                 <span class="lp-act-card-main">
                                   <b>{{{name}}}</b>
                                 </span>
-                                <span class="lp-chip {{statustone}}">{{status_label}}</span>
+                                {{#show_status}}
+                                  <span class="lp-chip{{#status_chip}} {{status_chip}}{{/status_chip}}{{^status_chip}} {{statustone}}{{/status_chip}}">{{status_label}}</span>
+                                {{/show_status}}
+                                {{^show_status}}
+                                  <span class="lp-chip {{statustone}}">{{status_label}}</span>
+                                {{/show_status}}
                                 <iconify-icon class="lp-act-chev" icon="hugeicons:arrow-right-01" width="18" height="18" aria-hidden="true"></iconify-icon>
                               </span>
                             </a>

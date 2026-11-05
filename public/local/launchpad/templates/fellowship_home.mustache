@@ -61,6 +61,10 @@
           <h2>{{#selected_course_name}}{{{selected_course_name}}}{{/selected_course_name}}{{^selected_course_name}}{{#str}} fellowship_nav_home, local_launchpad {{/str}}{{/selected_course_name}}</h2>
         {{/show_hero_welcome}}
         <p class="lp-hero-lead">{{hero_lead}}</p>
+        <aside class="lp-judge-note" aria-label="{{#str}} fellowship_judging_title, local_launchpad {{/str}}">
+          <b>{{#str}} fellowship_judging_title, local_launchpad {{/str}}</b>
+          <p>{{#str}} fellowship_judging_body, local_launchpad {{/str}}</p>
+        </aside>
         {{#hasquest}}
           {{#quest}}
             <div class="lp-quest">
@@ -145,6 +149,29 @@
   {{/has_gate_legend}}
 </section>
 {{/journey.has_gates}}
+
+{{#has_foundations_activities}}
+<section class="lp-card lift lp-foundations-card lp-home-block lp-reveal" data-region="fellowship-foundations" style="--lp-d:1">
+  <div class="lp-card-head">
+    <h3>{{#str}} fellowship_foundations_heading, local_launchpad {{/str}}</h3>
+    <a class="lp-link" href="{{track_url}}">{{#str}} fellowship_nav_track, local_launchpad {{/str}} <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon></a>
+  </div>
+  <ul class="lp-act-list lp-foundations-list">
+    {{#foundations_activities}}
+      <li class="lp-act{{#complete}} is-done{{/complete}}">
+        <span class="lp-chk{{#complete}} on{{/complete}}" aria-hidden="true">{{#complete}}✓{{/complete}}</span>
+        <div class="lp-act-meta">
+          <span class="lp-act-k">{{modname_display}}</span>
+          <a class="lp-act-t" href="{{url}}">{{{name}}}</a>
+        </div>
+        {{#show_status}}
+          <span class="lp-chip{{#status_chip}} {{status_chip}}{{/status_chip}}">{{status_label}}</span>
+        {{/show_status}}
+      </li>
+    {{/foundations_activities}}
+  </ul>
+</section>
+{{/has_foundations_activities}}
 
 {{! —— 3. Current gate activities —— }}
 {{#has_scoped_activities}}

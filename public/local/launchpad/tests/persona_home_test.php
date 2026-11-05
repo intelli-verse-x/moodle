@@ -67,12 +67,14 @@ final class persona_home_test extends \basic_testcase {
     }
 
     public function test_path_constants(): void {
+        $this->assertSame('/local/launchpad/admin.php', persona_home::ADMIN_PATH);
         $this->assertSame('/local/launchpad/mentor.php', persona_home::MENTOR_PATH);
         $this->assertSame('/local/launchpad/employee.php', persona_home::EMPLOYEE_PATH);
         $this->assertSame('/local/launchpad/fellow.php', persona_home::FELLOW_PATH);
     }
 
     public function test_is_persona_shell_path(): void {
+        $this->assertTrue(persona_home::is_persona_shell_path('/local/launchpad/admin.php'));
         $this->assertTrue(persona_home::is_persona_shell_path('/local/launchpad/fellow.php'));
         $this->assertTrue(persona_home::is_persona_shell_path('/local/launchpad/employee.php'));
         $this->assertTrue(persona_home::is_persona_shell_path('/local/launchpad/mentor.php'));
@@ -94,8 +96,16 @@ final class persona_home_test extends \basic_testcase {
         $this->assertTrue(persona_home::should_rewrite_wantsurl(0, null));
     }
 
+    public function test_should_not_rewrite_wrong_persona_shell(): void {
+        // Login portal tab pins employee.php for a fellow — must reach the gate.
+        $this->assertFalse(persona_home::should_rewrite_wantsurl(1, '/local/launchpad/employee.php'));
+        $this->assertFalse(persona_home::should_rewrite_wantsurl(1, '/local/launchpad/fellow.php'));
+        $this->assertFalse(persona_home::should_rewrite_wantsurl(1, '/local/launchpad/mentor.php'));
+        $this->assertTrue(persona_home::should_rewrite_wantsurl(1, '/my/'));
+    }
+
     public function test_should_honor_noredirect_policy(): void {
-        // Admins / no persona home may keep stock /my/.
+        // No persona home may keep stock /my/.
         $this->assertTrue(persona_home::should_honor_noredirect(null));
 
         // Employees always use Employer portal — noredirect cannot bypass.
@@ -103,6 +113,11 @@ final class persona_home_test extends \basic_testcase {
         $this->assertFalse(persona_home::should_honor_noredirect($employeehome));
         $this->assertFalse(persona_home::should_honor_noredirect(
             new \moodle_url('/local/launchpad/employee.php')
+        ));
+
+        // Admins always use Admin portal — noredirect cannot bypass.
+        $this->assertFalse(persona_home::should_honor_noredirect(
+            new \moodle_url(persona_home::ADMIN_PATH)
         ));
 
         // Fellows / mentors may still opt into stock /my/ via noredirect.

@@ -28,7 +28,9 @@ require(__DIR__ . '/../../config.php');
 
 require_once(__DIR__ . '/classes/calendar_service.php');
 require_once(__DIR__ . '/classes/mentor_dashboard.php');
+require_once(__DIR__ . '/classes/admin_dashboard.php');
 
+use local_launchpad\admin_dashboard;
 use local_launchpad\calendar_service;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\mentor_dashboard;
@@ -40,7 +42,9 @@ header('Content-Type: application/json; charset=utf-8');
 
 $userid = (int) $USER->id;
 $portal = optional_param('portal', 'fellow', PARAM_ALPHA);
-if ($portal === 'mentor') {
+if ($portal === 'admin') {
+    $allowed = admin_dashboard::can_access($userid) || is_siteadmin();
+} else if ($portal === 'mentor') {
     $allowed = mentor_dashboard::can_access($userid) || is_siteadmin();
 } else {
     $allowed = fellowship_dashboard::can_access($userid) || is_siteadmin();
@@ -61,7 +65,11 @@ if ($action === 'delete') {
     $result = calendar_service::delete_event($userid, $eventid);
 } else if ($action === 'create' || $action === 'update') {
     $scope = optional_param('scope', 'personal', PARAM_ALPHA);
-    if ($scope !== 'course') {
+    if (!in_array($scope, ['personal', 'course', 'site'], true)) {
+        $scope = 'personal';
+    }
+    // Site create/update is admin portal only (caps still fail-closed in service).
+    if ($scope === 'site' && $portal !== 'admin') {
         $scope = 'personal';
     }
     $name = required_param('name', PARAM_TEXT);
@@ -116,6 +124,29 @@ if ($action === 'delete') {
                         $userid,
                         $eventid,
                         $courseid,
+                        (string) $name,
+                        $timestart,
+                        $timeduration,
+                        $description,
+                        $location
+                    );
+                }
+            } else if ($scope === 'site') {
+                if ($action === 'create') {
+                    $result = calendar_service::create_site(
+                        $userid,
+                        (string) $name,
+                        $timestart,
+                        $timeduration,
+                        $description,
+                        $location,
+                        $repeats
+                    );
+                } else {
+                    $eventid = required_param('id', PARAM_INT);
+                    $result = calendar_service::update_site(
+                        $userid,
+                        $eventid,
                         (string) $name,
                         $timestart,
                         $timeduration,
