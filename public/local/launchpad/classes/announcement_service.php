@@ -136,9 +136,11 @@ final class announcement_service {
         $tracks = admin_dashboard::list_track_courses();
         $trackoptions = [];
         foreach ($tracks as $course) {
+            $short = trim((string) ($course->shortname ?? ''));
             $trackoptions[] = [
                 'id' => (int) $course->id,
                 'label' => format_string($course->fullname),
+                'subtitle' => $short !== '' ? format_string($short) : '',
             ];
         }
 
@@ -152,23 +154,52 @@ final class announcement_service {
 
         $rawitems = self::list_for_admin($tracks, self::LIST_FETCH_LIMIT);
         $items = [];
+        $pinnedcount = 0;
+        $trackswithposts = [];
         foreach ($rawitems as $i => $item) {
             $item['paged_out'] = $i >= self::LIST_PAGE_SIZE;
+            if (!empty($item['is_pinned'])) {
+                $pinnedcount++;
+            }
+            $cid = (int) ($item['courseid'] ?? 0);
+            if ($cid > 0) {
+                $trackswithposts[$cid] = true;
+            }
             $items[] = $item;
         }
         $morecount = max(0, count($items) - self::LIST_PAGE_SIZE);
+        $tracktotal = count($trackoptions);
+        $trackslive = count($trackswithposts);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']))->out(false);
 
         return array_merge([
             'eyebrow' => get_string('admin_announcements_eyebrow', 'local_launchpad'),
-            'heading' => get_string('admin_nav_announcements', 'local_launchpad'),
+            'heading' => get_string('admin_announcements_heading', 'local_launchpad'),
             'lead' => get_string('admin_announcements_lead', 'local_launchpad'),
+            'stats_label' => get_string('admin_announcements_stats_label', 'local_launchpad'),
+            'stat_active' => (string) count($items),
+            'stat_active_label' => get_string('admin_announcements_stat_active', 'local_launchpad'),
+            'stat_pinned' => (string) $pinnedcount,
+            'stat_pinned_label' => get_string('admin_announcements_stat_pinned', 'local_launchpad'),
+            // Plain ratio — avoids a missing-lang key widening the hero stats column.
+            'stat_tracks' => $trackslive . '/' . $tracktotal,
+            'stat_tracks_label' => get_string('admin_announcements_stat_tracks', 'local_launchpad'),
             'form_title' => get_string('admin_announcements_compose_title', 'local_launchpad'),
+            'compose_lead' => get_string('admin_announcements_compose_lead', 'local_launchpad'),
             'list_title' => get_string('admin_announcements_list_title', 'local_launchpad'),
+            'live_badge' => get_string('admin_announcements_live_badge', 'local_launchpad', count($items)),
+            'refresh_label' => get_string('admin_announcements_refresh', 'local_launchpad'),
+            'filter_label' => get_string('admin_announcements_filter_label', 'local_launchpad'),
+            'filter_all' => get_string('admin_announcements_filter_all', 'local_launchpad'),
+            'filter_pinned' => get_string('admin_announcements_filter_pinned', 'local_launchpad'),
+            'filter_scheduled' => get_string('admin_announcements_filter_scheduled', 'local_launchpad'),
             'subject_label' => get_string('admin_announcements_subject', 'local_launchpad'),
+            'subject_placeholder' => get_string('admin_announcements_subject_ph', 'local_launchpad'),
             'message_label' => get_string('admin_announcements_message', 'local_launchpad'),
+            'message_placeholder' => get_string('admin_announcements_message_ph', 'local_launchpad'),
             'tags_label' => get_string('admin_announcements_tags', 'local_launchpad'),
             'tracks_label' => get_string('admin_announcements_tracks', 'local_launchpad'),
+            'tracks_help' => get_string('admin_announcements_tracks_help', 'local_launchpad'),
             'all_tracks_label' => get_string('admin_announcements_all_tracks', 'local_launchpad'),
             'custom_tag_label' => get_string('admin_announcements_custom_tag', 'local_launchpad'),
             'custom_tag_placeholder' => get_string('admin_announcements_custom_tag_ph', 'local_launchpad'),
@@ -177,6 +208,7 @@ final class announcement_service {
             'schedule_label' => get_string('admin_announcements_schedule', 'local_launchpad'),
             'schedule_help' => get_string('admin_announcements_schedule_help', 'local_launchpad'),
             'attach_label' => get_string('admin_announcements_attach', 'local_launchpad'),
+            'attach_cta' => get_string('admin_announcements_attach_cta', 'local_launchpad'),
             'attach_help' => get_string('admin_announcements_attach_help', 'local_launchpad'),
             'choose_files_label' => get_string('admin_activity_choose_files', 'local_launchpad'),
             'picker_empty_label' => get_string('admin_activity_picker_empty', 'local_launchpad'),
@@ -192,6 +224,8 @@ final class announcement_service {
             'delete_label' => get_string('admin_announcements_delete', 'local_launchpad'),
             'delete_confirm' => get_string('admin_announcements_delete_confirm', 'local_launchpad'),
             'show_more_label' => get_string('admin_announcements_show_more', 'local_launchpad', $morecount),
+            'show_more_pattern' => get_string('admin_announcements_show_more', 'local_launchpad', '{n}'),
+            'archive_label' => get_string('admin_announcements_archive', 'local_launchpad', count($items)),
             'col_subject' => get_string('admin_announcements_col_subject', 'local_launchpad'),
             'col_track' => get_string('admin_announcements_col_track', 'local_launchpad'),
             'col_when' => get_string('admin_announcements_col_when', 'local_launchpad'),
@@ -643,6 +677,7 @@ final class announcement_service {
                     ), 160),
                     'when' => userdate((int) $discussion->timemodified, get_string('strftimedatetimeshort', 'langconfig')),
                     'timemodified' => (int) $discussion->timemodified,
+                    'courseid' => $cid,
                     'course_name' => format_string($course->fullname),
                     'url' => (new \moodle_url('/mod/forum/discuss.php', ['d' => $discussion->id]))->out(false),
                     'tags' => $tagrows,

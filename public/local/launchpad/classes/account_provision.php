@@ -37,6 +37,9 @@ final class account_provision {
     /** Capability required in the course to enrol via this workflow (or site admin). */
     public const ENROL_CAPABILITY = 'enrol/manual:enrol';
 
+    /** Capability required in the course to unenrol via this workflow (or site admin). */
+    public const UNENROL_CAPABILITY = 'enrol/manual:unenrol';
+
     /** Capability to manage the Employee cohort (or site admin). */
     public const COHORT_CAPABILITY = 'moodle/cohort:assign';
 
@@ -135,6 +138,23 @@ final class account_provision {
     }
 
     /**
+     * True when actor may manually unenrol in this course.
+     *
+     * @param \stdClass|null $actor
+     * @param int $courseid
+     */
+    public static function actor_may_unenrol(?\stdClass $actor, int $courseid): bool {
+        if ($actor === null || empty($actor->id) || $courseid <= 0) {
+            return false;
+        }
+        $userid = (int) $actor->id;
+        if (is_siteadmin($userid)) {
+            return true;
+        }
+        return has_capability(self::UNENROL_CAPABILITY, \context_course::instance($courseid), $userid);
+    }
+
+    /**
      * Require create-user authorization or throw.
      *
      * @param \stdClass|null $actor
@@ -156,6 +176,19 @@ final class account_provision {
     public static function require_can_enrol(?\stdClass $actor, int $courseid): void {
         if (!self::actor_may_enrol($actor, $courseid)) {
             throw new account_provision_exception('forbidden', 'Not authorized to enrol in this course');
+        }
+    }
+
+    /**
+     * Require unenrol authorization for the course or throw.
+     *
+     * @param \stdClass|null $actor
+     * @param int $courseid
+     * @throws account_provision_exception
+     */
+    public static function require_can_unenrol(?\stdClass $actor, int $courseid): void {
+        if (!self::actor_may_unenrol($actor, $courseid)) {
+            throw new account_provision_exception('forbidden', 'Not authorized to unenrol in this course');
         }
     }
 
@@ -330,6 +363,34 @@ final class account_provision {
     }
 
     /**
+     * Unenrol a fellow (student) from a LaunchPad track. Caps fail-closed.
+     *
+     * @return array{status:string,userid:int,courseid:int} status unenrolled|not_enrolled
+     * @throws account_provision_exception
+     */
+    public static function unenrol_fellow(\stdClass $actor, int $userid, int $courseid): array {
+        self::require_can_unenrol($actor, $courseid);
+        self::require_user($userid);
+        self::require_launchpad_course($courseid);
+
+        return self::unenrol_with_archetype($userid, $courseid, 'student');
+    }
+
+    /**
+     * Remove a mentor (teacher/editingteacher) from a LaunchPad track. Caps fail-closed.
+     *
+     * @return array{status:string,userid:int,courseid:int} status unenrolled|not_enrolled
+     * @throws account_provision_exception
+     */
+    public static function remove_mentor(\stdClass $actor, int $userid, int $courseid): array {
+        self::require_can_unenrol($actor, $courseid);
+        self::require_user($userid);
+        self::require_launchpad_course($courseid);
+
+        return self::unenrol_with_archetype($userid, $courseid, 'teacher');
+    }
+
+    /**
      * Explicitly refuse Admin grants through this workflow.
      *
      * @throws account_provision_exception
@@ -468,6 +529,83 @@ final class account_provision {
 
         return [
             'status' => $already ? 'already_enrolled' : 'enrolled',
+            'userid' => $userid,
+            'courseid' => $courseid,
+        ];
+    }
+
+    /**
+     * Unenrol via manual plugin when the user has the expected role archetype on the course.
+     * For mentors, archetype match is teacher|editingteacher.
+     *
+     * @return array{status:string,userid:int,courseid:int}
+     * @throws account_provision_exception
+     */
+    private static function unenrol_with_archetype(int $userid, int $courseid, string $archetype): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $context = \context_course::instance($courseid);
+        $archetypes = $archetype === 'teacher'
+            ? ['teacher', 'editingteacher']
+            : [$archetype];
+
+        $hasrole = false;
+        foreach ($archetypes as $arch) {
+            $roles = get_archetype_roles($arch);
+            foreach ($roles as $role) {
+                if (user_has_role_assignment($userid, (int) $role->id, $context->id)) {
+                    $hasrole = true;
+                    break 2;
+                }
+            }
+        }
+        if (!$hasrole || !is_enrolled($context, $userid, '', true)) {
+            return [
+                'status' => 'not_enrolled',
+                'userid' => $userid,
+                'courseid' => $courseid,
+            ];
+        }
+
+        $plugin = enrol_get_plugin('manual');
+        if (!$plugin) {
+            throw new account_provision_exception('enrol_unavailable', 'Manual enrolment plugin missing');
+        }
+
+        $instance = $DB->get_record('enrol', [
+            'enrol' => 'manual',
+            'courseid' => $courseid,
+            'status' => ENROL_INSTANCE_ENABLED,
+        ], '*', IGNORE_MISSING);
+        if (!$instance) {
+            throw new account_provision_exception(
+                'enrol_unavailable',
+                'No enabled manual enrolment on course ' . $courseid
+            );
+        }
+
+        $ue = $DB->get_record('user_enrolments', [
+            'enrolid' => $instance->id,
+            'userid' => $userid,
+        ], '*', IGNORE_MISSING);
+        if (!$ue) {
+            return [
+                'status' => 'not_enrolled',
+                'userid' => $userid,
+                'courseid' => $courseid,
+            ];
+        }
+
+        if (!$plugin->allow_unenrol_user($instance, $ue)) {
+            throw new account_provision_exception('forbidden', 'Manual unenrol not allowed for this enrolment');
+        }
+
+        $plugin->unenrol_user($instance, $userid);
+
+        return [
+            'status' => 'unenrolled',
             'userid' => $userid,
             'courseid' => $courseid,
         ];

@@ -24,7 +24,7 @@
 {{#has_tracks}}
   <div class="lp-tgrid" style="margin-top:16px">
     {{#tracks}}
-      <article class="lp-tcard">
+      <article class="lp-tcard{{#is_highlight}} is-highlight{{/is_highlight}}" id="{{anchor_id}}">
         <h3>{{name}}</h3>
         <p class="lp-xs lp-muted">{{idnumber}}</p>
         {{#has_teacher}}

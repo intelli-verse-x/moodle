@@ -1,7 +1,8 @@
 {{!
     @template local_launchpad/admin_courseops
 
-    M5 Course ops hub + Settings (Slice B). Later sections stay placeholders.
+    M5 Course ops hub + Settings (Slice B) + Participants roster (Slice C).
+    Later sections stay placeholders.
 }}
 <section class="lp-hero" data-region="local-launchpad-admin-courseops">
   <div class="lp-hero-row">
@@ -164,6 +165,129 @@
       </nav>
     </section>
   {{/is_settings}}
+
+  {{#is_participants}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{participants_title}}</h3>
+        <p class="lp-muted">{{participants_lead}}</p>
+      </div>
+
+      <div class="lp-courseops-roster-actions">
+        <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{enrol_fellow_url}}">{{enrol_fellow_label}}</a>
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{assign_mentor_url}}">{{assign_mentor_label}}</a>
+      </div>
+      <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{enrol_fellow_help}} {{assign_mentor_help}}</p>
+      {{^can_unenrol}}
+        <p class="lp-sm lp-muted">{{unenrol_no_cap}}</p>
+      {{/can_unenrol}}
+
+      <div class="lp-courseops-roster-block">
+        <h4 class="lp-courseops-roster-h">{{fellows_section_title}}</h4>
+        {{#has_fellows}}
+          <div class="lp-table-wrap">
+            <table class="lp-table">
+              <thead>
+                <tr>
+                  <th>{{col_name}}</th>
+                  <th>{{col_email}}</th>
+                  <th>{{col_role}}</th>
+                  {{#can_unenrol}}<th>{{col_actions}}</th>{{/can_unenrol}}
+                </tr>
+              </thead>
+              <tbody>
+                {{#fellow_rows}}
+                  <tr>
+                    <td>
+                      <div class="lp-people-name">
+                        <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{initials}}</span>
+                        <b>{{name}}</b>
+                      </div>
+                    </td>
+                    <td>{{email}}</td>
+                    <td>{{role_label}}</td>
+                    {{#can_unenrol}}
+                      <td>
+                        {{#can_remove}}
+                          <form method="post" action="{{participants_form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{remove_confirm}}">
+                            <input type="hidden" name="sesskey" value="{{sesskey}}">
+                            <input type="hidden" name="action" value="unenrol_fellow">
+                            <input type="hidden" name="trackid" value="{{trackid}}">
+                            <input type="hidden" name="userid" value="{{id}}">
+                            <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{unenrol_label}}</button>
+                          </form>
+                        {{/can_remove}}
+                      </td>
+                    {{/can_unenrol}}
+                  </tr>
+                {{/fellow_rows}}
+              </tbody>
+            </table>
+          </div>
+        {{/has_fellows}}
+        {{^has_fellows}}
+          <p class="lp-muted lp-sm">{{fellows_empty}}</p>
+        {{/has_fellows}}
+      </div>
+
+      <div class="lp-courseops-roster-block">
+        <h4 class="lp-courseops-roster-h">{{mentors_section_title}}</h4>
+        {{#has_mentors}}
+          <div class="lp-table-wrap">
+            <table class="lp-table">
+              <thead>
+                <tr>
+                  <th>{{col_name}}</th>
+                  <th>{{col_email}}</th>
+                  <th>{{col_role}}</th>
+                  {{#can_unenrol}}<th>{{col_actions}}</th>{{/can_unenrol}}
+                </tr>
+              </thead>
+              <tbody>
+                {{#mentor_rows}}
+                  <tr>
+                    <td>
+                      <div class="lp-people-name">
+                        <span class="lp-av lp-av-sm tone-green" aria-hidden="true">{{initials}}</span>
+                        <b>{{name}}</b>
+                      </div>
+                    </td>
+                    <td>{{email}}</td>
+                    <td>{{role_label}}</td>
+                    {{#can_unenrol}}
+                      <td>
+                        {{#can_remove}}
+                          <form method="post" action="{{participants_form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{remove_confirm}}">
+                            <input type="hidden" name="sesskey" value="{{sesskey}}">
+                            <input type="hidden" name="action" value="remove_mentor">
+                            <input type="hidden" name="trackid" value="{{trackid}}">
+                            <input type="hidden" name="userid" value="{{id}}">
+                            <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{remove_mentor_label}}</button>
+                          </form>
+                        {{/can_remove}}
+                      </td>
+                    {{/can_unenrol}}
+                  </tr>
+                {{/mentor_rows}}
+              </tbody>
+            </table>
+          </div>
+        {{/has_mentors}}
+        {{^has_mentors}}
+          <p class="lp-muted lp-sm">{{mentors_empty}}</p>
+        {{/has_mentors}}
+      </div>
+
+      <div class="lp-courseops-settings-actions" style="margin-top:16px">
+        <a class="lp-btn lp-btn-light" href="{{hub_url}}">{{back_hub_label}}</a>
+      </div>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_participants}}
 
   {{#is_soon}}
     <section class="lp-card lift" style="margin-top:16px">

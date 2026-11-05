@@ -2661,9 +2661,53 @@
             annForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        var selectAllBtn = annForm.querySelector('[data-lp-ann-select-all]');
+        var annList = shell.querySelector('[data-lp-ann-list]');
+        var annFilterMode = 'all';
+        var showMorePattern = annPage
+            ? (annPage.getAttribute('data-str-show-more') || 'Show more ({n})')
+            : 'Show more ({n})';
+
+        function applyAnnFilter(mode) {
+            annFilterMode = mode || 'all';
+            if (!annList) {
+                return;
+            }
+            var moreWrap = shell.querySelector('.lp-ann-more-wrap, .lp-ann-archive-wrap');
+            annList.querySelectorAll('[data-lp-ann-item]').forEach(function (li) {
+                var match = annFilterMode === 'all'
+                    || (annFilterMode === 'pinned' && li.classList.contains('is-pinned'))
+                    || (annFilterMode === 'scheduled' && li.classList.contains('is-scheduled'));
+                if (!match) {
+                    li.hidden = true;
+                    return;
+                }
+                if (annFilterMode === 'all') {
+                    li.hidden = li.classList.contains('is-paged-out');
+                } else {
+                    li.hidden = false;
+                }
+            });
+            if (moreWrap) {
+                moreWrap.hidden = annFilterMode !== 'all'
+                    || !annList.querySelector('li.is-paged-out[hidden]');
+            }
+            shell.querySelectorAll('[data-lp-ann-filter]').forEach(function (btn) {
+                var on = btn.getAttribute('data-lp-ann-filter') === annFilterMode;
+                btn.classList.toggle('is-active', on);
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+
         if (allTracks) {
             allTracks.addEventListener('change', syncAnnTracks);
             syncAnnTracks();
+        }
+        if (selectAllBtn && allTracks) {
+            selectAllBtn.addEventListener('click', function () {
+                allTracks.checked = !allTracks.checked;
+                syncAnnTracks();
+            });
         }
         if (cancelEditEl) {
             cancelEditEl.addEventListener('click', function () {
@@ -2688,6 +2732,18 @@
             }
         });
         shell.addEventListener('click', function (e) {
+            var refreshBtn = e.target.closest('[data-lp-ann-refresh]');
+            if (refreshBtn && annPage && annPage.contains(refreshBtn)) {
+                e.preventDefault();
+                window.location.reload();
+                return;
+            }
+            var filterBtn = e.target.closest('[data-lp-ann-filter]');
+            if (filterBtn && annPage && annPage.contains(filterBtn)) {
+                e.preventDefault();
+                applyAnnFilter(filterBtn.getAttribute('data-lp-ann-filter') || 'all');
+                return;
+            }
             var editBtn = e.target.closest('[data-lp-ann-edit]');
             if (editBtn) {
                 e.preventDefault();
@@ -2698,13 +2754,16 @@
             if (!moreAnn) {
                 return;
             }
-            var annList = shell.querySelector('[data-lp-ann-list]');
             if (!annList) {
                 return;
             }
+            if (annFilterMode !== 'all') {
+                applyAnnFilter('all');
+            }
+            var revealAll = moreAnn.hasAttribute('data-lp-ann-archive');
             var pageSize = parseInt(annList.getAttribute('data-page-size') || '8', 10) || 8;
             var hidden = annList.querySelectorAll('li.is-paged-out[hidden]');
-            var show = Math.min(pageSize, hidden.length);
+            var show = revealAll ? hidden.length : Math.min(pageSize, hidden.length);
             for (var ai = 0; ai < show; ai++) {
                 hidden[ai].removeAttribute('hidden');
                 hidden[ai].classList.remove('is-paged-out');
@@ -2712,9 +2771,13 @@
             var left = annList.querySelectorAll('li.is-paged-out[hidden]').length;
             if (left === 0) {
                 moreAnn.setAttribute('hidden', 'hidden');
-            } else {
+                var archiveWrap = moreAnn.closest('.lp-ann-archive-wrap, .lp-ann-more-wrap');
+                if (archiveWrap) {
+                    archiveWrap.setAttribute('hidden', 'hidden');
+                }
+            } else if (!revealAll) {
                 moreAnn.setAttribute('data-remaining', String(left));
-                moreAnn.textContent = 'Show more (' + left + ')';
+                moreAnn.textContent = showMorePattern.replace('{n}', String(left)).replace('{$a}', String(left));
             }
         });
         shell.addEventListener('submit', function (e) {

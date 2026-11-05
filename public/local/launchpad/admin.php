@@ -105,6 +105,28 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             'section' => 'settings',
         ]));
     }
+    if ($view === 'courseops' && $action === 'unenrol_fellow') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $targetuserid = optional_param('userid', 0, PARAM_INT);
+        $flash = admin_dashboard::unenrol_fellow_from_track($USER, $targetuserid, $trackid);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]));
+    }
+    if ($view === 'courseops' && $action === 'remove_mentor') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $targetuserid = optional_param('userid', 0, PARAM_INT);
+        $flash = admin_dashboard::remove_mentor_from_track($USER, $targetuserid, $trackid);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]));
+    }
     if ($view === 'reviews' && $action === 'ping_review') {
         $submissionid = optional_param('submissionid', 0, PARAM_INT);
         $pingteacherid = optional_param('teacherid', 0, PARAM_INT);
@@ -561,7 +583,7 @@ if ($view === 'tracks') {
     $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_cohorts',
-        admin_dashboard::cohorts_context($USER, $flash)
+        admin_dashboard::cohorts_context($USER, $flash, $trackid)
     );
 } else if ($view === 'people') {
     $pagetitle = get_string('admin_nav_people', 'local_launchpad');
@@ -573,7 +595,7 @@ if ($view === 'tracks') {
     $pagetitle = get_string('admin_nav_mentors', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_mentors',
-        admin_dashboard::mentors_context($USER, $flash)
+        admin_dashboard::mentors_context($USER, $flash, $trackid)
     );
 } else if ($view === 'reviews') {
     $pagetitle = get_string('admin_nav_reviews', 'local_launchpad');

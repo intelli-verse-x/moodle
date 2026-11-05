@@ -211,7 +211,6 @@ final class admin_dashboard {
 
         require_once($CFG->libdir . '/completionlib.php');
 
-        unset($user);
         $allowed = ['hub', 'settings', 'participants', 'grades', 'completion', 'reports', 'qbank'];
         if (!in_array($section, $allowed, true)) {
             $section = 'hub';
@@ -227,6 +226,7 @@ final class admin_dashboard {
                 'has_tracks' => false,
                 'is_hub' => true,
                 'is_settings' => false,
+                'is_participants' => false,
                 'is_soon' => false,
                 'flash_ok' => !empty($flash['ok']),
                 'flash_ok_body' => (string) ($flash['ok'] ?? ''),
@@ -336,11 +336,8 @@ final class admin_dashboard {
 
         $ishub = $section === 'hub';
         $issettings = $section === 'settings';
+        $isparticipants = $section === 'participants';
         $sectionmeta = [
-            'participants' => [
-                'title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
-                'body' => get_string('admin_courseops_soon_participants', 'local_launchpad'),
-            ],
             'grades' => [
                 'title' => get_string('admin_courseops_nav_grades', 'local_launchpad'),
                 'body' => get_string('admin_courseops_soon_grades', 'local_launchpad'),
@@ -401,12 +398,13 @@ final class admin_dashboard {
             'primary_nav' => $primary,
             'is_hub' => $ishub,
             'is_settings' => $issettings,
-            'is_soon' => !$ishub && !$issettings,
+            'is_participants' => $isparticipants,
+            'is_soon' => !$ishub && !$issettings && !$isparticipants,
             'section' => $section,
-            'section_title' => ($ishub || $issettings)
+            'section_title' => ($ishub || $issettings || $isparticipants)
                 ? ''
                 : (string) ($sectionmeta[$section]['title'] ?? ''),
-            'section_body' => ($ishub || $issettings)
+            'section_body' => ($ishub || $issettings || $isparticipants)
                 ? ''
                 : (string) ($sectionmeta[$section]['body'] ?? ''),
             'soon_badge' => get_string('admin_courseops_soon_badge', 'local_launchpad'),
@@ -473,7 +471,287 @@ final class admin_dashboard {
             }
         }
 
+        if ($isparticipants) {
+            $ctx = array_merge($ctx, self::courseops_participants_context($user, $trackid, $fullcourse));
+        }
+
         return $ctx;
+    }
+
+    /**
+     * Participants section: track roster + reuse links to Cohorts / Mentors (Slice C).
+     *
+     * @return array<string, mixed>
+     */
+    public static function courseops_participants_context(
+        \stdClass $user,
+        int $trackid,
+        \stdClass $course
+    ): array {
+        $canunenrol = account_provision::actor_may_unenrol($user, $trackid);
+        $fellows = self::list_track_fellows($trackid);
+        $mentors = self::list_track_roster_mentors($trackid);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]))->out(false);
+        $sk = sesskey();
+        $unenrollabel = get_string('admin_courseops_unenrol', 'local_launchpad');
+        $removementorlabel = get_string('admin_courseops_remove_mentor', 'local_launchpad');
+
+        $fellowrows = [];
+        foreach ($fellows as $row) {
+            $fellowrows[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'email' => $row['email'],
+                'initials' => $row['initials'],
+                'role_label' => get_string('admin_courseops_role_fellow', 'local_launchpad'),
+                'can_remove' => $canunenrol,
+                'remove_confirm' => get_string(
+                    'admin_courseops_unenrol_confirm',
+                    'local_launchpad',
+                    $row['name']
+                ),
+                'trackid' => $trackid,
+                'sesskey' => $sk,
+                'participants_form_action' => $formaction,
+                'unenrol_label' => $unenrollabel,
+            ];
+        }
+
+        $mentorrows = [];
+        foreach ($mentors as $row) {
+            $mentorrows[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'email' => $row['email'],
+                'initials' => $row['initials'],
+                'role_label' => $row['role_label'],
+                'can_remove' => $canunenrol,
+                'remove_confirm' => get_string(
+                    'admin_courseops_remove_mentor_confirm',
+                    'local_launchpad',
+                    $row['name']
+                ),
+                'trackid' => $trackid,
+                'sesskey' => $sk,
+                'participants_form_action' => $formaction,
+                'remove_mentor_label' => $removementorlabel,
+            ];
+        }
+
+        $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'cohorts',
+            'trackid' => $trackid,
+        ]))->out(false);
+        $mentorsurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'mentors',
+            'trackid' => $trackid,
+        ]))->out(false) . '#lp-mentor-track-' . $trackid;
+
+        return [
+            'participants_title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
+            'participants_lead' => get_string('admin_courseops_participants_lead', 'local_launchpad'),
+            'participants_form_action' => $formaction,
+            'enrol_fellow_url' => $cohortsurl,
+            'enrol_fellow_label' => get_string('admin_courseops_enrol_fellow', 'local_launchpad'),
+            'enrol_fellow_help' => get_string('admin_courseops_enrol_fellow_help', 'local_launchpad'),
+            'assign_mentor_url' => $mentorsurl,
+            'assign_mentor_label' => get_string('admin_courseops_assign_mentor', 'local_launchpad'),
+            'assign_mentor_help' => get_string('admin_courseops_assign_mentor_help', 'local_launchpad'),
+            'fellows_section_title' => get_string('admin_courseops_fellows_title', 'local_launchpad', count($fellowrows)),
+            'mentors_section_title' => get_string('admin_courseops_mentors_title', 'local_launchpad', count($mentorrows)),
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_email' => get_string('admin_people_col_email', 'local_launchpad'),
+            'col_role' => get_string('admin_people_col_role', 'local_launchpad'),
+            'col_actions' => get_string('admin_courseops_col_actions', 'local_launchpad'),
+            'unenrol_label' => $unenrollabel,
+            'remove_mentor_label' => $removementorlabel,
+            'fellow_rows' => $fellowrows,
+            'has_fellows' => $fellowrows !== [],
+            'fellows_empty' => get_string('admin_courseops_fellows_empty', 'local_launchpad'),
+            'mentor_rows' => $mentorrows,
+            'has_mentors' => $mentorrows !== [],
+            'mentors_empty' => get_string('admin_courseops_mentors_empty', 'local_launchpad'),
+            'can_unenrol' => $canunenrol,
+            'unenrol_no_cap' => get_string('admin_courseops_err_unenrol_cap', 'local_launchpad'),
+            'track_fullname_plain' => format_string($course->fullname),
+        ];
+    }
+
+    /**
+     * Active student enrolments on one track (roster rows).
+     *
+     * @return list<array{id:int,name:string,email:string,initials:string}>
+     */
+    public static function list_track_fellows(int $courseid): array {
+        global $CFG, $DB;
+
+        if ($courseid <= 0) {
+            return [];
+        }
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email
+                  FROM {user_enrolments} ue
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                  JOIN {context} ctx ON ctx.instanceid = e.courseid AND ctx.contextlevel = :ctxlevel
+                  JOIN {role_assignments} ra ON ra.contextid = ctx.id AND ra.userid = ue.userid
+                  JOIN {role} r ON r.id = ra.roleid AND r.archetype = :arch
+                  JOIN {user} u ON u.id = ue.userid
+                 WHERE e.courseid = :courseid
+                   AND ue.status = :uestatus
+                   AND e.status = :estatus
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $users = $DB->get_records_sql($sql, [
+            'courseid' => $courseid,
+            'ctxlevel' => CONTEXT_COURSE,
+            'arch' => 'student',
+            'uestatus' => ENROL_USER_ACTIVE,
+            'estatus' => ENROL_INSTANCE_ENABLED,
+        ]);
+        $out = [];
+        foreach ($users as $u) {
+            $out[] = [
+                'id' => (int) $u->id,
+                'name' => fullname($u),
+                'email' => s($u->email),
+                'initials' => fellowship_dashboard::initials($u),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Mentors on one track for the Course ops roster (includes email + role label).
+     *
+     * @return list<array{id:int,name:string,email:string,initials:string,role_label:string}>
+     */
+    public static function list_track_roster_mentors(int $courseid): array {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return [];
+        }
+        $context = \context_course::instance($courseid);
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email, r.shortname AS roleshortname, r.archetype
+                  FROM {role_assignments} ra
+                  JOIN {role} r ON r.id = ra.roleid
+                  JOIN {user} u ON u.id = ra.userid
+                 WHERE ra.contextid = :ctx
+                   AND r.archetype IN ('teacher', 'editingteacher')
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $users = $DB->get_records_sql($sql, ['ctx' => $context->id]);
+        $out = [];
+        $seen = [];
+        foreach ($users as $u) {
+            $uid = (int) $u->id;
+            if (isset($seen[$uid])) {
+                continue;
+            }
+            $seen[$uid] = true;
+            $rolelabel = ((string) ($u->roleshortname ?? '') === 'editingteacher')
+                ? get_string('admin_courseops_role_editingteacher', 'local_launchpad')
+                : get_string('admin_courseops_role_teacher', 'local_launchpad');
+            $out[] = [
+                'id' => $uid,
+                'name' => fullname($u),
+                'email' => s($u->email),
+                'initials' => fellowship_dashboard::initials($u),
+                'role_label' => $rolelabel,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Unenrol a fellow from this track (Course ops roster). Caps fail-closed.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function unenrol_fellow_from_track(\stdClass $actor, int $userid, int $trackcourseid): array {
+        if ($userid <= 0 || $trackcourseid <= 0) {
+            return ['error' => get_string('admin_courseops_err_roster_params', 'local_launchpad')];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+
+        try {
+            $result = account_provision::unenrol_fellow($actor, $userid, $trackcourseid);
+        } catch (account_provision_exception $e) {
+            if ($e->errorcode === 'forbidden') {
+                return ['error' => get_string('admin_courseops_err_unenrol_cap', 'local_launchpad')];
+            }
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $target = \core_user::get_user($userid, '*', IGNORE_MISSING);
+        $name = $target ? fullname($target) : (string) $userid;
+        if ($result['status'] === 'not_enrolled') {
+            return ['error' => get_string('admin_courseops_err_not_fellow', 'local_launchpad', $name)];
+        }
+
+        return [
+            'ok' => get_string('admin_courseops_unenrol_ok', 'local_launchpad', (object) [
+                'name' => $name,
+                'track' => format_string($course->fullname),
+            ]),
+        ];
+    }
+
+    /**
+     * Remove a mentor from this track (Course ops roster). Caps fail-closed.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function remove_mentor_from_track(\stdClass $actor, int $userid, int $trackcourseid): array {
+        if ($userid <= 0 || $trackcourseid <= 0) {
+            return ['error' => get_string('admin_courseops_err_roster_params', 'local_launchpad')];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+
+        try {
+            $result = account_provision::remove_mentor($actor, $userid, $trackcourseid);
+        } catch (account_provision_exception $e) {
+            if ($e->errorcode === 'forbidden') {
+                return ['error' => get_string('admin_courseops_err_unenrol_cap', 'local_launchpad')];
+            }
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $target = \core_user::get_user($userid, '*', IGNORE_MISSING);
+        $name = $target ? fullname($target) : (string) $userid;
+        if ($result['status'] === 'not_enrolled') {
+            return ['error' => get_string('admin_courseops_err_not_mentor', 'local_launchpad', $name)];
+        }
+
+        return [
+            'ok' => get_string('admin_courseops_remove_mentor_ok', 'local_launchpad', (object) [
+                'name' => $name,
+                'track' => format_string($course->fullname),
+            ]),
+        ];
     }
 
     /**
@@ -2548,7 +2826,8 @@ final class admin_dashboard {
      * @param array{ok?:string,error?:string} $flash
      * @return array<string, mixed>
      */
-    public static function cohorts_context(\stdClass $user, array $flash = []): array {
+    public static function cohorts_context(\stdClass $user, array $flash = [], int $preselecttrackid = 0): array {
+        unset($user);
         $tracks = self::list_track_courses();
         $slug = self::primary_cohort_slug($tracks);
         $totalfellows = 0;
@@ -2580,19 +2859,37 @@ final class admin_dashboard {
 
         $hasready = false;
         $selectedset = false;
-        foreach ($options as &$opt) {
-            if (!$selectedset && empty($opt['disabled'])) {
-                $opt['selected'] = true;
-                $selectedset = true;
-                $hasready = true;
-            } else {
-                $opt['selected'] = false;
-                if (empty($opt['disabled'])) {
+        // Prefer Course ops trackid when that track is ready; else first ready track.
+        if ($preselecttrackid > 0) {
+            foreach ($options as &$opt) {
+                if ((int) $opt['id'] === $preselecttrackid && empty($opt['disabled'])) {
+                    $opt['selected'] = true;
+                    $selectedset = true;
                     $hasready = true;
+                } else {
+                    $opt['selected'] = false;
+                    if (empty($opt['disabled'])) {
+                        $hasready = true;
+                    }
                 }
             }
+            unset($opt);
         }
-        unset($opt);
+        if (!$selectedset) {
+            foreach ($options as &$opt) {
+                if (!$selectedset && empty($opt['disabled'])) {
+                    $opt['selected'] = true;
+                    $selectedset = true;
+                    $hasready = true;
+                } else {
+                    $opt['selected'] = false;
+                    if (empty($opt['disabled'])) {
+                        $hasready = true;
+                    }
+                }
+            }
+            unset($opt);
+        }
 
         $startdate = self::earliest_track_startdate($tracks);
         $selfon = self::any_self_enrolment_enabled($tracks);
@@ -3553,11 +3850,12 @@ final class admin_dashboard {
      * @param array{ok?:string,error?:string} $flash
      * @return array<string, mixed>
      */
-    public static function mentors_context(\stdClass $user, array $flash = []): array {
+    public static function mentors_context(\stdClass $user, array $flash = [], int $highlighttrackid = 0): array {
+        unset($user);
         $tracks = self::list_track_courses();
         $cards = [];
         foreach ($tracks as $course) {
-            $cards[] = self::mentor_track_card_context($course);
+            $cards[] = self::mentor_track_card_context($course, $highlighttrackid);
         }
 
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
@@ -3587,7 +3885,7 @@ final class admin_dashboard {
      * @param \stdClass $course
      * @return array<string, mixed>
      */
-    public static function mentor_track_card_context(\stdClass $course): array {
+    public static function mentor_track_card_context(\stdClass $course, int $highlighttrackid = 0): array {
         $courseid = (int) $course->id;
         $teachers = self::list_track_teachers($courseid);
         $fellows = self::fellow_count($courseid);
@@ -3596,6 +3894,8 @@ final class admin_dashboard {
 
         return [
             'id' => $courseid,
+            'anchor_id' => 'lp-mentor-track-' . $courseid,
+            'is_highlight' => $highlighttrackid > 0 && $highlighttrackid === $courseid,
             'name' => format_string($course->fullname),
             'idnumber' => s($course->idnumber),
             'has_teacher' => $hasteacher,
