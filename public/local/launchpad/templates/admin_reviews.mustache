@@ -10,6 +10,7 @@
       <span class="lp-eyebrow">{{eyebrow}}</span>
       <h2>{{heading}}</h2>
       <p class="lp-hero-lead">{{lead}}</p>
+      <p class="lp-sm lp-muted lp-reviews-ping-help">{{ping_target_help}}</p>
     </div>
   </div>
 </section>
@@ -34,7 +35,10 @@
   {{/tiles}}
 </div>
 
-<div class="lp-card lift" style="margin-top:18px">
+<div class="lp-card lift" style="margin-top:18px"
+  data-lp-reviews-page
+  data-ping-action-url="{{ping_action_url}}"
+  data-sesskey="{{sesskey}}">
   <div class="lp-table-wrap">
     {{#has_pending}}
       <table class="lp-table">
@@ -50,7 +54,7 @@
         </thead>
         <tbody>
           {{#pending}}
-            <tr class="{{#is_overdue}}is-overdue{{/is_overdue}}">
+            <tr class="{{#is_overdue}}is-overdue{{/is_overdue}}" data-lp-review-row data-submissionid="{{submissionid}}">
               <td>
                 <div class="lp-people-name"><b>{{fellow}}</b></div>
                 <div class="lp-sm">{{email}}</div>
@@ -61,25 +65,61 @@
                 <div>{{submitted}}</div>
                 {{#has_age}}<div class="lp-reviews-age{{#is_overdue}} is-overdue{{/is_overdue}}">{{age_label}}</div>{{/has_age}}
               </td>
-              <td class="lp-sm">{{teacher}}</td>
+              <td class="lp-sm">
+                {{#has_teacher_choice}}
+                  <div class="lp-reviews-target">
+                    <div class="lp-select lp-select-compact" data-lp-select data-lp-ping-target>
+                      <button type="button" class="lp-select-trigger" data-lp-select-trigger
+                        aria-haspopup="listbox" aria-expanded="false"
+                        aria-label="{{col_teacher}}">
+                        <span class="lp-select-value" data-lp-select-label>{{teacher}}</span>
+                        <iconify-icon icon="hugeicons:arrow-down-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+                      </button>
+                      <ul class="lp-select-menu" data-lp-select-menu hidden role="listbox">
+                        {{#teacher_options}}
+                          <li role="option"
+                            class="lp-select-option{{#selected}} is-selected{{/selected}}"
+                            data-lp-select-option
+                            data-value="{{id}}"
+                            data-cooled="{{#cooled}}1{{/cooled}}{{^cooled}}0{{/cooled}}"
+                            tabindex="-1"
+                            {{#selected}}aria-selected="true"{{/selected}}>{{name}}</li>
+                        {{/teacher_options}}
+                      </ul>
+                      <select name="teacherid" form="lp-ping-{{submissionid}}"
+                        class="lp-select-native" data-lp-select-input data-lp-ping-teacher
+                        tabindex="-1" aria-hidden="true">
+                        {{#teacher_options}}
+                          <option value="{{id}}"{{#selected}} selected{{/selected}}
+                            data-cooled="{{#cooled}}1{{/cooled}}{{^cooled}}0{{/cooled}}">{{name}}</option>
+                        {{/teacher_options}}
+                      </select>
+                    </div>
+                    <div class="lp-reviews-target-hint">{{ping_target_scope}}</div>
+                  </div>
+                {{/has_teacher_choice}}
+                {{^has_teacher_choice}}
+                  <div class="lp-reviews-target-single">{{teacher}}</div>
+                {{/has_teacher_choice}}
+              </td>
               <td>
                 <span class="lp-chip {{state_chip_class}}">{{state}}</span>
                 {{#is_overdue}}<span class="lp-chip is-overdue">{{overdue_badge}}</span>{{/is_overdue}}
               </td>
               <td class="lp-reviews-actions">
                 <a class="lp-btn lp-btn-solid" href="{{grader_url}}">{{open_label}}</a>
-                {{#can_ping}}
-                  <form method="post" action="{{ping_action_url}}" class="lp-reviews-ping-form">
+                {{#has_teachers}}
+                  <form method="post" action="{{ping_action_url}}" class="lp-reviews-ping-form" id="lp-ping-{{submissionid}}" data-lp-ping-form>
                     <input type="hidden" name="sesskey" value="{{sesskey}}">
                     <input type="hidden" name="action" value="ping_review">
                     <input type="hidden" name="submissionid" value="{{submissionid}}">
-                    <input type="hidden" name="teacherid" value="{{teacherid}}">
-                    <button type="submit" class="lp-btn lp-btn-light">{{ping_label}}</button>
+                    {{^has_teacher_choice}}
+                      <input type="hidden" name="teacherid" value="{{teacherid}}">
+                    {{/has_teacher_choice}}
+                    <button type="submit" class="lp-btn lp-btn-light" data-lp-ping-btn{{#ping_cooled}} hidden{{/ping_cooled}}>{{ping_label}}</button>
+                    <span class="lp-btn lp-btn-light is-disabled" aria-disabled="true" data-lp-ping-cooled{{^ping_cooled}} hidden{{/ping_cooled}}>{{ping_cooled_label}}</span>
                   </form>
-                {{/can_ping}}
-                {{#ping_cooled}}
-                  <span class="lp-btn lp-btn-light is-disabled" aria-disabled="true">{{ping_cooled_label}}</span>
-                {{/ping_cooled}}
+                {{/has_teachers}}
               </td>
             </tr>
           {{/pending}}

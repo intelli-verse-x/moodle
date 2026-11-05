@@ -2070,8 +2070,68 @@ body.local-launchpad-mentor {
   white-space: nowrap;
 }
 .lp-reviews-ping-form {
-  display: inline;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin: 0;
+}
+.lp-reviews-ping-help {
+  margin: 6px 0 0;
+  max-width: 52rem;
+}
+[data-lp-reviews-page].lp-card,
+[data-lp-reviews-page] .lp-table-wrap,
+[data-lp-reviews-page] .lp-table,
+[data-lp-reviews-page] .lp-table td {
+  overflow: visible;
+}
+.lp-reviews-target {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 11.5rem;
+  max-width: 16rem;
+  position: relative;
+  z-index: 1;
+}
+.lp-reviews-target:has(.lp-select.is-open) {
+  z-index: 40;
+}
+.lp-reviews-target .lp-select-compact .lp-select-trigger {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lp-reviews-target .lp-select-compact .lp-select-menu {
+  z-index: 50;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: 260px;
+  box-sizing: border-box;
+}
+.lp-reviews-target .lp-select-compact .lp-select-menu.is-fixed {
+  position: fixed;
+  right: auto;
+  top: auto;
+  /* width/left set in JS to match trigger; avoid % (fixed % = viewport) */
+  min-width: 0;
+  max-width: none;
+}
+.lp-reviews-target .lp-select-compact .lp-select-option {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.lp-reviews-target-hint {
+  font-size: 11px;
+  color: var(--lp-muted);
+  letter-spacing: 0.01em;
+}
+.lp-reviews-target-single {
+  font-weight: 600;
+  color: var(--lp-ink);
 }
 .lp-reviews-actions .lp-btn.is-disabled {
   opacity: .55;

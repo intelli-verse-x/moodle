@@ -2727,4 +2727,249 @@
             }
         });
     }
+
+    // Admin reviews: soft ping-target (track-scoped lp-select + cooldown).
+    (function initReviewPingTargets() {
+        var page = shell.querySelector('[data-lp-reviews-page]');
+        if (!page) {
+            return;
+        }
+        var actionUrl = page.getAttribute('data-ping-action-url') || '';
+        var sesskey = page.getAttribute('data-sesskey') || '';
+
+        function placeReviewMenu(root) {
+            var menu = root ? root.querySelector('[data-lp-select-menu]') : null;
+            var trigger = root ? root.querySelector('[data-lp-select-trigger]') : null;
+            if (!menu || !trigger) {
+                return;
+            }
+            var rect = trigger.getBoundingClientRect();
+            var pad = 12;
+            var width = Math.round(rect.width);
+            var maxWidth = Math.max(160, window.innerWidth - pad * 2);
+            if (width > maxWidth) {
+                width = maxWidth;
+            }
+            var left = Math.round(rect.left);
+            if (left + width > window.innerWidth - pad) {
+                left = Math.max(pad, window.innerWidth - width - pad);
+            }
+            if (left < pad) {
+                left = pad;
+            }
+            var top = rect.bottom + 6;
+            menu.classList.add('is-fixed');
+            menu.style.width = width + 'px';
+            menu.style.maxWidth = width + 'px';
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            menu.style.right = 'auto';
+            menu.style.minWidth = '0';
+            // Flip up if near bottom of viewport.
+            requestAnimationFrame(function () {
+                var menuRect = menu.getBoundingClientRect();
+                if (menuRect.bottom > window.innerHeight - 8) {
+                    var upTop = rect.top - menuRect.height - 6;
+                    if (upTop >= 8) {
+                        menu.style.top = upTop + 'px';
+                    }
+                }
+            });
+        }
+
+        function clearReviewMenuPlace(menu) {
+            if (!menu) {
+                return;
+            }
+            menu.classList.remove('is-fixed');
+            menu.style.width = '';
+            menu.style.maxWidth = '';
+            menu.style.minWidth = '';
+            menu.style.left = '';
+            menu.style.top = '';
+            menu.style.right = '';
+        }
+
+        function closeReviewSelects(except) {
+            page.querySelectorAll('[data-lp-ping-target]').forEach(function (root) {
+                if (except && root === except) {
+                    return;
+                }
+                var menu = root.querySelector('[data-lp-select-menu]');
+                var trigger = root.querySelector('[data-lp-select-trigger]');
+                root.classList.remove('is-open');
+                if (menu) {
+                    menu.setAttribute('hidden', 'hidden');
+                    clearReviewMenuPlace(menu);
+                }
+                if (trigger) {
+                    trigger.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
+        function syncPingUi(select) {
+            if (!select) {
+                return;
+            }
+            var form = select.form || page.querySelector('#' + (select.getAttribute('form') || ''));
+            if (!form) {
+                return;
+            }
+            var opt = select.options[select.selectedIndex];
+            var cooled = !!(opt && opt.getAttribute('data-cooled') === '1');
+            var btn = form.querySelector('[data-lp-ping-btn]');
+            var cooledEl = form.querySelector('[data-lp-ping-cooled]');
+            if (btn) {
+                if (cooled) {
+                    btn.setAttribute('hidden', 'hidden');
+                } else {
+                    btn.removeAttribute('hidden');
+                }
+            }
+            if (cooledEl) {
+                if (cooled) {
+                    cooledEl.removeAttribute('hidden');
+                } else {
+                    cooledEl.setAttribute('hidden', 'hidden');
+                }
+            }
+        }
+
+        function persistTarget(select) {
+            if (!actionUrl || !sesskey || !select) {
+                return;
+            }
+            var row = select.closest('[data-lp-review-row]');
+            var submissionid = row ? (row.getAttribute('data-submissionid') || '') : '';
+            var teacherid = select.value || '';
+            if (!submissionid || !teacherid || typeof window.fetch !== 'function') {
+                return;
+            }
+            var body = new URLSearchParams();
+            body.set('sesskey', sesskey);
+            body.set('action', 'set_ping_target');
+            body.set('submissionid', submissionid);
+            body.set('teacherid', teacherid);
+            body.set('ajax', '1');
+            window.fetch(actionUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: body.toString()
+            }).catch(function () {
+                // Soft preference only — ping still posts the selected teacherid.
+            });
+        }
+
+        function setPingTargetValue(root, value, persist) {
+            if (!root) {
+                return;
+            }
+            var options = root.querySelectorAll('[data-lp-select-option]');
+            var labelEl = root.querySelector('[data-lp-select-label]');
+            var input = root.querySelector('[data-lp-select-input]');
+            var matched = null;
+            options.forEach(function (opt) {
+                var on = String(opt.getAttribute('data-value') || '') === String(value);
+                opt.classList.toggle('is-selected', on);
+                if (on) {
+                    opt.setAttribute('aria-selected', 'true');
+                    matched = opt;
+                } else {
+                    opt.removeAttribute('aria-selected');
+                }
+            });
+            if (!matched && options.length) {
+                matched = options[0];
+                matched.classList.add('is-selected');
+                matched.setAttribute('aria-selected', 'true');
+                value = matched.getAttribute('data-value');
+            }
+            if (labelEl && matched) {
+                labelEl.textContent = (matched.textContent || '').replace(/\s+/g, ' ').trim();
+            }
+            if (input) {
+                input.value = String(value);
+                if (input.tagName === 'SELECT') {
+                    Array.prototype.forEach.call(input.options, function (opt) {
+                        opt.selected = String(opt.value) === String(value);
+                    });
+                }
+                syncPingUi(input);
+                if (persist) {
+                    persistTarget(input);
+                }
+            }
+        }
+
+        page.querySelectorAll('[data-lp-ping-target]').forEach(function (root) {
+            if (root.getAttribute('data-lp-select-ready') === '1') {
+                return;
+            }
+            root.setAttribute('data-lp-select-ready', '1');
+            var trigger = root.querySelector('[data-lp-select-trigger]');
+            var menu = root.querySelector('[data-lp-select-menu]');
+            var input = root.querySelector('[data-lp-select-input]');
+            if (input) {
+                setPingTargetValue(root, input.value || '', false);
+            }
+            if (trigger) {
+                trigger.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (root.classList.contains('is-open')) {
+                        closeReviewSelects(null);
+                    } else {
+                        closeReviewSelects(root);
+                        root.classList.add('is-open');
+                        if (menu) {
+                            menu.removeAttribute('hidden');
+                            placeReviewMenu(root);
+                        }
+                        trigger.setAttribute('aria-expanded', 'true');
+                        var selected = root.querySelector('[data-lp-select-option].is-selected')
+                            || root.querySelector('[data-lp-select-option]');
+                        if (selected) {
+                            selected.focus();
+                        }
+                    }
+                });
+            }
+            if (menu) {
+                menu.addEventListener('click', function (e) {
+                    var opt = e.target.closest('[data-lp-select-option]');
+                    if (!opt || !menu.contains(opt)) {
+                        return;
+                    }
+                    e.preventDefault();
+                    setPingTargetValue(root, opt.getAttribute('data-value') || '', true);
+                    closeReviewSelects(null);
+                    if (trigger) {
+                        trigger.focus();
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('[data-lp-ping-target]')) {
+                closeReviewSelects(null);
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeReviewSelects(null);
+            }
+        });
+        window.addEventListener('resize', function () {
+            closeReviewSelects(null);
+        });
+        window.addEventListener('scroll', function () {
+            closeReviewSelects(null);
+        }, true);
+    })();
 })();

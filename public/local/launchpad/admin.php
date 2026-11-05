@@ -79,6 +79,23 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']));
     }
+    if ($view === 'reviews' && $action === 'set_ping_target') {
+        $submissionid = optional_param('submissionid', 0, PARAM_INT);
+        $pingteacherid = optional_param('teacherid', 0, PARAM_INT);
+        $result = admin_dashboard::save_review_ping_target($USER, $submissionid, $pingteacherid);
+        if (optional_param('ajax', 0, PARAM_BOOL)) {
+            @header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => empty($result['error']),
+                'error' => (string) ($result['error'] ?? ''),
+            ]);
+            exit;
+        }
+        if (!empty($result['error'])) {
+            $SESSION->lp_admin_flash = $result;
+        }
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']));
+    }
     if ($view === 'announcements' && $action === 'post_announcement') {
         $subject = optional_param('subject', '', PARAM_TEXT);
         $message = optional_param('message', '', PARAM_RAW);

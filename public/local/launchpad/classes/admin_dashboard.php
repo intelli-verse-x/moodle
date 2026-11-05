@@ -2615,6 +2615,8 @@ final class admin_dashboard {
             'open_label' => get_string('admin_reviews_open', 'local_launchpad'),
             'ping_label' => get_string('admin_reviews_ping', 'local_launchpad'),
             'ping_cooled_label' => get_string('admin_reviews_ping_cooled', 'local_launchpad'),
+            'ping_target_help' => get_string('admin_reviews_ping_target_help', 'local_launchpad'),
+            'ping_target_scope' => get_string('admin_reviews_ping_target_scope', 'local_launchpad'),
             'sesskey' => sesskey(),
             'ping_action_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false),
             'flash_ok' => !empty($flash['ok']),
@@ -2680,12 +2682,30 @@ final class admin_dashboard {
                 $teachercache[$courseid] = self::teacher_rows($courseid);
             }
             $teachers = $teachercache[$courseid];
-            $primary = $teachers[0] ?? null;
-            $teacherid = $primary ? (int) $primary['id'] : 0;
-            $teacherlabel = $teachers !== []
-                ? implode(', ', array_map(static fn(array $t): string => (string) $t['name'], $teachers))
-                : get_string('admin_tracks_no_teacher', 'local_launchpad');
             $submissionid = (int) $row->id;
+            $preferred = self::get_review_ping_target($submissionid);
+            $teacherids = [];
+            foreach ($teachers as $t) {
+                $teacherids[(int) $t['id']] = true;
+            }
+            $teacherid = ($preferred > 0 && isset($teacherids[$preferred]))
+                ? $preferred
+                : (int) (($teachers[0]['id'] ?? 0));
+            $teacheroptions = [];
+            $teacherlabel = get_string('admin_tracks_no_teacher', 'local_launchpad');
+            foreach ($teachers as $t) {
+                $tid = (int) $t['id'];
+                $selected = $tid === $teacherid;
+                if ($selected) {
+                    $teacherlabel = (string) $t['name'];
+                }
+                $teacheroptions[] = [
+                    'id' => $tid,
+                    'name' => (string) $t['name'],
+                    'selected' => $selected,
+                    'cooled' => self::review_ping_is_cooled($submissionid, $tid),
+                ];
+            }
             $cooled = $teacherid > 0 && self::review_ping_is_cooled($submissionid, $teacherid);
             $submitted = (int) ($row->timemodified ?: $row->timecreated);
             $age = $submitted > 0 ? max(0, $now - $submitted) : 0;
@@ -2712,6 +2732,9 @@ final class admin_dashboard {
                     : '',
                 'teacher' => $teacherlabel,
                 'teacherid' => $teacherid,
+                'teacher_options' => $teacheroptions,
+                'has_teacher_choice' => count($teacheroptions) > 1,
+                'has_teachers' => $teacheroptions !== [],
                 'can_ping' => $teacherid > 0 && !$cooled,
                 'ping_cooled' => $cooled,
                 'state' => $isoverdue
@@ -2750,7 +2773,8 @@ final class admin_dashboard {
     public const REVIEW_PING_COOLDOWN = 1800;
 
     /**
-     * Teachers on a course (id + display name), ordered by name.
+     * Teachers/mentors on one LaunchPad track only (that course context).
+     * Never includes mentors from other tracks or site-wide roles.
      *
      * @return list<array{id:int,name:string}>
      */
@@ -2769,6 +2793,7 @@ final class admin_dashboard {
                  WHERE ra.contextid = :ctx
                    AND r.archetype IN ('teacher', 'editingteacher')
                    AND u.deleted = 0
+                   AND u.suspended = 0
               ORDER BY u.lastname ASC, u.firstname ASC";
         $users = $DB->get_records_sql($sql, ['ctx' => $context->id]);
         $out = [];
@@ -2804,6 +2829,72 @@ final class admin_dashboard {
             'local_launchpad_review_ping_' . $submissionid . '_' . $teacherid,
             time()
         );
+    }
+
+    /**
+     * Last soft ping-target teacher for a pending submission (this admin).
+     */
+    public static function get_review_ping_target(int $submissionid): int {
+        if ($submissionid <= 0) {
+            return 0;
+        }
+        return (int) get_user_preferences('local_launchpad_review_ping_target_' . $submissionid, 0);
+    }
+
+    /**
+     * Remember soft ping-target for reload (grading stays shared — not Moodle allocation).
+     */
+    public static function set_review_ping_target(int $submissionid, int $teacherid): void {
+        if ($submissionid <= 0 || $teacherid <= 0) {
+            return;
+        }
+        set_user_preference('local_launchpad_review_ping_target_' . $submissionid, $teacherid);
+    }
+
+    /**
+     * Persist ping-target after validating the teacher is on that submission's track.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function save_review_ping_target(\stdClass $admin, int $submissionid, int $teacherid): array {
+        global $DB;
+
+        $adminid = (int) ($admin->id ?? 0);
+        if ($adminid <= 0 || (!self::can_access($adminid) && !is_siteadmin($adminid))) {
+            return ['error' => get_string('admin_reviews_ping_err_permission', 'local_launchpad')];
+        }
+        if ($submissionid <= 0 || $teacherid <= 0) {
+            return ['error' => get_string('admin_reviews_ping_err_params', 'local_launchpad')];
+        }
+
+        $sql = "SELECT s.id, a.course AS courseid, c.idnumber AS courseidn
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+                 WHERE s.id = :sid
+                   AND s.latest = 1
+                   AND s.status = :status";
+        $row = $DB->get_record_sql($sql, [
+            'sid' => $submissionid,
+            'status' => 'submitted',
+        ]);
+        if (!$row || !self::is_track_idnumber((string) ($row->courseidn ?? ''))) {
+            return ['error' => get_string('admin_reviews_ping_err_gone', 'local_launchpad')];
+        }
+
+        $isteacher = false;
+        foreach (self::teacher_rows((int) $row->courseid) as $t) {
+            if ((int) $t['id'] === $teacherid) {
+                $isteacher = true;
+                break;
+            }
+        }
+        if (!$isteacher) {
+            return ['error' => get_string('admin_reviews_ping_err_teacher', 'local_launchpad')];
+        }
+
+        self::set_review_ping_target($submissionid, $teacherid);
+        return ['ok' => '1'];
     }
 
     /**
@@ -2905,6 +2996,7 @@ final class admin_dashboard {
         }
 
         self::review_ping_mark($submissionid, $teacherid);
+        self::set_review_ping_target($submissionid, $teacherid);
         $teacher = \core_user::get_user($teacherid, '*', IGNORE_MISSING);
         $teachername = $teacher ? fullname($teacher) : get_string('admin_reviews_col_teacher', 'local_launchpad');
         return [
