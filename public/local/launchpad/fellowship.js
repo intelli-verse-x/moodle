@@ -3188,4 +3188,50 @@
             closeReviewSelects(null);
         }, true);
     })();
+
+    // Admin Mentors & capacity: All / Needs mentor / Over capacity filters.
+    (function initMentorsCapacityFilters() {
+        var page = shell.querySelector('[data-lp-mentors-page]');
+        if (!page) {
+            return;
+        }
+        var tabs = page.querySelectorAll('[data-lp-mc-filter]');
+        var cards = page.querySelectorAll('[data-lp-mc-card]');
+        var emptyEl = page.querySelector('[data-lp-mc-empty]');
+        var builder = page.querySelector('.lp-mc-builder-tile');
+        if (!tabs.length || !cards.length) {
+            return;
+        }
+        var mode = 'all';
+
+        function applyFilter(next) {
+            mode = next || 'all';
+            var shown = 0;
+            cards.forEach(function (card) {
+                var status = card.getAttribute('data-lp-mc-status') || '';
+                var show = mode === 'all' || status === mode;
+                card.hidden = !show;
+                if (show) {
+                    shown += 1;
+                }
+            });
+            if (builder) {
+                builder.hidden = mode !== 'all';
+            }
+            if (emptyEl) {
+                emptyEl.hidden = shown > 0;
+            }
+            tabs.forEach(function (tab) {
+                var on = tab.getAttribute('data-lp-mc-filter') === mode;
+                tab.classList.toggle('is-active', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                applyFilter(tab.getAttribute('data-lp-mc-filter') || 'all');
+            });
+        });
+    })();
 })();

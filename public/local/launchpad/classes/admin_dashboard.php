@@ -4934,12 +4934,25 @@ final class admin_dashboard {
         unset($user);
         $tracks = self::list_track_courses();
         $cards = [];
+        $mentorsusedtotal = 0;
+        $needscount = 0;
+        $overcount = 0;
         foreach ($tracks as $course) {
-            $cards[] = self::mentor_track_card_context($course, $highlighttrackid);
+            $card = self::mentor_track_card_context($course, $highlighttrackid);
+            $cards[] = $card;
+            $mentorsusedtotal += (int) ($card['mentors_used'] ?? 0);
+            if (!empty($card['needs_mentor'])) {
+                $needscount++;
+            }
+            if (!empty($card['is_over_capacity'])) {
+                $overcount++;
+            }
         }
 
+        $trackcount = count($cards);
         $maxmentors = account_provision::pilot_max_mentors_per_track();
         $maxfellows = account_provision::pilot_max_fellows_per_track();
+        $seats = $trackcount * $maxmentors;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
         return array_merge([
@@ -4954,6 +4967,32 @@ final class admin_dashboard {
             'flash_err_body' => (string) ($flash['error'] ?? ''),
             'form_action' => $formaction,
             'sesskey' => sesskey(),
+            // Hero summary (computed from live track cards).
+            'stat_tracks_label' => get_string('admin_mentors_stat_tracks', 'local_launchpad'),
+            'stat_tracks_value' => (string) $trackcount,
+            'stat_tracks_sub' => get_string('admin_mentors_stat_tracks_sub', 'local_launchpad'),
+            'stat_mentors_label' => get_string('admin_mentors_stat_mentors', 'local_launchpad'),
+            'stat_mentors_value' => (string) $mentorsusedtotal,
+            'stat_mentors_sub' => get_string(
+                'admin_mentors_stat_mentors_sub',
+                'local_launchpad',
+                (object) ['seats' => $seats]
+            ),
+            'has_over_stat' => $overcount > 0,
+            'stat_over_label' => get_string('admin_mentors_stat_over', 'local_launchpad', $overcount),
+            // Grid filters (client-side; counts are real).
+            'grid_title' => get_string('admin_mentors_grid_title', 'local_launchpad'),
+            'grid_lead' => get_string('admin_mentors_grid_lead', 'local_launchpad'),
+            'filter_all_label' => get_string('admin_mentors_filter_all', 'local_launchpad', $trackcount),
+            'filter_needs_label' => get_string('admin_mentors_filter_needs', 'local_launchpad', $needscount),
+            'filter_over_label' => get_string('admin_mentors_filter_over', 'local_launchpad', $overcount),
+            'filter_empty' => get_string('admin_mentors_filter_empty', 'local_launchpad'),
+            // Builder CTA tile (real Course builder link — not a fake allocator).
+            'builder_tile_title' => get_string('admin_mentors_builder_tile_title', 'local_launchpad'),
+            'builder_tile_body' => get_string('admin_mentors_builder_tile_body', 'local_launchpad'),
+            'builder_tile_cta' => get_string('admin_mentors_builder_tile_cta', 'local_launchpad'),
+            'builder_url' => $builderurl,
+            'footer_tip' => get_string('admin_mentors_footer_tip', 'local_launchpad'),
             // Pilot capacity card (admin-managed; no deploy to change later).
             'pilot_title' => get_string('admin_pilot_title', 'local_launchpad'),
             'pilot_lead' => get_string('admin_pilot_lead', 'local_launchpad'),
@@ -4964,6 +5003,7 @@ final class admin_dashboard {
             'pilot_fellows_help' => get_string('admin_pilot_fellows_help', 'local_launchpad'),
             'pilot_fellows_value' => $maxfellows,
             'pilot_save_label' => get_string('admin_pilot_save', 'local_launchpad'),
+            'pilot_live_note' => get_string('admin_pilot_live_note', 'local_launchpad'),
             'pilot_form_action' => $formaction,
         ], self::empty_state(
             'admin_mentors_empty',
@@ -5035,6 +5075,34 @@ final class admin_dashboard {
             )
             : get_string('admin_mentors_fellows_uncapped', 'local_launchpad', $fellowsused);
 
+        $isover = $mentorover || $fellowover;
+        $needsmentor = $mentorsused < $maxmentors;
+        $openseats = max(0, $maxmentors - $mentorsused);
+        $mentorpct = $maxmentors > 0
+            ? (int) min(100, round(($mentorsused / $maxmentors) * 100))
+            : 0;
+        $statuskey = $isover ? 'over' : ($needsmentor ? 'needs' : 'staffed');
+        $statuslabel = match ($statuskey) {
+            'over' => get_string('admin_mentors_status_over', 'local_launchpad'),
+            'needs' => get_string('admin_mentors_status_needs', 'local_launchpad'),
+            default => get_string('admin_mentors_status_staffed', 'local_launchpad'),
+        };
+        $mentorhint = $isover
+            ? get_string('admin_mentors_hint_over', 'local_launchpad')
+            : ($openseats > 0
+                ? get_string('admin_mentors_hint_open', 'local_launchpad', $openseats)
+                : get_string('admin_mentors_hint_full', 'local_launchpad'));
+
+        $teacherrows = [];
+        foreach ($teachers as $t) {
+            $teacherrows[] = [
+                'name' => $t['name'],
+                'initials' => $t['initials'],
+                'role_label' => get_string('admin_mentors_teacher_role', 'local_launchpad'),
+                'active_label' => get_string('admin_mentors_active', 'local_launchpad'),
+            ];
+        }
+
         return [
             'id' => $courseid,
             'anchor_id' => 'lp-mentor-track-' . $courseid,
@@ -5042,6 +5110,7 @@ final class admin_dashboard {
             'name' => format_string($course->fullname),
             'idnumber' => s($course->idnumber),
             'has_teacher' => $hasteacher,
+            'teachers' => $teacherrows,
             'teacher_name' => $primary ? $primary['name'] : '',
             'teacher_initials' => $primary ? $primary['initials'] : '',
             'teacher_role_label' => get_string('admin_mentors_teacher_role', 'local_launchpad'),
@@ -5049,20 +5118,33 @@ final class admin_dashboard {
                 ? get_string('admin_mentors_more_teachers', 'local_launchpad', count($teachers) - 1)
                 : '',
             'has_more_teachers' => count($teachers) > 1,
+            'teachers_section_label' => get_string('admin_mentors_assigned_teachers', 'local_launchpad'),
+            'mentors_used' => $mentorsused,
+            'mentors_max' => $maxmentors,
+            'mentor_pct' => $mentorpct,
             'capacity_label' => get_string('admin_mentors_capacity', 'local_launchpad'),
             'capacity_value' => get_string(
                 'admin_mentors_slots_used',
                 'local_launchpad',
                 (object) ['used' => $mentorsused, 'max' => $maxmentors]
             ),
+            'mentor_hint' => $mentorhint,
             'fellows_label' => get_string('admin_mentors_fellows', 'local_launchpad'),
             'fellows_value' => $fellowsvalue,
-            'is_over_capacity' => $mentorover || $fellowover,
+            'fellows_hint' => $maxfellows > 0
+                ? get_string('admin_mentors_hint_fellow_cap', 'local_launchpad')
+                : get_string('admin_mentors_hint_fellow_uncapped', 'local_launchpad'),
+            'is_over_capacity' => $isover,
+            'needs_mentor' => $needsmentor,
+            'is_staffed' => !$isover && !$needsmentor,
+            'status_key' => $statuskey,
+            'status_label' => $statuslabel,
             'over_capacity_label' => get_string('admin_mentors_over_capacity', 'local_launchpad'),
             'can_assign_mentor' => $canassign,
             'assign_full_label' => get_string('admin_mentors_assign_full', 'local_launchpad'),
             'participants_url' => $participantsurl,
             'participants_label' => get_string('admin_mentors_participants', 'local_launchpad'),
+            'manage_participants_label' => get_string('admin_mentors_manage_participants', 'local_launchpad'),
             'email_label' => get_string('admin_mentors_email_label', 'local_launchpad'),
             'email_placeholder' => get_string('admin_mentors_email_placeholder', 'local_launchpad'),
             'submit_label' => get_string('admin_mentors_submit', 'local_launchpad'),
