@@ -92,6 +92,8 @@ final class admin_dashboard {
             'moodle_admin_label' => get_string('admin_open_moodle_admin', 'local_launchpad'),
             'tracks_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false),
             'tracks_cta_label' => get_string('admin_overview_tracks_cta', 'local_launchpad'),
+            'fellows_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'people', 'tab' => 'fellow']))->out(false),
+            'mentors_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false),
             'reviews_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false),
             'kpi_tracks_ready' => $ready,
             'kpi_tracks_total' => $total,
@@ -608,10 +610,6 @@ final class admin_dashboard {
             'view' => 'cohorts',
             'trackid' => $trackid,
         ]))->out(false);
-        $mentorsurl = (new \moodle_url(persona_home::ADMIN_PATH, [
-            'view' => 'mentors',
-            'trackid' => $trackid,
-        ]))->out(false) . '#lp-mentor-track-' . $trackid;
 
         return [
             'participants_title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
@@ -620,7 +618,7 @@ final class admin_dashboard {
             'enrol_fellow_url' => $cohortsurl,
             'enrol_fellow_label' => get_string('admin_courseops_enrol_fellow', 'local_launchpad'),
             'enrol_fellow_help' => get_string('admin_courseops_enrol_fellow_help', 'local_launchpad'),
-            'assign_mentor_url' => $mentorsurl,
+            'assign_mentor_url' => self::assign_mentor_url($trackid),
             'assign_mentor_label' => get_string('admin_courseops_assign_mentor', 'local_launchpad'),
             'assign_mentor_help' => get_string('admin_courseops_assign_mentor_help', 'local_launchpad'),
             'fellows_section_title' => get_string('admin_courseops_fellows_title', 'local_launchpad', count($fellowrows)),
@@ -5300,7 +5298,7 @@ final class admin_dashboard {
                 'trackid' => $courseid,
             ]))->out(false),
             'builder_label' => get_string('admin_tracks_open_builder', 'local_launchpad'),
-            'assign_teacher_url' => self::assign_teacher_url($courseid)->out(false),
+            'assign_teacher_url' => self::assign_mentor_url($courseid),
             'assign_teacher_label' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
         ];
     }
@@ -5541,7 +5539,7 @@ final class admin_dashboard {
                     'idnumber' => s($course->idnumber),
                     'issue' => get_string('admin_attention_no_teacher', 'local_launchpad'),
                     'hint' => get_string('admin_attention_no_teacher_hint', 'local_launchpad'),
-                    'url' => self::assign_teacher_url($courseid)->out(false),
+                    'url' => self::assign_mentor_url($courseid),
                     'cta' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
                     'badge' => get_string('admin_attention_badge_no_teacher', 'local_launchpad'),
                     'is_teacher_gap' => true,
@@ -5578,30 +5576,33 @@ final class admin_dashboard {
     }
 
     /**
-     * Deep link: Moodle “Assign role” for Editing teacher on this course.
+     * In-shell Mentors & capacity deep link for a track (non-editing teacher assign).
      *
-     * Lands on the picker where the admin selects a user — not the generic
-     * Participants roster. Falls back to Teacher, then Participants.
+     * Same destination Course ops “Assign mentor” uses: Mentors view + track card anchor.
+     */
+    public static function assign_mentor_url(int $trackid): string {
+        if ($trackid <= 0) {
+            return (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
+        }
+
+        return (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'mentors',
+            'trackid' => $trackid,
+        ]))->out(false) . '#lp-mentor-track-' . $trackid;
+    }
+
+    /**
+     * Assign teacher CTA → Mentors & capacity for this track (alias of assign_mentor_url).
+     *
+     * Kept for callers/tests that expect a moodle_url; day-to-day seating stays in-shell.
      */
     public static function assign_teacher_url(int $courseid): \moodle_url {
-        global $DB;
-
-        if ($courseid <= 0) {
-            return new \moodle_url('/user/index.php');
+        $url = new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']);
+        if ($courseid > 0) {
+            $url->param('trackid', $courseid);
+            $url->set_anchor('lp-mentor-track-' . $courseid);
         }
-
-        $context = \context_course::instance($courseid);
-        foreach (['editingteacher', 'teacher'] as $shortname) {
-            $roleid = (int) $DB->get_field('role', 'id', ['shortname' => $shortname]);
-            if ($roleid > 0) {
-                return new \moodle_url('/admin/roles/assign.php', [
-                    'contextid' => $context->id,
-                    'roleid' => $roleid,
-                ]);
-            }
-        }
-
-        return new \moodle_url('/user/index.php', ['id' => $courseid]);
+        return $url;
     }
 
     /**

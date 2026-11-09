@@ -53,7 +53,15 @@ final class admin_dashboard_test extends \basic_testcase {
 
     public function test_assign_teacher_url_invalid_course_falls_back(): void {
         $url = admin_dashboard::assign_teacher_url(0);
-        $this->assertStringContainsString('/user/index.php', $url->out(false));
+        $this->assertStringContainsString('/local/launchpad/admin.php', $url->out(false));
+        $this->assertStringContainsString('view=mentors', $url->out(false));
+    }
+
+    public function test_assign_mentor_url_includes_track_anchor(): void {
+        $url = admin_dashboard::assign_mentor_url(42);
+        $this->assertStringContainsString('view=mentors', $url);
+        $this->assertStringContainsString('trackid=42', $url);
+        $this->assertStringContainsString('#lp-mentor-track-42', $url);
     }
 
     public function test_foundations_ready_invalid_course(): void {
