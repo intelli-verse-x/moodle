@@ -231,6 +231,12 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $alsoorient = (bool) optional_param('also_orient', 0, PARAM_BOOL);
         $flash = admin_dashboard::enrol_fellow_by_email($USER, $email, $trackid, $alsoorient);
+    } else if ($view === 'mentors' && $action === 'save_pilot_capacity') {
+        $maxmentors = optional_param('pilot_max_mentors', 1, PARAM_INT);
+        $maxfellows = optional_param('pilot_max_fellows', 0, PARAM_INT);
+        $flash = admin_dashboard::save_pilot_capacity($USER, $maxmentors, $maxfellows);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']));
     } else if ($view === 'mentors' && $action === 'assign_mentor') {
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);

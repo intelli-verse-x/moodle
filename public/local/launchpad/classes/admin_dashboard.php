@@ -179,6 +179,16 @@ final class admin_dashboard {
         if ($e instanceof \required_capability_exception) {
             return get_string('admin_err_capability', 'local_launchpad');
         }
+        if ($e instanceof account_provision_exception) {
+            $raw = trim($e->getMessage());
+            $prefix = $e->errorcode . ': ';
+            if (str_starts_with($raw, $prefix)) {
+                $raw = trim(substr($raw, strlen($prefix)));
+            }
+            if ($raw !== '') {
+                return $raw;
+            }
+        }
         $msg = trim($e->getMessage());
         return $msg !== '' ? $msg : get_string('admin_err_generic', 'local_launchpad');
     }
@@ -4928,7 +4938,10 @@ final class admin_dashboard {
             $cards[] = self::mentor_track_card_context($course, $highlighttrackid);
         }
 
+        $maxmentors = account_provision::pilot_max_mentors_per_track();
+        $maxfellows = account_provision::pilot_max_fellows_per_track();
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
         return array_merge([
             'eyebrow' => get_string('admin_mentors_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_mentors_heading', 'local_launchpad'),
@@ -4939,14 +4952,55 @@ final class admin_dashboard {
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
-            'form_action' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false),
+            'form_action' => $formaction,
             'sesskey' => sesskey(),
+            // Pilot capacity card (admin-managed; no deploy to change later).
+            'pilot_title' => get_string('admin_pilot_title', 'local_launchpad'),
+            'pilot_lead' => get_string('admin_pilot_lead', 'local_launchpad'),
+            'pilot_mentors_label' => get_string('admin_pilot_mentors_label', 'local_launchpad'),
+            'pilot_mentors_help' => get_string('admin_pilot_mentors_help', 'local_launchpad'),
+            'pilot_mentors_value' => $maxmentors,
+            'pilot_fellows_label' => get_string('admin_pilot_fellows_label', 'local_launchpad'),
+            'pilot_fellows_help' => get_string('admin_pilot_fellows_help', 'local_launchpad'),
+            'pilot_fellows_value' => $maxfellows,
+            'pilot_save_label' => get_string('admin_pilot_save', 'local_launchpad'),
+            'pilot_form_action' => $formaction,
         ], self::empty_state(
             'admin_mentors_empty',
             'admin_empty_title_no_tracks',
             $builderurl,
             'admin_empty_cta_builder'
         ));
+    }
+
+    /**
+     * Save pilot mentor/fellow caps from Mentors & capacity (LaunchPad admin).
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function save_pilot_capacity(\stdClass $actor, int $maxmentors, int $maxfellows): array {
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return ['error' => get_string('admin_err_capability', 'local_launchpad')];
+        }
+        if ($maxmentors < 1) {
+            return ['error' => get_string('admin_pilot_err_mentors_min', 'local_launchpad')];
+        }
+        if ($maxfellows < 0) {
+            return ['error' => get_string('admin_pilot_err_fellows_min', 'local_launchpad')];
+        }
+        $saved = account_provision::set_pilot_capacity($maxmentors, $maxfellows);
+        return [
+            'ok' => get_string(
+                'admin_pilot_ok_saved',
+                'local_launchpad',
+                (object) [
+                    'mentors' => $saved['mentors'],
+                    'fellows' => $saved['fellows'] === 0
+                        ? get_string('admin_pilot_fellows_unlimited', 'local_launchpad')
+                        : (string) $saved['fellows'],
+                ]
+            ),
+        ];
     }
 
     /**
@@ -4958,9 +5012,28 @@ final class admin_dashboard {
     public static function mentor_track_card_context(\stdClass $course, int $highlighttrackid = 0): array {
         $courseid = (int) $course->id;
         $teachers = self::list_track_teachers($courseid);
-        $fellows = self::fellow_count($courseid);
+        $mentorsused = count($teachers);
+        $fellowsused = self::fellow_count($courseid);
+        $maxmentors = account_provision::pilot_max_mentors_per_track();
+        $maxfellows = account_provision::pilot_max_fellows_per_track();
         $hasteacher = $teachers !== [];
         $primary = $hasteacher ? $teachers[0] : null;
+        $mentorover = $mentorsused > $maxmentors;
+        $fellowover = $maxfellows > 0 && $fellowsused > $maxfellows;
+        $canassign = $mentorsused < $maxmentors;
+        $participantsurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $courseid,
+            'section' => 'participants',
+        ]))->out(false);
+
+        $fellowsvalue = $maxfellows > 0
+            ? get_string(
+                'admin_mentors_slots_used',
+                'local_launchpad',
+                (object) ['used' => $fellowsused, 'max' => $maxfellows]
+            )
+            : get_string('admin_mentors_fellows_uncapped', 'local_launchpad', $fellowsused);
 
         return [
             'id' => $courseid,
@@ -4977,14 +5050,22 @@ final class admin_dashboard {
                 : '',
             'has_more_teachers' => count($teachers) > 1,
             'capacity_label' => get_string('admin_mentors_capacity', 'local_launchpad'),
-            'capacity_value' => get_string('admin_mentors_capacity_unset', 'local_launchpad'),
+            'capacity_value' => get_string(
+                'admin_mentors_slots_used',
+                'local_launchpad',
+                (object) ['used' => $mentorsused, 'max' => $maxmentors]
+            ),
             'fellows_label' => get_string('admin_mentors_fellows', 'local_launchpad'),
-            'fellows_value' => (string) $fellows,
+            'fellows_value' => $fellowsvalue,
+            'is_over_capacity' => $mentorover || $fellowover,
+            'over_capacity_label' => get_string('admin_mentors_over_capacity', 'local_launchpad'),
+            'can_assign_mentor' => $canassign,
+            'assign_full_label' => get_string('admin_mentors_assign_full', 'local_launchpad'),
+            'participants_url' => $participantsurl,
+            'participants_label' => get_string('admin_mentors_participants', 'local_launchpad'),
             'email_label' => get_string('admin_mentors_email_label', 'local_launchpad'),
             'email_placeholder' => get_string('admin_mentors_email_placeholder', 'local_launchpad'),
             'submit_label' => get_string('admin_mentors_submit', 'local_launchpad'),
-            'assign_teacher_url' => self::assign_teacher_url($courseid)->out(false),
-            'assign_moodle_label' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
         ];
     }
 

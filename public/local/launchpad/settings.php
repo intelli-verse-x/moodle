@@ -157,6 +157,26 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_heading(
+        'local_launchpad/pilotcapacityheading',
+        get_string('admin_pilot_settings_heading', 'local_launchpad'),
+        get_string('admin_pilot_settings_heading_desc', 'local_launchpad')
+    ));
+    $settings->add(new admin_setting_configtext(
+        'local_launchpad/pilot_max_mentors_per_track',
+        get_string('admin_pilot_mentors_label', 'local_launchpad'),
+        get_string('admin_pilot_mentors_help', 'local_launchpad'),
+        1,
+        PARAM_INT
+    ));
+    $settings->add(new admin_setting_configtext(
+        'local_launchpad/pilot_max_fellows_per_track',
+        get_string('admin_pilot_fellows_label', 'local_launchpad'),
+        get_string('admin_pilot_fellows_help', 'local_launchpad'),
+        0,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_heading(
         'local_launchpad/footerheading',
         get_string('footerheading', 'local_launchpad'),
         get_string('footerheading_desc', 'local_launchpad')

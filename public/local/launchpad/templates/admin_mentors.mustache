@@ -1,7 +1,7 @@
 {{!
     @template local_launchpad/admin_mentors
 
-    Admin Mentors and capacity — per-track teacher cards and assign form.
+    Admin Mentors and capacity — pilot caps + per-track teacher cards.
     All copy comes from PHP context. Keep this file comment free of Mustache braces.
 }}
 <section class="lp-hero" data-region="local-launchpad-admin-mentors">
@@ -21,14 +21,42 @@
   <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
 {{/flash_err}}
 
+<section class="lp-card lift lp-pilot-card" style="margin-top:16px">
+  <div class="lp-card-head lp-card-head-stack">
+    <h3>{{pilot_title}}</h3>
+    <p class="lp-muted">{{pilot_lead}}</p>
+  </div>
+  <form method="post" action="{{pilot_form_action}}" class="lp-stack lp-pilot-form">
+    <input type="hidden" name="sesskey" value="{{sesskey}}">
+    <input type="hidden" name="action" value="save_pilot_capacity">
+    <div class="lp-pilot-fields">
+      <label class="lp-field">
+        <span>{{pilot_mentors_label}}</span>
+        <input type="number" name="pilot_max_mentors" min="1" step="1" required value="{{pilot_mentors_value}}">
+        <span class="lp-xs lp-muted">{{pilot_mentors_help}}</span>
+      </label>
+      <label class="lp-field">
+        <span>{{pilot_fellows_label}}</span>
+        <input type="number" name="pilot_max_fellows" min="0" step="1" required value="{{pilot_fellows_value}}">
+        <span class="lp-xs lp-muted">{{pilot_fellows_help}}</span>
+      </label>
+    </div>
+    <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm" style="align-self:flex-start">{{pilot_save_label}}</button>
+  </form>
+</section>
+
 {{#has_tracks}}
   <div class="lp-tgrid" style="margin-top:16px">
     {{#tracks}}
-      <article class="lp-tcard{{#is_highlight}} is-highlight{{/is_highlight}}" id="{{anchor_id}}">
+      <article class="lp-tcard{{#is_highlight}} is-highlight{{/is_highlight}}{{#is_over_capacity}} is-over-cap{{/is_over_capacity}}" id="{{anchor_id}}">
         <h3>{{name}}</h3>
         <p class="lp-xs lp-muted">{{idnumber}}</p>
+        {{#is_over_capacity}}
+          <p class="lp-chip is-overdue" style="margin-top:8px">{{over_capacity_label}}</p>
+        {{/is_over_capacity}}
+
         {{#has_teacher}}
-          <div class="lp-people-name" style="margin-top:4px">
+          <div class="lp-people-name" style="margin-top:8px">
             <span class="lp-av lp-av-sm tone-green" aria-hidden="true">{{teacher_initials}}</span>
             <div>
               <b>{{teacher_name}}</b>
@@ -38,22 +66,21 @@
               {{/has_more_teachers}}
             </div>
           </div>
-          <div class="lp-mentor-meta">
-            <div class="lp-mentor-meta-row">
-              <span>{{capacity_label}}</span>
-              <b>{{capacity_value}}</b>
-            </div>
-            <div class="lp-mentor-meta-row">
-              <span>{{fellows_label}}</span>
-              <b>{{fellows_value}}</b>
-            </div>
-          </div>
-          <div class="lp-tcard-actions">
-            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{assign_teacher_url}}">{{assign_moodle_label}}</a>
-          </div>
         {{/has_teacher}}
-        {{^has_teacher}}
-          <form method="post" action="{{form_action}}" class="lp-stack lp-enrol-form" style="margin-top:6px">
+
+        <div class="lp-mentor-meta">
+          <div class="lp-mentor-meta-row">
+            <span>{{capacity_label}}</span>
+            <b>{{capacity_value}}</b>
+          </div>
+          <div class="lp-mentor-meta-row">
+            <span>{{fellows_label}}</span>
+            <b>{{fellows_value}}</b>
+          </div>
+        </div>
+
+        {{#can_assign_mentor}}
+          <form method="post" action="{{form_action}}" class="lp-stack lp-enrol-form" style="margin-top:10px">
             <input type="hidden" name="sesskey" value="{{sesskey}}">
             <input type="hidden" name="action" value="assign_mentor">
             <input type="hidden" name="trackid" value="{{id}}">
@@ -63,13 +90,14 @@
             </label>
             <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm" style="align-self:flex-start">{{submit_label}}</button>
           </form>
-          <div class="lp-mentor-meta" style="margin-top:10px">
-            <div class="lp-mentor-meta-row">
-              <span>{{fellows_label}}</span>
-              <b>{{fellows_value}}</b>
-            </div>
-          </div>
-        {{/has_teacher}}
+        {{/can_assign_mentor}}
+        {{^can_assign_mentor}}
+          <p class="lp-sm lp-muted" style="margin-top:10px">{{assign_full_label}}</p>
+        {{/can_assign_mentor}}
+
+        <div class="lp-tcard-actions">
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{participants_url}}">{{participants_label}}</a>
+        </div>
       </article>
     {{/tracks}}
   </div>
