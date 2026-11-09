@@ -1,70 +1,138 @@
 {{!
     @template local_launchpad/admin_tracks
 
-    Admin Tracks and courses — HTML a-tracks card grid from live Moodle.
-    Track cards with Open in builder + Moodle course link.
+    Admin Tracks & courses — Stitch-inspired layout.
+    Navbar stays in admin_shell. Live track cards only (no reorder/sync/search/archive chrome).
 }}
-<section class="lp-hero" data-region="local-launchpad-admin-tracks">
-  <div class="lp-hero-row">
-    <div class="lp-hero-main">
-      <span class="lp-eyebrow">{{eyebrow}}</span>
-      <h2>{{heading}}</h2>
-      <p class="lp-hero-lead">{{lead}}</p>
-      <p class="lp-sm">
-        {{#category_chip_ok}}
-          <span class="lp-chip ok">{{category_chip}}</span>
-        {{/category_chip_ok}}
-        {{^category_chip_ok}}
-          <span class="lp-chip line">{{category_chip}}</span>
-        {{/category_chip_ok}}
-      </p>
-    </div>
-  </div>
-</section>
+<div class="lp-tr" data-region="local-launchpad-admin-tracks" data-lp-tracks-page>
 
-{{#has_tracks}}
-  <div class="lp-tgrid" style="margin-top:16px">
-    {{#tracks}}
-      <article class="lp-tcard">
-        <div class="lp-tcard-top">
-          {{#ready}}
-            <span class="lp-chip ok">{{ready_label}}</span>
-          {{/ready}}
-          {{^ready}}
-            <span class="lp-chip warn">{{ready_label}}</span>
-          {{/ready}}
-          <span class="lp-xs lp-muted">{{phases_shown_label}}</span>
+  <section class="lp-hero lp-tr-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+        <p class="lp-sm lp-tr-cat">
+          {{#category_chip_ok}}
+            <span class="lp-chip ok">{{category_chip}}</span>
+          {{/category_chip_ok}}
+          {{^category_chip_ok}}
+            <span class="lp-chip line">{{category_chip}}</span>
+          {{/category_chip_ok}}
+        </p>
+      </div>
+      <aside class="lp-tr-hero-stats" aria-label="{{heading}}">
+        <div class="lp-tr-hero-stat">
+          <span class="lp-tr-hero-stat-label">{{stat_tracks_label}}</span>
+          <b>{{stat_tracks_value}}</b>
         </div>
-        <h3>{{name}}</h3>
-        <p class="lp-sm lp-muted">{{capstone}}</p>
-        <div class="lp-phdots" aria-label="{{phases_shown_label}}">
-          {{#phases}}
-            <i class="{{#on}}on{{/on}}" title="{{title}}"></i>
-          {{/phases}}
+        <div class="lp-tr-hero-stat">
+          <span class="lp-tr-hero-stat-label">{{stat_ready_label}}</span>
+          <b>{{stat_ready_value}}</b>
+          <span class="lp-tr-hero-stat-sub is-ok">{{stat_ready_sub}}</span>
         </div>
-        <div class="lp-tcard-meta">
-          {{#has_teacher}}
-            <span>{{teacher_label}}</span>
-          {{/has_teacher}}
-          {{^has_teacher}}
-            <span class="lp-tcard-warn">{{teacher_label}}</span>
-          {{/has_teacher}}
-          <span>{{fellows_label}}</span>
+        <div class="lp-tr-hero-stat">
+          <span class="lp-tr-hero-stat-label">{{stat_outline_label}}</span>
+          <b>{{stat_outline_value}}</b>
+          <span class="lp-tr-hero-stat-sub is-warn">{{stat_outline_sub}}</span>
         </div>
-        <div class="lp-tcard-actions">
-          {{^has_teacher}}
-            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{assign_teacher_url}}">{{assign_teacher_label}}</a>
-          {{/has_teacher}}
-          <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{courseops_url}}">{{courseops_label}}</a>
-          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
-          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}">{{open_label}}</a>
+        <div class="lp-tr-hero-stat">
+          <span class="lp-tr-hero-stat-label">{{stat_fellows_label}}</span>
+          <b>{{stat_fellows_value}}</b>
+          <span class="lp-tr-hero-stat-sub">{{stat_fellows_sub}}</span>
         </div>
-      </article>
-    {{/tracks}}
-  </div>
-{{/has_tracks}}
-{{^has_tracks}}
-  <div style="margin-top:16px">
-    {{> local_launchpad/admin_empty}}
-  </div>
-{{/has_tracks}}
+      </aside>
+    </div>
+  </section>
+
+  {{#has_tracks}}
+    <section class="lp-tr-grid-wrap">
+      <div class="lp-tr-grid-head">
+        <div>
+          <h3>{{grid_title}}</h3>
+          <p class="lp-muted lp-sm">{{grid_lead}}</p>
+        </div>
+        <div class="lp-tr-filters" role="tablist" aria-label="{{grid_title}}">
+          <button type="button" class="lp-tr-filter is-active" data-lp-tr-filter="all" role="tab" aria-selected="true">{{filter_all_label}}</button>
+          <button type="button" class="lp-tr-filter" data-lp-tr-filter="ready" role="tab" aria-selected="false">{{filter_ready_label}}</button>
+          <button type="button" class="lp-tr-filter" data-lp-tr-filter="outline" role="tab" aria-selected="false">{{filter_outline_label}}</button>
+        </div>
+      </div>
+
+      <div class="lp-tr-grid">
+        {{#tracks}}
+          <article class="lp-tr-card{{#ready}} is-ready{{/ready}}{{^ready}} is-outline{{/ready}}{{^is_visible}} is-hidden-course{{/is_visible}}"
+            data-lp-tr-card
+            data-lp-tr-status="{{status_key}}">
+            <div class="lp-tr-card-top">
+              <span class="lp-tr-status lp-tr-status-{{status_key}}">{{ready_label}}</span>
+              <span class="lp-tr-phases-pill">{{phases_shown_label}}</span>
+            </div>
+
+            <div class="lp-tr-card-titles">
+              <h3>{{name}}</h3>
+              <div class="lp-tr-codes">
+                {{#idnumber}}<code class="lp-tr-idn">{{idnumber}}</code>{{/idnumber}}
+                {{#shortname}}<code class="lp-tr-idn">{{shortname}}</code>{{/shortname}}
+                <span class="lp-tr-vis{{#is_visible}} is-on{{/is_visible}}{{^is_visible}} is-off{{/is_visible}}">{{visibility_label}}</span>
+              </div>
+            </div>
+
+            <p class="lp-tr-capstone">{{capstone}}</p>
+
+            <div class="lp-tr-phases">
+              <span class="lp-tr-section-label">{{phases_section_label}}</span>
+              <div class="lp-tr-phdots" aria-label="{{phases_shown_label}}">
+                {{#phases}}
+                  <i class="{{#on}}on{{/on}}" title="{{title}}"></i>
+                {{/phases}}
+              </div>
+            </div>
+
+            <div class="lp-tr-meta">
+              <div class="lp-tr-meta-row">
+                <span class="lp-tr-section-label">{{mentors_section_label}}</span>
+                {{#has_teacher}}
+                  <span class="lp-tr-meta-value">{{teacher_label}}</span>
+                {{/has_teacher}}
+                {{^has_teacher}}
+                  <a class="lp-tr-assign" href="{{assign_teacher_url}}">{{assign_teacher_label}}</a>
+                {{/has_teacher}}
+              </div>
+              <div class="lp-tr-meta-row">
+                <span class="lp-tr-section-label">{{enrolled_section_label}}</span>
+                <span class="lp-tr-meta-value{{#fellows_count}} is-enrolled{{/fellows_count}}">{{fellows_label}}</span>
+              </div>
+            </div>
+
+            <div class="lp-tr-card-foot">
+              <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{courseops_url}}">{{courseops_label}}</a>
+              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
+              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}">{{open_label}}</a>
+            </div>
+          </article>
+        {{/tracks}}
+
+        <a class="lp-tr-builder-tile" href="{{builder_url}}">
+          <span class="lp-tr-builder-ico" aria-hidden="true">+</span>
+          <b>{{builder_tile_title}}</b>
+          <span class="lp-muted lp-sm">{{builder_tile_body}}</span>
+          <span class="lp-tr-builder-cta">{{builder_tile_cta}}</span>
+        </a>
+      </div>
+      <p class="lp-tr-filter-empty" data-lp-tr-empty hidden>{{filter_empty}}</p>
+    </section>
+  {{/has_tracks}}
+  {{^has_tracks}}
+    <div style="margin-top:4px">
+      {{> local_launchpad/admin_empty}}
+    </div>
+  {{/has_tracks}}
+
+  <aside class="lp-tr-footer-tip" aria-label="{{footer_tip}}">
+    <span class="lp-tr-footer-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    </span>
+    <p>{{footer_tip}}</p>
+  </aside>
+</div>

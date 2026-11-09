@@ -205,10 +205,21 @@ final class admin_dashboard {
         $firstname = format_string($user->firstname ?? '');
         $tracks = self::list_track_courses();
         $cards = [];
+        $readycount = 0;
+        $outlinecount = 0;
+        $fellowstotal = 0;
         foreach ($tracks as $course) {
-            $cards[] = self::track_card_context($course);
+            $card = self::track_card_context($course);
+            $cards[] = $card;
+            if (!empty($card['ready'])) {
+                $readycount++;
+            } else {
+                $outlinecount++;
+            }
+            $fellowstotal += (int) ($card['fellows_count'] ?? 0);
         }
 
+        $trackcount = count($cards);
         $root = self::fellowship_root_category();
         $catvisible = $root && (int) $root->visible === 1;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
@@ -224,6 +235,31 @@ final class admin_dashboard {
             'category_chip_ok' => $catvisible,
             'has_tracks' => $cards !== [],
             'tracks' => $cards,
+            // Hero summary (computed from live track cards — no fake export/sync CTAs).
+            'stat_tracks_label' => get_string('admin_tracks_stat_tracks', 'local_launchpad'),
+            'stat_tracks_value' => (string) $trackcount,
+            'stat_ready_label' => get_string('admin_tracks_stat_ready', 'local_launchpad'),
+            'stat_ready_value' => (string) $readycount,
+            'stat_ready_sub' => get_string('admin_tracks_stat_ready_sub', 'local_launchpad'),
+            'stat_outline_label' => get_string('admin_tracks_stat_outline', 'local_launchpad'),
+            'stat_outline_value' => (string) $outlinecount,
+            'stat_outline_sub' => get_string('admin_tracks_stat_outline_sub', 'local_launchpad'),
+            'stat_fellows_label' => get_string('admin_tracks_stat_fellows', 'local_launchpad'),
+            'stat_fellows_value' => (string) $fellowstotal,
+            'stat_fellows_sub' => get_string('admin_tracks_stat_fellows_sub', 'local_launchpad'),
+            // Grid filters (client-side; counts are real).
+            'grid_title' => get_string('admin_tracks_grid_title', 'local_launchpad'),
+            'grid_lead' => get_string('admin_tracks_grid_lead', 'local_launchpad'),
+            'filter_all_label' => get_string('admin_tracks_filter_all', 'local_launchpad', $trackcount),
+            'filter_ready_label' => get_string('admin_tracks_filter_ready', 'local_launchpad', $readycount),
+            'filter_outline_label' => get_string('admin_tracks_filter_outline', 'local_launchpad', $outlinecount),
+            'filter_empty' => get_string('admin_tracks_filter_empty', 'local_launchpad'),
+            // Builder CTA tile (real Course builder link — not a fake create-track flow).
+            'builder_tile_title' => get_string('admin_tracks_builder_tile_title', 'local_launchpad'),
+            'builder_tile_body' => get_string('admin_tracks_builder_tile_body', 'local_launchpad'),
+            'builder_tile_cta' => get_string('admin_tracks_builder_tile_cta', 'local_launchpad'),
+            'builder_url' => $builderurl,
+            'footer_tip' => get_string('admin_tracks_footer_tip', 'local_launchpad'),
         ], self::empty_state(
             'admin_tracks_empty',
             'admin_empty_title_no_tracks',
@@ -5265,26 +5301,41 @@ final class admin_dashboard {
         $teachers = self::teacher_names($courseid);
         $fellows = self::fellow_count($courseid);
         $capstone = self::capstone_line($course);
+        $isvisible = (int) ($course->visible ?? 0) === 1;
+        $idnumber = trim((string) ($course->idnumber ?? ''));
+        $shortname = trim((string) ($course->shortname ?? ''));
+        // Prefer idnumber; show shortname only when it adds information.
+        $showshortname = $shortname !== '' && strcasecmp($shortname, $idnumber) !== 0;
 
         return [
             'id' => $courseid,
             'name' => format_string($course->fullname),
-            'idnumber' => s($course->idnumber),
+            'idnumber' => $idnumber !== '' ? s($idnumber) : '',
+            'shortname' => $showshortname ? s($shortname) : '',
             'ready' => $foundationsready,
+            'status_key' => $foundationsready ? 'ready' : 'outline',
             'ready_label' => $foundationsready
                 ? get_string('admin_tracks_foundations_ready', 'local_launchpad')
                 : get_string('admin_tracks_outline_only', 'local_launchpad'),
+            'is_visible' => $isvisible,
+            'visibility_label' => $isvisible
+                ? get_string('admin_tracks_course_visible', 'local_launchpad')
+                : get_string('admin_tracks_course_hidden', 'local_launchpad'),
             'phases_shown_label' => get_string(
                 'admin_tracks_phases_shown',
                 'local_launchpad',
                 (object) ['shown' => $shown, 'total' => 4]
             ),
+            'phases_section_label' => get_string('admin_tracks_phases_section', 'local_launchpad'),
             'capstone' => $capstone,
             'phases' => $phases,
+            'mentors_section_label' => get_string('admin_tracks_mentors_section', 'local_launchpad'),
+            'enrolled_section_label' => get_string('admin_tracks_enrolled_section', 'local_launchpad'),
             'has_teacher' => $teachers !== [],
             'teacher_label' => $teachers !== []
                 ? implode(', ', $teachers)
                 : get_string('admin_tracks_no_teacher', 'local_launchpad'),
+            'fellows_count' => $fellows,
             'fellows_label' => get_string('admin_tracks_fellows', 'local_launchpad', $fellows),
             'course_url' => (new \moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
             'open_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
