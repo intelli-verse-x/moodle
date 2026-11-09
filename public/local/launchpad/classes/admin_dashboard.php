@@ -2131,7 +2131,16 @@ final class admin_dashboard {
         $duplicatelabel = get_string('admin_manage_duplicate', 'local_launchpad');
         $renamelabel = get_string('admin_manage_rename', 'local_launchpad');
         $draghandlelabel = get_string('admin_manage_drag_handle', 'local_launchpad');
+        $activitycount = count($activities);
+        $draftcount = 0;
+        $showncount = 0;
         foreach ($activities as &$act) {
+            $modname = (string) ($act['modname'] ?? '');
+            $kindkey = $modname === 'resource' ? 'file' : $modname;
+            if ($kindkey === '') {
+                $kindkey = 'page';
+            }
+            $act['kind_key'] = $kindkey;
             $act['form_action'] = $formaction;
             $act['sesskey'] = $sesskey;
             $act['trackid'] = $trackid;
@@ -2152,14 +2161,35 @@ final class admin_dashboard {
                 'cmid' => (int) $act['cmid'],
             ]))->out(false);
             $act['open_label'] = get_string('admin_manage_open', 'local_launchpad');
+            if (!empty($act['is_draft'])) {
+                $draftcount++;
+            }
+            if ($sectionvisible && !empty($act['cm_visible']) && empty($act['is_draft'])) {
+                $showncount++;
+            }
         }
         unset($act);
 
+        $quickletters = [
+            'page' => 'P',
+            'resource' => 'F',
+            'quiz' => 'Q',
+            'assign' => 'A',
+        ];
+        $quicklabels = [
+            'page' => get_string('admin_manage_quick_page', 'local_launchpad'),
+            'resource' => get_string('admin_manage_quick_file', 'local_launchpad'),
+            'quiz' => get_string('admin_manage_quick_quiz', 'local_launchpad'),
+            'assign' => get_string('admin_manage_quick_assign', 'local_launchpad'),
+        ];
         $addtypes = [];
         foreach (['page', 'resource', 'quiz', 'assign'] as $mod) {
             $addtypes[] = [
                 'mod' => $mod,
                 'label' => self::builder_mod_kind($mod),
+                'kind_key' => $mod === 'resource' ? 'file' : $mod,
+                'letter' => $quickletters[$mod],
+                'quick_label' => $quicklabels[$mod],
                 'form_action' => $formaction,
                 'sesskey' => $sesskey,
                 'trackid' => $trackid,
@@ -2181,23 +2211,35 @@ final class admin_dashboard {
             ];
         }
 
+        $tracklabel = self::builder_track_tab_label($course);
+        $hasdraftqueue = $draftcount > 0;
+
         return [
             'has_course' => true,
             'eyebrow' => get_string('admin_manage_eyebrow', 'local_launchpad'),
+            'page_heading' => get_string('admin_manage_page_heading', 'local_launchpad'),
             'heading' => $phasetitle,
-            'lead' => get_string('admin_manage_lead', 'local_launchpad'),
+            'lead' => get_string('admin_manage_hero_lead', 'local_launchpad'),
+            'safe_chip' => get_string('admin_manage_safe_chip', 'local_launchpad'),
             'track_name' => format_string($course->fullname),
-            'track_tab_label' => self::builder_track_tab_label($course),
+            'track_tab_label' => $tracklabel,
             'section_state' => $sectionvisible
                 ? get_string('admin_builder_section_shown', 'local_launchpad')
                 : get_string('admin_builder_section_hidden', 'local_launchpad'),
+            'section_state_label' => $sectionvisible
+                ? get_string('admin_manage_section_visible', 'local_launchpad')
+                : get_string('admin_manage_section_hidden', 'local_launchpad'),
             'section_shown' => $sectionvisible,
+            'sectionnum' => $sectionnum,
             'activities' => $activities,
             'has_activities' => $activities !== [],
             'empty_acts' => get_string('admin_builder_no_activities', 'local_launchpad'),
             'phase_links' => $phaselinks,
+            'phases_label' => get_string('admin_manage_phases_label', 'local_launchpad'),
+            'phase_count_label' => get_string('admin_manage_phase_count', 'local_launchpad', $activitycount),
             'add_types' => $addtypes,
             'add_label' => get_string('admin_builder_add', 'local_launchpad'),
+            'add_activity_label' => get_string('admin_manage_add_activity', 'local_launchpad'),
             'add_chooser_title' => get_string('admin_manage_add_chooser', 'local_launchpad'),
             'add_name_label' => get_string('admin_manage_add_name', 'local_launchpad'),
             'add_name_placeholder' => get_string('admin_manage_add_name_placeholder', 'local_launchpad'),
@@ -2210,10 +2252,31 @@ final class admin_dashboard {
             ]))->out(false),
             'builder_label' => get_string('admin_nav_builder', 'local_launchpad'),
             'back_label' => get_string('admin_manage_back', 'local_launchpad'),
+            'preview_url' => (new \moodle_url('/course/view.php', ['id' => $trackid]))->out(false),
+            'preview_label' => get_string('admin_manage_preview_course', 'local_launchpad'),
+            'stat_track_label' => get_string('admin_manage_stat_track', 'local_launchpad'),
+            'stat_track_value' => $tracklabel,
+            'stat_activities_label' => get_string('admin_manage_stat_activities', 'local_launchpad'),
+            'stat_activities_value' => (string) $activitycount,
+            'stat_activities_sub' => get_string('admin_manage_stat_activities_sub', 'local_launchpad'),
+            'stat_shown_label' => get_string('admin_manage_stat_shown', 'local_launchpad'),
+            'stat_shown_value' => (string) $showncount,
+            'stat_shown_sub' => get_string('admin_manage_stat_shown_sub', 'local_launchpad'),
+            'stat_draft_label' => get_string('admin_manage_stat_draft', 'local_launchpad'),
+            'stat_draft_value' => (string) $draftcount,
+            'stat_draft_sub' => $hasdraftqueue
+                ? get_string('admin_manage_stat_draft_sub', 'local_launchpad')
+                : get_string('admin_manage_stat_draft_none', 'local_launchpad'),
+            'has_draft_queue' => $hasdraftqueue,
+            'quick_title' => get_string('admin_manage_quick_title', 'local_launchpad'),
+            'safety_title' => get_string('admin_manage_safety_title', 'local_launchpad'),
+            'safety_body' => get_string('admin_manage_safety_body', 'local_launchpad'),
+            'safety_draft' => get_string('admin_manage_safety_draft', 'local_launchpad'),
+            'safety_ready' => get_string('admin_manage_safety_ready', 'local_launchpad'),
+            'safety_shown' => get_string('admin_manage_safety_shown', 'local_launchpad'),
             'form_action' => $formaction,
             'sesskey' => $sesskey,
             'trackid' => $trackid,
-            'sectionnum' => $sectionnum,
             'reorder_hint' => get_string('admin_manage_reorder_hint', 'local_launchpad'),
             'save_order_label' => get_string('admin_manage_save_order', 'local_launchpad'),
             'cancel_order_label' => get_string('admin_manage_cancel_order', 'local_launchpad'),
@@ -3519,10 +3582,18 @@ final class admin_dashboard {
                 $hasfile = !empty($filesummary['has_file']);
                 $filestatus = (string) $filesummary['file_status_label'];
             }
+            $kindkey = match ($modname) {
+                'page' => 'page',
+                'resource' => 'file',
+                'quiz' => 'quiz',
+                'assign' => 'assign',
+                default => 'other',
+            };
             $out[] = [
                 'cmid' => $cmid,
                 'modname' => $modname,
                 'kind' => self::builder_mod_kind($modname),
+                'kind_key' => $kindkey,
                 'title' => format_string($instancename !== '' ? $instancename : $modname),
                 'name_raw' => $instancename !== '' ? $instancename : $modname,
                 'state' => $state,

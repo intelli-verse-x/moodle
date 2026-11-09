@@ -2131,7 +2131,7 @@
         }
         var toggle = root.querySelector('[data-lp-manage-edit-toggle]');
         var chooser = root.querySelector('[data-lp-manage-chooser]');
-        var addOpen = root.querySelector('[data-lp-manage-add-open]');
+        var addOpenButtons = root.querySelectorAll('[data-lp-manage-add-open]');
         var editOnly = root.querySelectorAll('.lp-manage-edit-only');
         var actlist = root.querySelector('[data-lp-manage-actlist]');
         var reorderForm = root.querySelector('[data-lp-manage-reorder]');
@@ -2261,11 +2261,19 @@
                 setEdit(!root.classList.contains('is-editing'));
             });
         }
-        if (addOpen && chooser) {
+        addOpenButtons.forEach(function (addOpen) {
             addOpen.addEventListener('click', function () {
-                chooser.hidden = !chooser.hidden;
+                setEdit(true);
+                if (chooser) {
+                    chooser.hidden = false;
+                    try {
+                        chooser.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } catch (err) {
+                        // Older browsers may lack smooth scroll; ignore.
+                    }
+                }
             });
-        }
+        });
         if (cancelBtn) {
             cancelBtn.addEventListener('click', function () {
                 restoreOrder();

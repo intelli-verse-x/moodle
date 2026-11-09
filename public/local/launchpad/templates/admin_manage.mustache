@@ -1,7 +1,8 @@
 {{!
     @template local_launchpad/admin_manage
 
-    Admin phase manage — LaunchPad shell over Moodle section activities.
+    Admin phase manage - Stitch-inspired Course builder layout.
+    Navbar stays in admin_shell. Single phase + Quick Insert only (no Track Inspector / CLI Sync).
     Edit mode toggles manage controls client-side. Keep comments free of Mustache braces.
 }}
 <div class="lp-manage" data-lp-manage data-region="local-launchpad-admin-manage">
@@ -13,15 +14,22 @@
     <span>{{heading}}</span>
   </nav>
 
-  <section class="lp-hero" style="margin-top:8px">
-    <div class="lp-hero-row">
+  <section class="lp-hero lp-manage-hero">
+    <div class="lp-manage-hero-top">
       <div class="lp-hero-main">
-        <span class="lp-eyebrow">{{eyebrow}}</span>
-        <h2>{{heading}}</h2>
+        <div class="lp-manage-hero-meta">
+          <span class="lp-eyebrow lp-manage-eyebrow">{{eyebrow}}</span>
+          <span class="lp-manage-safe-chip">
+            <span class="lp-manage-safe-dot" aria-hidden="true"></span>
+            {{safe_chip}}
+          </span>
+        </div>
+        <h2>{{page_heading}}</h2>
         <p class="lp-hero-lead">{{lead}}</p>
-        <p class="lp-sm lp-muted" style="margin:0">{{track_name}} · {{section_state}}</p>
       </div>
       <div class="lp-manage-toolbar">
+        <a class="lp-btn lp-btn-sm lp-manage-btn-ghost" href="{{preview_url}}">{{preview_label}}</a>
+        <a class="lp-btn lp-btn-sm lp-manage-btn-ghost" href="{{builder_url}}">{{back_label}}</a>
         <button type="button"
                 class="lp-btn lp-btn-light lp-btn-sm"
                 data-lp-manage-edit-toggle
@@ -30,7 +38,30 @@
                 aria-pressed="false">
           {{edit_mode_off_label}}
         </button>
-        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{back_label}}</a>
+        <button type="button" class="lp-btn lp-btn-sm lp-manage-btn-solid" data-lp-manage-add-open>
+          {{add_activity_label}}
+        </button>
+      </div>
+    </div>
+    <div class="lp-manage-hero-stats" aria-label="{{page_heading}}">
+      <div class="lp-manage-hero-stat">
+        <span class="lp-manage-hero-stat-label">{{stat_track_label}}</span>
+        <b>{{stat_track_value}}</b>
+      </div>
+      <div class="lp-manage-hero-stat">
+        <span class="lp-manage-hero-stat-label">{{stat_activities_label}}</span>
+        <b>{{stat_activities_value}}</b>
+        <span class="lp-manage-hero-stat-sub">{{stat_activities_sub}}</span>
+      </div>
+      <div class="lp-manage-hero-stat">
+        <span class="lp-manage-hero-stat-label">{{stat_shown_label}}</span>
+        <b>{{stat_shown_value}}</b>
+        <span class="lp-manage-hero-stat-sub">{{stat_shown_sub}}</span>
+      </div>
+      <div class="lp-manage-hero-stat{{#has_draft_queue}} is-warn{{/has_draft_queue}}">
+        <span class="lp-manage-hero-stat-label">{{stat_draft_label}}</span>
+        <b>{{stat_draft_value}}</b>
+        <span class="lp-manage-hero-stat-sub{{#has_draft_queue}} is-warn{{/has_draft_queue}}">{{stat_draft_sub}}</span>
       </div>
     </div>
   </section>
@@ -43,150 +74,203 @@
   {{/flash_err}}
 
   {{^has_course}}
-    <div style="margin-top:16px">
+    <div class="lp-manage-empty">
       {{> local_launchpad/admin_empty}}
     </div>
   {{/has_course}}
 
   {{#has_course}}
-    <div class="lp-tabs lp-tabs-block" role="tablist" aria-label="{{eyebrow}}" style="margin-top:16px">
+    <div class="lp-manage-phases" role="tablist" aria-label="{{phases_label}}">
       {{#phase_links}}
-        <a class="lp-tab{{#current}} is-on{{/current}}"
+        <a class="lp-manage-phase{{#current}} is-on{{/current}}"
            href="{{url}}"
            role="tab"
            aria-selected="{{#current}}true{{/current}}{{^current}}false{{/current}}">
-          {{title}}
+          <span class="lp-manage-phase-num" aria-hidden="true">{{sectionnum}}</span>
+          <span class="lp-manage-phase-title">{{title}}</span>
         </a>
       {{/phase_links}}
     </div>
 
-    <div class="lp-card lift" style="margin-top:16px">
-      <div class="lp-row-sb" style="margin-bottom:12px">
-        <h3 style="margin:0">{{heading}}</h3>
-        <div class="lp-manage-edit-only" hidden>
-          <button type="button" class="lp-btn lp-btn-solid lp-btn-sm" data-lp-manage-add-open>{{add_label}}</button>
-        </div>
-      </div>
-
-      <div class="lp-manage-chooser" data-lp-manage-chooser hidden>
-        <p class="lp-sm" style="margin:0 0 8px"><b>{{add_chooser_title}}</b></p>
-        <form method="post" action="{{form_action}}" class="lp-stack" style="gap:10px">
-          <input type="hidden" name="sesskey" value="{{sesskey}}">
-          <input type="hidden" name="action" value="add_activity">
-          <input type="hidden" name="trackid" value="{{trackid}}">
-          <input type="hidden" name="sectionnum" value="{{sectionnum}}">
-          <label class="lp-field">
-            <span>{{add_name_label}}</span>
-            <input type="text" name="name" maxlength="255" placeholder="{{add_name_placeholder}}" autocomplete="off">
-          </label>
-          <div class="lp-manage-add-grid">
-            {{#add_types}}
-              <button type="submit" class="lp-btn lp-btn-light lp-btn-sm" name="mod" value="{{mod}}">{{label}}</button>
-            {{/add_types}}
-          </div>
-        </form>
-      </div>
-
-      {{#has_activities}}
-        <form method="post" action="{{form_action}}" class="lp-manage-reorder-form" data-lp-manage-reorder>
-          <input type="hidden" name="sesskey" value="{{sesskey}}">
-          <input type="hidden" name="action" value="reorder_cm">
-          <input type="hidden" name="trackid" value="{{trackid}}">
-          <input type="hidden" name="section" value="{{sectionnum}}">
-          <input type="hidden" name="cmordercsv" value="" data-lp-reorder-csv>
-          <div class="lp-manage-edit-only lp-manage-reorder-bar" hidden data-lp-reorder-bar>
-            <p class="lp-sm lp-muted lp-manage-reorder-hint">{{reorder_hint}}</p>
-            <div class="lp-manage-reorder-actions">
-              <button type="button" class="lp-btn lp-btn-light lp-btn-sm" data-lp-reorder-cancel disabled>{{cancel_order_label}}</button>
-              <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm" data-lp-reorder-save disabled>{{save_order_label}}</button>
-            </div>
-          </div>
-          <div data-lp-reorder-inputs></div>
-        </form>
-        <div class="lp-actlist" data-lp-manage-actlist>
-          {{#activities}}
-            <div class="lp-actrow{{#cm_hidden}} is-cm-hidden{{/cm_hidden}}" id="cm-{{cmid}}" data-lp-manage-row data-cmid="{{cmid}}">
-              <button type="button"
-                      class="lp-manage-drag lp-manage-edit-only"
-                      hidden
-                      draggable="true"
-                      data-lp-manage-drag
-                      title="{{drag_handle_label}}"
-                      aria-label="{{drag_handle_label}}">⋮⋮</button>
-              <span class="lp-kd">{{kind}}</span>
-              <span class="lp-act-title">{{title}}</span>
-              <span class="lp-chip {{state_chip}}">{{state_label}}</span>
-              {{#is_resource}}
-                <span class="lp-chip{{#file_missing}} line{{/file_missing}}{{#has_file}} ok{{/has_file}}" title="{{file_status_label}}">{{file_status_label}}</span>
-              {{/is_resource}}
-              {{#cm_hidden}}
-                <span class="lp-chip line">{{hidden_badge}}</span>
-              {{/cm_hidden}}
-              <div class="lp-manage-edit-only" hidden>
-                <div class="lp-manage-row-actions">
-                  <a class="lp-btn lp-btn-light lp-btn-sm" href="{{settings_url}}">{{settings_label}}</a>
-                  <form method="post" action="{{form_action}}" class="lp-inline-form">
-                    <input type="hidden" name="sesskey" value="{{sesskey}}">
-                    <input type="hidden" name="action" value="duplicate_cm">
-                    <input type="hidden" name="trackid" value="{{trackid}}">
-                    <input type="hidden" name="cmid" value="{{cmid}}">
-                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{duplicate_label}}</button>
-                  </form>
-                  {{#cm_visible}}
-                    <form method="post" action="{{form_action}}" class="lp-inline-form">
-                      <input type="hidden" name="sesskey" value="{{sesskey}}">
-                      <input type="hidden" name="action" value="toggle_cm">
-                      <input type="hidden" name="trackid" value="{{trackid}}">
-                      <input type="hidden" name="cmid" value="{{cmid}}">
-                      <input type="hidden" name="show" value="0">
-                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
-                    </form>
-                  {{/cm_visible}}
-                  {{#cm_hidden}}
-                    <form method="post" action="{{form_action}}" class="lp-inline-form">
-                      <input type="hidden" name="sesskey" value="{{sesskey}}">
-                      <input type="hidden" name="action" value="toggle_cm">
-                      <input type="hidden" name="trackid" value="{{trackid}}">
-                      <input type="hidden" name="cmid" value="{{cmid}}">
-                      <input type="hidden" name="show" value="1">
-                      <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_cm_label}}</button>
-                    </form>
-                  {{/cm_hidden}}
-                  {{#is_draft}}
-                    <form method="post" action="{{form_action}}" class="lp-inline-form">
-                      <input type="hidden" name="sesskey" value="{{sesskey}}">
-                      <input type="hidden" name="action" value="mark_reviewed">
-                      <input type="hidden" name="trackid" value="{{trackid}}">
-                      <input type="hidden" name="cmid" value="{{cmid}}">
-                      <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
-                    </form>
-                  {{/is_draft}}
-                  <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{delete_confirm}}">
-                    <input type="hidden" name="sesskey" value="{{sesskey}}">
-                    <input type="hidden" name="action" value="delete_cm">
-                    <input type="hidden" name="trackid" value="{{trackid}}">
-                    <input type="hidden" name="cmid" value="{{cmid}}">
-                    <input type="hidden" name="section" value="{{sectionnum}}">
-                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{delete_label}}</button>
-                  </form>
-                </div>
-                <form method="post" action="{{form_action}}" class="lp-manage-rename">
-                  <input type="hidden" name="sesskey" value="{{sesskey}}">
-                  <input type="hidden" name="action" value="rename_cm">
-                  <input type="hidden" name="trackid" value="{{trackid}}">
-                  <input type="hidden" name="cmid" value="{{cmid}}">
-                  <label class="lp-sr-only" for="lp-rename-{{cmid}}">{{rename_label}}</label>
-                  <input id="lp-rename-{{cmid}}" type="text" name="name" maxlength="255" value="{{name_raw}}" required autocomplete="off">
-                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{rename_label}}</button>
-                </form>
+    <div class="lp-manage-workspace">
+      <div class="lp-manage-main">
+        <section class="lp-manage-phase-card">
+          <div class="lp-manage-phase-head">
+            <div class="lp-manage-phase-identity">
+              <span class="lp-manage-phase-badge" aria-hidden="true">{{sectionnum}}</span>
+              <div>
+                <h3>{{heading}}</h3>
+                <p class="lp-muted lp-sm">
+                  <span class="lp-manage-phase-state{{#section_shown}} is-shown{{/section_shown}}{{^section_shown}} is-hidden{{/section_shown}}">{{section_state_label}}</span>
+                  <span aria-hidden="true">·</span>
+                  {{phase_count_label}}
+                </p>
               </div>
             </div>
-          {{/activities}}
-        </div>
-      {{/has_activities}}
-      {{^has_activities}}
-        <p class="lp-muted lp-sm" style="margin:0">{{empty_acts}}</p>
-      {{/has_activities}}
+            <div class="lp-manage-phase-actions">
+              <div class="lp-manage-edit-only" hidden>
+                <button type="button" class="lp-btn lp-btn-solid lp-btn-sm" data-lp-manage-add-open>{{add_label}}</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lp-manage-chooser" data-lp-manage-chooser hidden>
+            <p class="lp-sm" style="margin:0 0 8px"><b>{{add_chooser_title}}</b></p>
+            <form method="post" action="{{form_action}}" class="lp-stack" style="gap:10px">
+              <input type="hidden" name="sesskey" value="{{sesskey}}">
+              <input type="hidden" name="action" value="add_activity">
+              <input type="hidden" name="trackid" value="{{trackid}}">
+              <input type="hidden" name="sectionnum" value="{{sectionnum}}">
+              <label class="lp-field">
+                <span>{{add_name_label}}</span>
+                <input type="text" name="name" maxlength="255" placeholder="{{add_name_placeholder}}" autocomplete="off">
+              </label>
+              <div class="lp-manage-add-grid">
+                {{#add_types}}
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm" name="mod" value="{{mod}}">{{label}}</button>
+                {{/add_types}}
+              </div>
+            </form>
+          </div>
+
+          {{#has_activities}}
+            <form method="post" action="{{form_action}}" class="lp-manage-reorder-form" data-lp-manage-reorder>
+              <input type="hidden" name="sesskey" value="{{sesskey}}">
+              <input type="hidden" name="action" value="reorder_cm">
+              <input type="hidden" name="trackid" value="{{trackid}}">
+              <input type="hidden" name="section" value="{{sectionnum}}">
+              <input type="hidden" name="cmordercsv" value="" data-lp-reorder-csv>
+              <div class="lp-manage-edit-only lp-manage-reorder-bar" hidden data-lp-reorder-bar>
+                <p class="lp-sm lp-muted lp-manage-reorder-hint">{{reorder_hint}}</p>
+                <div class="lp-manage-reorder-actions">
+                  <button type="button" class="lp-btn lp-btn-light lp-btn-sm" data-lp-reorder-cancel disabled>{{cancel_order_label}}</button>
+                  <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm" data-lp-reorder-save disabled>{{save_order_label}}</button>
+                </div>
+              </div>
+              <div data-lp-reorder-inputs></div>
+            </form>
+            <div class="lp-actlist lp-manage-actlist" data-lp-manage-actlist>
+              {{#activities}}
+                <div class="lp-actrow lp-manage-row{{#cm_hidden}} is-cm-hidden{{/cm_hidden}}" id="cm-{{cmid}}" data-lp-manage-row data-cmid="{{cmid}}">
+                  <button type="button"
+                          class="lp-manage-drag lp-manage-edit-only"
+                          hidden
+                          draggable="true"
+                          data-lp-manage-drag
+                          title="{{drag_handle_label}}"
+                          aria-label="{{drag_handle_label}}">⋮⋮</button>
+                  <div class="lp-manage-row-body">
+                    <div class="lp-manage-row-main">
+                      <span class="lp-manage-row-title">{{title}}</span>
+                      <span class="lp-manage-kd is-{{kind_key}}">{{kind}}</span>
+                      {{#is_resource}}
+                        <span class="lp-manage-file-meta{{#file_missing}} is-missing{{/file_missing}}{{#has_file}} is-ok{{/has_file}}" title="{{file_status_label}}">{{file_status_label}}</span>
+                      {{/is_resource}}
+                      {{#cm_hidden}}
+                        <span class="lp-chip line">{{hidden_badge}}</span>
+                      {{/cm_hidden}}
+                    </div>
+                    <div class="lp-manage-row-end">
+                      <span class="lp-chip {{state_chip}}">{{state_label}}</span>
+                      <a class="lp-btn lp-btn-light lp-btn-sm" href="{{settings_url}}">{{settings_label}}</a>
+                    </div>
+                  </div>
+                  <div class="lp-manage-edit-only" hidden>
+                    <div class="lp-manage-row-actions">
+                      <form method="post" action="{{form_action}}" class="lp-inline-form">
+                        <input type="hidden" name="sesskey" value="{{sesskey}}">
+                        <input type="hidden" name="action" value="duplicate_cm">
+                        <input type="hidden" name="trackid" value="{{trackid}}">
+                        <input type="hidden" name="cmid" value="{{cmid}}">
+                        <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{duplicate_label}}</button>
+                      </form>
+                      {{#cm_visible}}
+                        <form method="post" action="{{form_action}}" class="lp-inline-form">
+                          <input type="hidden" name="sesskey" value="{{sesskey}}">
+                          <input type="hidden" name="action" value="toggle_cm">
+                          <input type="hidden" name="trackid" value="{{trackid}}">
+                          <input type="hidden" name="cmid" value="{{cmid}}">
+                          <input type="hidden" name="show" value="0">
+                          <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
+                        </form>
+                      {{/cm_visible}}
+                      {{#cm_hidden}}
+                        <form method="post" action="{{form_action}}" class="lp-inline-form">
+                          <input type="hidden" name="sesskey" value="{{sesskey}}">
+                          <input type="hidden" name="action" value="toggle_cm">
+                          <input type="hidden" name="trackid" value="{{trackid}}">
+                          <input type="hidden" name="cmid" value="{{cmid}}">
+                          <input type="hidden" name="show" value="1">
+                          <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_cm_label}}</button>
+                        </form>
+                      {{/cm_hidden}}
+                      {{#is_draft}}
+                        <form method="post" action="{{form_action}}" class="lp-inline-form">
+                          <input type="hidden" name="sesskey" value="{{sesskey}}">
+                          <input type="hidden" name="action" value="mark_reviewed">
+                          <input type="hidden" name="trackid" value="{{trackid}}">
+                          <input type="hidden" name="cmid" value="{{cmid}}">
+                          <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
+                        </form>
+                      {{/is_draft}}
+                      <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{delete_confirm}}">
+                        <input type="hidden" name="sesskey" value="{{sesskey}}">
+                        <input type="hidden" name="action" value="delete_cm">
+                        <input type="hidden" name="trackid" value="{{trackid}}">
+                        <input type="hidden" name="cmid" value="{{cmid}}">
+                        <input type="hidden" name="section" value="{{sectionnum}}">
+                        <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{delete_label}}</button>
+                      </form>
+                    </div>
+                    <form method="post" action="{{form_action}}" class="lp-manage-rename">
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="rename_cm">
+                      <input type="hidden" name="trackid" value="{{trackid}}">
+                      <input type="hidden" name="cmid" value="{{cmid}}">
+                      <label class="lp-sr-only" for="lp-rename-{{cmid}}">{{rename_label}}</label>
+                      <input id="lp-rename-{{cmid}}" type="text" name="name" maxlength="255" value="{{name_raw}}" required autocomplete="off">
+                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{rename_label}}</button>
+                    </form>
+                  </div>
+                </div>
+              {{/activities}}
+            </div>
+          {{/has_activities}}
+          {{^has_activities}}
+            <p class="lp-muted lp-sm lp-manage-empty-acts">{{empty_acts}}</p>
+          {{/has_activities}}
+        </section>
+      </div>
+
+      <aside class="lp-manage-rail" aria-label="{{quick_title}}">
+        <section class="lp-manage-quick">
+          <h3 class="lp-manage-rail-title">{{quick_title}}</h3>
+          <form method="post" action="{{form_action}}" class="lp-manage-quick-grid">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="action" value="add_activity">
+            <input type="hidden" name="trackid" value="{{trackid}}">
+            <input type="hidden" name="sectionnum" value="{{sectionnum}}">
+            {{#add_types}}
+              <button type="submit" class="lp-manage-quick-btn is-{{kind_key}}" name="mod" value="{{mod}}">
+                <span class="lp-manage-quick-letter" aria-hidden="true">{{letter}}</span>
+                <span>{{quick_label}}</span>
+              </button>
+            {{/add_types}}
+          </form>
+        </section>
+
+        <section class="lp-manage-safety">
+          <h3 class="lp-manage-rail-title">{{safety_title}}</h3>
+          <div class="lp-manage-safety-flow" aria-hidden="true">
+            <span class="lp-manage-safety-chip is-draft">{{safety_draft}}</span>
+            <span class="lp-manage-safety-arrow">→</span>
+            <span class="lp-manage-safety-chip is-ready">{{safety_ready}}</span>
+            <span class="lp-manage-safety-arrow">→</span>
+            <span class="lp-manage-safety-chip is-shown">{{safety_shown}}</span>
+          </div>
+          <p class="lp-sm lp-muted">{{safety_body}}</p>
+        </section>
+      </aside>
     </div>
   {{/has_course}}
 </div>
