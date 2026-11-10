@@ -1603,6 +1603,17 @@ final class messaging {
 
         $existing = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER);
         if ($existing) {
+            // Track chat must be ALL-visible so admin/CLI sync and groups_get_members work.
+            // MEMBERS visibility hides roster from non-members and breaks enable/sync.
+            if ((int) ($existing->visibility ?? -1) !== GROUPS_VISIBILITY_ALL) {
+                $existing->visibility = GROUPS_VISIBILITY_ALL;
+                try {
+                    groups_update_group($existing);
+                } catch (\Throwable $e) {
+                    // Soft-fail — still return the group for callers.
+                }
+                $existing = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER) ?: $existing;
+            }
             return $existing;
         }
 
@@ -1621,7 +1632,8 @@ final class messaging {
             ? get_string('admin_track_chat_group_desc', 'local_launchpad')
             : 'LaunchPad track group chat for fellows and mentors on this course.';
         $data->descriptionformat = FORMAT_HTML;
-        $data->visibility = GROUPS_VISIBILITY_MEMBERS;
+        // ALL: roster visible for sync/messaging; MEMBERS breaks groups_is_member for admins.
+        $data->visibility = GROUPS_VISIBILITY_ALL;
         $data->participation = 1;
 
         try {
@@ -1649,19 +1661,15 @@ final class messaging {
             ? get_string('fellowship_messages_group_empty_title', 'local_launchpad')
             : 'No group chats';
 
-        $courses = $portal === 'mentor'
-            ? persona_home::list_mentor_courses($userid)
-            : fellowship_dashboard::list_courses($userid);
+        // Include hidden tracks — fellowship list_courses hides visible=0, but messaging still applies.
+        $courseids = self::user_track_courseids_for_messages($userid, $portal);
 
         $sawon = false;
         $sawdisabled = false;
         $sawoff = false;
         $sawsiteoff = false;
-        foreach ($courses as $course) {
-            if (fellowship_dashboard::is_orientation_course($course)) {
-                continue;
-            }
-            $status = self::get_track_chat_status((int) ($course->id ?? 0));
+        foreach ($courseids as $courseid) {
+            $status = self::get_track_chat_status($courseid);
             switch ((string) ($status['status_key'] ?? 'off')) {
                 case 'on':
                     $sawon = true;
@@ -1697,6 +1705,60 @@ final class messaging {
         }
 
         return ['title' => $title, 'body' => $body];
+    }
+
+    /**
+     * LaunchPad track course ids for a user (fellow student / mentor teacher), including hidden courses.
+     * Skips orientation. Used for Group-tab empty copy.
+     *
+     * @return list<int>
+     */
+    public static function user_track_courseids_for_messages(int $userid, string $portal = 'fellow'): array {
+        global $CFG, $DB;
+
+        if ($userid <= 0) {
+            return [];
+        }
+
+        if ($portal === 'mentor') {
+            $ids = [];
+            foreach (persona_home::list_mentor_courses($userid) as $course) {
+                if (fellowship_dashboard::is_orientation_course($course)) {
+                    continue;
+                }
+                $ids[] = (int) $course->id;
+            }
+            return $ids;
+        }
+
+        require_once($CFG->libdir . '/enrollib.php');
+        $sql = "SELECT DISTINCT c.id, c.idnumber
+                  FROM {user_enrolments} ue
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                  JOIN {course} c ON c.id = e.courseid
+                  JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = :ctxlevel
+                  JOIN {role_assignments} ra ON ra.contextid = ctx.id AND ra.userid = ue.userid
+                  JOIN {role} r ON r.id = ra.roleid AND r.archetype = :arch
+                 WHERE ue.userid = :userid
+                   AND ue.status = :uestatus
+                   AND e.status = :estatus
+                   AND " . $DB->sql_like('c.idnumber', ':idn', false);
+        $rows = $DB->get_records_sql($sql, [
+            'userid' => $userid,
+            'uestatus' => ENROL_USER_ACTIVE,
+            'estatus' => ENROL_INSTANCE_ENABLED,
+            'ctxlevel' => CONTEXT_COURSE,
+            'arch' => 'student',
+            'idn' => $DB->sql_like_escape(account_persona::COURSE_IDNUMBER_PREFIX) . '%',
+        ]);
+        $ids = [];
+        foreach ($rows as $row) {
+            if (account_provision::is_orientation_idnumber((string) ($row->idnumber ?? ''))) {
+                continue;
+            }
+            $ids[] = (int) $row->id;
+        }
+        return $ids;
     }
 
     /**
