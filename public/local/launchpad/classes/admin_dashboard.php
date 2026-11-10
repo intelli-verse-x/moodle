@@ -647,6 +647,15 @@ final class admin_dashboard {
             'trackid' => $trackid,
         ]))->out(false);
 
+        $chat = messaging::get_track_chat_status($trackid);
+        $statuskey = (string) ($chat['status_key'] ?? 'off');
+        $statuslabel = match ($statuskey) {
+            'on' => get_string('admin_track_chat_status_on', 'local_launchpad'),
+            'disabled' => get_string('admin_track_chat_status_disabled', 'local_launchpad'),
+            'site_off' => get_string('admin_track_chat_status_site_off', 'local_launchpad'),
+            default => get_string('admin_track_chat_status_off', 'local_launchpad'),
+        };
+
         return [
             'participants_title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
             'participants_lead' => get_string('admin_courseops_participants_lead', 'local_launchpad'),
@@ -674,7 +683,47 @@ final class admin_dashboard {
             'can_unenrol' => $canunenrol,
             'unenrol_no_cap' => get_string('admin_courseops_err_unenrol_cap', 'local_launchpad'),
             'track_fullname_plain' => format_string($course->fullname),
+            'track_chat_title' => get_string('admin_track_chat_title', 'local_launchpad'),
+            'track_chat_lead' => get_string('admin_track_chat_lead', 'local_launchpad'),
+            'track_chat_status_label' => $statuslabel,
+            'track_chat_status_on' => $statuskey === 'on',
+            'track_chat_status_disabled' => $statuskey === 'disabled',
+            'track_chat_status_site_off' => $statuskey === 'site_off',
+            'track_chat_status_off' => $statuskey === 'off',
+            'track_chat_member_count' => (int) ($chat['member_count'] ?? 0),
+            'track_chat_members_label' => get_string(
+                'admin_track_chat_members',
+                'local_launchpad',
+                (int) ($chat['member_count'] ?? 0)
+            ),
+            'track_chat_can_toggle' => !empty($chat['messaging_site_on']),
+            'track_chat_enable_label' => get_string('admin_track_chat_enable', 'local_launchpad'),
+            'track_chat_disable_label' => get_string('admin_track_chat_disable', 'local_launchpad'),
+            'track_chat_sesskey' => $sk,
+            'track_chat_trackid' => $trackid,
         ];
+    }
+
+    /**
+     * Enable or disable track group chat (Admin Course ops only).
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function set_track_chat_enabled(\stdClass $actor, int $trackid, bool $on): array {
+        global $DB;
+
+        $adminid = (int) ($actor->id ?? 0);
+        if ($adminid <= 0 || (!self::can_access($adminid) && !is_siteadmin($adminid))) {
+            return ['error' => get_string('admin_courseops_err_cap', 'local_launchpad')];
+        }
+        if ($trackid <= 0) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        $course = $DB->get_record('course', ['id' => $trackid], 'id,idnumber', IGNORE_MISSING);
+        if (!$course || !self::is_track_idnumber((string) ($course->idnumber ?? ''))) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        return messaging::set_track_chat_enabled($trackid, $on);
     }
 
     /**

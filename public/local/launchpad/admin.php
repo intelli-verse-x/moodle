@@ -127,6 +127,16 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             'section' => 'participants',
         ]));
     }
+    if ($view === 'courseops' && ($action === 'track_chat_enable' || $action === 'track_chat_disable')) {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $flash = admin_dashboard::set_track_chat_enabled($USER, $trackid, $action === 'track_chat_enable');
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]));
+    }
     if ($view === 'courseops' && $action === 'save_course_completion') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $enablecompletion = (bool) optional_param('enablecompletion', 0, PARAM_BOOL);

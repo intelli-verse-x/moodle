@@ -156,7 +156,8 @@ $courseids = array_map(static fn($c) => (int) $c->id, $courses);
 
 // Send / delete LaunchPad messages (Moodle-backed) before rendering.
 if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
-    $toid = required_param('id', PARAM_INT);
+    $toid = optional_param('id', 0, PARAM_INT);
+    $messageconvid = optional_param('convid', 0, PARAM_INT);
     $msgaction = optional_param('msgaction', 'send', PARAM_ALPHA);
     $posttab = optional_param('mtab', 'all', PARAM_ALPHA);
     if (!in_array($posttab, ['all', 'starred', 'private', 'group'], true)) {
@@ -164,7 +165,8 @@ if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
     }
     $redirect = new moodle_url(persona_home::FELLOW_PATH, array_filter([
         'view' => 'messages',
-        'id' => $toid,
+        'id' => $toid > 0 ? $toid : null,
+        'convid' => ($toid <= 0 && $messageconvid > 0) ? $messageconvid : null,
         'mtab' => $posttab !== 'all' ? $posttab : null,
     ]));
     if ($msgaction === 'delete') {
@@ -172,7 +174,11 @@ if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
         $result = messaging::delete_messages($userid, $messageids);
     } else {
         $body = required_param('message', PARAM_RAW_TRIMMED);
-        $result = messaging::send($userid, $toid, $body, 'fellow');
+        if ($toid <= 0 && $messageconvid > 0) {
+            $result = messaging::send_to_conversation($userid, $messageconvid, $body, 'fellow');
+        } else {
+            $result = messaging::send($userid, $toid, $body, 'fellow');
+        }
     }
     if (!$result['ok']) {
         redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);

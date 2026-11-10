@@ -59,10 +59,11 @@ $convid = optional_param('convid', 0, PARAM_INT);
 
 if ($action === 'send') {
     $body = required_param('message', PARAM_RAW_TRIMMED);
-    if ($portal === 'mentor' && $toid <= 0 && $convid > 0) {
-        echo json_encode(messaging::send_to_conversation($userid, $convid, $body, 'mentor'));
+    $sendportal = $portal === 'mentor' ? 'mentor' : 'fellow';
+    if ($toid <= 0 && $convid > 0) {
+        echo json_encode(messaging::send_to_conversation($userid, $convid, $body, $sendportal));
     } else {
-        echo json_encode(messaging::send($userid, $toid, $body, $portal === 'mentor' ? 'mentor' : 'fellow'));
+        echo json_encode(messaging::send($userid, $toid, $body, $sendportal));
     }
     exit;
 }

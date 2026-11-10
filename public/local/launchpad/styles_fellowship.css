@@ -931,6 +931,13 @@ body.local-launchpad-mentor {
 .lp-courseops-roster-reuse {
   margin: 8px 0 0;
 }
+.lp-courseops-trackchat {
+  margin-top: 16px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--lp-line, #E4E8EF);
+  border-radius: 12px;
+  background: #FBFCFE;
+}
 .lp-courseops-roster-block {
   margin-top: 18px;
 }

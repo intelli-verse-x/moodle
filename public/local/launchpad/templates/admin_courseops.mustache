@@ -181,6 +181,42 @@
         <p class="lp-sm lp-muted">{{unenrol_no_cap}}</p>
       {{/can_unenrol}}
 
+      <div class="lp-courseops-trackchat">
+        <div class="lp-row-sb" style="align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div>
+            <h4 class="lp-courseops-roster-h" style="margin:0 0 4px">{{track_chat_title}}</h4>
+            <p class="lp-sm lp-muted" style="margin:0">{{track_chat_lead}}</p>
+            <p class="lp-sm" style="margin:8px 0 0">
+              <span class="lp-chip{{#track_chat_status_on}} ok{{/track_chat_status_on}}">{{track_chat_status_label}}</span>
+              <span class="lp-muted"> · {{track_chat_members_label}}</span>
+            </p>
+          </div>
+          <div class="lp-courseops-roster-actions" style="margin:0">
+            {{#track_chat_can_toggle}}
+              {{#track_chat_status_on}}
+                <form method="post" action="{{participants_form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{track_chat_sesskey}}">
+                  <input type="hidden" name="action" value="track_chat_disable">
+                  <input type="hidden" name="trackid" value="{{track_chat_trackid}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{track_chat_disable_label}}</button>
+                </form>
+              {{/track_chat_status_on}}
+              {{^track_chat_status_on}}
+                <form method="post" action="{{participants_form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{track_chat_sesskey}}">
+                  <input type="hidden" name="action" value="track_chat_enable">
+                  <input type="hidden" name="trackid" value="{{track_chat_trackid}}">
+                  <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{track_chat_enable_label}}</button>
+                </form>
+              {{/track_chat_status_on}}
+            {{/track_chat_can_toggle}}
+            {{^track_chat_can_toggle}}
+              <button type="button" class="lp-btn lp-btn-light lp-btn-sm" disabled>{{track_chat_enable_label}}</button>
+            {{/track_chat_can_toggle}}
+          </div>
+        </div>
+      </div>
+
       <div class="lp-courseops-roster-block">
         <h4 class="lp-courseops-roster-h">{{fellows_section_title}}</h4>
         {{#has_fellows}}

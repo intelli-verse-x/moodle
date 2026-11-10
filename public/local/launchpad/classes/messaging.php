@@ -31,6 +31,9 @@ final class messaging {
     /** Max conversations on the inbox list. */
     public const INBOX_LIMIT = 40;
 
+    /** Canonical Moodle course-group idnumber for one LaunchPad track chat. */
+    public const TRACK_CHAT_IDNUMBER = 'lp-trackchat';
+
     /**
      * LaunchPad messages URL (fellow or mentor shell).
      *
@@ -674,7 +677,7 @@ final class messaging {
             } catch (\Throwable $e) {
                 $cansend = false;
             }
-        } else if ($portal === 'mentor' && $convid > 0 && $otherid <= 0) {
+        } else if (($portal === 'mentor' || $portal === 'fellow') && $convid > 0 && $otherid <= 0) {
             // Personal space (self) / group: Moodle allows members to post; LaunchPad was blocking other_id=0.
             try {
                 $cansend = \core_message\api::can_send_message_to_conversation($userid, $convid);
@@ -981,11 +984,12 @@ final class messaging {
     }
 
     /**
-     * Mentor: post into an existing conversation by id (personal space / group).
+     * Post into an existing conversation by id (personal space / group).
+     * Fellow + mentor portals — used when there is no other user id (self/group).
      *
      * @return array{ok:bool,error:?string,message?:array}
      */
-    public static function send_to_conversation(int $fromid, int $convid, string $text, string $portal = 'mentor'): array {
+    public static function send_to_conversation(int $fromid, int $convid, string $text, string $portal = 'fellow'): array {
         $text = trim($text);
         if ($text === '') {
             return [
@@ -993,13 +997,19 @@ final class messaging {
                 'error' => get_string('fellowship_messages_err_empty', 'local_launchpad'),
             ];
         }
-        if ($portal !== 'mentor' || $fromid <= 0 || $convid <= 0) {
+        if ($portal !== 'mentor' && $portal !== 'fellow') {
+            $portal = 'fellow';
+        }
+        if ($fromid <= 0 || $convid <= 0) {
             return [
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
             ];
         }
-        if (!account_persona::is_mentor($fromid) && !is_siteadmin($fromid)) {
+        $allowed = is_siteadmin($fromid)
+            || ($portal === 'mentor' && account_persona::is_mentor($fromid))
+            || ($portal === 'fellow' && account_persona::is_fellowship($fromid));
+        if (!$allowed) {
             return [
                 'ok' => false,
                 'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
@@ -1467,6 +1477,59 @@ final class messaging {
                 'has_role_label' => $rolelabel !== '',
             ];
         }
+
+        // Moodle sometimes omits empty/cleared self chats from get_conversations — keep Personal space visible.
+        $hasself = false;
+        foreach ($out as $row) {
+            if (!empty($row['is_self'])) {
+                $hasself = true;
+                break;
+            }
+        }
+        if (!$hasself) {
+            try {
+                $self = \core_message\api::get_self_conversation($userid);
+                $selfid = (int) ($self->id ?? 0);
+                if ($selfid > 0) {
+                    $selfname = get_string('selfconversation', 'core_message');
+                    $selfpreview = $str(
+                        'employer_messages_self_empty',
+                        'Your personal space — add a note here.'
+                    );
+                    array_unshift($out, [
+                        'id' => $selfid,
+                        'other_id' => 0,
+                        'name' => $selfname,
+                        'other_name' => $selfname,
+                        'other_initials' => self::conversation_initials($selfname),
+                        'initials' => self::conversation_initials($selfname),
+                        'imageurl' => '',
+                        'has_image' => false,
+                        'preview' => $selfpreview,
+                        'has_preview' => $selfpreview !== '',
+                        'preview_prefix' => '',
+                        'has_preview_prefix' => false,
+                        'when' => '',
+                        'has_when' => false,
+                        'type_label' => $str('employer_messages_type_self', 'Personal'),
+                        'isfavourite' => true,
+                        'is_group' => false,
+                        'is_self' => true,
+                        'is_private' => false,
+                        'unread' => 0,
+                        'has_unread' => false,
+                        'is_unread' => false,
+                        'is_selected' => $selectedconvid > 0 && $selfid === $selectedconvid,
+                        'url' => self::messages_url(null, $portal, $mtab, $selfid),
+                        'role_label' => '',
+                        'has_role_label' => false,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // Non-fatal — inbox still works without Personal space.
+            }
+        }
+
         return $out;
     }
 
@@ -1516,6 +1579,257 @@ final class messaging {
             return (int) ($created->id ?? 0);
         } catch (\Throwable $e) {
             return 0;
+        }
+    }
+
+    /**
+     * Find or create the canonical track chat Moodle course group (idnumber lp-trackchat).
+     */
+    public static function ensure_track_chat_group(int $courseid): ?\stdClass {
+        global $CFG, $DB;
+
+        if ($courseid <= 0) {
+            return null;
+        }
+        require_once($CFG->dirroot . '/group/lib.php');
+
+        $existing = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER);
+        if ($existing) {
+            return $existing;
+        }
+
+        $course = $DB->get_record('course', ['id' => $courseid], '*', IGNORE_MISSING);
+        if (!$course) {
+            return null;
+        }
+
+        $data = new \stdClass();
+        $data->courseid = $courseid;
+        $data->name = get_string_manager()->string_exists('admin_track_chat_group_name', 'local_launchpad')
+            ? get_string('admin_track_chat_group_name', 'local_launchpad')
+            : 'Track chat';
+        $data->idnumber = self::TRACK_CHAT_IDNUMBER;
+        $data->description = get_string_manager()->string_exists('admin_track_chat_group_desc', 'local_launchpad')
+            ? get_string('admin_track_chat_group_desc', 'local_launchpad')
+            : 'LaunchPad track group chat for fellows and mentors on this course.';
+        $data->descriptionformat = FORMAT_HTML;
+        $data->visibility = GROUPS_VISIBILITY_MEMBERS;
+        $data->participation = 1;
+
+        try {
+            $gid = (int) groups_create_group($data);
+        } catch (\Throwable $e) {
+            // Race: another request created it.
+            $existing = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER);
+            return $existing ?: null;
+        }
+        if ($gid <= 0) {
+            return null;
+        }
+        return groups_get_group($gid, '*', IGNORE_MISSING) ?: null;
+    }
+
+    /**
+     * Set course-group members to LaunchPad fellows + mentors on this track.
+     *
+     * @return int Active member count after sync
+     */
+    public static function sync_track_chat_members(int $courseid): int {
+        global $CFG;
+
+        if ($courseid <= 0) {
+            return 0;
+        }
+        require_once($CFG->dirroot . '/group/lib.php');
+
+        $group = self::ensure_track_chat_group($courseid);
+        if (!$group) {
+            return 0;
+        }
+        $groupid = (int) $group->id;
+
+        $wanted = [];
+        foreach (admin_dashboard::list_track_fellows($courseid) as $row) {
+            $uid = (int) ($row['id'] ?? 0);
+            if ($uid > 0) {
+                $wanted[$uid] = true;
+            }
+        }
+        foreach (admin_dashboard::list_track_roster_mentors($courseid) as $row) {
+            $uid = (int) ($row['id'] ?? 0);
+            if ($uid > 0) {
+                $wanted[$uid] = true;
+            }
+        }
+
+        $current = [];
+        foreach (groups_get_members($groupid, 'u.id') as $u) {
+            $current[(int) $u->id] = true;
+        }
+
+        foreach (array_keys($wanted) as $uid) {
+            if (empty($current[$uid])) {
+                // Soft-fail per user (e.g. not enrolled yet).
+                try {
+                    groups_add_member($groupid, $uid);
+                } catch (\Throwable $e) {
+                    // Continue.
+                }
+            }
+        }
+        foreach (array_keys($current) as $uid) {
+            if (empty($wanted[$uid])) {
+                try {
+                    groups_remove_member($groupid, $uid);
+                } catch (\Throwable $e) {
+                    // Continue.
+                }
+            }
+        }
+
+        return count(groups_get_members($groupid, 'u.id'));
+    }
+
+    /**
+     * Status bag for Admin Course ops Participants card.
+     *
+     * @return array{
+     *   messaging_site_on:bool,
+     *   has_group:bool,
+     *   group_id:int,
+     *   conversation_id:int,
+     *   enabled:bool,
+     *   member_count:int,
+     *   status_key:string
+     * }
+     */
+    public static function get_track_chat_status(int $courseid): array {
+        global $CFG;
+
+        $out = [
+            'messaging_site_on' => !empty($CFG->messaging),
+            'has_group' => false,
+            'group_id' => 0,
+            'conversation_id' => 0,
+            'enabled' => false,
+            'member_count' => 0,
+            'status_key' => 'off',
+        ];
+        if ($courseid <= 0) {
+            return $out;
+        }
+        if (empty($CFG->messaging)) {
+            $out['status_key'] = 'site_off';
+            return $out;
+        }
+
+        require_once($CFG->dirroot . '/group/lib.php');
+        $group = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER);
+        if (!$group) {
+            $out['status_key'] = 'off';
+            return $out;
+        }
+        $out['has_group'] = true;
+        $out['group_id'] = (int) $group->id;
+        $out['member_count'] = count(groups_get_members((int) $group->id, 'u.id'));
+
+        $context = \context_course::instance($courseid);
+        $conv = \core_message\api::get_conversation_by_area(
+            'core_group',
+            'groups',
+            (int) $group->id,
+            $context->id
+        );
+        if ($conv) {
+            $out['conversation_id'] = (int) $conv->id;
+            $out['enabled'] = !empty($conv->enabled);
+            $out['status_key'] = $out['enabled'] ? 'on' : 'disabled';
+        } else {
+            $out['status_key'] = 'off';
+        }
+        return $out;
+    }
+
+    /**
+     * Admin-owned: enable or disable the track group conversation.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function set_track_chat_enabled(int $courseid, bool $on): array {
+        global $CFG;
+
+        if ($courseid <= 0) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        if (empty($CFG->messaging)) {
+            return ['error' => get_string('admin_track_chat_err_messaging_off', 'local_launchpad')];
+        }
+
+        require_once($CFG->dirroot . '/group/lib.php');
+
+        $group = self::ensure_track_chat_group($courseid);
+        if (!$group) {
+            return ['error' => get_string('admin_track_chat_err_group', 'local_launchpad')];
+        }
+
+        $membercount = self::sync_track_chat_members($courseid);
+        $context = \context_course::instance($courseid);
+        $convid = 0;
+        $conv = \core_message\api::get_conversation_by_area(
+            'core_group',
+            'groups',
+            (int) $group->id,
+            $context->id
+        );
+
+        try {
+            if ($on) {
+                if (!$conv) {
+                    $memberids = array_map(
+                        static fn($u) => (int) $u->id,
+                        groups_get_members((int) $group->id, 'u.id')
+                    );
+                    $created = \core_message\api::create_conversation(
+                        \core_message\api::MESSAGE_CONVERSATION_TYPE_GROUP,
+                        $memberids,
+                        (string) $group->name,
+                        \core_message\api::MESSAGE_CONVERSATION_ENABLED,
+                        'core_group',
+                        'groups',
+                        (int) $group->id,
+                        $context->id
+                    );
+                    $convid = (int) ($created->id ?? 0);
+                } else {
+                    $convid = (int) $conv->id;
+                    if (empty($conv->enabled)) {
+                        \core_message\api::enable_conversation($convid);
+                    }
+                    \core_message\api::update_conversation_name($convid, (string) $group->name);
+                    // Ensure members match group after re-enable.
+                    $memberids = array_map(
+                        static fn($u) => (int) $u->id,
+                        groups_get_members((int) $group->id, 'u.id')
+                    );
+                    if ($memberids !== []) {
+                        \core_message\api::add_members_to_conversation($memberids, $convid);
+                    }
+                }
+                if ($convid <= 0) {
+                    return ['error' => get_string('admin_track_chat_err_enable', 'local_launchpad')];
+                }
+                return [
+                    'ok' => get_string('admin_track_chat_enabled_ok', 'local_launchpad', $membercount),
+                ];
+            }
+
+            // Disable.
+            if ($conv && !empty($conv->enabled)) {
+                \core_message\api::disable_conversation((int) $conv->id);
+            }
+            return ['ok' => get_string('admin_track_chat_disabled_ok', 'local_launchpad')];
+        } catch (\Throwable $e) {
+            return ['error' => get_string('admin_track_chat_err_enable', 'local_launchpad')];
         }
     }
 }
