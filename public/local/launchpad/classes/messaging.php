@@ -421,6 +421,9 @@ final class messaging {
             'has_thread' => false,
             'can_send' => false,
             'can_delete_messages' => false,
+            'isfavourite' => false,
+            'starred_limit' => self::STARRED_LIMIT,
+            'starred_count' => 0,
             'conversations' => [],
             'has_conversations' => false,
             'conversation_count' => 0,
@@ -460,19 +463,9 @@ final class messaging {
 
         $selectedother = ($otherid !== null && $otherid > 0) ? $otherid : 0;
         $selectedconvid = max(0, $convid);
-        $allconversations = self::list_conversations($userid, $portal, $mtab, $selectedother, $selectedconvid);
-        $filtered = array_values(array_filter($allconversations, static function (array $row) use ($mtab): bool {
-            if ($mtab === 'starred') {
-                return !empty($row['isfavourite']);
-            }
-            if ($mtab === 'private') {
-                return !empty($row['is_private']) || !empty($row['is_self']);
-            }
-            if ($mtab === 'group') {
-                return !empty($row['is_group']);
-            }
-            return true;
-        }));
+        // Fetch full inbox once, then filter like Moodle's All / Starred / Private / Group tabs.
+        $allconversations = self::list_conversations($userid, $portal, 'all', $selectedother, $selectedconvid);
+        $filtered = self::filter_conversations_by_tab($allconversations, $mtab);
 
         $unreadconversations = 0;
         try {
@@ -494,8 +487,10 @@ final class messaging {
         $ctx['unread_conversations'] = $unreadconversations;
         $ctx['has_unread_conversations'] = $unreadconversations > 0;
         $ctx['has_filter_empty'] = $allconversations !== [] && $filtered === [];
+        // People picker only on All — otherwise classmates look like chats under every filter.
+        $ctx['show_people_picker'] = $portal === 'fellow' && $mtab === 'all';
 
-        if ($portal === 'fellow') {
+        if (!empty($ctx['show_people_picker'])) {
             $ctx['classmates'] = self::list_classmates($userid, $portal);
             $ctx['has_classmates'] = $ctx['classmates'] !== [];
             $ctx['mentors'] = self::list_course_mentors_for_messages($userid, $portal);
@@ -688,6 +683,8 @@ final class messaging {
             }
         }
 
+        $isfavourite = self::is_conversation_starred($userid, $convid);
+
         $ctx['has_thread'] = true;
         $ctx['thread_denied'] = false;
         $ctx['conversation_id'] = $convid;
@@ -701,6 +698,9 @@ final class messaging {
         $ctx['has_messages'] = $messages !== [];
         $ctx['can_send'] = $cansend;
         $ctx['can_delete_messages'] = $candelete && $cansend;
+        $ctx['isfavourite'] = $isfavourite;
+        $ctx['starred_limit'] = self::STARRED_LIMIT;
+        $ctx['starred_count'] = self::count_starred_conversations($userid);
         $ctx['form_action'] = $threadurl;
         $ctx['ajax_url'] = (new \moodle_url('/local/launchpad/ajax_messaging.php'))->out(false);
         $ctx['portal'] = $portal === 'mentor' ? 'mentor' : 'fellow';
@@ -710,6 +710,96 @@ final class messaging {
         $ctx['inbox_url'] = self::messages_url(null, $portal, $mtab);
 
         return $ctx;
+    }
+
+    /** Soft cap so Starred stays useful (Moodle itself has no cap). */
+    public const STARRED_LIMIT = 10;
+
+    /**
+     * How many conversations this user has starred.
+     */
+    public static function count_starred_conversations(int $userid): int {
+        if ($userid <= 0) {
+            return 0;
+        }
+        try {
+            $service = \core_favourites\service_factory::get_service_for_user_context(
+                \context_user::instance($userid)
+            );
+            $favs = $service->find_favourites_by_type('core_message', 'message_conversations');
+            return is_array($favs) ? count($favs) : 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Whether this conversation is in the user's starred / favourites list.
+     */
+    public static function is_conversation_starred(int $userid, int $convid): bool {
+        if ($userid <= 0 || $convid <= 0) {
+            return false;
+        }
+        try {
+            $conv = \core_message\api::get_conversation($userid, $convid, false, false, 0, 0, 0);
+            return !empty($conv->isfavourite);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Star or unstar a conversation the user belongs to.
+     *
+     * @return array{ok:bool,error:?string,starred?:bool,starred_count?:int,starred_limit?:int}
+     */
+    public static function set_conversation_starred(int $userid, int $convid, bool $star): array {
+        $limit = self::STARRED_LIMIT;
+        if ($userid <= 0 || $convid <= 0) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_star', 'local_launchpad'),
+            ];
+        }
+        try {
+            if (!\core_message\api::is_user_in_conversation($userid, $convid)) {
+                return [
+                    'ok' => false,
+                    'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+                ];
+            }
+            $already = self::is_conversation_starred($userid, $convid);
+            if ($star) {
+                if (!$already) {
+                    $count = self::count_starred_conversations($userid);
+                    if ($count >= $limit) {
+                        return [
+                            'ok' => false,
+                            'error' => get_string('fellowship_messages_err_star_limit', 'local_launchpad', $limit),
+                            'starred' => false,
+                            'starred_count' => $count,
+                            'starred_limit' => $limit,
+                        ];
+                    }
+                    \core_message\api::set_favourite_conversation($convid, $userid);
+                }
+            } else if ($already) {
+                \core_message\api::unset_favourite_conversation($convid, $userid);
+            }
+            $starred = self::is_conversation_starred($userid, $convid);
+            return [
+                'ok' => true,
+                'error' => null,
+                'starred' => $starred,
+                'starred_count' => self::count_starred_conversations($userid),
+                'starred_limit' => $limit,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_star', 'local_launchpad'),
+            ];
+        }
     }
 
     /**
@@ -742,6 +832,16 @@ final class messaging {
             'tab_starred' => $str('employer_messages_tab_starred', 'Starred'),
             'tab_private' => $str('employer_messages_tab_private', 'Private'),
             'tab_group' => $str('employer_messages_tab_group', 'Group'),
+            'star' => $str('fellowship_messages_star', 'Star'),
+            'unstar' => $str('fellowship_messages_unstar', 'Unstar'),
+            'star_title' => $str('fellowship_messages_star_title', 'Star this conversation'),
+            'unstar_title' => $str('fellowship_messages_unstar_title', 'Remove from starred'),
+            'star_limit_hint' => get_string_manager()->string_exists(
+                'fellowship_messages_star_limit_hint',
+                'local_launchpad'
+            )
+                ? get_string('fellowship_messages_star_limit_hint', 'local_launchpad', self::STARRED_LIMIT)
+                : ('You can star up to ' . self::STARRED_LIMIT . ' conversations.'),
             'thread_heading' => $str('fellowship_messages_thread', 'Conversation'),
             'private' => $str('fellowship_messages_private', 'Private chat'),
             'back' => $str('fellowship_messages_back', 'All messages'),
@@ -1173,8 +1273,29 @@ final class messaging {
     }
 
     /**
-     * @return list<array>
+     * Filter inbox rows for All / Starred / Private / Group (Moodle-aligned).
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
      */
+    private static function filter_conversations_by_tab(array $rows, string $mtab): array {
+        if ($mtab === 'all' || $mtab === '') {
+            return array_values($rows);
+        }
+        return array_values(array_filter($rows, static function (array $row) use ($mtab): bool {
+            if ($mtab === 'starred') {
+                return !empty($row['isfavourite']);
+            }
+            if ($mtab === 'private') {
+                // Moodle private view = 1:1 + personal space.
+                return !empty($row['is_private']) || !empty($row['is_self']);
+            }
+            if ($mtab === 'group') {
+                return !empty($row['is_group']);
+            }
+            return true;
+        }));
+    }
 
     /**
      * @return list<array<string,mixed>>
@@ -1187,7 +1308,7 @@ final class messaging {
         int $selectedconvid = 0
     ): array {
         try {
-            // Favourites + private (+ self) + groups — same overview as Employer.
+            // Always load the overview set; tab filtering happens in filter_conversations_by_tab().
             $rows = \core_message\api::get_conversations($userid, 0, self::INBOX_LIMIT, null, null, true);
         } catch (\Throwable $e) {
             return [];

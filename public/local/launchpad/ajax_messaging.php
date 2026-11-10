@@ -73,6 +73,18 @@ if ($action === 'delete') {
     exit;
 }
 
+if ($action === 'star' || $action === 'unstar') {
+    if ($convid <= 0) {
+        echo json_encode([
+            'ok' => false,
+            'error' => get_string('fellowship_messages_err_star', 'local_launchpad'),
+        ]);
+        exit;
+    }
+    echo json_encode(messaging::set_conversation_starred($userid, $convid, $action === 'star'));
+    exit;
+}
+
 echo json_encode([
     'ok' => false,
     'error' => get_string('fellowship_messages_err_save', 'local_launchpad'),

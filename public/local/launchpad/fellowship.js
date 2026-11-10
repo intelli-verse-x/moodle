@@ -1638,6 +1638,9 @@
         var otherId = layout.getAttribute('data-other-id') || '';
         var convId = layout.getAttribute('data-convid') || '';
         var canDelete = layout.getAttribute('data-can-delete') === '1';
+        var starBtn = layout.querySelector('[data-lp-msg-star]');
+        var starTitle = (starBtn && starBtn.getAttribute('data-title-star')) || 'Star this conversation';
+        var unstarTitle = (starBtn && starBtn.getAttribute('data-title-unstar')) || 'Remove from starred';
 
         if (msgScroll) {
             msgScroll.scrollTop = msgScroll.scrollHeight;
@@ -1947,6 +1950,50 @@
                         sendBtn.disabled = false;
                     }
                     window.alert('Could not send');
+                });
+            });
+        }
+
+        // --- star / unstar conversation ---
+        if (starBtn && convId) {
+            starTitle = starBtn.getAttribute('data-title-star') || starTitle;
+            unstarTitle = starBtn.getAttribute('data-title-unstar') || unstarTitle;
+            starBtn.addEventListener('click', function () {
+                if (starBtn.disabled) {
+                    return;
+                }
+                var starred = starBtn.getAttribute('data-starred') === '1';
+                var next = !starred;
+                starBtn.disabled = true;
+                postAction(next ? 'star' : 'unstar', {}).then(function (data) {
+                    starBtn.disabled = false;
+                    if (!data || !data.ok) {
+                        window.alert((data && data.error) || 'Could not update star');
+                        return;
+                    }
+                    var on = !!data.starred;
+                    starBtn.setAttribute('data-starred', on ? '1' : '0');
+                    starBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    starBtn.classList.toggle('is-on', on);
+                    var label = on ? unstarTitle : starTitle;
+                    starBtn.setAttribute('title', label);
+                    starBtn.setAttribute('aria-label', label);
+                    var row = layout.querySelector('.lp-msg-row.is-selected .lp-msg-meta-row');
+                    if (row) {
+                        var existing = row.querySelector('.lp-msg-star');
+                        if (on && !existing) {
+                            var mark = document.createElement('span');
+                            mark.className = 'lp-msg-star';
+                            mark.setAttribute('aria-hidden', 'true');
+                            mark.textContent = '★';
+                            row.appendChild(mark);
+                        } else if (!on && existing) {
+                            existing.remove();
+                        }
+                    }
+                }).catch(function () {
+                    starBtn.disabled = false;
+                    window.alert('Could not update star');
                 });
             });
         }

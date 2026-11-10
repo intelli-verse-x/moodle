@@ -6629,12 +6629,11 @@ body.lp-portal-mismatch-lock {
 .lp-msg-inbox {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 12px;
+  gap: 0;
+  padding: 14px 12px 0;
   border-right: 1px solid var(--lp-line);
   background: #FBFCFE;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   min-height: 0;
   min-width: 0;
 }
@@ -6643,13 +6642,23 @@ body.lp-portal-mismatch-lock {
   width: 100%;
   margin: 0;
   flex: none;
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 2;
   background: #FBFCFE;
-  padding-bottom: 4px;
+  padding-bottom: 12px;
   box-sizing: border-box;
   min-width: 0;
+}
+.lp-msg-inbox-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .lp-msg-inbox-empty {
   display: flex;
@@ -6702,7 +6711,7 @@ body.lp-portal-mismatch-lock {
 .lp-scroll::-webkit-scrollbar-corner {
   background: transparent;
 }
-.lp-msg-inbox.lp-scroll,
+.lp-msg-inbox-body.lp-scroll,
 .lp-msg-scroll.lp-scroll {
   scrollbar-gutter: stable;
 }
@@ -6910,6 +6919,37 @@ body.lp-portal-mismatch-lock {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.lp-msg-star-btn {
+  appearance: none;
+  border: 1px solid var(--lp-line, #E4E8EF);
+  background: #fff;
+  color: #9AA3B2;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.lp-msg-star-btn:hover {
+  color: #C98500;
+  border-color: #E8C56A;
+  background: #FFF8E8;
+}
+.lp-msg-star-btn.is-on {
+  color: #C98500;
+  border-color: #E8C56A;
+  background: #FFF8E8;
+}
+.lp-msg-star-btn:disabled {
+  opacity: .55;
+  cursor: wait;
 }
 .lp-msg-back {
   padding: 8px 12px;
@@ -7237,7 +7277,7 @@ body.lp-portal-mismatch-lock {
     border-right: 0;
     border-bottom: 1px solid var(--lp-line);
     max-height: min(42vh, 360px);
-    overflow-x: hidden;
+    overflow: hidden;
   }
   .lp-msg-thread { min-height: 360px; }
   .lp-msg-layout:not(.is-split) .lp-msg-thread { min-height: 220px; }

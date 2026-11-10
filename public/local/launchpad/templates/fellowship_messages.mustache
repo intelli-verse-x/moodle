@@ -69,10 +69,11 @@
     data-portal="{{portal}}"
     data-other-id="{{other_id}}"
     data-convid="{{conversation_id}}"
+    data-starred-limit="{{starred_limit}}"
     data-can-delete="{{#can_delete_messages}}1{{/can_delete_messages}}{{^can_delete_messages}}0{{/can_delete_messages}}">
 
     <div class="lp-msg-layout{{#has_thread}} is-split has-thread{{/has_thread}}">
-      <aside class="lp-msg-inbox lp-scroll" aria-label="{{strings.inbox_heading}}">
+      <aside class="lp-msg-inbox" aria-label="{{strings.inbox_heading}}">
         <div class="lp-tabs lp-tabs-block lp-msg-tabs" role="tablist" aria-label="{{strings.inbox_heading}}">
           <a class="lp-tab{{#mtab_all}} is-on{{/mtab_all}}"
              role="tab"
@@ -100,6 +101,7 @@
           </a>
         </div>
 
+        <div class="lp-msg-inbox-body lp-scroll">
         {{#has_conversations}}
           <ul class="lp-msg-list">
             {{#conversations}}
@@ -151,6 +153,7 @@
           </div>
         {{/has_conversations}}
 
+        {{#show_people_picker}}
         {{#is_fellow_portal}}
           {{#has_classmates}}
             <h3 class="lp-msg-aside-label">{{#str}} fellowship_messages_classmates, local_launchpad {{/str}}</h3>
@@ -205,6 +208,8 @@
             {{/has_conversations}}
           {{/has_people}}
         {{/is_fellow_portal}}
+        {{/show_people_picker}}
+        </div>
       </aside>
 
       <div class="lp-msg-thread" aria-label="{{strings.thread_heading}}">
@@ -238,7 +243,20 @@
                   </div>
                 </div>
               </div>
-              <a class="lp-btn lp-btn-light lp-msg-back" href="{{inbox_url}}" data-lp-msg-back>{{strings.back}}</a>
+              <div class="lp-msg-thread-actions">
+                <button type="button"
+                        class="lp-msg-star-btn{{#isfavourite}} is-on{{/isfavourite}}"
+                        data-lp-msg-star
+                        data-starred="{{#isfavourite}}1{{/isfavourite}}{{^isfavourite}}0{{/isfavourite}}"
+                        data-title-star="{{strings.star_title}}"
+                        data-title-unstar="{{strings.unstar_title}}"
+                        aria-pressed="{{#isfavourite}}true{{/isfavourite}}{{^isfavourite}}false{{/isfavourite}}"
+                        title="{{#isfavourite}}{{strings.unstar_title}}{{/isfavourite}}{{^isfavourite}}{{strings.star_title}}{{/isfavourite}}"
+                        aria-label="{{#isfavourite}}{{strings.unstar_title}}{{/isfavourite}}{{^isfavourite}}{{strings.star_title}}{{/isfavourite}}">
+                  <span aria-hidden="true">★</span>
+                </button>
+                <a class="lp-btn lp-btn-light lp-msg-back" href="{{inbox_url}}" data-lp-msg-back>{{strings.back}}</a>
+              </div>
             </div>
 
             {{#can_delete_messages}}
