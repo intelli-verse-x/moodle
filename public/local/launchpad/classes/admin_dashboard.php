@@ -1970,9 +1970,16 @@ final class admin_dashboard {
                     $act['trackid'] = $cid;
                 $act['edit_label'] = $editlabel;
                 $act['mark_label'] = $marklabel;
-                // Prefer LaunchPad manage deep-link when present.
+                // Edit must open the LaunchPad activity page for this cmid.
+                if (empty($act['activity_url'])) {
+                    $act['activity_url'] = (new \moodle_url(persona_home::ADMIN_PATH, [
+                        'view' => 'activity',
+                        'trackid' => $cid,
+                        'cmid' => (int) ($act['cmid'] ?? 0),
+                    ]))->out(false);
+                }
                 if (empty($act['manage_url'])) {
-                    $act['manage_url'] = $act['edit_url'];
+                    $act['manage_url'] = $act['activity_url'];
                 }
             }
             unset($act);
@@ -2296,7 +2303,6 @@ final class admin_dashboard {
             'phase_count_label' => get_string('admin_manage_phase_count', 'local_launchpad', $activitycount),
             'add_types' => $addtypes,
             'add_label' => get_string('admin_builder_add', 'local_launchpad'),
-            'add_activity_label' => get_string('admin_manage_add_activity', 'local_launchpad'),
             'add_chooser_title' => get_string('admin_manage_add_chooser', 'local_launchpad'),
             'add_name_label' => get_string('admin_manage_add_name', 'local_launchpad'),
             'add_name_placeholder' => get_string('admin_manage_add_name_placeholder', 'local_launchpad'),
@@ -3663,6 +3669,13 @@ final class admin_dashboard {
                 'has_file' => $hasfile,
                 'file_missing' => $isresource && !$hasfile,
                 'file_status_label' => $filestatus,
+                // Edit on a builder row opens this one activity (not Manage phase).
+                'activity_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'activity',
+                    'trackid' => $courseid,
+                    'cmid' => $cmid,
+                ]))->out(false),
+                // Phase list / deep-link (add, reorder, hide) — not per-activity Edit.
                 'manage_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
                     'view' => 'manage',
                     'trackid' => $courseid,
