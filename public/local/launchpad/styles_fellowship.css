@@ -10979,14 +10979,16 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  flex-wrap: nowrap;
+  /* Wrap so edit panel can sit under the title row (nowrap + width:100%
+     collapsed titles into a tall column and shoved actions into the rail). */
+  flex-wrap: wrap;
   padding: 14px 14px;
   border-radius: 14px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
 .lp-manage-row-body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: flex-start;
@@ -11058,8 +11060,28 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   flex: 0 0 auto;
 }
 .lp-manage-row > .lp-manage-edit-only {
+  flex: 1 1 100%;
   width: 100%;
-  padding-left: 34px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding-left: 34px; /* align under body, past drag handle */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Author display:flex beats UA [hidden] — otherwise Duplicate/Hide/Delete stay visible with Edit mode off. */
+.lp-manage-edit-only[hidden],
+.lp-manage-drag[hidden],
+.lp-manage-chooser[hidden],
+.lp-manage-reorder-bar[hidden] {
+  display: none !important;
+}
+.lp-manage.is-editing .lp-manage-row {
+  align-items: flex-start;
+}
+.lp-manage.is-editing .lp-manage-drag {
+  align-self: flex-start;
+  margin-top: 2px;
 }
 .lp-manage-empty-acts {
   margin: 0;
