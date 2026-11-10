@@ -195,13 +195,15 @@ class page {
      */
     private static function footer_context(): array {
         $defaults = [
-            'footerbrand' => 'Employer and fellowship portals on one Moodle account. Assigned courses, mentor review, and proof of work.',
+            'footerbrand' => 'Employer and fellowship portals on one Learn account. Assigned courses, mentor review, and proof of work.',
             'footercompany' => 'ToBa Tech Solutions · ToBa Learn',
             'footerlegal' => 'Structured learning for employers and fellows not a paid internship.',
             'footerctanote' => 'Your enrolment decides which portal opens.',
         ];
 
         $brand = self::config_text('footerbrand', $defaults['footerbrand']);
+        // Public landing: never show the platform name, even if an old setting still has it.
+        $brand = str_ireplace('Moodle', 'Learn', $brand);
         $company = self::config_text('footercompany', $defaults['footercompany']);
         $legal = self::config_text('footerlegal', $defaults['footerlegal']);
         $ctanote = self::config_text('footerctanote', $defaults['footerctanote']);

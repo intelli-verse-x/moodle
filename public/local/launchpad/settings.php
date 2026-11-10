@@ -186,7 +186,7 @@ if ($hassiteconfig) {
         'local_launchpad/footerbrand',
         get_string('footerbrand', 'local_launchpad'),
         get_string('footerbrand_desc', 'local_launchpad'),
-        'Employer and fellowship portals on one Moodle account. Assigned courses, mentor review, and proof of work.',
+        'Employer and fellowship portals on one Learn account. Assigned courses, mentor review, and proof of work.',
         PARAM_TEXT
     ));
 
