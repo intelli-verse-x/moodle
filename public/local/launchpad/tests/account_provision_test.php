@@ -203,6 +203,55 @@ final class account_provision_test extends \advanced_testcase {
         }
     }
 
+    public function test_pilot_mentor_cap_blocks_second_mentor(): void {
+        $this->setAdminUser();
+        global $USER;
+
+        account_provision::set_pilot_capacity(1, 0);
+        $course = $this->create_lp_course('lp-prov-cap-m');
+        $m1 = $this->getDataGenerator()->create_user(['username' => 'lp_cap_m1']);
+        $m2 = $this->getDataGenerator()->create_user(['username' => 'lp_cap_m2']);
+
+        $first = account_provision::assign_mentor($USER, (int) $m1->id, (int) $course->id);
+        $this->assertSame('enrolled', $first['status']);
+
+        // Same mentor re-assign is OK.
+        $again = account_provision::assign_mentor($USER, (int) $m1->id, (int) $course->id);
+        $this->assertSame('already_enrolled', $again['status']);
+
+        try {
+            account_provision::assign_mentor($USER, (int) $m2->id, (int) $course->id);
+            $this->fail('expected mentor capacity block');
+        } catch (account_provision_exception $e) {
+            $this->assertSame('pilot_mentor_full', $e->errorcode);
+        }
+    }
+
+    public function test_pilot_fellow_cap_blocks_and_skips_orient(): void {
+        $this->setAdminUser();
+        global $USER;
+
+        account_provision::set_pilot_capacity(1, 1);
+        $course = $this->create_lp_course('lp-prov-cap-f');
+        $orient = $this->create_lp_course('lp-orient-cap');
+        $f1 = $this->getDataGenerator()->create_user(['username' => 'lp_cap_f1']);
+        $f2 = $this->getDataGenerator()->create_user(['username' => 'lp_cap_f2']);
+
+        $first = account_provision::enrol_fellow($USER, (int) $f1->id, (int) $course->id);
+        $this->assertSame('enrolled', $first['status']);
+
+        try {
+            account_provision::enrol_fellow($USER, (int) $f2->id, (int) $course->id);
+            $this->fail('expected fellow capacity block');
+        } catch (account_provision_exception $e) {
+            $this->assertSame('pilot_fellow_full', $e->errorcode);
+        }
+
+        // Orientation is not seat-capped by the track fellow max.
+        $orientenrol = account_provision::enrol_fellow($USER, (int) $f2->id, (int) $orient->id);
+        $this->assertSame('enrolled', $orientenrol['status']);
+    }
+
     public function test_auth_snapshot_unchanged_by_provisioning(): void {
         $this->setAdminUser();
         global $USER, $CFG;

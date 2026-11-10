@@ -53,7 +53,7 @@ const FAQ=[
   },
   {
     q: 'What’s the difference between the two portals?',
-    a: 'One Moodle account, two portals. The Employer portal upskills assigned employee cohorts. The Fellowship portal bridges college to real-life craft. Same courses, same 70/100 rubric, same honesty.',
+    a: 'One Learn account, two portals. The Employer portal upskills assigned employee cohorts. The Fellowship portal bridges college to real-life craft. Same courses, same 70/100 rubric, same honesty.',
     say: 'Two doors, one standard. Dot Dot walks both paths with you.',
   },
   {
@@ -203,7 +203,7 @@ function openTrack(i){
 
       <div class="d-foot">
         <a class="btn primary" href="${PORTAL_HREF}" ${PORTAL_ATTR}>${PORTAL_LABEL} ${hi('arrow-right-02',16)}</a>
-        <span class="muted" style="font-size:13px">${LOGGED_IN ? 'Opens your dashboard. This popup is a preview of programme tracks.' : 'Opens Moodle. This popup is a preview; enrolment decides which assigned tracks you see.'}</span>
+        <span class="muted" style="font-size:13px">${LOGGED_IN ? 'Opens your dashboard. This popup is a preview of programme tracks.' : 'Opens sign-in. This popup is a preview; enrolment decides which assigned tracks you see.'}</span>
       </div>
     </div>`;
 
@@ -358,14 +358,14 @@ if (faqList) {
   }));
 }
 
-/* ----- Smooth Moodle login / portal handoff ----- */
+/* ----- Smooth sign-in / portal handoff ----- */
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-moodle-login], [data-moodle-portal]');
   if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || a.target === '_blank') return;
   e.preventDefault();
   const toPortal = a.hasAttribute('data-moodle-portal');
   const href = a.getAttribute('href') || (toPortal ? DASH : LOGIN);
-  toast(toPortal ? 'Opening your portal…' : 'Opening Moodle sign-in…');
+  toast(toPortal ? 'Opening your portal…' : 'Opening sign-in…');
   document.body.classList.add('is-leaving');
   setTimeout(() => { location.href = href; }, reduce ? 0 : 220);
 });

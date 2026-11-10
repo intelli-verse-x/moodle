@@ -31,6 +31,9 @@ final class messaging {
     /** Max conversations on the inbox list. */
     public const INBOX_LIMIT = 40;
 
+    /** Canonical Moodle course-group idnumber for one LaunchPad track chat. */
+    public const TRACK_CHAT_IDNUMBER = 'lp-trackchat';
+
     /**
      * LaunchPad messages URL (fellow or mentor shell).
      *
@@ -421,6 +424,9 @@ final class messaging {
             'has_thread' => false,
             'can_send' => false,
             'can_delete_messages' => false,
+            'isfavourite' => false,
+            'starred_limit' => self::STARRED_LIMIT,
+            'starred_count' => 0,
             'conversations' => [],
             'has_conversations' => false,
             'conversation_count' => 0,
@@ -460,19 +466,9 @@ final class messaging {
 
         $selectedother = ($otherid !== null && $otherid > 0) ? $otherid : 0;
         $selectedconvid = max(0, $convid);
-        $allconversations = self::list_conversations($userid, $portal, $mtab, $selectedother, $selectedconvid);
-        $filtered = array_values(array_filter($allconversations, static function (array $row) use ($mtab): bool {
-            if ($mtab === 'starred') {
-                return !empty($row['isfavourite']);
-            }
-            if ($mtab === 'private') {
-                return !empty($row['is_private']) || !empty($row['is_self']);
-            }
-            if ($mtab === 'group') {
-                return !empty($row['is_group']);
-            }
-            return true;
-        }));
+        // Fetch full inbox once, then filter like Moodle's All / Starred / Private / Group tabs.
+        $allconversations = self::list_conversations($userid, $portal, 'all', $selectedother, $selectedconvid);
+        $filtered = self::filter_conversations_by_tab($allconversations, $mtab);
 
         $unreadconversations = 0;
         try {
@@ -494,8 +490,18 @@ final class messaging {
         $ctx['unread_conversations'] = $unreadconversations;
         $ctx['has_unread_conversations'] = $unreadconversations > 0;
         $ctx['has_filter_empty'] = $allconversations !== [] && $filtered === [];
+        // Group tab: honest empty copy when track chat is off / disabled / pending sync.
+        if ($mtab === 'group' && $filtered === []) {
+            $groupempty = self::group_tab_empty_copy($userid, $portal);
+            $ctx['strings']['empty_filter_title'] = $groupempty['title'];
+            $ctx['strings']['empty_filter_body'] = $groupempty['body'];
+            $ctx['strings']['inbox_empty_title'] = $groupempty['title'];
+            $ctx['strings']['inbox_empty_body'] = $groupempty['body'];
+        }
+        // People picker only on All — otherwise classmates look like chats under every filter.
+        $ctx['show_people_picker'] = $portal === 'fellow' && $mtab === 'all';
 
-        if ($portal === 'fellow') {
+        if (!empty($ctx['show_people_picker'])) {
             $ctx['classmates'] = self::list_classmates($userid, $portal);
             $ctx['has_classmates'] = $ctx['classmates'] !== [];
             $ctx['mentors'] = self::list_course_mentors_for_messages($userid, $portal);
@@ -679,7 +685,16 @@ final class messaging {
             } catch (\Throwable $e) {
                 $cansend = false;
             }
+        } else if (($portal === 'mentor' || $portal === 'fellow') && $convid > 0 && $otherid <= 0) {
+            // Personal space (self) / group: Moodle allows members to post; LaunchPad was blocking other_id=0.
+            try {
+                $cansend = \core_message\api::can_send_message_to_conversation($userid, $convid);
+            } catch (\Throwable $e) {
+                $cansend = false;
+            }
         }
+
+        $isfavourite = self::is_conversation_starred($userid, $convid);
 
         $ctx['has_thread'] = true;
         $ctx['thread_denied'] = false;
@@ -694,6 +709,9 @@ final class messaging {
         $ctx['has_messages'] = $messages !== [];
         $ctx['can_send'] = $cansend;
         $ctx['can_delete_messages'] = $candelete && $cansend;
+        $ctx['isfavourite'] = $isfavourite;
+        $ctx['starred_limit'] = self::STARRED_LIMIT;
+        $ctx['starred_count'] = self::count_starred_conversations($userid);
         $ctx['form_action'] = $threadurl;
         $ctx['ajax_url'] = (new \moodle_url('/local/launchpad/ajax_messaging.php'))->out(false);
         $ctx['portal'] = $portal === 'mentor' ? 'mentor' : 'fellow';
@@ -703,6 +721,96 @@ final class messaging {
         $ctx['inbox_url'] = self::messages_url(null, $portal, $mtab);
 
         return $ctx;
+    }
+
+    /** Soft cap so Starred stays useful (Moodle itself has no cap). */
+    public const STARRED_LIMIT = 10;
+
+    /**
+     * How many conversations this user has starred.
+     */
+    public static function count_starred_conversations(int $userid): int {
+        if ($userid <= 0) {
+            return 0;
+        }
+        try {
+            $service = \core_favourites\service_factory::get_service_for_user_context(
+                \context_user::instance($userid)
+            );
+            $favs = $service->find_favourites_by_type('core_message', 'message_conversations');
+            return is_array($favs) ? count($favs) : 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Whether this conversation is in the user's starred / favourites list.
+     */
+    public static function is_conversation_starred(int $userid, int $convid): bool {
+        if ($userid <= 0 || $convid <= 0) {
+            return false;
+        }
+        try {
+            $conv = \core_message\api::get_conversation($userid, $convid, false, false, 0, 0, 0);
+            return !empty($conv->isfavourite);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Star or unstar a conversation the user belongs to.
+     *
+     * @return array{ok:bool,error:?string,starred?:bool,starred_count?:int,starred_limit?:int}
+     */
+    public static function set_conversation_starred(int $userid, int $convid, bool $star): array {
+        $limit = self::STARRED_LIMIT;
+        if ($userid <= 0 || $convid <= 0) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_star', 'local_launchpad'),
+            ];
+        }
+        try {
+            if (!\core_message\api::is_user_in_conversation($userid, $convid)) {
+                return [
+                    'ok' => false,
+                    'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+                ];
+            }
+            $already = self::is_conversation_starred($userid, $convid);
+            if ($star) {
+                if (!$already) {
+                    $count = self::count_starred_conversations($userid);
+                    if ($count >= $limit) {
+                        return [
+                            'ok' => false,
+                            'error' => get_string('fellowship_messages_err_star_limit', 'local_launchpad', $limit),
+                            'starred' => false,
+                            'starred_count' => $count,
+                            'starred_limit' => $limit,
+                        ];
+                    }
+                    \core_message\api::set_favourite_conversation($convid, $userid);
+                }
+            } else if ($already) {
+                \core_message\api::unset_favourite_conversation($convid, $userid);
+            }
+            $starred = self::is_conversation_starred($userid, $convid);
+            return [
+                'ok' => true,
+                'error' => null,
+                'starred' => $starred,
+                'starred_count' => self::count_starred_conversations($userid),
+                'starred_limit' => $limit,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_star', 'local_launchpad'),
+            ];
+        }
     }
 
     /**
@@ -725,7 +833,7 @@ final class messaging {
             'inbox_heading' => $str('fellowship_messages_inbox', 'Conversations'),
             'intro' => $str(
                 'fellowship_messages_intro',
-                'Read and reply here — conversations sync with Moodle messaging.'
+                'Private messages with mentors and peers. This page is LaunchPad\'s view of those conversations.'
             ),
             'open_moodle' => $str('fellowship_messages_open_moodle', 'Open Moodle messenger'),
             'open_thread' => $str('employer_messages_open_thread', 'Open in Moodle'),
@@ -735,6 +843,16 @@ final class messaging {
             'tab_starred' => $str('employer_messages_tab_starred', 'Starred'),
             'tab_private' => $str('employer_messages_tab_private', 'Private'),
             'tab_group' => $str('employer_messages_tab_group', 'Group'),
+            'star' => $str('fellowship_messages_star', 'Star'),
+            'unstar' => $str('fellowship_messages_unstar', 'Unstar'),
+            'star_title' => $str('fellowship_messages_star_title', 'Star this conversation'),
+            'unstar_title' => $str('fellowship_messages_unstar_title', 'Remove from starred'),
+            'star_limit_hint' => get_string_manager()->string_exists(
+                'fellowship_messages_star_limit_hint',
+                'local_launchpad'
+            )
+                ? get_string('fellowship_messages_star_limit_hint', 'local_launchpad', self::STARRED_LIMIT)
+                : ('You can star up to ' . self::STARRED_LIMIT . ' conversations.'),
             'thread_heading' => $str('fellowship_messages_thread', 'Conversation'),
             'private' => $str('fellowship_messages_private', 'Private chat'),
             'back' => $str('fellowship_messages_back', 'All messages'),
@@ -756,7 +874,7 @@ final class messaging {
             ),
             'cannot_reply' => $str(
                 'employer_messages_cannot_reply',
-                'You cannot reply here. Open Moodle Messages or check messaging permissions.'
+                'You cannot reply here. Open Messages or check messaging permissions.'
             ),
             'readonly' => $str(
                 'fellowship_messages_readonly',
@@ -775,7 +893,7 @@ final class messaging {
             'disabled_title' => $str('fellowship_messages_disabled_title', 'Messaging is off'),
             'disabled_body' => $str(
                 'fellowship_messages_disabled_body',
-                'Site messaging is disabled in Moodle. Ask an admin to enable it.'
+                'Site messaging is disabled. Ask an admin to enable it.'
             ),
             'delete' => $str('fellowship_messages_delete', 'Delete'),
             'delete_cancel' => $str('fellowship_messages_delete_cancel', 'Cancel'),
@@ -871,6 +989,84 @@ final class messaging {
         }
         return has_capability('moodle/site:deleteownmessage', \context_system::instance())
             || has_capability('moodle/site:deleteanymessage', \context_system::instance());
+    }
+
+    /**
+     * Post into an existing conversation by id (personal space / group).
+     * Fellow + mentor portals — used when there is no other user id (self/group).
+     *
+     * @return array{ok:bool,error:?string,message?:array}
+     */
+    public static function send_to_conversation(int $fromid, int $convid, string $text, string $portal = 'fellow'): array {
+        $text = trim($text);
+        if ($text === '') {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_empty', 'local_launchpad'),
+            ];
+        }
+        if ($portal !== 'mentor' && $portal !== 'fellow') {
+            $portal = 'fellow';
+        }
+        if ($fromid <= 0 || $convid <= 0) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+            ];
+        }
+        $allowed = is_siteadmin($fromid)
+            || ($portal === 'mentor' && account_persona::is_mentor($fromid))
+            || ($portal === 'fellow' && account_persona::is_fellowship($fromid));
+        if (!$allowed) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+            ];
+        }
+
+        $clean = clean_param($text, PARAM_TEXT);
+        if (trim($clean) === '') {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_empty', 'local_launchpad'),
+            ];
+        }
+
+        try {
+            if (!\core_message\api::can_send_message_to_conversation($fromid, $convid)) {
+                return [
+                    'ok' => false,
+                    'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+                ];
+            }
+            $sent = \core_message\api::send_message_to_conversation($fromid, $convid, $clean, FORMAT_PLAIN);
+            $mid = (int) ($sent->id ?? 0);
+            $when = !empty($sent->timecreated)
+                ? userdate((int) $sent->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
+                : '';
+            $youlabel = get_string_manager()->string_exists('employer_messages_you', 'local_launchpad')
+                ? get_string('employer_messages_you', 'local_launchpad')
+                : 'You';
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'message' => [
+                    'id' => $mid,
+                    'text' => (string) ($sent->text ?? $clean),
+                    'is_mine' => true,
+                    'from_label' => $youlabel,
+                    'can_delete' => $mid > 0 && self::user_can_delete_own_messages($fromid)
+                        && \core_message\api::can_delete_message($fromid, $mid),
+                    'when' => $when,
+                ],
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_save', 'local_launchpad'),
+            ];
+        }
     }
 
     /**
@@ -1095,8 +1291,29 @@ final class messaging {
     }
 
     /**
-     * @return list<array>
+     * Filter inbox rows for All / Starred / Private / Group (Moodle-aligned).
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
      */
+    private static function filter_conversations_by_tab(array $rows, string $mtab): array {
+        if ($mtab === 'all' || $mtab === '') {
+            return array_values($rows);
+        }
+        return array_values(array_filter($rows, static function (array $row) use ($mtab): bool {
+            if ($mtab === 'starred') {
+                return !empty($row['isfavourite']);
+            }
+            if ($mtab === 'private') {
+                // Moodle private view = 1:1 + personal space.
+                return !empty($row['is_private']) || !empty($row['is_self']);
+            }
+            if ($mtab === 'group') {
+                return !empty($row['is_group']);
+            }
+            return true;
+        }));
+    }
 
     /**
      * @return list<array<string,mixed>>
@@ -1109,7 +1326,7 @@ final class messaging {
         int $selectedconvid = 0
     ): array {
         try {
-            // Favourites + private (+ self) + groups — same overview as Employer.
+            // Always load the overview set; tab filtering happens in filter_conversations_by_tab().
             $rows = \core_message\api::get_conversations($userid, 0, self::INBOX_LIMIT, null, null, true);
         } catch (\Throwable $e) {
             return [];
@@ -1205,7 +1422,7 @@ final class messaging {
             } else if ($isself) {
                 $preview = $str(
                     'employer_messages_self_empty',
-                    'Your personal space in Moodle — open it to add a note.'
+                    'Your personal space — add a note here.'
                 );
             }
 
@@ -1268,6 +1485,59 @@ final class messaging {
                 'has_role_label' => $rolelabel !== '',
             ];
         }
+
+        // Moodle sometimes omits empty/cleared self chats from get_conversations — keep Personal space visible.
+        $hasself = false;
+        foreach ($out as $row) {
+            if (!empty($row['is_self'])) {
+                $hasself = true;
+                break;
+            }
+        }
+        if (!$hasself) {
+            try {
+                $self = \core_message\api::get_self_conversation($userid);
+                $selfid = (int) ($self->id ?? 0);
+                if ($selfid > 0) {
+                    $selfname = get_string('selfconversation', 'core_message');
+                    $selfpreview = $str(
+                        'employer_messages_self_empty',
+                        'Your personal space — add a note here.'
+                    );
+                    array_unshift($out, [
+                        'id' => $selfid,
+                        'other_id' => 0,
+                        'name' => $selfname,
+                        'other_name' => $selfname,
+                        'other_initials' => self::conversation_initials($selfname),
+                        'initials' => self::conversation_initials($selfname),
+                        'imageurl' => '',
+                        'has_image' => false,
+                        'preview' => $selfpreview,
+                        'has_preview' => $selfpreview !== '',
+                        'preview_prefix' => '',
+                        'has_preview_prefix' => false,
+                        'when' => '',
+                        'has_when' => false,
+                        'type_label' => $str('employer_messages_type_self', 'Personal'),
+                        'isfavourite' => true,
+                        'is_group' => false,
+                        'is_self' => true,
+                        'is_private' => false,
+                        'unread' => 0,
+                        'has_unread' => false,
+                        'is_unread' => false,
+                        'is_selected' => $selectedconvid > 0 && $selfid === $selectedconvid,
+                        'url' => self::messages_url(null, $portal, $mtab, $selfid),
+                        'role_label' => '',
+                        'has_role_label' => false,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // Non-fatal — inbox still works without Personal space.
+            }
+        }
+
         return $out;
     }
 
@@ -1317,6 +1587,406 @@ final class messaging {
             return (int) ($created->id ?? 0);
         } catch (\Throwable $e) {
             return 0;
+        }
+    }
+
+    /**
+     * Find or create the canonical track chat Moodle course group (idnumber lp-trackchat).
+     */
+    public static function ensure_track_chat_group(int $courseid): ?\stdClass {
+        global $CFG, $DB;
+
+        if ($courseid <= 0) {
+            return null;
+        }
+        require_once($CFG->dirroot . '/group/lib.php');
+
+        $existing = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER);
+        if ($existing) {
+            // Track chat must be ALL-visible so admin/CLI sync and groups_get_members work.
+            // MEMBERS visibility hides roster from non-members and breaks enable/sync.
+            if ((int) ($existing->visibility ?? -1) !== GROUPS_VISIBILITY_ALL) {
+                $existing->visibility = GROUPS_VISIBILITY_ALL;
+                try {
+                    groups_update_group($existing);
+                } catch (\Throwable $e) {
+                    // Soft-fail — still return the group for callers.
+                }
+                $existing = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER) ?: $existing;
+            }
+            return $existing;
+        }
+
+        $course = $DB->get_record('course', ['id' => $courseid], '*', IGNORE_MISSING);
+        if (!$course) {
+            return null;
+        }
+
+        $data = new \stdClass();
+        $data->courseid = $courseid;
+        $data->name = get_string_manager()->string_exists('admin_track_chat_group_name', 'local_launchpad')
+            ? get_string('admin_track_chat_group_name', 'local_launchpad')
+            : 'Track chat';
+        $data->idnumber = self::TRACK_CHAT_IDNUMBER;
+        $data->description = get_string_manager()->string_exists('admin_track_chat_group_desc', 'local_launchpad')
+            ? get_string('admin_track_chat_group_desc', 'local_launchpad')
+            : 'LaunchPad track group chat for fellows and mentors on this course.';
+        $data->descriptionformat = FORMAT_HTML;
+        // ALL: roster visible for sync/messaging; MEMBERS breaks groups_is_member for admins.
+        $data->visibility = GROUPS_VISIBILITY_ALL;
+        $data->participation = 1;
+
+        try {
+            $gid = (int) groups_create_group($data);
+        } catch (\Throwable $e) {
+            // Race: another request created it.
+            $existing = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER);
+            return $existing ?: null;
+        }
+        if ($gid <= 0) {
+            return null;
+        }
+        return groups_get_group($gid, '*', IGNORE_MISSING) ?: null;
+    }
+
+    /**
+     * Empty-state title/body for Messages → Group when the filtered list is empty.
+     *
+     * Distinguishes track chat never enabled vs disabled vs enabled-but-missing.
+     *
+     * @return array{title:string,body:string}
+     */
+    public static function group_tab_empty_copy(int $userid, string $portal = 'fellow'): array {
+        $title = get_string_manager()->string_exists('fellowship_messages_group_empty_title', 'local_launchpad')
+            ? get_string('fellowship_messages_group_empty_title', 'local_launchpad')
+            : 'No group chats';
+
+        // Include hidden tracks — fellowship list_courses hides visible=0, but messaging still applies.
+        $courseids = self::user_track_courseids_for_messages($userid, $portal);
+
+        $sawon = false;
+        $sawdisabled = false;
+        $sawoff = false;
+        $sawsiteoff = false;
+        foreach ($courseids as $courseid) {
+            $status = self::get_track_chat_status($courseid);
+            switch ((string) ($status['status_key'] ?? 'off')) {
+                case 'on':
+                    $sawon = true;
+                    break;
+                case 'disabled':
+                    $sawdisabled = true;
+                    break;
+                case 'site_off':
+                    $sawsiteoff = true;
+                    break;
+                default:
+                    $sawoff = true;
+                    break;
+            }
+        }
+
+        if ($sawon) {
+            $body = get_string_manager()->string_exists('fellowship_messages_group_empty_pending', 'local_launchpad')
+                ? get_string('fellowship_messages_group_empty_pending', 'local_launchpad')
+                : 'Track group chat is enabled, but it is not in your inbox yet. Refresh, or ask a programme admin to check membership.';
+        } else if ($sawdisabled) {
+            $body = get_string_manager()->string_exists('fellowship_messages_group_empty_disabled', 'local_launchpad')
+                ? get_string('fellowship_messages_group_empty_disabled', 'local_launchpad')
+                : 'Track group chat is turned off right now. Ask a programme admin to enable it again — history returns with it.';
+        } else if ($sawsiteoff && !$sawoff) {
+            $body = get_string_manager()->string_exists('fellowship_messages_disabled_body', 'local_launchpad')
+                ? get_string('fellowship_messages_disabled_body', 'local_launchpad')
+                : 'Site messaging is disabled. Ask an admin to enable it.';
+        } else {
+            $body = get_string_manager()->string_exists('fellowship_messages_group_empty_off', 'local_launchpad')
+                ? get_string('fellowship_messages_group_empty_off', 'local_launchpad')
+                : 'No track group chat yet. When a programme admin enables it for your course, it appears here.';
+        }
+
+        return ['title' => $title, 'body' => $body];
+    }
+
+    /**
+     * LaunchPad track course ids for a user (fellow student / mentor teacher), including hidden courses.
+     * Skips orientation. Used for Group-tab empty copy.
+     *
+     * @return list<int>
+     */
+    public static function user_track_courseids_for_messages(int $userid, string $portal = 'fellow'): array {
+        global $CFG, $DB;
+
+        if ($userid <= 0) {
+            return [];
+        }
+
+        if ($portal === 'mentor') {
+            $ids = [];
+            foreach (persona_home::list_mentor_courses($userid) as $course) {
+                if (fellowship_dashboard::is_orientation_course($course)) {
+                    continue;
+                }
+                $ids[] = (int) $course->id;
+            }
+            return $ids;
+        }
+
+        require_once($CFG->libdir . '/enrollib.php');
+        $sql = "SELECT DISTINCT c.id, c.idnumber
+                  FROM {user_enrolments} ue
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                  JOIN {course} c ON c.id = e.courseid
+                  JOIN {context} ctx ON ctx.instanceid = c.id AND ctx.contextlevel = :ctxlevel
+                  JOIN {role_assignments} ra ON ra.contextid = ctx.id AND ra.userid = ue.userid
+                  JOIN {role} r ON r.id = ra.roleid AND r.archetype = :arch
+                 WHERE ue.userid = :userid
+                   AND ue.status = :uestatus
+                   AND e.status = :estatus
+                   AND " . $DB->sql_like('c.idnumber', ':idn', false);
+        $rows = $DB->get_records_sql($sql, [
+            'userid' => $userid,
+            'uestatus' => ENROL_USER_ACTIVE,
+            'estatus' => ENROL_INSTANCE_ENABLED,
+            'ctxlevel' => CONTEXT_COURSE,
+            'arch' => 'student',
+            'idn' => $DB->sql_like_escape(account_persona::COURSE_IDNUMBER_PREFIX) . '%',
+        ]);
+        $ids = [];
+        foreach ($rows as $row) {
+            if (account_provision::is_orientation_idnumber((string) ($row->idnumber ?? ''))) {
+                continue;
+            }
+            $ids[] = (int) $row->id;
+        }
+        return $ids;
+    }
+
+    /**
+     * Soft-sync membership when the track chat group already exists (enrol/assign hooks).
+     * Does not create the group — admin Enable owns creation.
+     */
+    public static function maybe_sync_track_chat_members(int $courseid): void {
+        global $CFG, $DB;
+
+        if ($courseid <= 0) {
+            return;
+        }
+        try {
+            $idnumber = (string) ($DB->get_field('course', 'idnumber', ['id' => $courseid]) ?: '');
+            if ($idnumber !== '' && account_provision::is_orientation_idnumber($idnumber)) {
+                return;
+            }
+            require_once($CFG->dirroot . '/group/lib.php');
+            if (!groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER)) {
+                return;
+            }
+            self::sync_track_chat_members($courseid);
+        } catch (\Throwable $e) {
+            // Soft-fail — roster ops must not break if messaging/group sync fails.
+        }
+    }
+
+    /**
+     * Set course-group members to LaunchPad fellows + mentors on this track.
+     *
+     * @return int Active member count after sync
+     */
+    public static function sync_track_chat_members(int $courseid): int {
+        global $CFG;
+
+        if ($courseid <= 0) {
+            return 0;
+        }
+        require_once($CFG->dirroot . '/group/lib.php');
+
+        $group = self::ensure_track_chat_group($courseid);
+        if (!$group) {
+            return 0;
+        }
+        $groupid = (int) $group->id;
+
+        $wanted = [];
+        foreach (admin_dashboard::list_track_fellows($courseid) as $row) {
+            $uid = (int) ($row['id'] ?? 0);
+            if ($uid > 0) {
+                $wanted[$uid] = true;
+            }
+        }
+        foreach (admin_dashboard::list_track_roster_mentors($courseid) as $row) {
+            $uid = (int) ($row['id'] ?? 0);
+            if ($uid > 0) {
+                $wanted[$uid] = true;
+            }
+        }
+
+        $current = [];
+        foreach (groups_get_members($groupid, 'u.id') as $u) {
+            $current[(int) $u->id] = true;
+        }
+
+        foreach (array_keys($wanted) as $uid) {
+            if (empty($current[$uid])) {
+                // Soft-fail per user (e.g. not enrolled yet).
+                try {
+                    groups_add_member($groupid, $uid);
+                } catch (\Throwable $e) {
+                    // Continue.
+                }
+            }
+        }
+        foreach (array_keys($current) as $uid) {
+            if (empty($wanted[$uid])) {
+                try {
+                    groups_remove_member($groupid, $uid);
+                } catch (\Throwable $e) {
+                    // Continue.
+                }
+            }
+        }
+
+        return count(groups_get_members($groupid, 'u.id'));
+    }
+
+    /**
+     * Status bag for Admin Course ops Participants card.
+     *
+     * @return array{
+     *   messaging_site_on:bool,
+     *   has_group:bool,
+     *   group_id:int,
+     *   conversation_id:int,
+     *   enabled:bool,
+     *   member_count:int,
+     *   status_key:string
+     * }
+     */
+    public static function get_track_chat_status(int $courseid): array {
+        global $CFG;
+
+        $out = [
+            'messaging_site_on' => !empty($CFG->messaging),
+            'has_group' => false,
+            'group_id' => 0,
+            'conversation_id' => 0,
+            'enabled' => false,
+            'member_count' => 0,
+            'status_key' => 'off',
+        ];
+        if ($courseid <= 0) {
+            return $out;
+        }
+        if (empty($CFG->messaging)) {
+            $out['status_key'] = 'site_off';
+            return $out;
+        }
+
+        require_once($CFG->dirroot . '/group/lib.php');
+        $group = groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER);
+        if (!$group) {
+            $out['status_key'] = 'off';
+            return $out;
+        }
+        $out['has_group'] = true;
+        $out['group_id'] = (int) $group->id;
+        $out['member_count'] = count(groups_get_members((int) $group->id, 'u.id'));
+
+        $context = \context_course::instance($courseid);
+        $conv = \core_message\api::get_conversation_by_area(
+            'core_group',
+            'groups',
+            (int) $group->id,
+            $context->id
+        );
+        if ($conv) {
+            $out['conversation_id'] = (int) $conv->id;
+            $out['enabled'] = !empty($conv->enabled);
+            $out['status_key'] = $out['enabled'] ? 'on' : 'disabled';
+        } else {
+            $out['status_key'] = 'off';
+        }
+        return $out;
+    }
+
+    /**
+     * Admin-owned: enable or disable the track group conversation.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function set_track_chat_enabled(int $courseid, bool $on): array {
+        global $CFG;
+
+        if ($courseid <= 0) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        if (empty($CFG->messaging)) {
+            return ['error' => get_string('admin_track_chat_err_messaging_off', 'local_launchpad')];
+        }
+
+        require_once($CFG->dirroot . '/group/lib.php');
+
+        $group = self::ensure_track_chat_group($courseid);
+        if (!$group) {
+            return ['error' => get_string('admin_track_chat_err_group', 'local_launchpad')];
+        }
+
+        $membercount = self::sync_track_chat_members($courseid);
+        $context = \context_course::instance($courseid);
+        $convid = 0;
+        $conv = \core_message\api::get_conversation_by_area(
+            'core_group',
+            'groups',
+            (int) $group->id,
+            $context->id
+        );
+
+        try {
+            if ($on) {
+                if (!$conv) {
+                    $memberids = array_map(
+                        static fn($u) => (int) $u->id,
+                        groups_get_members((int) $group->id, 'u.id')
+                    );
+                    $created = \core_message\api::create_conversation(
+                        \core_message\api::MESSAGE_CONVERSATION_TYPE_GROUP,
+                        $memberids,
+                        (string) $group->name,
+                        \core_message\api::MESSAGE_CONVERSATION_ENABLED,
+                        'core_group',
+                        'groups',
+                        (int) $group->id,
+                        $context->id
+                    );
+                    $convid = (int) ($created->id ?? 0);
+                } else {
+                    $convid = (int) $conv->id;
+                    if (empty($conv->enabled)) {
+                        \core_message\api::enable_conversation($convid);
+                    }
+                    \core_message\api::update_conversation_name($convid, (string) $group->name);
+                    // Ensure members match group after re-enable.
+                    $memberids = array_map(
+                        static fn($u) => (int) $u->id,
+                        groups_get_members((int) $group->id, 'u.id')
+                    );
+                    if ($memberids !== []) {
+                        \core_message\api::add_members_to_conversation($memberids, $convid);
+                    }
+                }
+                if ($convid <= 0) {
+                    return ['error' => get_string('admin_track_chat_err_enable', 'local_launchpad')];
+                }
+                return [
+                    'ok' => get_string('admin_track_chat_enabled_ok', 'local_launchpad', $membercount),
+                ];
+            }
+
+            // Disable.
+            if ($conv && !empty($conv->enabled)) {
+                \core_message\api::disable_conversation((int) $conv->id);
+            }
+            return ['ok' => get_string('admin_track_chat_disabled_ok', 'local_launchpad')];
+        } catch (\Throwable $e) {
+            return ['error' => get_string('admin_track_chat_err_enable', 'local_launchpad')];
         }
     }
 }

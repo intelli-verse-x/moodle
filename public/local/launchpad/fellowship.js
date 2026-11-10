@@ -1636,20 +1636,27 @@
         var sesskey = layout.getAttribute('data-sesskey') || '';
         var portal = layout.getAttribute('data-portal') || 'fellow';
         var otherId = layout.getAttribute('data-other-id') || '';
+        var convId = layout.getAttribute('data-convid') || '';
         var canDelete = layout.getAttribute('data-can-delete') === '1';
+        var starBtn = layout.querySelector('[data-lp-msg-star]');
+        var starTitle = (starBtn && starBtn.getAttribute('data-title-star')) || 'Star this conversation';
+        var unstarTitle = (starBtn && starBtn.getAttribute('data-title-unstar')) || 'Remove from starred';
 
         if (msgScroll) {
             msgScroll.scrollTop = msgScroll.scrollHeight;
         }
 
         function postAction(action, fields) {
-            if (!ajaxUrl || !sesskey || !otherId) {
+            if (!ajaxUrl || !sesskey || (!otherId && !convId)) {
                 return Promise.reject(new Error('no ajax'));
             }
             var body = new URLSearchParams();
             body.set('sesskey', sesskey);
             body.set('portal', portal);
-            body.set('id', otherId);
+            body.set('id', otherId || '0');
+            if (convId) {
+                body.set('convid', convId);
+            }
             body.set('action', action);
             Object.keys(fields || {}).forEach(function (key) {
                 var val = fields[key];
@@ -1947,6 +1954,50 @@
             });
         }
 
+        // --- star / unstar conversation ---
+        if (starBtn && convId) {
+            starTitle = starBtn.getAttribute('data-title-star') || starTitle;
+            unstarTitle = starBtn.getAttribute('data-title-unstar') || unstarTitle;
+            starBtn.addEventListener('click', function () {
+                if (starBtn.disabled) {
+                    return;
+                }
+                var starred = starBtn.getAttribute('data-starred') === '1';
+                var next = !starred;
+                starBtn.disabled = true;
+                postAction(next ? 'star' : 'unstar', {}).then(function (data) {
+                    starBtn.disabled = false;
+                    if (!data || !data.ok) {
+                        window.alert((data && data.error) || 'Could not update star');
+                        return;
+                    }
+                    var on = !!data.starred;
+                    starBtn.setAttribute('data-starred', on ? '1' : '0');
+                    starBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    starBtn.classList.toggle('is-on', on);
+                    var label = on ? unstarTitle : starTitle;
+                    starBtn.setAttribute('title', label);
+                    starBtn.setAttribute('aria-label', label);
+                    var row = layout.querySelector('.lp-msg-row.is-selected .lp-msg-meta-row');
+                    if (row) {
+                        var existing = row.querySelector('.lp-msg-star');
+                        if (on && !existing) {
+                            var mark = document.createElement('span');
+                            mark.className = 'lp-msg-star';
+                            mark.setAttribute('aria-hidden', 'true');
+                            mark.textContent = '★';
+                            row.appendChild(mark);
+                        } else if (!on && existing) {
+                            existing.remove();
+                        }
+                    }
+                }).catch(function () {
+                    starBtn.disabled = false;
+                    window.alert('Could not update star');
+                });
+            });
+        }
+
         // --- emoji picker (lightweight, LaunchPad-styled) ---
         var emojiToggle = layout.querySelector('[data-lp-msg-emoji-toggle]');
         var emojiPanel = layout.querySelector('[data-lp-msg-emoji-panel]');
@@ -1996,6 +2047,75 @@
                 setEmojiOpen(false);
             });
         }
+    })();
+
+    // Profile tabs: switch Overview / Edit / Preferences in-place (no full-page reload).
+    (function profileTabs() {
+        var root = shell.querySelector('[data-lp-profile]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-profile-tab]');
+        var panels = root.querySelectorAll('[data-lp-profile-panel]');
+        if (!tabs.length || !panels.length) {
+            return;
+        }
+
+        function applyTab(tab, pushUrl) {
+            var key = tab || 'overview';
+            if (key !== 'overview' && key !== 'edit' && key !== 'preferences') {
+                key = 'overview';
+            }
+            root.setAttribute('data-lp-profile-active', key);
+
+            tabs.forEach(function (el) {
+                var on = el.getAttribute('data-lp-profile-tab') === key;
+                el.classList.toggle('is-on', on);
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+
+            panels.forEach(function (panel) {
+                panel.hidden = panel.getAttribute('data-lp-profile-panel') !== key;
+            });
+
+            if (pushUrl) {
+                var hub = root.querySelector('[data-lp-profile-pref-hub]');
+                var detail = root.querySelector('[data-lp-profile-pref-detail]');
+                if (hub && detail) {
+                    hub.hidden = false;
+                    detail.hidden = true;
+                }
+                if (window.history && window.history.replaceState) {
+                    try {
+                        var url = new URL(window.location.href);
+                        url.searchParams.set('view', 'profile');
+                        if (key === 'overview') {
+                            url.searchParams.delete('ptab');
+                        } else {
+                            url.searchParams.set('ptab', key);
+                        }
+                        // Hub-level tab switch drops preference subpages.
+                        url.searchParams.delete('pref');
+                        url.searchParams.delete('saved');
+                        url.searchParams.delete('err');
+                        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+                    } catch (err) {
+                        // Ignore URL sync failures.
+                    }
+                }
+            }
+        }
+
+        root.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-profile-tab]');
+            if (!tab || !root.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyTab(tab.getAttribute('data-lp-profile-tab'), true);
+        });
+
+        applyTab(root.getAttribute('data-lp-profile-active') || 'overview', false);
     })();
 
     // Admin People tabs: filter in-place (no full-page reload).
@@ -2131,7 +2251,7 @@
         }
         var toggle = root.querySelector('[data-lp-manage-edit-toggle]');
         var chooser = root.querySelector('[data-lp-manage-chooser]');
-        var addOpen = root.querySelector('[data-lp-manage-add-open]');
+        var addOpenButtons = root.querySelectorAll('[data-lp-manage-add-open]');
         var editOnly = root.querySelectorAll('.lp-manage-edit-only');
         var actlist = root.querySelector('[data-lp-manage-actlist]');
         var reorderForm = root.querySelector('[data-lp-manage-reorder]');
@@ -2261,11 +2381,19 @@
                 setEdit(!root.classList.contains('is-editing'));
             });
         }
-        if (addOpen && chooser) {
+        addOpenButtons.forEach(function (addOpen) {
             addOpen.addEventListener('click', function () {
-                chooser.hidden = !chooser.hidden;
+                setEdit(true);
+                if (chooser) {
+                    chooser.hidden = false;
+                    try {
+                        chooser.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } catch (err) {
+                        // Older browsers may lack smooth scroll; ignore.
+                    }
+                }
             });
-        }
+        });
         if (cancelBtn) {
             cancelBtn.addEventListener('click', function () {
                 restoreOrder();
@@ -2393,8 +2521,11 @@
         var pendingWrap = root.querySelector('[data-lp-pending-wrap]');
         var pendingList = root.querySelector('[data-lp-pending-list]');
         var removeBox = root.querySelector('[data-lp-remove-inputs]');
-        var removeLabel = root.querySelector('[data-lp-attached-remove]');
-        var removeAria = removeLabel ? (removeLabel.getAttribute('aria-label') || 'Remove file') : 'Remove file';
+        var removeName = root.getAttribute('data-lp-remove-name') || 'removeresourcefiles[]';
+        var removeAria = root.getAttribute('data-lp-remove-label')
+            || (root.querySelector('[data-lp-attached-remove]')
+                ? (root.querySelector('[data-lp-attached-remove]').getAttribute('aria-label') || 'Remove file')
+                : 'Remove file');
         if (!input || !status) {
             return;
         }
@@ -2412,21 +2543,24 @@
                 }
                 var hidden = document.createElement('input');
                 hidden.type = 'hidden';
-                hidden.name = 'removeresourcefiles[]';
+                hidden.name = removeName;
                 hidden.value = name;
                 removeBox.appendChild(hidden);
             });
         }
 
-        root.querySelectorAll('[data-lp-attached-remove]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var card = btn.closest('[data-lp-attached-card]');
-                if (!card) {
-                    return;
-                }
-                card.classList.toggle('is-removing');
-                syncRemoveInputs();
-            });
+        root.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-lp-attached-remove]');
+            if (!btn || !root.contains(btn)) {
+                return;
+            }
+            e.preventDefault();
+            var card = btn.closest('[data-lp-attached-card]');
+            if (!card) {
+                return;
+            }
+            card.classList.toggle('is-removing');
+            syncRemoveInputs();
         });
 
         function setInputFiles(fileList) {
@@ -2514,6 +2648,17 @@
         var submitEl = annForm.querySelector('[data-lp-ann-submit]');
         var cancelEditEl = annForm.querySelector('[data-lp-ann-cancel-edit]');
         var formTitleEl = shell.querySelector('[data-lp-ann-form-title]');
+        var filesEl = annForm.querySelector('[data-lp-ann-files]');
+        var annFilePicker = annForm.querySelector('[data-lp-ann-file-picker]');
+        var attachedList = annFilePicker ? annFilePicker.querySelector('[data-lp-attached-files]') : null;
+        var removeBox = annFilePicker ? annFilePicker.querySelector('[data-lp-remove-inputs]') : null;
+        var pendingWrap = annFilePicker ? annFilePicker.querySelector('[data-lp-pending-wrap]') : null;
+        var pendingList = annFilePicker ? annFilePicker.querySelector('[data-lp-pending-list]') : null;
+        var fileStatus = annFilePicker ? annFilePicker.querySelector('[data-lp-file-status]') : null;
+        var removeAria = annFilePicker
+            ? (annFilePicker.getAttribute('data-lp-remove-label') || 'Remove file')
+            : 'Remove file';
+        var pickerEmpty = fileStatus ? fileStatus.textContent : 'No new file chosen';
         var strSubmit = annPage ? (annPage.getAttribute('data-str-submit') || 'Post announcement') : 'Post announcement';
         var strSave = annPage ? (annPage.getAttribute('data-str-save') || 'Save changes') : 'Save changes';
         var strEditing = annPage ? (annPage.getAttribute('data-str-editing') || 'Edit announcement') : 'Edit announcement';
@@ -2521,6 +2666,96 @@
         var strDeleteConfirm = annPage
             ? (annPage.getAttribute('data-str-delete-confirm') || 'Delete this announcement?')
             : 'Delete this announcement?';
+
+        function clearAnnFiles() {
+            if (filesEl) {
+                filesEl.value = '';
+            }
+            if (attachedList) {
+                attachedList.innerHTML = '';
+                attachedList.setAttribute('hidden', 'hidden');
+            }
+            if (removeBox) {
+                removeBox.innerHTML = '';
+            }
+            if (pendingList) {
+                pendingList.innerHTML = '';
+            }
+            if (pendingWrap) {
+                pendingWrap.hidden = true;
+            }
+            if (fileStatus) {
+                fileStatus.textContent = pickerEmpty;
+            }
+        }
+        function renderExistingFiles(raw) {
+            if (!attachedList) {
+                return;
+            }
+            attachedList.innerHTML = '';
+            if (removeBox) {
+                removeBox.innerHTML = '';
+            }
+            var rows = [];
+            try {
+                rows = JSON.parse(raw || '[]') || [];
+            } catch (err) {
+                rows = [];
+            }
+            if (!Array.isArray(rows) || !rows.length) {
+                attachedList.setAttribute('hidden', 'hidden');
+                return;
+            }
+            rows.forEach(function (row) {
+                var name = String((row && (row.name || row.filename)) || '').trim();
+                if (!name) {
+                    return;
+                }
+                var display = String((row && row.displayname) || name);
+                var size = String((row && row.size) || (row && row.filesize) || '');
+                var ext = String((row && row.ext) || '').toUpperCase() || 'FILE';
+                if (ext.length > 5) {
+                    ext = 'FILE';
+                }
+                var preview = String((row && row.previewurl) || '');
+                var li = document.createElement('li');
+                li.className = 'lp-admin-file-card' + (preview ? ' has-thumb' : '');
+                li.title = name;
+                li.setAttribute('data-lp-attached-card', '');
+                li.setAttribute('data-filename', name);
+                if (preview) {
+                    li.innerHTML =
+                        '<span class="lp-admin-file-thumb" aria-hidden="true"><img alt=""></span>' +
+                        '<span class="lp-admin-file-body">' +
+                        '<span class="lp-admin-file-name"></span>' +
+                        '<span class="lp-admin-file-meta"></span>' +
+                        '</span>' +
+                        '<button type="button" class="lp-file-remove" data-lp-attached-remove></button>';
+                    li.querySelector('img').src = preview;
+                } else {
+                    li.innerHTML =
+                        '<span class="lp-admin-file-ico" aria-hidden="true"></span>' +
+                        '<span class="lp-admin-file-body">' +
+                        '<span class="lp-admin-file-name"></span>' +
+                        '<span class="lp-admin-file-meta"></span>' +
+                        '</span>' +
+                        '<button type="button" class="lp-file-remove" data-lp-attached-remove></button>';
+                    li.querySelector('.lp-admin-file-ico').textContent = ext;
+                }
+                li.querySelector('.lp-admin-file-name').textContent = display;
+                li.querySelector('.lp-admin-file-meta').textContent = size;
+                var rm = li.querySelector('[data-lp-attached-remove]');
+                rm.setAttribute('aria-label', removeAria);
+                rm.title = removeAria;
+                rm.textContent = '×';
+                attachedList.appendChild(li);
+            });
+            if (attachedList.children.length) {
+                attachedList.removeAttribute('hidden');
+            } else {
+                attachedList.setAttribute('hidden', 'hidden');
+            }
+        }
 
         function syncAnnTracks() {
             var on = !!(allTracks && allTracks.checked);
@@ -2585,6 +2820,15 @@
                 box.checked = false;
                 box.disabled = false;
             });
+            var pinElReset = annForm.querySelector('[data-lp-ann-pinned]');
+            if (pinElReset) {
+                pinElReset.checked = false;
+            }
+            var publishElReset = annForm.querySelector('[data-lp-ann-publish-at]');
+            if (publishElReset) {
+                publishElReset.value = '';
+            }
+            clearAnnFiles();
             if (submitEl) {
                 submitEl.textContent = strSubmit;
             }
@@ -2613,6 +2857,16 @@
                 messageEl.value = item.getAttribute('data-message') || '';
             }
             setAnnTagChecks(item.getAttribute('data-tags') || '');
+            var pinEl = annForm.querySelector('[data-lp-ann-pinned]');
+            if (pinEl) {
+                pinEl.checked = item.getAttribute('data-pinned') === '1';
+            }
+            var publishEl = annForm.querySelector('[data-lp-ann-publish-at]');
+            if (publishEl) {
+                publishEl.value = item.getAttribute('data-publish-at') || '';
+            }
+            clearAnnFiles();
+            renderExistingFiles(item.getAttribute('data-attachments') || '[]');
             if (tracksWrap) {
                 tracksWrap.setAttribute('hidden', 'hidden');
             }
@@ -2632,9 +2886,53 @@
             annForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        var selectAllBtn = annForm.querySelector('[data-lp-ann-select-all]');
+        var annList = shell.querySelector('[data-lp-ann-list]');
+        var annFilterMode = 'all';
+        var showMorePattern = annPage
+            ? (annPage.getAttribute('data-str-show-more') || 'Show more ({n})')
+            : 'Show more ({n})';
+
+        function applyAnnFilter(mode) {
+            annFilterMode = mode || 'all';
+            if (!annList) {
+                return;
+            }
+            var moreWrap = shell.querySelector('.lp-ann-more-wrap, .lp-ann-archive-wrap');
+            annList.querySelectorAll('[data-lp-ann-item]').forEach(function (li) {
+                var match = annFilterMode === 'all'
+                    || (annFilterMode === 'pinned' && li.classList.contains('is-pinned'))
+                    || (annFilterMode === 'scheduled' && li.classList.contains('is-scheduled'));
+                if (!match) {
+                    li.hidden = true;
+                    return;
+                }
+                if (annFilterMode === 'all') {
+                    li.hidden = li.classList.contains('is-paged-out');
+                } else {
+                    li.hidden = false;
+                }
+            });
+            if (moreWrap) {
+                moreWrap.hidden = annFilterMode !== 'all'
+                    || !annList.querySelector('li.is-paged-out[hidden]');
+            }
+            shell.querySelectorAll('[data-lp-ann-filter]').forEach(function (btn) {
+                var on = btn.getAttribute('data-lp-ann-filter') === annFilterMode;
+                btn.classList.toggle('is-active', on);
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+
         if (allTracks) {
             allTracks.addEventListener('change', syncAnnTracks);
             syncAnnTracks();
+        }
+        if (selectAllBtn && allTracks) {
+            selectAllBtn.addEventListener('click', function () {
+                allTracks.checked = !allTracks.checked;
+                syncAnnTracks();
+            });
         }
         if (cancelEditEl) {
             cancelEditEl.addEventListener('click', function () {
@@ -2659,6 +2957,18 @@
             }
         });
         shell.addEventListener('click', function (e) {
+            var refreshBtn = e.target.closest('[data-lp-ann-refresh]');
+            if (refreshBtn && annPage && annPage.contains(refreshBtn)) {
+                e.preventDefault();
+                window.location.reload();
+                return;
+            }
+            var filterBtn = e.target.closest('[data-lp-ann-filter]');
+            if (filterBtn && annPage && annPage.contains(filterBtn)) {
+                e.preventDefault();
+                applyAnnFilter(filterBtn.getAttribute('data-lp-ann-filter') || 'all');
+                return;
+            }
             var editBtn = e.target.closest('[data-lp-ann-edit]');
             if (editBtn) {
                 e.preventDefault();
@@ -2669,13 +2979,16 @@
             if (!moreAnn) {
                 return;
             }
-            var annList = shell.querySelector('[data-lp-ann-list]');
             if (!annList) {
                 return;
             }
+            if (annFilterMode !== 'all') {
+                applyAnnFilter('all');
+            }
+            var revealAll = moreAnn.hasAttribute('data-lp-ann-archive');
             var pageSize = parseInt(annList.getAttribute('data-page-size') || '8', 10) || 8;
             var hidden = annList.querySelectorAll('li.is-paged-out[hidden]');
-            var show = Math.min(pageSize, hidden.length);
+            var show = revealAll ? hidden.length : Math.min(pageSize, hidden.length);
             for (var ai = 0; ai < show; ai++) {
                 hidden[ai].removeAttribute('hidden');
                 hidden[ai].classList.remove('is-paged-out');
@@ -2683,9 +2996,13 @@
             var left = annList.querySelectorAll('li.is-paged-out[hidden]').length;
             if (left === 0) {
                 moreAnn.setAttribute('hidden', 'hidden');
-            } else {
+                var archiveWrap = moreAnn.closest('.lp-ann-archive-wrap, .lp-ann-more-wrap');
+                if (archiveWrap) {
+                    archiveWrap.setAttribute('hidden', 'hidden');
+                }
+            } else if (!revealAll) {
                 moreAnn.setAttribute('data-remaining', String(left));
-                moreAnn.textContent = 'Show more (' + left + ')';
+                moreAnn.textContent = showMorePattern.replace('{n}', String(left)).replace('{$a}', String(left));
             }
         });
         shell.addEventListener('submit', function (e) {
@@ -2698,4 +3015,397 @@
             }
         });
     }
+
+    // Admin reviews: queue filters (state / track / search) + soft ping-target.
+    (function initReviewPingTargets() {
+        var page = shell.querySelector('[data-lp-reviews-page]');
+        if (!page) {
+            return;
+        }
+        var actionUrl = page.getAttribute('data-ping-action-url') || '';
+        var sesskey = page.getAttribute('data-sesskey') || '';
+
+        (function initReviewQueueFilters() {
+            var tabs = page.querySelectorAll('[data-lp-ro-state]');
+            var trackSel = page.querySelector('[data-lp-ro-track]');
+            var searchInput = page.querySelector('[data-lp-ro-search]');
+            var rows = page.querySelectorAll('[data-lp-review-row]');
+            var emptyEl = page.querySelector('[data-lp-ro-empty]');
+            var countEl = page.querySelector('[data-lp-ro-count]');
+            if (!tabs.length || !rows.length) {
+                return;
+            }
+            var state = 'all';
+
+            function applyFilters() {
+                var track = trackSel ? String(trackSel.value || '') : '';
+                var q = searchInput ? String(searchInput.value || '').toLowerCase().trim() : '';
+                var shown = 0;
+                rows.forEach(function (row) {
+                    var rowState = row.getAttribute('data-lp-ro-state') || '';
+                    var rowTrack = row.getAttribute('data-lp-ro-track') || '';
+                    var blob = row.getAttribute('data-lp-ro-search') || '';
+                    var okState = state === 'all' || rowState === state;
+                    var okTrack = !track || rowTrack === track;
+                    var okSearch = !q || blob.indexOf(q) !== -1;
+                    var show = okState && okTrack && okSearch;
+                    row.hidden = !show;
+                    if (show) {
+                        shown += 1;
+                    }
+                });
+                if (emptyEl) {
+                    emptyEl.hidden = shown > 0;
+                }
+                if (countEl) {
+                    countEl.textContent = 'Showing ' + shown;
+                }
+            }
+
+            tabs.forEach(function (tab) {
+                tab.addEventListener('click', function () {
+                    state = tab.getAttribute('data-lp-ro-state') || 'all';
+                    tabs.forEach(function (t) {
+                        var on = t === tab;
+                        t.classList.toggle('is-active', on);
+                        t.setAttribute('aria-selected', on ? 'true' : 'false');
+                    });
+                    applyFilters();
+                });
+            });
+            if (trackSel) {
+                trackSel.addEventListener('change', applyFilters);
+            }
+            if (searchInput) {
+                searchInput.addEventListener('input', applyFilters);
+            }
+        })();
+
+        function placeReviewMenu(root) {
+            var menu = root ? root.querySelector('[data-lp-select-menu]') : null;
+            var trigger = root ? root.querySelector('[data-lp-select-trigger]') : null;
+            if (!menu || !trigger) {
+                return;
+            }
+            var rect = trigger.getBoundingClientRect();
+            var pad = 12;
+            var width = Math.round(rect.width);
+            var maxWidth = Math.max(160, window.innerWidth - pad * 2);
+            if (width > maxWidth) {
+                width = maxWidth;
+            }
+            var left = Math.round(rect.left);
+            if (left + width > window.innerWidth - pad) {
+                left = Math.max(pad, window.innerWidth - width - pad);
+            }
+            if (left < pad) {
+                left = pad;
+            }
+            var top = rect.bottom + 6;
+            menu.classList.add('is-fixed');
+            menu.style.width = width + 'px';
+            menu.style.maxWidth = width + 'px';
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            menu.style.right = 'auto';
+            menu.style.minWidth = '0';
+            // Flip up if near bottom of viewport.
+            requestAnimationFrame(function () {
+                var menuRect = menu.getBoundingClientRect();
+                if (menuRect.bottom > window.innerHeight - 8) {
+                    var upTop = rect.top - menuRect.height - 6;
+                    if (upTop >= 8) {
+                        menu.style.top = upTop + 'px';
+                    }
+                }
+            });
+        }
+
+        function clearReviewMenuPlace(menu) {
+            if (!menu) {
+                return;
+            }
+            menu.classList.remove('is-fixed');
+            menu.style.width = '';
+            menu.style.maxWidth = '';
+            menu.style.minWidth = '';
+            menu.style.left = '';
+            menu.style.top = '';
+            menu.style.right = '';
+        }
+
+        function closeReviewSelects(except) {
+            page.querySelectorAll('[data-lp-ping-target]').forEach(function (root) {
+                if (except && root === except) {
+                    return;
+                }
+                var menu = root.querySelector('[data-lp-select-menu]');
+                var trigger = root.querySelector('[data-lp-select-trigger]');
+                root.classList.remove('is-open');
+                if (menu) {
+                    menu.setAttribute('hidden', 'hidden');
+                    clearReviewMenuPlace(menu);
+                }
+                if (trigger) {
+                    trigger.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
+        function syncPingUi(select) {
+            if (!select) {
+                return;
+            }
+            var form = select.form || page.querySelector('#' + (select.getAttribute('form') || ''));
+            if (!form) {
+                return;
+            }
+            var opt = select.options[select.selectedIndex];
+            var cooled = !!(opt && opt.getAttribute('data-cooled') === '1');
+            var btn = form.querySelector('[data-lp-ping-btn]');
+            var cooledEl = form.querySelector('[data-lp-ping-cooled]');
+            if (btn) {
+                if (cooled) {
+                    btn.setAttribute('hidden', 'hidden');
+                } else {
+                    btn.removeAttribute('hidden');
+                }
+            }
+            if (cooledEl) {
+                if (cooled) {
+                    cooledEl.removeAttribute('hidden');
+                } else {
+                    cooledEl.setAttribute('hidden', 'hidden');
+                }
+            }
+        }
+
+        function persistTarget(select) {
+            if (!actionUrl || !sesskey || !select) {
+                return;
+            }
+            var row = select.closest('[data-lp-review-row]');
+            var submissionid = row ? (row.getAttribute('data-submissionid') || '') : '';
+            var teacherid = select.value || '';
+            if (!submissionid || !teacherid || typeof window.fetch !== 'function') {
+                return;
+            }
+            var body = new URLSearchParams();
+            body.set('sesskey', sesskey);
+            body.set('action', 'set_ping_target');
+            body.set('submissionid', submissionid);
+            body.set('teacherid', teacherid);
+            body.set('ajax', '1');
+            window.fetch(actionUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: body.toString()
+            }).catch(function () {
+                // Soft preference only — ping still posts the selected teacherid.
+            });
+        }
+
+        function setPingTargetValue(root, value, persist) {
+            if (!root) {
+                return;
+            }
+            var options = root.querySelectorAll('[data-lp-select-option]');
+            var labelEl = root.querySelector('[data-lp-select-label]');
+            var input = root.querySelector('[data-lp-select-input]');
+            var matched = null;
+            options.forEach(function (opt) {
+                var on = String(opt.getAttribute('data-value') || '') === String(value);
+                opt.classList.toggle('is-selected', on);
+                if (on) {
+                    opt.setAttribute('aria-selected', 'true');
+                    matched = opt;
+                } else {
+                    opt.removeAttribute('aria-selected');
+                }
+            });
+            if (!matched && options.length) {
+                matched = options[0];
+                matched.classList.add('is-selected');
+                matched.setAttribute('aria-selected', 'true');
+                value = matched.getAttribute('data-value');
+            }
+            if (labelEl && matched) {
+                labelEl.textContent = (matched.textContent || '').replace(/\s+/g, ' ').trim();
+            }
+            if (input) {
+                input.value = String(value);
+                if (input.tagName === 'SELECT') {
+                    Array.prototype.forEach.call(input.options, function (opt) {
+                        opt.selected = String(opt.value) === String(value);
+                    });
+                }
+                syncPingUi(input);
+                if (persist) {
+                    persistTarget(input);
+                }
+            }
+        }
+
+        page.querySelectorAll('[data-lp-ping-target]').forEach(function (root) {
+            if (root.getAttribute('data-lp-select-ready') === '1') {
+                return;
+            }
+            root.setAttribute('data-lp-select-ready', '1');
+            var trigger = root.querySelector('[data-lp-select-trigger]');
+            var menu = root.querySelector('[data-lp-select-menu]');
+            var input = root.querySelector('[data-lp-select-input]');
+            if (input) {
+                setPingTargetValue(root, input.value || '', false);
+            }
+            if (trigger) {
+                trigger.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (root.classList.contains('is-open')) {
+                        closeReviewSelects(null);
+                    } else {
+                        closeReviewSelects(root);
+                        root.classList.add('is-open');
+                        if (menu) {
+                            menu.removeAttribute('hidden');
+                            placeReviewMenu(root);
+                        }
+                        trigger.setAttribute('aria-expanded', 'true');
+                        var selected = root.querySelector('[data-lp-select-option].is-selected')
+                            || root.querySelector('[data-lp-select-option]');
+                        if (selected) {
+                            selected.focus();
+                        }
+                    }
+                });
+            }
+            if (menu) {
+                menu.addEventListener('click', function (e) {
+                    var opt = e.target.closest('[data-lp-select-option]');
+                    if (!opt || !menu.contains(opt)) {
+                        return;
+                    }
+                    e.preventDefault();
+                    setPingTargetValue(root, opt.getAttribute('data-value') || '', true);
+                    closeReviewSelects(null);
+                    if (trigger) {
+                        trigger.focus();
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('[data-lp-ping-target]')) {
+                closeReviewSelects(null);
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeReviewSelects(null);
+            }
+        });
+        window.addEventListener('resize', function () {
+            closeReviewSelects(null);
+        });
+        window.addEventListener('scroll', function () {
+            closeReviewSelects(null);
+        }, true);
+    })();
+
+    // Admin Mentors & capacity: All / Needs mentor / Over capacity filters.
+    (function initMentorsCapacityFilters() {
+        var page = shell.querySelector('[data-lp-mentors-page]');
+        if (!page) {
+            return;
+        }
+        var tabs = page.querySelectorAll('[data-lp-mc-filter]');
+        var cards = page.querySelectorAll('[data-lp-mc-card]');
+        var emptyEl = page.querySelector('[data-lp-mc-empty]');
+        var builder = page.querySelector('.lp-mc-builder-tile');
+        if (!tabs.length || !cards.length) {
+            return;
+        }
+        var mode = 'all';
+
+        function applyFilter(next) {
+            mode = next || 'all';
+            var shown = 0;
+            cards.forEach(function (card) {
+                var status = card.getAttribute('data-lp-mc-status') || '';
+                var show = mode === 'all' || status === mode;
+                card.hidden = !show;
+                if (show) {
+                    shown += 1;
+                }
+            });
+            if (builder) {
+                builder.hidden = mode !== 'all';
+            }
+            if (emptyEl) {
+                emptyEl.hidden = shown > 0;
+            }
+            tabs.forEach(function (tab) {
+                var on = tab.getAttribute('data-lp-mc-filter') === mode;
+                tab.classList.toggle('is-active', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                applyFilter(tab.getAttribute('data-lp-mc-filter') || 'all');
+            });
+        });
+    })();
+
+    // Admin Tracks & courses: All / Foundations ready / Outline only filters.
+    (function initTracksFilters() {
+        var page = shell.querySelector('[data-lp-tracks-page]');
+        if (!page) {
+            return;
+        }
+        var tabs = page.querySelectorAll('[data-lp-tr-filter]');
+        var cards = page.querySelectorAll('[data-lp-tr-card]');
+        var emptyEl = page.querySelector('[data-lp-tr-empty]');
+        var builder = page.querySelector('.lp-tr-builder-tile');
+        if (!tabs.length || !cards.length) {
+            return;
+        }
+        var mode = 'all';
+
+        function applyFilter(next) {
+            mode = next || 'all';
+            var shown = 0;
+            cards.forEach(function (card) {
+                var status = card.getAttribute('data-lp-tr-status') || '';
+                var show = mode === 'all' || status === mode;
+                card.hidden = !show;
+                if (show) {
+                    shown += 1;
+                }
+            });
+            if (builder) {
+                builder.hidden = mode !== 'all';
+            }
+            if (emptyEl) {
+                emptyEl.hidden = shown > 0;
+            }
+            tabs.forEach(function (tab) {
+                var on = tab.getAttribute('data-lp-tr-filter') === mode;
+                tab.classList.toggle('is-active', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                applyFilter(tab.getAttribute('data-lp-tr-filter') || 'all');
+            });
+        });
+    })();
 })();

@@ -142,7 +142,7 @@ final class fellowship_dashboard {
         $lead = self::str(
             'fellowship_track_lead_default',
             null,
-            'Work through the phases on your assigned Moodle track. Activities open in Moodle. Later phases appear when the programme releases them.'
+            'Work through the phases on your assigned track. Open activities here in LaunchPad. Later phases appear when the programme releases them.'
         );
 
         if ($key === 'ai') {
@@ -161,7 +161,7 @@ final class fellowship_dashboard {
             $lead = self::str(
                 'fellowship_track_lead_ai',
                 null,
-                'AI & Automation track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+                'AI & Automation track — Foundations through Demo day. Open activities here; later phases unlock when the programme releases them.'
             );
         } else if ($key === 'fullstack') {
             $blurbs = [
@@ -179,7 +179,7 @@ final class fellowship_dashboard {
             $lead = self::str(
                 'fellowship_track_lead_fs',
                 null,
-                'Full Stack track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+                'Full Stack track — Foundations through Demo day. Open activities here; later phases unlock when the programme releases them.'
             );
         } else if ($key === 'marketing') {
             $blurbs = [
@@ -196,7 +196,7 @@ final class fellowship_dashboard {
             $lead = self::str(
                 'fellowship_track_lead_mkt',
                 null,
-                'Digital Marketing track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+                'Digital Marketing track — Foundations through Demo day. Open activities here; later phases unlock when the programme releases them.'
             );
         } else if ($key === 'startup') {
             $blurbs = [
@@ -213,7 +213,7 @@ final class fellowship_dashboard {
             $lead = self::str(
                 'fellowship_track_lead_su',
                 null,
-                'Startup Building track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+                'Startup Building track — Foundations through Demo day. Open activities here; later phases unlock when the programme releases them.'
             );
         } else if ($key === 'orient') {
             $blurbs = [
@@ -236,7 +236,7 @@ final class fellowship_dashboard {
             $lead = self::str(
                 'fellowship_track_lead_pm',
                 null,
-                'Product Management track — Foundations through Demo day. Activities open in Moodle; later phases unlock when the programme releases them.'
+                'Product Management track — Foundations through Demo day. Open activities here; later phases unlock when the programme releases them.'
             );
         }
 
@@ -1382,7 +1382,7 @@ final class fellowship_dashboard {
             'journey_sub' => self::str(
                 'fellowship_journey_help_short',
                 null,
-                'Gates follow your Moodle course sections. Status updates from activity completion on this track.'
+                'Gates follow your course sections. Status updates from activity completion on this track.'
             ),
             'gates_heading' => self::str('fellowship_completion_gates_heading', null, 'Programme gates'),
             'gates_sub' => self::str(
@@ -1791,7 +1791,7 @@ final class fellowship_dashboard {
             'xp_empty_body' => self::str(
                 'fellowship_xp_empty_body',
                 null,
-                'Finish a lesson, quiz, or assignment in Moodle to earn your first XP and start building your learning progress.'
+                'Finish a lesson, quiz, or assignment to earn your first XP and start building your learning progress.'
             ),
             'xp_step_lessons' => self::str('fellowship_xp_step_lessons', null, 'Complete Lessons'),
             'xp_step_quizzes' => self::str('fellowship_xp_step_quizzes', null, 'Take Quizzes'),
@@ -1800,7 +1800,7 @@ final class fellowship_dashboard {
             'xp_title' => self::str(
                 'fellowship_xp_title',
                 null,
-                'XP from your Moodle activity record (lessons, quizzes, submissions). Does not affect grades.'
+                'XP from your activity record (lessons, quizzes, submissions). Does not affect grades.'
             ),
             'badges_heading' => self::str('fellowship_badges_heading', null, 'Badges'),
             'badges_of' => self::str('fellowship_badges_of', null, 'of'),
@@ -1830,23 +1830,23 @@ final class fellowship_dashboard {
             'xp_history_empty' => self::str(
                 'fellowship_xp_history_empty',
                 null,
-                'Nothing yet. Finish a lesson, quiz or assignment in Moodle to earn your first XP.'
+                'Nothing yet. Finish a lesson, quiz or assignment to earn your first XP.'
             ),
             'xp_provisional_note' => self::str(
                 'fellowship_xp_provisional_note',
                 null,
-                'XP and badges refresh from your Moodle completion, quiz and assignment records.'
+                'XP and badges refresh from your completion, quiz and assignment records.'
             ),
             'xp_how' => self::str('fellowship_xp_how', null, 'How XP works'),
             'xp_how_note' => self::str(
                 'fellowship_xp_how_note',
                 null,
-                'Each listed action counts once from your Moodle record. XP never affects your grade. Portfolio XP stays unavailable until that feature ships.'
+                'Each listed action counts once from your activity record. XP never affects your grade. Portfolio XP stays unavailable until that feature ships.'
             ),
             'xp_how_sub' => self::str(
                 'fellowship_xp_how_sub',
                 null,
-                'Each action awards XP once from your Moodle activity.'
+                'Each action awards XP once from your activity on this track.'
             ),
             'badge_pill_earned' => $earnedlabel,
             'badge_pill_locked' => $lockedlabel,
@@ -2360,8 +2360,7 @@ final class fellowship_dashboard {
             $requiredvalue = $gatecompleted . '/' . $gatetrackable;
         }
 
-        // Scoped list: current gate section (Employer pattern); keep Foundations for BC.
-        $foundations = self::section_activities_from_outline($outline, 1);
+        // One activity list only: current gate section (avoid duplicating Foundations).
         $scoped = [];
         $scopedname = $currentgate;
         if ($currentsection > 0) {
@@ -2378,9 +2377,12 @@ final class fellowship_dashboard {
                 break;
             }
         }
-        if ($scoped === [] && $foundations !== []) {
-            $scoped = $foundations;
-            $scopedname = get_string('fellowship_foundations_heading', 'local_launchpad');
+        if ($scoped === [] ) {
+            $fallback = self::section_activities_from_outline($outline, 1);
+            if ($fallback !== []) {
+                $scoped = $fallback;
+                $scopedname = get_string('fellowship_foundations_heading', 'local_launchpad');
+            }
         }
         $scoped = array_slice($scoped, 0, 8);
         $scoped = array_map([self::class, 'decorate_home_activity'], $scoped);
@@ -2480,8 +2482,8 @@ final class fellowship_dashboard {
             'achievements_url' => $achievementsurl,
             'phases_url' => $phasesurl,
             'track_url_default' => $trackurl,
-            'foundations_activities' => $foundations,
-            'has_foundations_activities' => $foundations !== [],
+            'foundations_activities' => [],
+            'has_foundations_activities' => false,
             'progresspct' => $ringpct,
             'all_tracked_done' => $alldone,
         ];
@@ -2533,18 +2535,33 @@ final class fellowship_dashboard {
             $icon = 'message-01';
             $tone = 'amber';
         }
-        $tracked = !empty($activity['tracked']);
-        $complete = !empty($activity['complete']);
-        if ($tracked && $complete) {
-            $status = get_string('fellowship_complete', 'local_launchpad');
-            $statustone = 'ok';
-        } else if ($tracked) {
-            $status = get_string('fellowship_incomplete', 'local_launchpad');
-            $statustone = 'line';
+
+        // Prefer evidence-first chips from activity_row_status (assigns: Met / Changes / Pending).
+        // Do not overwrite with completion-only "To do" — that made home look fake vs Foundations.
+        if (array_key_exists('show_status', $activity)) {
+            if (!empty($activity['show_status']) && ($activity['status_label'] ?? '') !== '') {
+                $status = (string) $activity['status_label'];
+                $chip = (string) ($activity['status_chip'] ?? 'line');
+                $statustone = in_array($chip, ['ok', 'warn'], true) ? $chip : 'line';
+            } else {
+                $status = '';
+                $statustone = 'line';
+            }
         } else {
-            $status = get_string('fellowship_not_tracked', 'local_launchpad');
-            $statustone = 'line';
+            $tracked = !empty($activity['tracked']);
+            $complete = !empty($activity['complete']);
+            if ($tracked && $complete) {
+                $status = get_string('fellowship_complete', 'local_launchpad');
+                $statustone = 'ok';
+            } else if ($tracked) {
+                $status = get_string('fellowship_incomplete', 'local_launchpad');
+                $statustone = 'line';
+            } else {
+                $status = get_string('fellowship_not_tracked', 'local_launchpad');
+                $statustone = 'line';
+            }
         }
+
         $meta = (string) ($activity['modname_display'] ?? '');
         $activity['icon'] = $icon;
         $activity['tone'] = $tone;
@@ -2612,6 +2629,9 @@ final class fellowship_dashboard {
                     'forum' => (int) $forum->id,
                 ], 'timemodified DESC', '*', 0, 20);
                 foreach ($discussions as $discussion) {
+                    if (!announcement_service::discussion_is_live($discussion)) {
+                        continue;
+                    }
                     $post = $DB->get_record('forum_posts', [
                         'discussion' => (int) $discussion->id,
                         'parent' => 0,
@@ -2622,13 +2642,17 @@ final class fellowship_dashboard {
                     $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
                     $authorname = $author ? fullname($author) : '';
                     $tagrows = announcement_service::tag_chips_for_post((int) $post->id);
+                    $ispinned = (int) ($discussion->pinned ?? 0) === 1;
+                    $modcontext = \context_module::instance((int) $cm->id);
+                    $attachments = announcement_service::attachment_rows_for_post($modcontext, (int) $post->id);
+                    $attachcount = count($attachments);
                     $items[] = [
                         'id' => (int) $discussion->id,
                         'subject' => format_string($discussion->name),
                         'excerpt' => shorten_text(format_text(
                             $post->message,
                             (int) $post->messageformat,
-                            ['context' => \context_module::instance((int) $cm->id), 'para' => false]
+                            ['context' => $modcontext, 'para' => false]
                         ), 180),
                         'author' => $authorname,
                         'has_author' => $authorname !== '',
@@ -2640,12 +2664,21 @@ final class fellowship_dashboard {
                         'icon' => 'news',
                         'tags' => $tagrows,
                         'has_tags' => $tagrows !== [],
+                        'is_pinned' => $ispinned,
+                        'pinned_badge' => $ispinned
+                            ? get_string('admin_announcements_pinned_badge', 'local_launchpad')
+                            : '',
+                        'has_attachments' => $attachcount > 0,
+                        'attachments' => $attachments,
+                        'attach_badge' => $attachcount > 0
+                            ? get_string('admin_announcements_attach_badge', 'local_launchpad', $attachcount)
+                            : '',
                     ];
                 }
             }
         }
 
-        usort($items, static fn(array $a, array $b): int => ($b['timemodified'] <=> $a['timemodified']));
+        usort($items, [announcement_service::class, 'sort_announcement_items']);
         $items = array_slice($items, 0, 15);
 
         $coursenames = [];
@@ -2799,7 +2832,7 @@ final class fellowship_dashboard {
             $herosummary = self::str(
                 'fellowship_portfolio_hero_empty',
                 null,
-                'When this track has Moodle assignments, submitted work and released mentor reviews appear here.'
+                'When this track has assignments, submitted work and released mentor reviews appear here.'
             );
             $evidenceheadline = self::str('fellowship_portfolio_evidence_none', null, 'No assignments on this track');
         } else {
@@ -2807,11 +2840,11 @@ final class fellowship_dashboard {
                 self::str(
                     'fellowship_portfolio_hero_evidence',
                     (object) ['evidence' => $countevidence, 'total' => $counttotal],
-                    "{$countevidence} of {$counttotal} track assignments have Moodle evidence"
+                    "{$countevidence} of {$counttotal} track assignments have evidence"
                 ),
             ];
             if (str_contains($heroparts[0], '{$a')) {
-                $heroparts[0] = "{$countevidence} of {$counttotal} track assignments have Moodle evidence";
+                $heroparts[0] = "{$countevidence} of {$counttotal} track assignments have evidence";
             }
             if ($countreviewed > 0) {
                 $heroparts[] = self::str(

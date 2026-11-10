@@ -1,81 +1,192 @@
 {{!
     @template local_launchpad/admin_mentors
 
-    Admin Mentors and capacity — per-track teacher cards and assign form.
-    All copy comes from PHP context. Keep this file comment free of Mustache braces.
+    Admin Mentors & capacity — Stitch-inspired layout.
+    Navbar stays in admin_shell. Pilot caps + track cards only (no export/search chrome).
 }}
-<section class="lp-hero" data-region="local-launchpad-admin-mentors">
-  <div class="lp-hero-row">
-    <div class="lp-hero-main">
-      <span class="lp-eyebrow">{{eyebrow}}</span>
-      <h2>{{heading}}</h2>
-      <p class="lp-hero-lead">{{lead}}</p>
+<div class="lp-mc" data-region="local-launchpad-admin-mentors" data-lp-mentors-page>
+
+  <section class="lp-hero lp-mc-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+      </div>
+      <aside class="lp-mc-hero-stats" aria-label="{{heading}}">
+        <div class="lp-mc-hero-stat">
+          <span class="lp-mc-hero-stat-label">{{stat_tracks_label}}</span>
+          <b>{{stat_tracks_value}}</b>
+          <span class="lp-mc-hero-stat-sub">{{stat_tracks_sub}}</span>
+        </div>
+        <div class="lp-mc-hero-stat">
+          <span class="lp-mc-hero-stat-label">{{stat_mentors_label}}</span>
+          <div class="lp-mc-hero-stat-row">
+            <b>{{stat_mentors_value}}</b>
+            <span class="lp-mc-hero-stat-sub">{{stat_mentors_sub}}</span>
+          </div>
+          {{#has_over_stat}}
+            <span class="lp-mc-hero-warn">{{stat_over_label}}</span>
+          {{/has_over_stat}}
+        </div>
+      </aside>
     </div>
-  </div>
-</section>
+  </section>
 
-{{#flash_ok}}
-  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
-{{/flash_ok}}
-{{#flash_err}}
-  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
-{{/flash_err}}
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
 
-{{#has_tracks}}
-  <div class="lp-tgrid" style="margin-top:16px">
-    {{#tracks}}
-      <article class="lp-tcard">
-        <h3>{{name}}</h3>
-        <p class="lp-xs lp-muted">{{idnumber}}</p>
-        {{#has_teacher}}
-          <div class="lp-people-name" style="margin-top:4px">
-            <span class="lp-av lp-av-sm tone-green" aria-hidden="true">{{teacher_initials}}</span>
-            <div>
-              <b>{{teacher_name}}</b>
-              <div class="lp-xs lp-muted">{{teacher_role_label}}</div>
-              {{#has_more_teachers}}
-                <div class="lp-xs lp-muted">{{more_teachers}}</div>
-              {{/has_more_teachers}}
+  <section class="lp-card lift lp-mc-pilot">
+    <div class="lp-mc-pilot-head">
+      <span class="lp-mc-pilot-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </span>
+      <div>
+        <h3>{{pilot_title}}</h3>
+        <p class="lp-muted">{{pilot_lead}}</p>
+      </div>
+    </div>
+    <form method="post" action="{{pilot_form_action}}" class="lp-stack lp-mc-pilot-form">
+      <input type="hidden" name="sesskey" value="{{sesskey}}">
+      <input type="hidden" name="action" value="save_pilot_capacity">
+      <div class="lp-pilot-fields">
+        <label class="lp-field">
+          <span>{{pilot_mentors_label}}</span>
+          <input type="number" name="pilot_max_mentors" min="1" step="1" required value="{{pilot_mentors_value}}">
+          <span class="lp-xs lp-muted">{{pilot_mentors_help}}</span>
+        </label>
+        <label class="lp-field">
+          <span>{{pilot_fellows_label}}</span>
+          <input type="number" name="pilot_max_fellows" min="0" step="1" required value="{{pilot_fellows_value}}">
+          <span class="lp-xs lp-muted">{{pilot_fellows_help}}</span>
+        </label>
+      </div>
+      <div class="lp-mc-pilot-actions">
+        <span class="lp-mc-live-note"><span class="lp-mc-live-dot" aria-hidden="true"></span>{{pilot_live_note}}</span>
+        <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{pilot_save_label}}</button>
+      </div>
+    </form>
+  </section>
+
+  {{#has_tracks}}
+    <section class="lp-mc-grid-wrap">
+      <div class="lp-mc-grid-head">
+        <div>
+          <h3>{{grid_title}}</h3>
+          <p class="lp-muted lp-sm">{{grid_lead}}</p>
+        </div>
+        <div class="lp-mc-filters" role="tablist" aria-label="{{grid_title}}">
+          <button type="button" class="lp-mc-filter is-active" data-lp-mc-filter="all" role="tab" aria-selected="true">{{filter_all_label}}</button>
+          <button type="button" class="lp-mc-filter" data-lp-mc-filter="needs" role="tab" aria-selected="false">{{filter_needs_label}}</button>
+          <button type="button" class="lp-mc-filter" data-lp-mc-filter="over" role="tab" aria-selected="false">{{filter_over_label}}</button>
+        </div>
+      </div>
+
+      <div class="lp-mc-grid">
+        {{#tracks}}
+          <article class="lp-mc-card{{#is_highlight}} is-highlight{{/is_highlight}}{{#is_over_capacity}} is-over{{/is_over_capacity}}{{#needs_mentor}}{{^is_over_capacity}} is-needs{{/is_over_capacity}}{{/needs_mentor}}"
+            id="{{anchor_id}}"
+            data-lp-mc-card
+            data-lp-mc-status="{{status_key}}">
+            <div class="lp-mc-card-top">
+              <div class="lp-mc-card-titles">
+                <h4>{{name}}</h4>
+                {{#idnumber}}<code class="lp-mc-idn">{{idnumber}}</code>{{/idnumber}}
+              </div>
+              <span class="lp-mc-status lp-mc-status-{{status_key}}">{{status_label}}</span>
             </div>
-          </div>
-          <div class="lp-mentor-meta">
-            <div class="lp-mentor-meta-row">
-              <span>{{capacity_label}}</span>
-              <b>{{capacity_value}}</b>
+
+            {{#is_over_capacity}}
+              <p class="lp-mc-alert">{{over_capacity_label}}</p>
+            {{/is_over_capacity}}
+
+            {{#has_teacher}}
+              <div class="lp-mc-teachers">
+                <span class="lp-mc-section-label">{{teachers_section_label}}</span>
+                <ul class="lp-mc-teacher-list">
+                  {{#teachers}}
+                    <li>
+                      <span class="lp-av lp-av-sm tone-green" aria-hidden="true">{{initials}}</span>
+                      <div>
+                        <b>{{name}}</b>
+                        <span class="lp-xs lp-muted">{{role_label}}</span>
+                      </div>
+                      <span class="lp-mc-active">{{active_label}}</span>
+                    </li>
+                  {{/teachers}}
+                </ul>
+              </div>
+            {{/has_teacher}}
+
+            <div class="lp-mc-meters">
+              <div class="lp-mc-meter{{#is_over_capacity}} is-over{{/is_over_capacity}}">
+                <div class="lp-mc-meter-row">
+                  <span>{{capacity_label}}</span>
+                  <b>{{capacity_value}}</b>
+                </div>
+                <div class="lp-mc-bar" aria-hidden="true"><i style="width:{{mentor_pct}}%"></i></div>
+                <span class="lp-mc-meter-hint">{{mentor_hint}}</span>
+              </div>
+              <div class="lp-mc-meter">
+                <div class="lp-mc-meter-row">
+                  <span>{{fellows_label}}</span>
+                  <b>{{fellows_value}}</b>
+                </div>
+                <span class="lp-mc-meter-hint">{{fellows_hint}}</span>
+              </div>
             </div>
-            <div class="lp-mentor-meta-row">
-              <span>{{fellows_label}}</span>
-              <b>{{fellows_value}}</b>
+
+            {{#can_assign_mentor}}
+              <form method="post" action="{{form_action}}" class="lp-stack lp-mc-assign">
+                <input type="hidden" name="sesskey" value="{{sesskey}}">
+                <input type="hidden" name="action" value="assign_mentor">
+                <input type="hidden" name="trackid" value="{{id}}">
+                <label class="lp-field">
+                  <span>{{email_label}}</span>
+                  <input type="email" name="email" required autocomplete="email" placeholder="{{email_placeholder}}">
+                </label>
+                <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{submit_label}}</button>
+              </form>
+            {{/can_assign_mentor}}
+            {{^can_assign_mentor}}
+              <p class="lp-sm lp-muted lp-mc-full-note">{{assign_full_label}}</p>
+            {{/can_assign_mentor}}
+
+            <div class="lp-mc-card-foot">
+              {{#is_over_capacity}}
+                <a class="lp-btn lp-btn-solid lp-btn-sm lp-mc-foot-btn" href="{{participants_url}}">{{manage_participants_label}}</a>
+              {{/is_over_capacity}}
+              {{^is_over_capacity}}
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{participants_url}}">{{participants_label}}</a>
+              {{/is_over_capacity}}
             </div>
-          </div>
-          <div class="lp-tcard-actions">
-            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{assign_teacher_url}}">{{assign_moodle_label}}</a>
-          </div>
-        {{/has_teacher}}
-        {{^has_teacher}}
-          <form method="post" action="{{form_action}}" class="lp-stack lp-enrol-form" style="margin-top:6px">
-            <input type="hidden" name="sesskey" value="{{sesskey}}">
-            <input type="hidden" name="action" value="assign_mentor">
-            <input type="hidden" name="trackid" value="{{id}}">
-            <label class="lp-field">
-              <span>{{email_label}}</span>
-              <input type="email" name="email" required autocomplete="email" placeholder="{{email_placeholder}}">
-            </label>
-            <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm" style="align-self:flex-start">{{submit_label}}</button>
-          </form>
-          <div class="lp-mentor-meta" style="margin-top:10px">
-            <div class="lp-mentor-meta-row">
-              <span>{{fellows_label}}</span>
-              <b>{{fellows_value}}</b>
-            </div>
-          </div>
-        {{/has_teacher}}
-      </article>
-    {{/tracks}}
-  </div>
-{{/has_tracks}}
-{{^has_tracks}}
-  <div style="margin-top:16px">
-    {{> local_launchpad/admin_empty}}
-  </div>
-{{/has_tracks}}
+          </article>
+        {{/tracks}}
+
+        <a class="lp-mc-builder-tile" href="{{builder_url}}">
+          <span class="lp-mc-builder-ico" aria-hidden="true">+</span>
+          <b>{{builder_tile_title}}</b>
+          <span class="lp-muted lp-sm">{{builder_tile_body}}</span>
+          <span class="lp-mc-builder-cta">{{builder_tile_cta}}</span>
+        </a>
+      </div>
+      <p class="lp-mc-filter-empty" data-lp-mc-empty hidden>{{filter_empty}}</p>
+    </section>
+  {{/has_tracks}}
+  {{^has_tracks}}
+    <div style="margin-top:4px">
+      {{> local_launchpad/admin_empty}}
+    </div>
+  {{/has_tracks}}
+
+  <aside class="lp-mc-footer-tip" aria-label="{{footer_tip}}">
+    <span class="lp-mc-footer-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    </span>
+    <p>{{footer_tip}}</p>
+  </aside>
+</div>

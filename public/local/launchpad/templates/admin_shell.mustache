@@ -41,7 +41,12 @@
         <button type="button" class="lp-menu-btn" data-lp-nav-toggle aria-expanded="false" aria-controls="lp-side">
           <span aria-hidden="true">☰</span> {{str_menu}}
         </button>
-        <h1 class="lp-page-title">{{pagetitle}}</h1>
+        <div class="lp-page-title-wrap">
+          <h1 class="lp-page-title">{{pagetitle}}</h1>
+          {{#pagesub}}
+            <p class="lp-page-sub">{{pagesub}}</p>
+          {{/pagesub}}
+        </div>
       </div>
       <div class="lp-topbar-actions">
         <a class="lp-iconbtn" href="{{notifications_url}}" aria-label="{{notifications_label}}">

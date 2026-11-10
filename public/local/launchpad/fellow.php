@@ -156,7 +156,8 @@ $courseids = array_map(static fn($c) => (int) $c->id, $courses);
 
 // Send / delete LaunchPad messages (Moodle-backed) before rendering.
 if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
-    $toid = required_param('id', PARAM_INT);
+    $toid = optional_param('id', 0, PARAM_INT);
+    $messageconvid = optional_param('convid', 0, PARAM_INT);
     $msgaction = optional_param('msgaction', 'send', PARAM_ALPHA);
     $posttab = optional_param('mtab', 'all', PARAM_ALPHA);
     if (!in_array($posttab, ['all', 'starred', 'private', 'group'], true)) {
@@ -164,7 +165,8 @@ if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
     }
     $redirect = new moodle_url(persona_home::FELLOW_PATH, array_filter([
         'view' => 'messages',
-        'id' => $toid,
+        'id' => $toid > 0 ? $toid : null,
+        'convid' => ($toid <= 0 && $messageconvid > 0) ? $messageconvid : null,
         'mtab' => $posttab !== 'all' ? $posttab : null,
     ]));
     if ($msgaction === 'delete') {
@@ -172,7 +174,11 @@ if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
         $result = messaging::delete_messages($userid, $messageids);
     } else {
         $body = required_param('message', PARAM_RAW_TRIMMED);
-        $result = messaging::send($userid, $toid, $body, 'fellow');
+        if ($toid <= 0 && $messageconvid > 0) {
+            $result = messaging::send_to_conversation($userid, $messageconvid, $body, 'fellow');
+        } else {
+            $result = messaging::send($userid, $toid, $body, 'fellow');
+        }
     }
     if (!$result['ok']) {
         redirect($redirect, $result['error'], null, \core\output\notification::NOTIFY_ERROR);
@@ -482,7 +488,6 @@ switch ($view) {
         } else {
             $trackdata = fellowship_dashboard::track_for_user($userid, $selected);
             $content = $OUTPUT->render_from_template('local_launchpad/fellowship_track', array_merge($trackdata, [
-                'moodle_course_url' => (new moodle_url('/course/view.php', ['id' => $selected->id]))->out(false),
                 'bot_url' => $pluginbase . '/assets/img/bot.webp',
                 'courses' => $coursecards,
                 'multi_course' => count($coursecards) > 1,
@@ -637,9 +642,82 @@ switch ($view) {
             $prefsaved > 0,
             $preferr
         );
+        // Fellowship: LaunchPad profile is enough — no Moodle escape buttons.
+        $profilestrings = employer_tools::profile_strings();
+        $profilestrings['profile_intro'] = $lpstr(
+            'fellowship_profile_intro',
+            null,
+            'Name, contact details, and preferences for your LaunchPad account.'
+        );
+        $profilestrings['profile_edit_help'] = $lpstr(
+            'fellowship_profile_edit_help',
+            null,
+            'Changes save to your account. Locked fields are controlled by your login method.'
+        );
+        $profilestrings['profile_edit_note'] = $lpstr(
+            'fellowship_profile_edit_note',
+            null,
+            'Use Edit for name, contact, and bio. Preferences covers messages, notifications, and language.'
+        );
+        $profilestrings['profile_edit_unavailable_title'] = $lpstr(
+            'fellowship_profile_edit_unavailable_title',
+            null,
+            'Profile edit is managed by your login method'
+        );
+        $profilestrings['profile_edit_unavailable_body'] = $lpstr(
+            'fellowship_profile_edit_unavailable_body',
+            null,
+            'Your organisation controls this account. Use Preferences for what LaunchPad allows, or ask your programme admin.'
+        );
+        $profilestrings['profile_prefs_lead'] = $lpstr(
+            'fellowship_profile_prefs_lead',
+            null,
+            'Account, communication, and system preferences — edit here when available.'
+        );
+        $profilestrings['native_tools_note'] = $lpstr(
+            'fellowship_profile_prefs_note',
+            null,
+            'Some advanced preference tools open outside LaunchPad when your programme requires them.'
+        );
+        $profilestrings['pref_open_moodle'] = $lpstr(
+            'fellowship_pref_open_advanced',
+            null,
+            'Open advanced settings'
+        );
+        $profilestrings['pref_advanced_moodle'] = $lpstr(
+            'fellowship_pref_advanced',
+            null,
+            'Advanced settings'
+        );
+        $profilestrings['profile_course_details_title'] = $lpstr(
+            'fellowship_profile_course_details_title',
+            null,
+            'Course details'
+        );
+        $profilestrings['profile_course_details_help'] = $lpstr(
+            'fellowship_profile_course_details_help',
+            null,
+            'Tracks you are enrolled on for this programme. Open one to continue on My track.'
+        );
+        $profilerole = $lpstr('fellowship_profile_course_role', null, 'Fellow');
+        $coursedetails = [];
+        foreach ($coursecards as $card) {
+            $meta = trim((string) ($card['idnumber'] ?? ''));
+            $coursedetails[] = [
+                'name' => (string) ($card['fullname'] ?? ''),
+                'url' => (string) ($card['url'] ?? ''),
+                'role' => $profilerole,
+                'meta' => $meta,
+            ];
+        }
         $content = $OUTPUT->render_from_template('local_launchpad/employer_profile', array_merge(
             $profilectx,
-            ['strings' => employer_tools::profile_strings()]
+            [
+                'hide_moodle_escapes' => true,
+                'course_details' => $coursedetails,
+                'has_course_details' => $coursedetails !== [],
+                'strings' => $profilestrings,
+            ]
         ));
         break;
 
@@ -689,7 +767,7 @@ switch ($view) {
                     'hint' => $lpstr(
                         'fellowship_help_link_messages_hint',
                         null,
-                        'Private threads synced with Moodle'
+                        'Private threads with mentors and staff'
                     ),
                     'url' => $messagesurl,
                     'icon' => 'message-01',
@@ -717,7 +795,7 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_phases_a',
                         null,
-                        'Each phase passes only after a released Moodle assign review at 70/100 or above. A missing or unreviewed grade stays pending. A high mark later cannot make up for a phase that has not passed.'
+                        'Each phase passes only after a released assignment review at 70/100 or above. A missing or unreviewed grade stays pending. A high mark later cannot make up for a phase that has not passed.'
                     ),
                 ],
                 [
@@ -725,7 +803,7 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_grade_a',
                         null,
-                        'In Moodle Assign activities and the gradebook. Feedback and Progress read the same released grades. This dashboard does not invent grades.'
+                        'On track assignments and in Feedback / Progress. Those views read the same released grades. This dashboard does not invent grades.'
                     ),
                 ],
                 [
@@ -733,7 +811,7 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_quiz_a',
                         null,
-                        'Open the quiz activity link to use Moodle’s quiz. Attempts and scoring stay in Moodle — LaunchPad only links you there.'
+                        'Open the quiz link to attempt it. Attempts and scoring use the quiz tool; LaunchPad shows the brief and status.'
                     ),
                 ],
                 [
@@ -749,7 +827,7 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_messages_a',
                         null,
-                        'Read and reply in Messages. Conversations sync with Moodle messaging — the same threads mentors and staff see there.'
+                        'Read and reply in Messages. Mentors and staff see the same threads.'
                     ),
                 ],
                 [
@@ -757,7 +835,7 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_xp_a',
                         null,
-                        'XP and badges come from your Moodle activity record (lessons, quizzes, submissions, site badges). They do not change grades or unlock phases.'
+                        'XP and badges come from your activity record (lessons, quizzes, submissions, site badges). They do not change grades or unlock phases.'
                     ),
                 ],
             ],
@@ -853,19 +931,19 @@ if ($view === 'home') {
         $herolead = $lpstr(
             'fellowship_home_lead_next',
             null,
-            'You are in a good place. Resume below to keep moving through your next Moodle activity on this track.'
+            'You are in a good place. Resume below to keep moving through your next activity on this track.'
         );
     } else if ($alltrackeddone) {
         $herolead = $lpstr(
             'fellowship_home_lead_done',
             null,
-            'Great progress. Tracked activities in this course are complete. Open My track for the full list, or continue in Moodle whenever you like.'
+            'Great progress. Tracked activities in this course are complete. Open My track for the full list, or continue whenever you like.'
         );
     } else {
         $herolead = $lpstr(
             'fellowship_home_lead_open',
             null,
-            'Browse your track to explore Moodle activities. Completion tracking is not enabled on this course yet, so percentages may stay at zero.'
+            'Browse your track to explore activities. Completion tracking is not enabled on this course yet, so percentages may stay at zero.'
         );
     }
 
@@ -1013,12 +1091,12 @@ $orbittips = [
     'home' => $lpstr(
         'fellowship_orbit_tip_home',
         null,
-        'Your <b>next activity</b> is at the top. XP comes from work saved in Moodle.'
+        'Your <b>next activity</b> is at the top. XP comes from work you save on this track.'
     ),
     'track' => $lpstr(
         'fellowship_orbit_tip_track',
         null,
-        'Open activities in Moodle. Later phases unlock when the programme releases them.'
+        'Open activities here on My track. Later phases unlock when the programme releases them.'
     ),
     'progress' => $lpstr(
         'fellowship_orbit_tip_progress_page',
@@ -1033,7 +1111,7 @@ $orbittips = [
     'feedback' => $lpstr(
         'fellowship_orbit_tip_feedback',
         null,
-        'Mentor comments and grades live on Moodle assignments. Open an item to revise or read the full review.'
+        'Mentor comments and grades live on your assignments. Open an item to revise or read the full review.'
     ),
     'help' => $lpstr(
         'fellowship_orbit_tip_help',
@@ -1043,7 +1121,7 @@ $orbittips = [
     'news' => $lpstr(
         'fellowship_orbit_tip_news',
         null,
-        'Announcements come from each course <b>news forum</b>. Open a post to read the full thread in Moodle.'
+        'Announcements come from each course <b>news forum</b>. Open a post to read the full thread.'
     ),
     'calendar' => $lpstr(
         'fellowship_orbit_tip_calendar',
@@ -1053,17 +1131,17 @@ $orbittips = [
     'portfolio' => $lpstr(
         'fellowship_orbit_tip_portfolio',
         null,
-        'Portfolio counts Moodle submissions and released mentor reviews for the <b>selected track</b>.'
+        'Portfolio counts submissions and released mentor reviews for the <b>selected track</b>.'
     ),
     'profile' => $lpstr(
         'fellowship_orbit_tip_profile',
         null,
-        'Profile saves to your Moodle account. Use <b>Preferences</b> for messages, notifications, and language.'
+        'Profile saves to your LaunchPad account. Use <b>Preferences</b> for messages, notifications, and language.'
     ),
     'messages' => $lpstr(
         'fellowship_orbit_tip_messages',
         null,
-        'LaunchPad messages sync with Moodle messaging. Mentors and peers you can message appear here.'
+        'LaunchPad messages stay in sync with your programme inbox. Mentors and peers you can message appear here.'
     ),
 ];
 $orbittip = $orbittips[$view] ?? $orbittips['home'];

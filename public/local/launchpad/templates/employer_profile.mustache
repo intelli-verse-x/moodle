@@ -1,9 +1,15 @@
 {{!
     @template local_launchpad/employer_profile
 
-    Profile — Moodle account overview, edit form, and preferences hub.
+    Profile — account overview, edit form, and preferences hub.
+    Fellowship passes hide_moodle_escapes to drop Full editor / Open public profile.
+    All three tab panels ship in the DOM; JS switches them without a full reload.
 }}
-<div class="lp-tools-page lp-reveal" data-region="launchpad-profile" style="--lp-d:0">
+<div class="lp-tools-page lp-reveal"
+     data-region="launchpad-profile"
+     data-lp-profile
+     data-lp-profile-active="{{#ptab_overview}}overview{{/ptab_overview}}{{#ptab_edit}}edit{{/ptab_edit}}{{#ptab_preferences}}preferences{{/ptab_preferences}}"
+     style="--lp-d:0">
   {{#has_flash}}
     {{#flash}}
       <div class="lp-flash{{#ok}} is-ok{{/ok}}{{^ok}} is-err{{/ok}}" role="status">{{text}}</div>
@@ -28,17 +34,18 @@
         </div>
       </div>
       <div class="lp-profile-hero-actions">
-        {{! Edit tab already opens the in-portal form — only show a hero CTA when
-            editing must leave LaunchPad (IdP or full Moodle editor). }}
+        {{! Edit tab opens the in-portal form. Moodle escapes are Employer-only. }}
         {{#has_edit_external}}
           <a class="lp-btn lp-btn-primary" href="{{edit_external_url}}">{{strings.profile_edit_external}}</a>
         {{/has_edit_external}}
-        {{^can_edit}}
-          {{^has_edit_external}}
-            <a class="lp-btn lp-btn-primary" href="{{moodle_edit_url}}">{{strings.profile_edit_moodle}}</a>
-          {{/has_edit_external}}
-        {{/can_edit}}
-        <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.profile_open_moodle}}</a>
+        {{^hide_moodle_escapes}}
+          {{^can_edit}}
+            {{^has_edit_external}}
+              <a class="lp-btn lp-btn-primary" href="{{moodle_edit_url}}">{{strings.profile_edit_moodle}}</a>
+            {{/has_edit_external}}
+          {{/can_edit}}
+          <a class="lp-btn lp-btn-light" href="{{moodle_url}}">{{strings.profile_open_moodle}}</a>
+        {{/hide_moodle_escapes}}
       </div>
     </div>
     <div class="lp-theme-hero-art" aria-hidden="true">
@@ -50,25 +57,28 @@
   <div class="lp-tabs lp-tabs-block lp-profile-tabs" role="tablist" aria-label="{{strings.profile_tabs_aria}}">
     <a class="lp-tab{{#ptab_overview}} is-on{{/ptab_overview}}"
        role="tab"
+       data-lp-profile-tab="overview"
        href="{{tab_overview_url}}"
        aria-selected="{{#ptab_overview}}true{{/ptab_overview}}{{^ptab_overview}}false{{/ptab_overview}}">
       {{strings.profile_tab_overview}}
     </a>
     <a class="lp-tab{{#ptab_edit}} is-on{{/ptab_edit}}"
        role="tab"
+       data-lp-profile-tab="edit"
        href="{{tab_edit_url}}"
        aria-selected="{{#ptab_edit}}true{{/ptab_edit}}{{^ptab_edit}}false{{/ptab_edit}}">
       {{strings.profile_tab_edit}}
     </a>
     <a class="lp-tab{{#ptab_preferences}} is-on{{/ptab_preferences}}"
        role="tab"
+       data-lp-profile-tab="preferences"
        href="{{tab_preferences_url}}"
        aria-selected="{{#ptab_preferences}}true{{/ptab_preferences}}{{^ptab_preferences}}false{{/ptab_preferences}}">
       {{strings.profile_tab_preferences}}
     </a>
   </div>
 
-  {{#ptab_overview}}
+  <div data-lp-profile-panel="overview" {{^ptab_overview}}hidden{{/ptab_overview}}>
     {{#has_sections}}
       <div class="lp-profile-sections">
         {{#sections}}
@@ -93,13 +103,41 @@
         <h2>{{strings.profile_empty_title}}</h2>
         <p>{{strings.profile_empty_body}}</p>
         <div class="lp-empty-actions">
-          <a class="lp-btn" href="{{tab_edit_url}}">{{strings.profile_edit_cta}}</a>
+          <a class="lp-btn" href="{{tab_edit_url}}" data-lp-profile-tab="edit">{{strings.profile_edit_cta}}</a>
         </div>
       </div>
     {{/has_sections}}
-  {{/ptab_overview}}
 
-  {{#ptab_edit}}
+    {{#has_course_details}}
+      <section class="lp-card lift lp-profile-section lp-profile-courses" data-region="profile-course-details">
+        <div class="lp-card-head">
+          <div class="lp-card-copy">
+            <h3>{{strings.profile_course_details_title}}</h3>
+            <p>{{strings.profile_course_details_help}}</p>
+          </div>
+        </div>
+        <ul class="lp-profile-course-list">
+          {{#course_details}}
+            <li class="lp-profile-course-item">
+              <a class="lp-profile-course-link" href="{{url}}">
+                <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+                  <iconify-icon icon="hugeicons:student" width="18" height="18"></iconify-icon>
+                </span>
+                <span class="lp-profile-course-copy">
+                  <b>{{{name}}}</b>
+                  {{#meta}}<span class="lp-muted lp-sm">{{meta}}</span>{{/meta}}
+                </span>
+                <span class="lp-chip">{{role}}</span>
+                <iconify-icon icon="hugeicons:arrow-right-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+              </a>
+            </li>
+          {{/course_details}}
+        </ul>
+      </section>
+    {{/has_course_details}}
+  </div>
+
+  <div data-lp-profile-panel="edit" {{^ptab_edit}}hidden{{/ptab_edit}}>
     {{#can_edit}}
       {{#form}}
         <form class="lp-card lift lp-profile-form" method="post" action="{{action_url}}">
@@ -115,7 +153,9 @@
                 <p>{{strings.profile_edit_help}}</p>
               </div>
             </div>
-            <a class="lp-btn lp-btn-light" href="{{moodle_edit_url}}">{{strings.profile_edit_moodle}}</a>
+            {{^hide_moodle_escapes}}
+              <a class="lp-btn lp-btn-light" href="{{moodle_edit_url}}">{{strings.profile_edit_moodle}}</a>
+            {{/hide_moodle_escapes}}
           </div>
 
           <div class="lp-profile-form-grid">
@@ -194,7 +234,7 @@
           <p class="lp-xs lp-muted">{{strings.profile_edit_note}}</p>
           <div class="lp-profile-form-actions">
             <button type="submit" class="lp-btn lp-btn-primary">{{strings.profile_save}}</button>
-            <a class="lp-btn lp-btn-light" href="{{tab_overview_url}}">{{strings.profile_cancel}}</a>
+            <a class="lp-btn lp-btn-light" href="{{tab_overview_url}}" data-lp-profile-tab="overview">{{strings.profile_cancel}}</a>
           </div>
         </form>
       {{/form}}
@@ -208,47 +248,49 @@
             <a class="lp-btn" href="{{edit_external_url}}">{{strings.profile_edit_external}}</a>
           {{/has_edit_external}}
           {{^has_edit_external}}
-            <a class="lp-btn" href="{{moodle_edit_url}}">{{strings.profile_edit_moodle}}</a>
+            {{^hide_moodle_escapes}}
+              <a class="lp-btn" href="{{moodle_edit_url}}">{{strings.profile_edit_moodle}}</a>
+            {{/hide_moodle_escapes}}
           {{/has_edit_external}}
         </div>
       </div>
     {{/can_edit}}
-  {{/ptab_edit}}
+  </div>
 
-  {{#ptab_preferences}}
+  <div data-lp-profile-panel="preferences" {{^ptab_preferences}}hidden{{/ptab_preferences}}>
+    <div class="lp-profile-prefs" data-lp-profile-pref-hub {{#has_pref_detail}}hidden{{/has_pref_detail}}>
+      <p class="lp-sm lp-muted lp-profile-prefs-lead">{{strings.profile_prefs_lead}}</p>
+      {{#has_preference_groups}}
+        {{#preference_groups}}
+          <section class="lp-card lift lp-profile-pref-group">
+            <div class="lp-card-head">
+              <h3>{{title}}</h3>
+            </div>
+            <ul class="lp-profile-pref-list">
+              {{#items}}
+                <li>
+                  <a class="lp-profile-pref-item" href="{{url}}">
+                    <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+                      <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+                    </span>
+                    <span class="lp-profile-pref-copy">
+                      <b>{{label}}</b>
+                      <span>{{desc}}</span>
+                    </span>
+                    <iconify-icon icon="hugeicons:arrow-right-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+                  </a>
+                </li>
+              {{/items}}
+            </ul>
+          </section>
+        {{/preference_groups}}
+      {{/has_preference_groups}}
+      <p class="lp-xs lp-muted">{{strings.native_tools_note}}</p>
+    </div>
     {{#has_pref_detail}}
-      {{> local_launchpad/employer_profile_pref}}
-    {{/has_pref_detail}}
-    {{^has_pref_detail}}
-      <div class="lp-profile-prefs">
-        <p class="lp-sm lp-muted lp-profile-prefs-lead">{{strings.profile_prefs_lead}}</p>
-        {{#has_preference_groups}}
-          {{#preference_groups}}
-            <section class="lp-card lift lp-profile-pref-group">
-              <div class="lp-card-head">
-                <h3>{{title}}</h3>
-              </div>
-              <ul class="lp-profile-pref-list">
-                {{#items}}
-                  <li>
-                    <a class="lp-profile-pref-item" href="{{url}}">
-                      <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
-                        <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
-                      </span>
-                      <span class="lp-profile-pref-copy">
-                        <b>{{label}}</b>
-                        <span>{{desc}}</span>
-                      </span>
-                      <iconify-icon icon="hugeicons:arrow-right-01" width="16" height="16" aria-hidden="true"></iconify-icon>
-                    </a>
-                  </li>
-                {{/items}}
-              </ul>
-            </section>
-          {{/preference_groups}}
-        {{/has_preference_groups}}
-        <p class="lp-xs lp-muted">{{strings.native_tools_note}}</p>
+      <div data-lp-profile-pref-detail>
+        {{> local_launchpad/employer_profile_pref}}
       </div>
     {{/has_pref_detail}}
-  {{/ptab_preferences}}
+  </div>
 </div>

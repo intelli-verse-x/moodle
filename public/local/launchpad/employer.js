@@ -623,4 +623,72 @@
         closeAllLpSelects(null);
     });
 
+    // Profile tabs: switch Overview / Edit / Preferences in-place (no full-page reload).
+    (function profileTabs() {
+        var root = shell.querySelector('[data-lp-profile]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-profile-tab]');
+        var panels = root.querySelectorAll('[data-lp-profile-panel]');
+        if (!tabs.length || !panels.length) {
+            return;
+        }
+
+        function applyTab(tab, pushUrl) {
+            var key = tab || 'overview';
+            if (key !== 'overview' && key !== 'edit' && key !== 'preferences') {
+                key = 'overview';
+            }
+            root.setAttribute('data-lp-profile-active', key);
+
+            tabs.forEach(function (el) {
+                var on = el.getAttribute('data-lp-profile-tab') === key;
+                el.classList.toggle('is-on', on);
+                el.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+
+            panels.forEach(function (panel) {
+                panel.hidden = panel.getAttribute('data-lp-profile-panel') !== key;
+            });
+
+            if (pushUrl) {
+                var hub = root.querySelector('[data-lp-profile-pref-hub]');
+                var detail = root.querySelector('[data-lp-profile-pref-detail]');
+                if (hub && detail) {
+                    hub.hidden = false;
+                    detail.hidden = true;
+                }
+                if (window.history && window.history.replaceState) {
+                    try {
+                        var url = new URL(window.location.href);
+                        url.searchParams.set('view', 'profile');
+                        if (key === 'overview') {
+                            url.searchParams.delete('ptab');
+                        } else {
+                            url.searchParams.set('ptab', key);
+                        }
+                        url.searchParams.delete('pref');
+                        url.searchParams.delete('saved');
+                        url.searchParams.delete('err');
+                        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+                    } catch (err) {
+                        // Ignore URL sync failures.
+                    }
+                }
+            }
+        }
+
+        root.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-profile-tab]');
+            if (!tab || !root.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyTab(tab.getAttribute('data-lp-profile-tab'), true);
+        });
+
+        applyTab(root.getAttribute('data-lp-profile-active') || 'overview', false);
+    })();
+
 })();

@@ -803,7 +803,7 @@ final class employer_tools {
             $preview = self::str(
                 'employer_messages_self_empty',
                 null,
-                'Your personal space in Moodle — open it to add a note.'
+                'Your personal space — add a note here.'
             );
         }
 
@@ -1456,12 +1456,12 @@ final class employer_tools {
             'profile_prefs_lead' => self::str(
                 'employer_profile_prefs_lead',
                 null,
-                'Account, communication, and system preferences — edit here when available, or open Moodle for advanced tools.'
+                'Account, communication, and system preferences — edit here when available.'
             ),
             'native_tools_note' => self::str(
                 'employer_profile_prefs_note',
                 null,
-                'Password, tokens, and some notification channels still open in Moodle.'
+                'Password, tokens, and some notification channels may open an advanced settings page.'
             ),
             'pref_back' => self::str('employer_pref_back', null, 'Back to preferences'),
             'pref_save' => self::str('employer_pref_save', null, 'Save preferences'),
@@ -1639,7 +1639,8 @@ final class employer_tools {
             'ptab_edit' => $ptab === 'edit',
             'ptab_preferences' => $ptab === 'preferences',
             'tab_overview_url' => $taburls['overview'],
-            'tab_edit_url' => $canedit ? $taburls['edit'] : ($editexternal !== '' ? $editexternal : $moodleedit),
+            // Always in-shell so client-side tab switching stays inside LaunchPad.
+            'tab_edit_url' => $taburls['edit'],
             'tab_preferences_url' => $taburls['preferences'],
             'displayname' => $fullname,
             'email' => $email,
@@ -2240,7 +2241,7 @@ final class employer_tools {
                         'desc' => self::str(
                             'employer_profile_prefs_public_desc',
                             null,
-                            'How others see your Moodle profile page.'
+                            'How others see your public profile page.'
                         ),
                         'url' => $prefurl('public'),
                         'icon' => 'user-circle',
@@ -2250,7 +2251,7 @@ final class employer_tools {
                         'desc' => self::str(
                             'employer_profile_prefs_password_desc',
                             null,
-                            'Update the password for this Moodle account.'
+                            'Update the password for this account.'
                         ),
                         'url' => $prefurl('password'),
                         'icon' => 'lock-password',
@@ -2300,7 +2301,7 @@ final class employer_tools {
                         'desc' => self::str(
                             'employer_profile_prefs_lang_desc',
                             null,
-                            'Interface language for Moodle.'
+                            'Interface language for LaunchPad.'
                         ),
                         'url' => $prefurl('language'),
                         'icon' => 'translate',
@@ -2330,7 +2331,7 @@ final class employer_tools {
                         'desc' => self::str(
                             'employer_profile_prefs_files_desc',
                             null,
-                            'Your private Moodle file area.'
+                            'Your private file area.'
                         ),
                         'url' => $prefurl('files'),
                         'icon' => 'folder-01',
@@ -2512,7 +2513,7 @@ final class employer_tools {
                 $body = self::str(
                     'employer_pref_edit_body',
                     null,
-                    'Use the in-portal editor for common fields, or open Moodle’s full profile editor for picture upload and advanced fields.'
+                    'Use the in-portal editor for common fields, or open advanced settings for picture upload and extra fields.'
                 );
                 $base['pref_portal_edit_url'] = $editportal;
                 $base['pref_has_portal_edit'] = true;
@@ -2918,7 +2919,7 @@ final class employer_tools {
             ],
             'language' => [
                 'title' => self::core_str('preferredlanguage', 'moodle', 'Preferred language'),
-                'help' => self::str('employer_profile_prefs_lang_desc', null, 'Interface language for Moodle.'),
+                'help' => self::str('employer_profile_prefs_lang_desc', null, 'Interface language for LaunchPad.'),
                 'icon' => 'translate',
             ],
             'editor' => [
@@ -2946,7 +2947,7 @@ final class employer_tools {
                 'help' => self::str(
                     'employer_pref_notifications_help',
                     null,
-                    'Quick toggles for email and popup on common alerts. Open Moodle for the full matrix.'
+                    'Quick toggles for email and popup on common alerts. Open advanced settings for the full matrix.'
                 ),
                 'icon' => 'notification-01',
             ],
@@ -2964,13 +2965,13 @@ final class employer_tools {
                 'help' => self::str(
                     'employer_profile_prefs_public_desc',
                     null,
-                    'How others see your Moodle profile page.'
+                    'How others see your public profile page.'
                 ),
                 'icon' => 'user-circle',
             ],
             'files' => [
                 'title' => self::core_str('privatefiles', 'moodle', 'Private files'),
-                'help' => self::str('employer_profile_prefs_files_desc', null, 'Your private Moodle file area.'),
+                'help' => self::str('employer_profile_prefs_files_desc', null, 'Your private file area.'),
                 'icon' => 'folder-01',
             ],
             'contentbank' => [
@@ -3019,7 +3020,7 @@ final class employer_tools {
             'external' => self::str(
                 'employer_pref_save_external',
                 null,
-                'Your login method manages passwords outside LaunchPad. Open Moodle or your identity provider.'
+                'Your login method manages passwords outside LaunchPad. Open your identity provider if needed.'
             ),
             'required' => self::str('employer_pref_save_required', null, 'Fill in all required fields.'),
             'mismatch' => self::str('employer_pref_save_mismatch', null, 'New passwords do not match.'),
@@ -3028,7 +3029,7 @@ final class employer_tools {
             'reused' => self::str('employer_pref_save_reused', null, 'That password was used recently. Choose a new one.'),
             'policy' => self::str('employer_pref_save_policy', null, 'New password does not meet the site password policy.'),
             'invalid' => self::str('employer_pref_save_invalid', null, 'That option is not available.'),
-            'failed' => self::str('employer_pref_save_failed', null, 'Moodle could not save this preference. Try again.'),
+            'failed' => self::str('employer_pref_save_failed', null, 'Could not save this preference. Try again.'),
         ];
         return [
             'ok' => false,

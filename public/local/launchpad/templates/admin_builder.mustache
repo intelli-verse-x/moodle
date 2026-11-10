@@ -1,143 +1,150 @@
 {{!
     @template local_launchpad/admin_builder
 
-    Admin Course builder — stage Moodle activities; Add/Edit deep-link to Moodle.
-    Track tabs switch client-side (no reload). Keep this file comment free of Mustache braces.
+    Admin Course builder overview - Stitch layout.
+    All phases stacked, track pills, right summary rail.
+    Navbar stays in admin_shell. Keep comments free of Mustache braces.
 }}
-<div data-lp-builder data-lp-builder-active="{{initial_trackid}}">
-<section class="lp-hero" data-region="local-launchpad-admin-builder">
-  <div class="lp-hero-row">
-    <div class="lp-hero-main">
-      <span class="lp-eyebrow">{{eyebrow}}</span>
-      <h2>{{heading}}</h2>
-      <p class="lp-hero-lead">{{lead}}</p>
+<div class="lp-cb" data-lp-builder data-lp-builder-active="{{initial_trackid}}" data-region="local-launchpad-admin-builder">
+  <section class="lp-hero lp-cb-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-{{#flash_ok}}
-  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
-{{/flash_ok}}
-{{#flash_err}}
-  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
-{{/flash_err}}
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
 
-{{^has_tracks}}
-  <div style="margin-top:16px">
-    {{> local_launchpad/admin_empty}}
-  </div>
-{{/has_tracks}}
+  {{^has_tracks}}
+    <div class="lp-cb-empty">
+      {{> local_launchpad/admin_empty}}
+    </div>
+  {{/has_tracks}}
 
-{{#has_tracks}}
-  <div class="lp-tabs lp-tabs-block lp-builder-tabs" role="tablist" aria-label="{{heading}}" style="margin-top:16px">
-    {{#track_tabs}}
-      <a class="lp-tab{{#current}} is-on{{/current}}"
-         role="tab"
-         href="{{url}}"
-         title="{{title}}"
-         data-lp-builder-tab="{{id}}"
-         aria-selected="{{#current}}true{{/current}}{{^current}}false{{/current}}">
-        {{label}}
-      </a>
-    {{/track_tabs}}
-  </div>
+  {{#has_tracks}}
+    <div class="lp-cb-tabs" role="tablist" aria-label="{{heading}}">
+      {{#track_tabs}}
+        <a class="lp-cb-tab{{#current}} is-on{{/current}}"
+           role="tab"
+           href="{{url}}"
+           title="{{title}}"
+           data-lp-builder-tab="{{id}}"
+           aria-selected="{{#current}}true{{/current}}{{^current}}false{{/current}}">
+          {{label}}
+        </a>
+      {{/track_tabs}}
+    </div>
 
-  {{#track_panels}}
-    <div class="lp-builder-panel" data-lp-builder-panel="{{id}}"{{^current}} hidden{{/current}}>
-      <div class="lp-grid-2" style="margin-top:16px">
-        <div class="lp-stack lp-builder-phases">
-          {{#phases}}
-            <section class="lp-card lift lp-bsec{{#shown}} is-shown{{/shown}}">
-              <div class="lp-row-sb">
-                <div class="lp-bsec-head">
-                  <span class="lp-bsec-n" aria-hidden="true">{{n}}</span>
-                  <div>
-                    <h3>{{title}}</h3>
-                    <span class="lp-xs lp-muted">{{meta}}</span>
+    {{#track_panels}}
+      <div class="lp-cb-panel" data-lp-builder-panel="{{id}}"{{^current}} hidden{{/current}}>
+        <div class="lp-cb-workspace">
+          <div class="lp-cb-main">
+            {{#phases}}
+              <section class="lp-cb-phase{{#shown}} is-shown{{/shown}}">
+                <div class="lp-cb-phase-head">
+                  <div class="lp-cb-phase-identity">
+                    <span class="lp-cb-phase-n" aria-hidden="true">{{n}}</span>
+                    <div>
+                      <h3>{{title}}</h3>
+                      <p class="lp-muted lp-sm">{{meta}}</p>
+                    </div>
                   </div>
-                </div>
-                <div class="lp-bsec-actions">
-                  <a class="lp-btn lp-btn-light lp-btn-sm" href="{{add_url}}">{{add_label}}</a>
-                  {{#shown}}
-                    <form method="post" action="{{form_action}}" class="lp-inline-form">
-                      <input type="hidden" name="sesskey" value="{{sesskey}}">
-                      <input type="hidden" name="action" value="toggle_section">
-                      <input type="hidden" name="trackid" value="{{trackid}}">
-                      <input type="hidden" name="sectionnum" value="{{sectionnum}}">
-                      <input type="hidden" name="show" value="0">
-                      <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
-                    </form>
-                  {{/shown}}
-                  {{^shown}}
-                    {{#can_show}}
+                  <div class="lp-cb-phase-actions">
+                    <a class="lp-btn lp-btn-light lp-btn-sm" href="{{add_url}}">{{add_label}}</a>
+                    {{#shown}}
                       <form method="post" action="{{form_action}}" class="lp-inline-form">
                         <input type="hidden" name="sesskey" value="{{sesskey}}">
                         <input type="hidden" name="action" value="toggle_section">
                         <input type="hidden" name="trackid" value="{{trackid}}">
                         <input type="hidden" name="sectionnum" value="{{sectionnum}}">
-                        <input type="hidden" name="show" value="1">
-                        <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_label}}</button>
+                        <input type="hidden" name="show" value="0">
+                        <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
                       </form>
-                    {{/can_show}}
-                    {{^can_show}}
-                      <button type="button" class="lp-btn lp-btn-solid lp-btn-sm" disabled title="{{show_blocked_title}}">{{show_label}}</button>
-                    {{/can_show}}
-                  {{/shown}}
-                </div>
-              </div>
-
-              {{#has_activities}}
-                <div class="lp-actlist">
-                  {{#activities}}
-                    <div class="lp-actrow">
-                      <span class="lp-kd">{{kind}}</span>
-                      <span class="lp-act-title">{{title}}</span>
-                      <span class="lp-chip {{state_chip}}">{{state_label}}</span>
-                      <a class="lp-btn lp-btn-light lp-btn-sm" href="{{manage_url}}">{{edit_label}}</a>
-                      {{#is_draft}}
+                    {{/shown}}
+                    {{^shown}}
+                      {{#can_show}}
                         <form method="post" action="{{form_action}}" class="lp-inline-form">
                           <input type="hidden" name="sesskey" value="{{sesskey}}">
-                          <input type="hidden" name="action" value="mark_reviewed">
+                          <input type="hidden" name="action" value="toggle_section">
                           <input type="hidden" name="trackid" value="{{trackid}}">
-                          <input type="hidden" name="cmid" value="{{cmid}}">
-                          <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
+                          <input type="hidden" name="sectionnum" value="{{sectionnum}}">
+                          <input type="hidden" name="show" value="1">
+                          <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_label}}</button>
                         </form>
-                      {{/is_draft}}
-                    </div>
-                  {{/activities}}
+                      {{/can_show}}
+                      {{^can_show}}
+                        <button type="button" class="lp-btn lp-btn-solid lp-btn-sm" disabled title="{{show_blocked_title}}">{{show_label}}</button>
+                      {{/can_show}}
+                    {{/shown}}
+                  </div>
                 </div>
-              {{/has_activities}}
-              {{^has_activities}}
-                <p class="lp-sm lp-muted" style="margin:12px 0 0">{{no_acts}}</p>
-              {{/has_activities}}
-            </section>
-          {{/phases}}
-        </div>
 
-        <div class="lp-stack-lg">
-          <section class="lp-card lift lp-stack">
-            <h3>{{side_title}}</h3>
-            <p class="lp-sm lp-muted" style="margin:0">{{side_capstone}}</p>
-            <dl class="lp-kv lp-sm">
-              <dt>{{side_teacher_label}}</dt><dd>{{side_teacher}}</dd>
-              <dt>{{side_enrolled_label}}</dt><dd>{{side_enrolled}}</dd>
-              <dt>{{side_guest_label}}</dt><dd>{{side_guest}}</dd>
-            </dl>
-            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}" style="align-self:flex-start">{{open_course_label}}</a>
-          </section>
-          <section class="lp-card soft">
-            <div class="lp-mascot">
-              {{#tip_prof_url}}
-                <img src="{{tip_prof_url}}" alt="" style="height:90px">
-              {{/tip_prof_url}}
-              <div class="lp-bubble">
-                <p class="lp-sm" style="margin:0">{{tip_body}}</p>
+                {{#has_activities}}
+                  <div class="lp-cb-actlist">
+                    {{#activities}}
+                      <div class="lp-cb-row">
+                        <div class="lp-cb-row-main">
+                          <span class="lp-cb-kd is-{{kind_key}}">{{kind}}</span>
+                          <span class="lp-cb-row-title">{{title}}</span>
+                        </div>
+                        <div class="lp-cb-row-end">
+                          <span class="lp-chip {{state_chip}}">{{state_label}}</span>
+                          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{activity_url}}">{{edit_label}}</a>
+                          {{#is_draft}}
+                            <form method="post" action="{{form_action}}" class="lp-inline-form">
+                              <input type="hidden" name="sesskey" value="{{sesskey}}">
+                              <input type="hidden" name="action" value="mark_reviewed">
+                              <input type="hidden" name="trackid" value="{{trackid}}">
+                              <input type="hidden" name="cmid" value="{{cmid}}">
+                              <button type="submit" class="lp-btn lp-btn-ghost lp-btn-sm">{{mark_label}}</button>
+                            </form>
+                          {{/is_draft}}
+                        </div>
+                      </div>
+                    {{/activities}}
+                  </div>
+                {{/has_activities}}
+                {{^has_activities}}
+                  <p class="lp-sm lp-muted lp-cb-empty-acts">{{no_acts}}</p>
+                {{/has_activities}}
+              </section>
+            {{/phases}}
+          </div>
+
+          <aside class="lp-cb-rail" aria-label="{{side_title}}">
+            <section class="lp-cb-summary">
+              <h3>{{side_title}}</h3>
+              {{#side_capstone}}
+                <p class="lp-sm lp-muted lp-cb-capstone">{{side_capstone}}</p>
+              {{/side_capstone}}
+              <dl class="lp-kv lp-sm lp-cb-kv">
+                <dt>{{side_teacher_label}}</dt><dd>{{side_teacher}}</dd>
+                <dt>{{side_enrolled_label}}</dt><dd>{{side_enrolled}}</dd>
+                <dt>{{side_guest_label}}</dt><dd>{{side_guest}}</dd>
+              </dl>
+              <a class="lp-btn lp-btn-light lp-btn-sm lp-cb-preview" href="{{course_url}}">{{open_course_label}}</a>
+            </section>
+            <section class="lp-cb-tip">
+              <div class="lp-mascot">
+                {{#tip_prof_url}}
+                  <img src="{{tip_prof_url}}" alt="" width="90" height="90">
+                {{/tip_prof_url}}
+                <div class="lp-bubble">
+                  <p class="lp-sm">{{tip_body}}</p>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          </aside>
         </div>
       </div>
-    </div>
-  {{/track_panels}}
-{{/has_tracks}}
+    {{/track_panels}}
+  {{/has_tracks}}
 </div>

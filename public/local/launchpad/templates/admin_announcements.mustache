@@ -1,15 +1,30 @@
 {{!
     @template local_launchpad/admin_announcements
 
-    Admin Announcements — compose to track news forums + recent posted list.
+    Admin Announcements — Stitch-aligned compose + recent list (existing features only).
 }}
-<section class="lp-hero" data-region="local-launchpad-admin-announcements">
-  <div class="lp-hero-row">
+<section class="lp-hero lp-ann-hero" data-region="local-launchpad-admin-announcements">
+  <div class="lp-ann-hero-glow" aria-hidden="true"></div>
+  <div class="lp-hero-row lp-ann-hero-row">
     <div class="lp-hero-main">
-      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <span class="lp-eyebrow lp-ann-hero-eyebrow">{{eyebrow}}</span>
       <h2>{{heading}}</h2>
       <p class="lp-hero-lead">{{lead}}</p>
     </div>
+    <aside class="lp-ann-hero-stats" aria-label="{{stats_label}}">
+      <div class="lp-ann-stat">
+        <strong>{{stat_active}}</strong>
+        <span>{{stat_active_label}}</span>
+      </div>
+      <div class="lp-ann-stat">
+        <strong>{{stat_pinned}}</strong>
+        <span>{{stat_pinned_label}}</span>
+      </div>
+      <div class="lp-ann-stat">
+        <strong>{{stat_tracks}}</strong>
+        <span>{{stat_tracks_label}}</span>
+      </div>
+    </aside>
   </div>
 </section>
 
@@ -20,37 +35,52 @@
   <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
 {{/flash_err}}
 
-<div class="lp-grid-2 lp-ann-layout" style="margin-top:16px"
+<div class="lp-ann-layout"
   data-lp-ann-page
   data-str-submit="{{submit_label}}"
   data-str-save="{{save_label}}"
   data-str-editing="{{editing_label}}"
   data-str-compose="{{form_title}}"
-  data-str-delete-confirm="{{delete_confirm}}">
-  <section class="lp-card lift lp-stack-lg">
-    <div class="lp-card-head">
-      <h3 data-lp-ann-form-title>{{form_title}}</h3>
+  data-str-delete-confirm="{{delete_confirm}}"
+  data-str-show-more="{{show_more_pattern}}">
+  <section class="lp-card lift lp-ann-compose">
+    <div class="lp-ann-card-head">
+      <div class="lp-ann-card-head-main">
+        <h3 data-lp-ann-form-title>{{form_title}}</h3>
+        <p class="lp-ann-card-sub">{{compose_lead}}</p>
+      </div>
     </div>
     {{^has_tracks}}
       {{> local_launchpad/admin_empty}}
     {{/has_tracks}}
     {{#has_tracks}}
-      <form method="post" action="{{form_action}}" class="lp-stack lp-ann-form" data-lp-ann-form>
+      <form method="post" action="{{form_action}}" class="lp-stack lp-ann-form" data-lp-ann-form enctype="multipart/form-data">
         <input type="hidden" name="sesskey" value="{{sesskey}}">
         <input type="hidden" name="action" value="post_announcement" data-lp-ann-action>
         <input type="hidden" name="discussionid" value="" data-lp-ann-discussionid>
+        <input type="checkbox" class="lp-ann-sr-only" name="all_tracks" value="1" data-lp-ann-all-tracks tabindex="-1" aria-hidden="true">
 
-        <label class="lp-field">
-          <span>{{subject_label}}</span>
-          <input type="text" name="subject" required maxlength="200" autocomplete="off" data-lp-ann-subject>
-        </label>
+        <div class="lp-ann-section">
+          <label class="lp-field">
+            <span class="lp-ann-label-row">
+              <span>{{subject_label}} <span class="lp-ann-req" aria-hidden="true">*</span></span>
+            </span>
+            <input type="text" name="subject" required maxlength="200" autocomplete="off"
+              placeholder="{{subject_placeholder}}" data-lp-ann-subject>
+          </label>
 
-        <label class="lp-field">
-          <span>{{message_label}}</span>
-          <textarea name="message" rows="6" required maxlength="10000" data-lp-ann-message></textarea>
-        </label>
+          <label class="lp-field lp-ann-message-field">
+            <span class="lp-ann-label-row">
+              <span>{{message_label}} <span class="lp-ann-req" aria-hidden="true">*</span></span>
+            </span>
+            <span class="lp-ann-editor">
+              <textarea name="message" rows="6" required maxlength="10000"
+                placeholder="{{message_placeholder}}" data-lp-ann-message></textarea>
+            </span>
+          </label>
+        </div>
 
-        <fieldset class="lp-ann-fieldset">
+        <fieldset class="lp-ann-fieldset lp-ann-section">
           <legend>{{tags_label}}</legend>
           <div class="lp-ann-tag-row">
             {{#tag_options}}
@@ -59,84 +89,177 @@
                 <span>{{name}}</span>
               </label>
             {{/tag_options}}
+            <label class="lp-field lp-ann-custom-tag">
+              <span class="lp-ann-sr-only">{{custom_tag_label}}</span>
+              <input type="text" name="customtag" maxlength="50" placeholder="{{custom_tag_placeholder}}" autocomplete="off" data-lp-ann-customtag>
+            </label>
           </div>
-          <label class="lp-field" style="margin-top:10px">
-            <span>{{custom_tag_label}}</span>
-            <input type="text" name="customtag" maxlength="50" placeholder="{{custom_tag_placeholder}}" autocomplete="off" data-lp-ann-customtag>
-          </label>
         </fieldset>
 
-        <fieldset class="lp-ann-fieldset" data-lp-ann-tracks-wrap>
+        <fieldset class="lp-ann-fieldset lp-ann-section lp-ann-tracks-section" data-lp-ann-tracks-wrap>
           <legend>{{tracks_label}}</legend>
-          <label class="lp-check-row lp-ann-all-tracks">
-            <input type="checkbox" name="all_tracks" value="1" data-lp-ann-all-tracks>
-            <span>{{all_tracks_label}}</span>
-          </label>
+          <div class="lp-ann-section-head">
+            <p class="lp-muted lp-sm">{{tracks_help}}</p>
+            <button type="button" class="lp-ann-text-btn" data-lp-ann-select-all>{{all_tracks_label}}</button>
+          </div>
           <div class="lp-ann-track-list" data-lp-ann-track-list>
             {{#track_options}}
-              <label class="lp-check-row">
+              <label class="lp-ann-track-card">
                 <input type="checkbox" name="trackids[]" value="{{id}}" data-lp-ann-track>
-                <span>{{label}}</span>
+                <span class="lp-ann-track-card-body">
+                  <span class="lp-ann-track-card-name">{{label}}</span>
+                  {{#subtitle}}<span class="lp-ann-track-card-sub">{{subtitle}}</span>{{/subtitle}}
+                </span>
               </label>
             {{/track_options}}
           </div>
         </fieldset>
 
+        <div class="lp-ann-section lp-ann-delivery">
+          <label class="lp-ann-pin-panel">
+            <span class="lp-ann-pin-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </span>
+            <span class="lp-ann-pin-panel-copy">
+              <strong>{{pin_label}}</strong>
+              <span class="lp-muted lp-sm">{{pin_help}}</span>
+            </span>
+            <span class="lp-ann-switch">
+              <input type="checkbox" name="pinned" value="1" data-lp-ann-pinned>
+              <span class="lp-ann-switch-ui" aria-hidden="true"></span>
+            </span>
+          </label>
+
+          <label class="lp-field lp-ann-schedule-field">
+            <span>{{schedule_label}}</span>
+            <input type="datetime-local" name="publish_at" data-lp-ann-publish-at>
+            <span class="lp-muted lp-sm">{{schedule_help}}</span>
+          </label>
+        </div>
+
+        <div class="lp-field lp-admin-files lp-ann-attach-field lp-ann-section"
+          data-lp-file-picker
+          data-lp-ann-file-picker
+          data-lp-remove-name="removeannfiles[]"
+          data-lp-remove-label="{{remove_file_label}}">
+          <span>{{attach_label}}</span>
+          <ul class="lp-admin-file-cards" data-lp-attached-files hidden></ul>
+          <div data-lp-remove-inputs></div>
+          <label class="lp-ann-attach-zone">
+            <span class="lp-ann-attach-ico" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </span>
+            <span class="lp-ann-attach-copy">
+              <span class="lp-ann-attach-cta">{{attach_cta}}</span>
+              <span class="lp-muted lp-sm">{{attach_help}}</span>
+            </span>
+            <input class="lp-file-picker-input lp-ann-sr-only" type="file" name="annfiles[]" multiple data-lp-file-input data-lp-ann-files>
+          </label>
+          <span class="lp-file-picker-status lp-sm lp-muted" data-lp-file-status hidden>{{picker_empty_label}}</span>
+          <div class="lp-admin-pending" data-lp-pending-wrap hidden>
+            <span class="lp-sm" style="font-weight:600">{{pending_heading}}</span>
+            <ul class="lp-admin-file-cards" data-lp-pending-list></ul>
+          </div>
+        </div>
+
         <div class="lp-ann-form-actions">
-          <button type="submit" class="lp-btn lp-btn-solid" data-lp-ann-submit>{{submit_label}}</button>
           <button type="button" class="lp-btn lp-btn-light" data-lp-ann-cancel-edit hidden>{{cancel_edit_label}}</button>
+          <button type="submit" class="lp-btn lp-btn-solid" data-lp-ann-submit>{{submit_label}}</button>
         </div>
       </form>
     {{/has_tracks}}
   </section>
 
-  <section class="lp-card lift">
-    <div class="lp-card-head">
-      <h3>{{list_title}}</h3>
+  <section class="lp-card lift lp-ann-feed">
+    <div class="lp-ann-card-head lp-ann-feed-head">
+      <div class="lp-ann-feed-title-row">
+        <h3>{{list_title}}</h3>
+        {{#has_items}}
+          <span class="lp-ann-live-badge">{{live_badge}}</span>
+        {{/has_items}}
+      </div>
+      <button type="button" class="lp-ann-text-btn" data-lp-ann-refresh>{{refresh_label}}</button>
     </div>
     {{#has_items}}
+      <div class="lp-ann-filters" role="tablist" aria-label="{{filter_label}}">
+        <button type="button" class="lp-ann-filter is-active" data-lp-ann-filter="all" aria-pressed="true">{{filter_all}}</button>
+        <button type="button" class="lp-ann-filter" data-lp-ann-filter="pinned" aria-pressed="false">{{filter_pinned}}</button>
+        <button type="button" class="lp-ann-filter" data-lp-ann-filter="scheduled" aria-pressed="false">{{filter_scheduled}}</button>
+      </div>
       <ul class="lp-ann-list" data-lp-ann-list data-page-size="{{list_page_size}}">
         {{#items}}
-          <li class="lp-ann-item{{#paged_out}} is-paged-out{{/paged_out}}"{{#paged_out}} hidden{{/paged_out}}
+          <li class="lp-ann-item{{#is_pinned}} is-pinned{{/is_pinned}}{{#is_scheduled}} is-scheduled{{/is_scheduled}}{{#paged_out}} is-paged-out{{/paged_out}}"{{#paged_out}} hidden{{/paged_out}}
             data-lp-ann-item
             data-id="{{id}}"
             data-subject="{{subject_raw}}"
             data-message="{{message_plain}}"
-            data-tags="{{tags_csv}}">
+            data-tags="{{tags_csv}}"
+            data-pinned="{{#is_pinned}}1{{/is_pinned}}{{^is_pinned}}0{{/is_pinned}}"
+            data-publish-at="{{publish_at_value}}"
+            data-attachments="{{attachments_json}}">
             <div class="lp-ann-item-main">
-              <a class="lp-ann-item-title" href="{{url}}">{{{subject}}}</a>
-              <div class="lp-ann-item-meta">
-                <span class="lp-ann-item-track">{{{course_name}}}</span>
+              <div class="lp-ann-item-top">
+                <div class="lp-ann-item-meta">
+                  {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
+                  {{#is_scheduled}}<span class="lp-ann-sched-badge">{{scheduled_badge}}</span>{{/is_scheduled}}
+                  {{#has_attachments}}<span class="lp-ann-attach-badge">{{attach_badge}}</span>{{/has_attachments}}
+                  <span class="lp-ann-item-track">{{{course_name}}}</span>
+                </div>
                 <span class="lp-ann-item-when">{{when}}</span>
               </div>
+              <a class="lp-ann-item-title" href="{{url}}">{{{subject}}}</a>
+              {{#message_plain}}
+                <p class="lp-ann-item-excerpt">{{message_plain}}</p>
+              {{/message_plain}}
               {{#has_tags}}
                 <div class="lp-ann-chips">
                   {{#tags}}<span class="lp-chip line">{{name}}</span>{{/tags}}
                 </div>
               {{/has_tags}}
+              {{#has_attachments}}
+                <ul class="lp-admin-file-cards lp-ann-file-cards">
+                  {{#attachments}}
+                    <li class="lp-admin-file-card{{#has_preview}} has-thumb{{/has_preview}}">
+                      {{#has_preview}}
+                        <span class="lp-admin-file-thumb" aria-hidden="true"><img src="{{previewurl}}" alt=""></span>
+                      {{/has_preview}}
+                      {{^has_preview}}
+                        <span class="lp-admin-file-ico" aria-hidden="true">{{#ext}}{{ext}}{{/ext}}{{^ext}}FILE{{/ext}}</span>
+                      {{/has_preview}}
+                      <span class="lp-admin-file-body">
+                        <span class="lp-admin-file-name">{{displayname}}</span>
+                        <span class="lp-admin-file-meta">{{size}}</span>
+                      </span>
+                      <a class="lp-btn lp-btn-light lp-ann-file-dl" href="{{url}}" target="_blank" rel="noopener">{{download_label}}</a>
+                    </li>
+                  {{/attachments}}
+                </ul>
+              {{/has_attachments}}
               <div class="lp-ann-item-actions">
-                {{#can_edit}}
-                  <button type="button" class="lp-ann-link" data-lp-ann-edit>{{edit_label}}</button>
-                {{/can_edit}}
-                {{#can_delete}}
-                  <form method="post" action="{{form_action}}" class="lp-ann-delete-form" data-lp-ann-delete-form>
-                    <input type="hidden" name="sesskey" value="{{sesskey}}">
-                    <input type="hidden" name="action" value="delete_announcement">
-                    <input type="hidden" name="discussionid" value="{{id}}">
-                    <button type="submit" class="lp-ann-link is-danger">{{delete_label}}</button>
-                  </form>
-                {{/can_delete}}
-                <a class="lp-ann-link" href="{{url}}">{{advanced_label}}</a>
+                <div class="lp-ann-item-actions-primary">
+                  {{#can_edit}}
+                    <button type="button" class="lp-ann-link" data-lp-ann-edit>{{edit_label}}</button>
+                  {{/can_edit}}
+                  {{#can_delete}}
+                    <form method="post" action="{{form_action}}" class="lp-ann-delete-form" data-lp-ann-delete-form>
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="delete_announcement">
+                      <input type="hidden" name="discussionid" value="{{id}}">
+                      <button type="submit" class="lp-ann-link is-danger">{{delete_label}}</button>
+                    </form>
+                  {{/can_delete}}
+                </div>
+                <a class="lp-ann-link lp-ann-link-advanced" href="{{url}}">{{advanced_label}}</a>
               </div>
             </div>
           </li>
         {{/items}}
       </ul>
       {{#list_has_more}}
-        <p class="lp-ann-more-wrap">
-          <button type="button" class="lp-btn lp-btn-light" data-lp-ann-more
-            data-remaining="{{list_more_count}}">{{show_more_label}}</button>
-        </p>
+        <div class="lp-ann-archive-wrap">
+          <button type="button" class="lp-ann-archive-link" data-lp-ann-more data-lp-ann-archive
+            data-remaining="{{list_more_count}}">{{archive_label}}</button>
+        </div>
       {{/list_has_more}}
     {{/has_items}}
     {{^has_items}}

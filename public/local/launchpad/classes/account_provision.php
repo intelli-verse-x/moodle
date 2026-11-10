@@ -37,11 +37,23 @@ final class account_provision {
     /** Capability required in the course to enrol via this workflow (or site admin). */
     public const ENROL_CAPABILITY = 'enrol/manual:enrol';
 
+    /** Capability required in the course to unenrol via this workflow (or site admin). */
+    public const UNENROL_CAPABILITY = 'enrol/manual:unenrol';
+
     /** Capability to manage the Employee cohort (or site admin). */
     public const COHORT_CAPABILITY = 'moodle/cohort:assign';
 
     /** Default mentor Moodle role shortname. */
     public const DEFAULT_MENTOR_ROLE = 'editingteacher';
+
+    /** Config key: max mentors per assigned track (default 1). */
+    public const CONFIG_PILOT_MAX_MENTORS = 'pilot_max_mentors_per_track';
+
+    /** Config key: max fellows per assigned track (0 = unlimited). */
+    public const CONFIG_PILOT_MAX_FELLOWS = 'pilot_max_fellows_per_track';
+
+    /** Shared orientation course idnumber prefix (not a mentor/fellow seat pool). */
+    public const ORIENT_IDNUMBER_PREFIX = 'lp-orient-';
 
     /**
      * Grants this workflow may perform (never admin).
@@ -50,6 +62,48 @@ final class account_provision {
      */
     public static function allowed_grants(): array {
         return [account_persona::FELLOWSHIP, account_persona::MENTOR, account_persona::EMPLOYEE];
+    }
+
+    /**
+     * Max mentors allowed per assigned track (LaunchPad admin config; default 1).
+     */
+    public static function pilot_max_mentors_per_track(): int {
+        $raw = get_config('local_launchpad', self::CONFIG_PILOT_MAX_MENTORS);
+        if ($raw === false || $raw === null || $raw === '') {
+            return 1;
+        }
+        return max(1, (int) $raw);
+    }
+
+    /**
+     * Max fellows allowed per assigned track (0 = unlimited until admin sets a cap).
+     */
+    public static function pilot_max_fellows_per_track(): int {
+        $raw = get_config('local_launchpad', self::CONFIG_PILOT_MAX_FELLOWS);
+        if ($raw === false || $raw === null || $raw === '') {
+            return 0;
+        }
+        return max(0, (int) $raw);
+    }
+
+    /**
+     * Persist pilot capacity (Mentors & capacity Save). Mentors ≥ 1; fellows ≥ 0 (0 = unlimited).
+     *
+     * @return array{mentors:int,fellows:int}
+     */
+    public static function set_pilot_capacity(int $maxmentors, int $maxfellows): array {
+        $maxmentors = max(1, $maxmentors);
+        $maxfellows = max(0, $maxfellows);
+        set_config(self::CONFIG_PILOT_MAX_MENTORS, (string) $maxmentors, 'local_launchpad');
+        set_config(self::CONFIG_PILOT_MAX_FELLOWS, (string) $maxfellows, 'local_launchpad');
+        return ['mentors' => $maxmentors, 'fellows' => $maxfellows];
+    }
+
+    /**
+     * True when course idnumber is Shared orientation (lp-orient-*), not an assigned track.
+     */
+    public static function is_orientation_idnumber(string $idnumber): bool {
+        return str_starts_with(strtolower(trim($idnumber)), self::ORIENT_IDNUMBER_PREFIX);
     }
 
     /**
@@ -135,6 +189,23 @@ final class account_provision {
     }
 
     /**
+     * True when actor may manually unenrol in this course.
+     *
+     * @param \stdClass|null $actor
+     * @param int $courseid
+     */
+    public static function actor_may_unenrol(?\stdClass $actor, int $courseid): bool {
+        if ($actor === null || empty($actor->id) || $courseid <= 0) {
+            return false;
+        }
+        $userid = (int) $actor->id;
+        if (is_siteadmin($userid)) {
+            return true;
+        }
+        return has_capability(self::UNENROL_CAPABILITY, \context_course::instance($courseid), $userid);
+    }
+
+    /**
      * Require create-user authorization or throw.
      *
      * @param \stdClass|null $actor
@@ -156,6 +227,19 @@ final class account_provision {
     public static function require_can_enrol(?\stdClass $actor, int $courseid): void {
         if (!self::actor_may_enrol($actor, $courseid)) {
             throw new account_provision_exception('forbidden', 'Not authorized to enrol in this course');
+        }
+    }
+
+    /**
+     * Require unenrol authorization for the course or throw.
+     *
+     * @param \stdClass|null $actor
+     * @param int $courseid
+     * @throws account_provision_exception
+     */
+    public static function require_can_unenrol(?\stdClass $actor, int $courseid): void {
+        if (!self::actor_may_unenrol($actor, $courseid)) {
+            throw new account_provision_exception('forbidden', 'Not authorized to unenrol in this course');
         }
     }
 
@@ -290,9 +374,16 @@ final class account_provision {
         self::assert_grant_allowed(account_persona::FELLOWSHIP);
         self::require_can_enrol($actor, $courseid);
         self::require_user($userid);
-        self::require_launchpad_course($courseid);
+        $course = self::require_launchpad_course($courseid);
 
-        return self::enrol_with_role($userid, $courseid, 'student');
+        // Seat caps apply to assigned tracks only — not Shared orientation.
+        if (!self::is_orientation_idnumber((string) ($course->idnumber ?? ''))) {
+            self::assert_fellow_capacity_allows($userid, $courseid);
+        }
+
+        $result = self::enrol_with_role($userid, $courseid, 'student');
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
     }
 
     /**
@@ -324,8 +415,43 @@ final class account_provision {
             );
         }
 
+        self::assert_mentor_capacity_allows($userid, $courseid);
+
         $result = self::enrol_with_role($userid, $courseid, $roleshortname);
         $result['role'] = $roleshortname;
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
+    }
+
+    /**
+     * Unenrol a fellow (student) from a LaunchPad track. Caps fail-closed.
+     *
+     * @return array{status:string,userid:int,courseid:int} status unenrolled|not_enrolled
+     * @throws account_provision_exception
+     */
+    public static function unenrol_fellow(\stdClass $actor, int $userid, int $courseid): array {
+        self::require_can_unenrol($actor, $courseid);
+        self::require_user($userid);
+        self::require_launchpad_course($courseid);
+
+        $result = self::unenrol_with_archetype($userid, $courseid, 'student');
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
+    }
+
+    /**
+     * Remove a mentor (teacher/editingteacher) from a LaunchPad track. Caps fail-closed.
+     *
+     * @return array{status:string,userid:int,courseid:int} status unenrolled|not_enrolled
+     * @throws account_provision_exception
+     */
+    public static function remove_mentor(\stdClass $actor, int $userid, int $courseid): array {
+        self::require_can_unenrol($actor, $courseid);
+        self::require_user($userid);
+        self::require_launchpad_course($courseid);
+
+        $result = self::unenrol_with_archetype($userid, $courseid, 'teacher');
+        messaging::maybe_sync_track_chat_members($courseid);
         return $result;
     }
 
@@ -428,6 +554,133 @@ final class account_provision {
     }
 
     /**
+     * Distinct mentors (teacher / editingteacher) on a course.
+     */
+    public static function count_mentors_on_course(int $courseid): int {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return 0;
+        }
+        $context = \context_course::instance($courseid);
+        $sql = "SELECT COUNT(DISTINCT ra.userid)
+                  FROM {role_assignments} ra
+                  JOIN {role} r ON r.id = ra.roleid
+                 WHERE ra.contextid = :ctx
+                   AND r.archetype IN ('teacher', 'editingteacher')";
+        return (int) $DB->count_records_sql($sql, ['ctx' => $context->id]);
+    }
+
+    /**
+     * Distinct fellows (student archetype) enrolled on a course.
+     */
+    public static function count_fellows_on_course(int $courseid): int {
+        global $CFG, $DB;
+
+        if ($courseid <= 0) {
+            return 0;
+        }
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $sql = "SELECT COUNT(DISTINCT ue.userid)
+                  FROM {user_enrolments} ue
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                  JOIN {context} ctx ON ctx.instanceid = e.courseid AND ctx.contextlevel = :ctxlevel
+                  JOIN {role_assignments} ra ON ra.contextid = ctx.id AND ra.userid = ue.userid
+                  JOIN {role} r ON r.id = ra.roleid AND r.archetype = :arch
+                 WHERE e.courseid = :courseid
+                   AND ue.status = :uestatus
+                   AND e.status = :estatus";
+        return (int) $DB->count_records_sql($sql, [
+            'courseid' => $courseid,
+            'ctxlevel' => CONTEXT_COURSE,
+            'arch' => 'student',
+            'uestatus' => ENROL_USER_ACTIVE,
+            'estatus' => ENROL_INSTANCE_ENABLED,
+        ]);
+    }
+
+    /**
+     * True when userid already has a mentor role on the course.
+     */
+    public static function user_is_mentor_on_course(int $userid, int $courseid): bool {
+        global $DB;
+
+        if ($userid <= 0 || $courseid <= 0) {
+            return false;
+        }
+        $context = \context_course::instance($courseid);
+        foreach (self::mentor_role_shortnames() as $shortname) {
+            $roleid = (int) $DB->get_field('role', 'id', ['shortname' => $shortname]);
+            if ($roleid > 0 && user_has_role_assignment($userid, $roleid, $context->id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when userid is an active student on the course.
+     */
+    public static function user_is_fellow_on_course(int $userid, int $courseid): bool {
+        global $CFG, $DB;
+
+        if ($userid <= 0 || $courseid <= 0) {
+            return false;
+        }
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $context = \context_course::instance($courseid);
+        if (!is_enrolled($context, $userid, '', true)) {
+            return false;
+        }
+        $roleid = (int) $DB->get_field('role', 'id', ['shortname' => 'student']);
+        return $roleid > 0 && user_has_role_assignment($userid, $roleid, $context->id);
+    }
+
+    /**
+     * Refuse a new mentor when the track is at/over pilot max (same user re-assign OK).
+     *
+     * @throws account_provision_exception
+     */
+    private static function assert_mentor_capacity_allows(int $userid, int $courseid): void {
+        if (self::user_is_mentor_on_course($userid, $courseid)) {
+            return;
+        }
+        $max = self::pilot_max_mentors_per_track();
+        $used = self::count_mentors_on_course($courseid);
+        if ($used >= $max) {
+            throw new account_provision_exception(
+                'pilot_mentor_full',
+                get_string('admin_pilot_err_mentor_full', 'local_launchpad', $max)
+            );
+        }
+    }
+
+    /**
+     * Refuse a new fellow enrol when the track is at/over fellow max (0 = unlimited).
+     * Already-enrolled fellows are always allowed (idempotent re-enrol).
+     *
+     * @throws account_provision_exception
+     */
+    private static function assert_fellow_capacity_allows(int $userid, int $courseid): void {
+        if (self::user_is_fellow_on_course($userid, $courseid)) {
+            return;
+        }
+        $max = self::pilot_max_fellows_per_track();
+        if ($max <= 0) {
+            return;
+        }
+        $used = self::count_fellows_on_course($courseid);
+        if ($used >= $max) {
+            throw new account_provision_exception(
+                'pilot_fellow_full',
+                get_string('admin_pilot_err_fellow_full', 'local_launchpad', $max)
+            );
+        }
+    }
+
+    /**
      * Manual enrol + course role. Idempotent for duplicates.
      *
      * @return array{status:string,userid:int,courseid:int}
@@ -468,6 +721,83 @@ final class account_provision {
 
         return [
             'status' => $already ? 'already_enrolled' : 'enrolled',
+            'userid' => $userid,
+            'courseid' => $courseid,
+        ];
+    }
+
+    /**
+     * Unenrol via manual plugin when the user has the expected role archetype on the course.
+     * For mentors, archetype match is teacher|editingteacher.
+     *
+     * @return array{status:string,userid:int,courseid:int}
+     * @throws account_provision_exception
+     */
+    private static function unenrol_with_archetype(int $userid, int $courseid, string $archetype): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $context = \context_course::instance($courseid);
+        $archetypes = $archetype === 'teacher'
+            ? ['teacher', 'editingteacher']
+            : [$archetype];
+
+        $hasrole = false;
+        foreach ($archetypes as $arch) {
+            $roles = get_archetype_roles($arch);
+            foreach ($roles as $role) {
+                if (user_has_role_assignment($userid, (int) $role->id, $context->id)) {
+                    $hasrole = true;
+                    break 2;
+                }
+            }
+        }
+        if (!$hasrole || !is_enrolled($context, $userid, '', true)) {
+            return [
+                'status' => 'not_enrolled',
+                'userid' => $userid,
+                'courseid' => $courseid,
+            ];
+        }
+
+        $plugin = enrol_get_plugin('manual');
+        if (!$plugin) {
+            throw new account_provision_exception('enrol_unavailable', 'Manual enrolment plugin missing');
+        }
+
+        $instance = $DB->get_record('enrol', [
+            'enrol' => 'manual',
+            'courseid' => $courseid,
+            'status' => ENROL_INSTANCE_ENABLED,
+        ], '*', IGNORE_MISSING);
+        if (!$instance) {
+            throw new account_provision_exception(
+                'enrol_unavailable',
+                'No enabled manual enrolment on course ' . $courseid
+            );
+        }
+
+        $ue = $DB->get_record('user_enrolments', [
+            'enrolid' => $instance->id,
+            'userid' => $userid,
+        ], '*', IGNORE_MISSING);
+        if (!$ue) {
+            return [
+                'status' => 'not_enrolled',
+                'userid' => $userid,
+                'courseid' => $courseid,
+            ];
+        }
+
+        if (!$plugin->allow_unenrol_user($instance, $ue)) {
+            throw new account_provision_exception('forbidden', 'Manual unenrol not allowed for this enrolment');
+        }
+
+        $plugin->unenrol_user($instance, $userid);
+
+        return [
+            'status' => 'unenrolled',
             'userid' => $userid,
             'courseid' => $courseid,
         ];

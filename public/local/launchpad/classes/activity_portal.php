@@ -117,10 +117,10 @@ final class activity_portal {
         if (!empty($options['courseurl'])) {
             $courseurl = (string) $options['courseurl'];
         } else {
-            $courseurl = (new \moodle_url('/local/launchpad/employee.php', [
-                'view' => 'course',
-                'id' => (int) $course->id,
-            ]))->out(false);
+        $courseurl = (new \moodle_url('/local/launchpad/employee.php', [
+            'view' => 'course',
+            'id' => (int) $course->id,
+        ]))->out(false);
         }
         $moodleurl = $cm->url
             ? $cm->url->out(false)
@@ -246,11 +246,11 @@ final class activity_portal {
                     false
                 )->out(false);
                 $downloadurl = \moodle_url::make_pluginfile_url(
-                    $context->id,
-                    'mod_resource',
-                    'content',
-                    $file->get_itemid(),
-                    $file->get_filepath(),
+                        $context->id,
+                        'mod_resource',
+                        'content',
+                        $file->get_itemid(),
+                        $file->get_filepath(),
                     $file->get_filename(),
                     true
                 )->out(false);

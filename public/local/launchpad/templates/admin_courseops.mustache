@@ -1,0 +1,811 @@
+{{!
+    @template local_launchpad/admin_courseops
+
+    M5 Course ops hub + Settings / Participants / Grades / Completion / Reports / Q-bank.
+}}
+<section class="lp-hero" data-region="local-launchpad-admin-courseops">
+  <div class="lp-hero-row">
+    <div class="lp-hero-main">
+      <span class="lp-eyebrow">{{eyebrow}}</span>
+      <h2>{{heading}}</h2>
+      <p class="lp-hero-lead">{{lead}}</p>
+      {{#has_tracks}}
+        <div class="lp-courseops-hero-actions">
+          <a class="lp-btn lp-btn-light" href="{{back_tracks_url}}">{{back_tracks_label}}</a>
+          <a class="lp-btn lp-btn-light" href="{{preview_url}}">{{preview_label}}</a>
+        </div>
+      {{/has_tracks}}
+    </div>
+  </div>
+</section>
+
+{{#flash_ok}}
+  <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+{{/flash_ok}}
+{{#flash_err}}
+  <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+{{/flash_err}}
+
+{{^has_tracks}}
+  <div style="margin-top:16px">
+    {{> local_launchpad/admin_empty}}
+  </div>
+{{/has_tracks}}
+
+{{#has_tracks}}
+  <div class="lp-tabs lp-tabs-block lp-courseops-tabs" role="tablist" aria-label="{{heading}}" style="margin-top:16px">
+    {{#track_tabs}}
+      <a class="lp-tab{{#current}} is-on{{/current}}" href="{{url}}"{{#current}} aria-current="page"{{/current}} title="{{title}}">{{label}}</a>
+    {{/track_tabs}}
+  </div>
+
+  <section class="lp-card lift lp-courseops-status" style="margin-top:16px">
+    <div class="lp-card-head">
+      <h3>{{status_title}}</h3>
+    </div>
+    <div class="lp-courseops-status-row">
+      <div>
+        <p class="lp-courseops-track-name">{{{track_name}}}</p>
+        <p class="lp-sm lp-muted">{{track_idnumber}}</p>
+      </div>
+      <div class="lp-courseops-chips">
+        <span class="lp-chip {{#is_visible}}ok{{/is_visible}}{{^is_visible}}warn{{/is_visible}}">{{visibility_chip}}</span>
+        <span class="lp-chip {{#ready_ok}}ok{{/ready_ok}}{{^ready_ok}}warn{{/ready_ok}}">{{ready_chip}}</span>
+      </div>
+    </div>
+    <dl class="lp-theme-kv lp-courseops-kv">
+      <div class="lp-theme-kv-row">
+        <dt>{{teacher_kv_label}}</dt>
+        <dd class="{{^has_teacher}}is-warn{{/has_teacher}}">{{teacher_summary}}</dd>
+      </div>
+      <div class="lp-theme-kv-row">
+        <dt>{{fellows_kv_label}}</dt>
+        <dd>{{fellows_summary}}</dd>
+      </div>
+    </dl>
+  </section>
+
+  {{#is_hub}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{ops_title}}</h3>
+        <p class="lp-muted">{{ops_lead}}</p>
+      </div>
+      <div class="lp-courseops-grid">
+        {{#primary_nav}}
+          <a class="lp-courseops-tile{{#current}} is-current{{/current}}" href="{{url}}">
+            <span class="lp-courseops-tile-ico" aria-hidden="true">{{{icon_svg}}}</span>
+            <span class="lp-courseops-tile-label">{{label}}</span>
+            <span class="lp-courseops-tile-blurb">{{blurb}}</span>
+          </a>
+        {{/primary_nav}}
+      </div>
+    </section>
+  {{/is_hub}}
+
+  {{#is_settings}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{settings_title}}</h3>
+        <p class="lp-muted">{{settings_lead}}</p>
+      </div>
+      <form method="post" action="{{form_action}}" class="lp-stack lp-courseops-settings-form">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="action" value="save_course_settings">
+        <input type="hidden" name="trackid" value="{{trackid}}">
+
+        <label class="lp-field">
+          <span>{{fullname_label}}</span>
+          <input type="text" name="fullname" required maxlength="254" value="{{fullname_value}}" autocomplete="off">
+        </label>
+
+        <label class="lp-field">
+          <span>{{shortname_label}}</span>
+          <input type="text" name="shortname" required maxlength="100" value="{{shortname_value}}" autocomplete="off">
+        </label>
+
+        <div class="lp-field">
+          <span>{{idnumber_label}}</span>
+          <input type="text" value="{{track_idnumber}}" disabled readonly>
+          <span class="lp-muted lp-sm">{{idnumber_help}}</span>
+        </div>
+
+        <label class="lp-check-row">
+          <input type="checkbox" name="visible" value="1"{{#visible_checked}} checked{{/visible_checked}}>
+          <span>
+            <strong>{{visible_label}}</strong>
+            <span class="lp-muted lp-sm">{{visible_help}}</span>
+          </span>
+        </label>
+
+        <div class="lp-courseops-date-row">
+          <label class="lp-field">
+            <span>{{startdate_label}}</span>
+            <input type="date" name="startdate" value="{{startdate_value}}">
+          </label>
+          <label class="lp-field">
+            <span>{{enddate_label}}</span>
+            <input type="date" name="enddate" value="{{enddate_value}}">
+            <span class="lp-muted lp-sm">{{enddate_help}}</span>
+          </label>
+        </div>
+
+        {{#completion_site_on}}
+          <label class="lp-check-row">
+            <input type="checkbox" name="enablecompletion" value="1"{{#completion_checked}} checked{{/completion_checked}}>
+            <span>
+              <strong>{{completion_label}}</strong>
+              <span class="lp-muted lp-sm">{{completion_help}}</span>
+            </span>
+          </label>
+        {{/completion_site_on}}
+        {{^completion_site_on}}
+          <p class="lp-sm lp-muted">{{completion_site_off}}</p>
+        {{/completion_site_on}}
+
+        <label class="lp-field">
+          <span>{{summary_label}}</span>
+          <textarea name="summary" rows="5" maxlength="10000">{{summary_value}}</textarea>
+        </label>
+
+        <div class="lp-courseops-settings-actions">
+          <button type="submit" class="lp-btn lp-btn-solid">{{save_label}}</button>
+          <a class="lp-btn lp-btn-light" href="{{hub_url}}">{{back_hub_label}}</a>
+        </div>
+      </form>
+      <p class="lp-courseops-advanced">
+        <a class="lp-ann-link" href="{{advanced_url}}">{{advanced_label}}</a>
+        <span class="lp-muted lp-sm">{{advanced_help}}</span>
+      </p>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_settings}}
+
+  {{#is_participants}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{participants_title}}</h3>
+        <p class="lp-muted">{{participants_lead}}</p>
+      </div>
+
+      <div class="lp-courseops-roster-actions">
+        <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{enrol_fellow_url}}">{{enrol_fellow_label}}</a>
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{assign_mentor_url}}">{{assign_mentor_label}}</a>
+      </div>
+      <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{enrol_fellow_help}} {{assign_mentor_help}}</p>
+      {{^can_unenrol}}
+        <p class="lp-sm lp-muted">{{unenrol_no_cap}}</p>
+      {{/can_unenrol}}
+
+      <div class="lp-courseops-trackchat">
+        <div class="lp-row-sb" style="align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div>
+            <h4 class="lp-courseops-roster-h" style="margin:0 0 4px">{{track_chat_title}}</h4>
+            <p class="lp-sm lp-muted" style="margin:0">{{track_chat_lead}}</p>
+            <p class="lp-sm" style="margin:8px 0 0">
+              <span class="lp-chip{{#track_chat_status_on}} ok{{/track_chat_status_on}}">{{track_chat_status_label}}</span>
+              <span class="lp-muted"> · {{track_chat_members_label}}</span>
+            </p>
+            {{#track_chat_has_open_link}}
+              <p class="lp-sm" style="margin:6px 0 0">
+                <span class="lp-muted">{{track_chat_open_label}}:</span>
+                <a href="{{track_chat_open_mentor_url}}">{{track_chat_open_mentor_label}}</a>
+                <span class="lp-muted"> · </span>
+                <a href="{{track_chat_open_fellow_url}}">{{track_chat_open_fellow_label}}</a>
+              </p>
+            {{/track_chat_has_open_link}}
+          </div>
+          <div class="lp-courseops-roster-actions" style="margin:0">
+            {{#track_chat_can_toggle}}
+              {{#track_chat_status_on}}
+                <form method="post" action="{{participants_form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{track_chat_sesskey}}">
+                  <input type="hidden" name="action" value="track_chat_disable">
+                  <input type="hidden" name="trackid" value="{{track_chat_trackid}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{track_chat_disable_label}}</button>
+                </form>
+              {{/track_chat_status_on}}
+              {{^track_chat_status_on}}
+                <form method="post" action="{{participants_form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{track_chat_sesskey}}">
+                  <input type="hidden" name="action" value="track_chat_enable">
+                  <input type="hidden" name="trackid" value="{{track_chat_trackid}}">
+                  <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{track_chat_enable_label}}</button>
+                </form>
+              {{/track_chat_status_on}}
+            {{/track_chat_can_toggle}}
+            {{^track_chat_can_toggle}}
+              <button type="button" class="lp-btn lp-btn-light lp-btn-sm" disabled>{{track_chat_enable_label}}</button>
+            {{/track_chat_can_toggle}}
+          </div>
+        </div>
+      </div>
+
+      <div class="lp-courseops-roster-block">
+        <h4 class="lp-courseops-roster-h">{{fellows_section_title}}</h4>
+        {{#has_fellows}}
+          <div class="lp-table-wrap">
+            <table class="lp-table">
+              <thead>
+                <tr>
+                  <th>{{col_name}}</th>
+                  <th>{{col_email}}</th>
+                  <th>{{col_role}}</th>
+                  {{#can_unenrol}}<th>{{col_actions}}</th>{{/can_unenrol}}
+                </tr>
+              </thead>
+              <tbody>
+                {{#fellow_rows}}
+                  <tr>
+                    <td>
+                      <div class="lp-people-name">
+                        <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{initials}}</span>
+                        <b>{{name}}</b>
+                      </div>
+                    </td>
+                    <td>{{email}}</td>
+                    <td>{{role_label}}</td>
+                    {{#can_unenrol}}
+                      <td>
+                        {{#can_remove}}
+                          <form method="post" action="{{participants_form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{remove_confirm}}">
+                            <input type="hidden" name="sesskey" value="{{sesskey}}">
+                            <input type="hidden" name="action" value="unenrol_fellow">
+                            <input type="hidden" name="trackid" value="{{trackid}}">
+                            <input type="hidden" name="userid" value="{{id}}">
+                            <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{unenrol_label}}</button>
+                          </form>
+                        {{/can_remove}}
+                      </td>
+                    {{/can_unenrol}}
+                  </tr>
+                {{/fellow_rows}}
+              </tbody>
+            </table>
+          </div>
+        {{/has_fellows}}
+        {{^has_fellows}}
+          <p class="lp-muted lp-sm">{{fellows_empty}}</p>
+        {{/has_fellows}}
+      </div>
+
+      <div class="lp-courseops-roster-block">
+        <h4 class="lp-courseops-roster-h">{{mentors_section_title}}</h4>
+        {{#has_mentors}}
+          <div class="lp-table-wrap">
+            <table class="lp-table">
+              <thead>
+                <tr>
+                  <th>{{col_name}}</th>
+                  <th>{{col_email}}</th>
+                  <th>{{col_role}}</th>
+                  {{#can_unenrol}}<th>{{col_actions}}</th>{{/can_unenrol}}
+                </tr>
+              </thead>
+              <tbody>
+                {{#mentor_rows}}
+                  <tr>
+                    <td>
+                      <div class="lp-people-name">
+                        <span class="lp-av lp-av-sm tone-green" aria-hidden="true">{{initials}}</span>
+                        <b>{{name}}</b>
+                      </div>
+                    </td>
+                    <td>{{email}}</td>
+                    <td>{{role_label}}</td>
+                    {{#can_unenrol}}
+                      <td>
+                        {{#can_remove}}
+                          <form method="post" action="{{participants_form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{remove_confirm}}">
+                            <input type="hidden" name="sesskey" value="{{sesskey}}">
+                            <input type="hidden" name="action" value="remove_mentor">
+                            <input type="hidden" name="trackid" value="{{trackid}}">
+                            <input type="hidden" name="userid" value="{{id}}">
+                            <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{remove_mentor_label}}</button>
+                          </form>
+                        {{/can_remove}}
+                      </td>
+                    {{/can_unenrol}}
+                  </tr>
+                {{/mentor_rows}}
+              </tbody>
+            </table>
+          </div>
+        {{/has_mentors}}
+        {{^has_mentors}}
+          <p class="lp-muted lp-sm">{{mentors_empty}}</p>
+        {{/has_mentors}}
+      </div>
+
+      <div class="lp-courseops-settings-actions" style="margin-top:16px">
+        <a class="lp-btn lp-btn-light" href="{{hub_url}}">{{back_hub_label}}</a>
+      </div>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_participants}}
+
+  {{#is_grades}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{grades_title}}</h3>
+        <p class="lp-muted">{{grades_lead}}</p>
+      </div>
+      {{^grades_can_view}}
+        <p class="lp-muted">{{grades_no_cap}}</p>
+      {{/grades_can_view}}
+      {{#grades_can_view}}
+        {{^grades_showgrades}}
+          <p class="lp-sm lp-muted">{{grades_hidden_course}}</p>
+        {{/grades_showgrades}}
+
+        {{#grades_is_user_report}}
+          <div class="lp-courseops-roster-actions">
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{grades_back_roster_url}}">{{grades_back_roster_label}}</a>
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{grades_reviews_url}}">{{grades_reviews_label}}</a>
+          </div>
+          {{#grades_report_ok}}
+            <div class="lp-courseops-grade-hero">
+              <div class="lp-people-name">
+                <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{grades_report_initials}}</span>
+                <b>{{grades_report_name}}</b>
+              </div>
+              <div class="lp-courseops-stat-row">
+                <span class="lp-chip line">{{grades_course_total_label}}: {{grades_report_total}}</span>
+                <span class="lp-chip line">{{col_percent}}: {{grades_report_percent}}</span>
+              </div>
+            </div>
+            <div class="lp-courseops-roster-block">
+              <h4 class="lp-courseops-roster-h">{{grades_report_heading}}</h4>
+              {{#has_grades_report_rows}}
+                <div class="lp-table-wrap">
+                  <table class="lp-table">
+                    <thead>
+                      <tr>
+                        <th>{{col_activity}}</th>
+                        <th>{{col_type}}</th>
+                        <th>{{col_item_grade}}</th>
+                        <th>{{col_percent}}</th>
+                        <th>{{col_feedback}}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {{#grades_report_rows}}
+                        <tr>
+                          <td><b>{{name}}</b></td>
+                          <td>{{type_label}}</td>
+                          <td>{{grade_display}}</td>
+                          <td>{{percent_display}}</td>
+                          <td class="lp-muted lp-sm">{{feedback_display}}</td>
+                        </tr>
+                      {{/grades_report_rows}}
+                    </tbody>
+                  </table>
+                </div>
+              {{/has_grades_report_rows}}
+              {{^has_grades_report_rows}}
+                <p class="lp-muted lp-sm">{{grades_empty_detail}}</p>
+              {{/has_grades_report_rows}}
+            </div>
+          {{/grades_report_ok}}
+          {{^grades_report_ok}}
+            <p class="lp-muted">{{grades_unknown_fellow}}</p>
+          {{/grades_report_ok}}
+        {{/grades_is_user_report}}
+
+        {{^grades_is_user_report}}
+          <div class="lp-courseops-roster-actions">
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{grades_reviews_url}}">{{grades_reviews_label}}</a>
+          </div>
+          <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{grades_reviews_help}}</p>
+          {{#has_grade_rows}}
+            <div class="lp-courseops-stat-row">
+              <span class="lp-chip line">{{grades_stat_graded}}</span>
+              <span class="lp-chip line">{{grades_stat_avg}}</span>
+            </div>
+          {{/has_grade_rows}}
+
+          <div class="lp-courseops-roster-block">
+            <h4 class="lp-courseops-roster-h">{{grades_fellows_title}}</h4>
+            {{#has_grade_rows}}
+              <div class="lp-table-wrap">
+                <table class="lp-table">
+                  <thead>
+                    <tr>
+                      <th>{{col_name}}</th>
+                      <th>{{col_grade}}</th>
+                      <th>{{col_percent}}</th>
+                      <th>{{col_actions}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {{#grade_rows}}
+                      <tr>
+                        <td>
+                          <div class="lp-people-name">
+                            <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{initials}}</span>
+                            <b>{{name}}</b>
+                          </div>
+                        </td>
+                        <td>{{grade_display}}</td>
+                        <td>{{percent_display}}</td>
+                        <td>
+                          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{user_report_url}}">{{grades_open_user_label}}</a>
+                        </td>
+                      </tr>
+                    {{/grade_rows}}
+                  </tbody>
+                </table>
+              </div>
+            {{/has_grade_rows}}
+            {{^has_grade_rows}}
+              <p class="lp-muted lp-sm">{{grades_empty_fellows}}</p>
+            {{/has_grade_rows}}
+          </div>
+
+          <div class="lp-courseops-roster-block">
+            <h4 class="lp-courseops-roster-h">{{grades_items_title}}</h4>
+            {{#has_item_rows}}
+              <div class="lp-table-wrap">
+                <table class="lp-table">
+                  <thead>
+                    <tr>
+                      <th>{{col_activity}}</th>
+                      <th>{{col_type}}</th>
+                      <th>{{col_max}}</th>
+                      <th>{{col_actions}}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {{#item_rows}}
+                      <tr>
+                        <td><b>{{name}}</b></td>
+                        <td>{{type_label}}</td>
+                        <td>{{max_display}}</td>
+                        <td>
+                          {{#is_assign}}
+                            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{reviews_url}}">{{grades_open_item_label}}</a>
+                          {{/is_assign}}
+                          {{^is_assign}}
+                            <span class="lp-muted lp-sm">—</span>
+                          {{/is_assign}}
+                        </td>
+                      </tr>
+                    {{/item_rows}}
+                  </tbody>
+                </table>
+              </div>
+            {{/has_item_rows}}
+            {{^has_item_rows}}
+              <p class="lp-muted lp-sm">{{grades_empty_items}}</p>
+            {{/has_item_rows}}
+          </div>
+        {{/grades_is_user_report}}
+
+        <p class="lp-courseops-advanced">
+          <a class="lp-ann-link" href="{{grades_advanced_url}}">{{grades_advanced_label}}</a>
+          <span class="lp-muted lp-sm">{{grades_advanced_help}}</span>
+        </p>
+      {{/grades_can_view}}
+      <div class="lp-courseops-settings-actions" style="margin-top:16px">
+        <a class="lp-btn lp-btn-light" href="{{hub_url}}">{{back_hub_label}}</a>
+      </div>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_grades}}
+
+  {{#is_completion}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{completion_section_title}}</h3>
+        <p class="lp-muted">{{completion_section_lead}}</p>
+      </div>
+      {{^completion_can_view}}
+        <p class="lp-muted">{{completion_no_cap}}</p>
+      {{/completion_can_view}}
+      {{#completion_can_view}}
+        {{^completion_site_on}}
+          <p class="lp-muted">{{completion_site_off}}</p>
+        {{/completion_site_on}}
+        {{#completion_site_on}}
+          {{#completion_can_update}}
+            <form method="post" action="{{completion_form_action}}" class="lp-stack lp-courseops-completion-form">
+              <input type="hidden" name="sesskey" value="{{sesskey}}">
+              <input type="hidden" name="action" value="save_course_completion">
+              <input type="hidden" name="trackid" value="{{trackid}}">
+              <label class="lp-check-row">
+                <input type="checkbox" name="enablecompletion" value="1"{{#completion_checked}} checked{{/completion_checked}}>
+                <span>
+                  <strong>{{completion_enable_label}}</strong>
+                  <span class="lp-muted lp-sm">{{completion_enable_help}}</span>
+                </span>
+              </label>
+              <div class="lp-courseops-roster-actions">
+                <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{completion_enable_save}}</button>
+              </div>
+            </form>
+          {{/completion_can_update}}
+          {{^completion_course_on}}
+            <p class="lp-sm lp-muted" style="margin-top:10px">{{completion_course_off}}</p>
+          {{/completion_course_on}}
+        {{/completion_site_on}}
+
+        <div class="lp-courseops-roster-actions" style="margin-top:12px">
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{completion_manage_url}}">{{completion_manage_label}}</a>
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{completion_settings_url}}">{{completion_settings_label}}</a>
+        </div>
+        <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{completion_manage_help}}</p>
+
+        {{#has_completion_stats}}
+          <div class="lp-courseops-stat-row">
+            <span class="lp-chip ok">{{completion_stat_complete}}</span>
+            <span class="lp-chip warn">{{completion_stat_progress}}</span>
+            <span class="lp-chip line">{{completion_stat_new}}</span>
+          </div>
+        {{/has_completion_stats}}
+
+        <div class="lp-courseops-roster-block">
+          {{#has_completion_rows}}
+            <div class="lp-table-wrap">
+              <table class="lp-table">
+                <thead>
+                  <tr>
+                    <th>{{col_name}}</th>
+                    <th>{{col_status}}</th>
+                    <th>{{col_progress}}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#completion_rows}}
+                    <tr>
+                      <td>
+                        <div class="lp-people-name">
+                          <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{initials}}</span>
+                          <b>{{name}}</b>
+                        </div>
+                      </td>
+                      <td><span class="lp-chip {{chip}}">{{status_label}}</span></td>
+                      <td>
+                        {{#has_percent}}
+                          <div class="lp-courseops-progress">
+                            <span class="lp-courseops-progress-bar" style="--lp-pct: {{percent}}%"></span>
+                            <span class="lp-sm">{{progress_label}}</span>
+                          </div>
+                        {{/has_percent}}
+                        {{^has_percent}}
+                          <span class="lp-muted lp-sm">{{progress_label}}</span>
+                        {{/has_percent}}
+                      </td>
+                    </tr>
+                  {{/completion_rows}}
+                </tbody>
+              </table>
+            </div>
+          {{/has_completion_rows}}
+          {{^has_completion_rows}}
+            <p class="lp-muted lp-sm">{{completion_empty_fellows}}</p>
+          {{/has_completion_rows}}
+        </div>
+      {{/completion_can_view}}
+      <div class="lp-courseops-settings-actions" style="margin-top:16px">
+        <a class="lp-btn lp-btn-light" href="{{hub_url}}">{{back_hub_label}}</a>
+      </div>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_completion}}
+
+  {{#is_reports}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{reports_title}}</h3>
+        <p class="lp-muted">{{reports_lead}}</p>
+      </div>
+      {{^reports_can_view}}
+        <p class="lp-muted">{{reports_no_cap}}</p>
+      {{/reports_can_view}}
+      {{#reports_can_view}}
+        <div class="lp-courseops-roster-actions">
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{reports_completion_url}}">{{reports_completion_label}}</a>
+        </div>
+        <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{reports_completion_help}}</p>
+
+        <div class="lp-courseops-roster-block">
+          <h4 class="lp-courseops-roster-h">{{reports_engagement_title}}</h4>
+          {{#has_engagement_rows}}
+            <div class="lp-table-wrap">
+              <table class="lp-table">
+                <thead>
+                  <tr>
+                    <th>{{col_name}}</th>
+                    <th>{{col_lastaccess}}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#engagement_rows}}
+                    <tr>
+                      <td>
+                        <div class="lp-people-name">
+                          <span class="lp-av lp-av-sm tone-blue" aria-hidden="true">{{initials}}</span>
+                          <b>{{name}}</b>
+                        </div>
+                      </td>
+                      <td class="{{^has_access}}lp-muted{{/has_access}}">{{lastaccess_label}}</td>
+                    </tr>
+                  {{/engagement_rows}}
+                </tbody>
+              </table>
+            </div>
+          {{/has_engagement_rows}}
+          {{^has_engagement_rows}}
+            <p class="lp-muted lp-sm">{{reports_empty_fellows}}</p>
+          {{/has_engagement_rows}}
+        </div>
+
+        <div class="lp-courseops-roster-block">
+          <h4 class="lp-courseops-roster-h">{{reports_activity_title}}</h4>
+          {{#reports_completion_off_show}}
+            <p class="lp-muted lp-sm">{{reports_completion_off}}</p>
+          {{/reports_completion_off_show}}
+          {{#has_activity_rows}}
+            <div class="lp-table-wrap">
+              <table class="lp-table">
+                <thead>
+                  <tr>
+                    <th>{{col_activity}}</th>
+                    <th>{{col_type}}</th>
+                    <th>{{col_complete}}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#activity_rows}}
+                    <tr>
+                      <td><b>{{name}}</b></td>
+                      <td>{{modlabel}}</td>
+                      <td>
+                        <div class="lp-courseops-progress">
+                          <span class="lp-courseops-progress-bar" style="--lp-pct: {{pct}}%"></span>
+                          <span class="lp-sm">{{complete_label}}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  {{/activity_rows}}
+                </tbody>
+              </table>
+            </div>
+          {{/has_activity_rows}}
+          {{^has_activity_rows}}
+            {{^reports_completion_off_show}}
+              <p class="lp-muted lp-sm">{{reports_empty_activities}}</p>
+            {{/reports_completion_off_show}}
+          {{/has_activity_rows}}
+        </div>
+
+        <p class="lp-courseops-advanced">
+          <a class="lp-ann-link" href="{{reports_advanced_participation_url}}">{{reports_advanced_participation}}</a>
+          <span class="lp-muted">·</span>
+          <a class="lp-ann-link" href="{{reports_advanced_outline_url}}">{{reports_advanced_outline}}</a>
+          <span class="lp-muted">·</span>
+          <a class="lp-ann-link" href="{{reports_advanced_progress_url}}">{{reports_advanced_progress}}</a>
+          <span class="lp-muted lp-sm">{{reports_advanced_help}}</span>
+        </p>
+      {{/reports_can_view}}
+      <div class="lp-courseops-settings-actions" style="margin-top:16px">
+        <a class="lp-btn lp-btn-light" href="{{hub_url}}">{{back_hub_label}}</a>
+      </div>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_reports}}
+
+  {{#is_qbank}}
+    <section class="lp-card lift" style="margin-top:16px">
+      <div class="lp-card-head lp-card-head-stack">
+        <h3>{{qbank_title}}</h3>
+        <p class="lp-muted">{{qbank_lead}}</p>
+      </div>
+      {{^qbank_can_view}}
+        <p class="lp-muted">{{qbank_no_cap}}</p>
+      {{/qbank_can_view}}
+      {{#qbank_can_view}}
+        <div class="lp-courseops-roster-actions">
+          {{#qbank_has_add}}
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{qbank_add_url}}">{{qbank_add_label}}</a>
+          {{/qbank_has_add}}
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{qbank_banks_url}}">{{qbank_banks_label}}</a>
+        </div>
+        <p class="lp-sm lp-muted lp-courseops-roster-reuse">{{qbank_banks_help}}</p>
+
+        <div class="lp-courseops-roster-block">
+          <h4 class="lp-courseops-roster-h">{{qbank_banks_title}}</h4>
+          {{#has_bank_rows}}
+            <div class="lp-table-wrap">
+              <table class="lp-table">
+                <thead>
+                  <tr>
+                    <th>{{col_name}}</th>
+                    <th>{{col_type}}</th>
+                    <th>{{col_count}}</th>
+                    <th>{{col_actions}}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#bank_rows}}
+                    <tr>
+                      <td><b>{{name}}</b></td>
+                      <td>{{kind_label}}</td>
+                      <td>{{count_label}}</td>
+                      <td class="lp-courseops-inline-actions">
+                        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{open_url}}">{{open_label}}</a>
+                        {{#has_add}}
+                          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{add_url}}">{{add_label}}</a>
+                        {{/has_add}}
+                      </td>
+                    </tr>
+                  {{/bank_rows}}
+                </tbody>
+              </table>
+            </div>
+          {{/has_bank_rows}}
+          {{^has_bank_rows}}
+            <p class="lp-muted lp-sm">{{qbank_empty_banks}}</p>
+          {{/has_bank_rows}}
+        </div>
+
+        <div class="lp-courseops-roster-block">
+          <h4 class="lp-courseops-roster-h">{{qbank_questions_title}}</h4>
+          {{#has_question_rows}}
+            <div class="lp-table-wrap">
+              <table class="lp-table">
+                <thead>
+                  <tr>
+                    <th>{{col_name}}</th>
+                    <th>{{col_type}}</th>
+                    <th>{{col_category}}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{#question_rows}}
+                    <tr>
+                      <td><b>{{name}}</b></td>
+                      <td>{{type_label}}</td>
+                      <td>{{category}}</td>
+                    </tr>
+                  {{/question_rows}}
+                </tbody>
+              </table>
+            </div>
+          {{/has_question_rows}}
+          {{^has_question_rows}}
+            <p class="lp-muted lp-sm">{{qbank_empty_questions}}</p>
+          {{/has_question_rows}}
+        </div>
+      {{/qbank_can_view}}
+      <div class="lp-courseops-settings-actions" style="margin-top:16px">
+        <a class="lp-btn lp-btn-light" href="{{hub_url}}">{{back_hub_label}}</a>
+      </div>
+      <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
+        {{#primary_nav}}
+          <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>
+        {{/primary_nav}}
+      </nav>
+    </section>
+  {{/is_qbank}}
+{{/has_tracks}}

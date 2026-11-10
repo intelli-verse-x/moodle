@@ -58,7 +58,7 @@
 
   <section class="lp-card lift lp-msg-workspace">
     <div class="lp-msg-layout{{#has_selected}} is-split{{/has_selected}}">
-      <aside class="lp-msg-inbox lp-scroll" aria-label="{{strings.messages_inbox_heading}}">
+      <aside class="lp-msg-inbox" aria-label="{{strings.messages_inbox_heading}}">
         <div class="lp-tabs lp-tabs-block lp-msg-tabs" role="tablist" aria-label="{{strings.messages_inbox_heading}}">
           <a class="lp-tab{{#mtab_all}} is-on{{/mtab_all}}"
              role="tab"
@@ -86,6 +86,7 @@
           </a>
         </div>
 
+        <div class="lp-msg-inbox-body lp-scroll">
         {{#has_items}}
           <ul class="lp-msg-list">
             {{#page_items}}
@@ -139,6 +140,7 @@
             {{/conversation_count}}
           </div>
         {{/has_items}}
+        </div>
       </aside>
 
       <div class="lp-msg-thread" aria-label="{{strings.messages_detail_heading}}">

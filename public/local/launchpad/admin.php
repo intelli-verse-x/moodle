@@ -46,11 +46,16 @@ portal_gate::assert_or_redirect_home(
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
 $allowedviews = [
-    'home', 'tracks', 'builder', 'manage', 'activity', 'calendar',
+    'home', 'tracks', 'courseops', 'builder', 'manage', 'activity', 'calendar',
     'announcements', 'cohorts', 'people', 'mentors', 'reviews',
 ];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+
+$courseopssection = optional_param('section', 'hub', PARAM_ALPHANUMEXT);
+if (!in_array($courseopssection, ['hub', 'settings', 'participants', 'grades', 'completion', 'reports', 'qbank'], true)) {
+    $courseopssection = 'hub';
 }
 
 $peopletab = optional_param('tab', 'all', PARAM_ALPHA);
@@ -69,9 +74,80 @@ if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
 }
 
 if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage'
-            || $view === 'activity' || $view === 'announcements' || $view === 'reviews')
+            || $view === 'activity' || $view === 'announcements' || $view === 'reviews'
+            || $view === 'courseops')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'courseops' && $action === 'save_course_settings') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $fullname = optional_param('fullname', '', PARAM_TEXT);
+        $shortname = optional_param('shortname', '', PARAM_TEXT);
+        $visible = (bool) optional_param('visible', 0, PARAM_BOOL);
+        $startdate = optional_param('startdate', '', PARAM_TEXT);
+        $enddate = optional_param('enddate', '', PARAM_TEXT);
+        $enablecompletion = (bool) optional_param('enablecompletion', 0, PARAM_BOOL);
+        $summary = optional_param('summary', '', PARAM_RAW);
+        $flash = admin_dashboard::save_courseops_settings(
+            $USER,
+            $trackid,
+            $fullname,
+            $shortname,
+            $visible,
+            $startdate,
+            $enddate,
+            $enablecompletion,
+            $summary
+        );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'settings',
+        ]));
+    }
+    if ($view === 'courseops' && $action === 'unenrol_fellow') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $targetuserid = optional_param('userid', 0, PARAM_INT);
+        $flash = admin_dashboard::unenrol_fellow_from_track($USER, $targetuserid, $trackid);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]));
+    }
+    if ($view === 'courseops' && $action === 'remove_mentor') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $targetuserid = optional_param('userid', 0, PARAM_INT);
+        $flash = admin_dashboard::remove_mentor_from_track($USER, $targetuserid, $trackid);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]));
+    }
+    if ($view === 'courseops' && ($action === 'track_chat_enable' || $action === 'track_chat_disable')) {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $flash = admin_dashboard::set_track_chat_enabled($USER, $trackid, $action === 'track_chat_enable');
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]));
+    }
+    if ($view === 'courseops' && $action === 'save_course_completion') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $enablecompletion = (bool) optional_param('enablecompletion', 0, PARAM_BOOL);
+        $flash = admin_dashboard::save_courseops_completion($USER, $trackid, $enablecompletion);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'completion',
+        ]));
+    }
     if ($view === 'reviews' && $action === 'ping_review') {
         $submissionid = optional_param('submissionid', 0, PARAM_INT);
         $pingteacherid = optional_param('teacherid', 0, PARAM_INT);
@@ -79,10 +155,29 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']));
     }
+    if ($view === 'reviews' && $action === 'set_ping_target') {
+        $submissionid = optional_param('submissionid', 0, PARAM_INT);
+        $pingteacherid = optional_param('teacherid', 0, PARAM_INT);
+        $result = admin_dashboard::save_review_ping_target($USER, $submissionid, $pingteacherid);
+        if (optional_param('ajax', 0, PARAM_BOOL)) {
+            @header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => empty($result['error']),
+                'error' => (string) ($result['error'] ?? ''),
+            ]);
+            exit;
+        }
+        if (!empty($result['error'])) {
+            $SESSION->lp_admin_flash = $result;
+        }
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']));
+    }
     if ($view === 'announcements' && $action === 'post_announcement') {
         $subject = optional_param('subject', '', PARAM_TEXT);
         $message = optional_param('message', '', PARAM_RAW);
         $alltracks = (bool) optional_param('all_tracks', 0, PARAM_BOOL);
+        $pinned = (bool) optional_param('pinned', 0, PARAM_BOOL);
+        $publishat = optional_param('publish_at', '', PARAM_TEXT);
         $trackids = optional_param_array('trackids', [], PARAM_INT);
         $tags = optional_param_array('tags', [], PARAM_TEXT);
         $customtag = optional_param('customtag', '', PARAM_TEXT);
@@ -91,7 +186,18 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
                 $tags[] = $extra;
             }
         }
-        $flash = announcement_service::post($USER, $subject, $message, $trackids, $alltracks, $tags);
+        $annfiles = (isset($_FILES['annfiles']) && is_array($_FILES['annfiles'])) ? $_FILES['annfiles'] : null;
+        $flash = announcement_service::post(
+            $USER,
+            $subject,
+            $message,
+            $trackids,
+            $alltracks,
+            $tags,
+            $pinned,
+            $publishat,
+            $annfiles
+        );
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
     }
@@ -99,6 +205,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $discussionid = optional_param('discussionid', 0, PARAM_INT);
         $subject = optional_param('subject', '', PARAM_TEXT);
         $message = optional_param('message', '', PARAM_RAW);
+        $pinned = (bool) optional_param('pinned', 0, PARAM_BOOL);
+        $publishat = optional_param('publish_at', '', PARAM_TEXT);
         $tags = optional_param_array('tags', [], PARAM_TEXT);
         $customtag = optional_param('customtag', '', PARAM_TEXT);
         foreach (preg_split('/\s*,\s*/', trim($customtag)) ?: [] as $extra) {
@@ -106,7 +214,19 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
                 $tags[] = $extra;
             }
         }
-        $flash = announcement_service::update($USER, $discussionid, $subject, $message, $tags);
+        $annfiles = (isset($_FILES['annfiles']) && is_array($_FILES['annfiles'])) ? $_FILES['annfiles'] : null;
+        $removefiles = optional_param_array('removeannfiles', [], PARAM_FILE);
+        $flash = announcement_service::update(
+            $USER,
+            $discussionid,
+            $subject,
+            $message,
+            $tags,
+            $pinned,
+            $publishat,
+            $annfiles,
+            $removefiles
+        );
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
     }
@@ -121,6 +241,12 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $alsoorient = (bool) optional_param('also_orient', 0, PARAM_BOOL);
         $flash = admin_dashboard::enrol_fellow_by_email($USER, $email, $trackid, $alsoorient);
+    } else if ($view === 'mentors' && $action === 'save_pilot_capacity') {
+        $maxmentors = optional_param('pilot_max_mentors', 1, PARAM_INT);
+        $maxfellows = optional_param('pilot_max_fellows', 0, PARAM_INT);
+        $flash = admin_dashboard::save_pilot_capacity($USER, $maxmentors, $maxfellows);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']));
     } else if ($view === 'mentors' && $action === 'assign_mentor') {
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);
@@ -233,11 +359,19 @@ if ($view === 'calendar') {
     $calincludeorient = false;
 }
 
+$coursopssectionparam = null;
+if ($view === 'courseops' && $courseopssection !== 'hub') {
+    $coursopssectionparam = $courseopssection;
+} else if ($view === 'manage' && $sectionnum > 0) {
+    $coursopssectionparam = $sectionnum;
+}
+
 $urlparams = array_filter([
     'view' => $view !== 'home' ? $view : null,
     'tab' => ($view === 'people' && $peopletab !== 'all') ? $peopletab : null,
-    'trackid' => (($view === 'builder' || $view === 'manage' || $view === 'activity') && $trackid > 0) ? $trackid : null,
-    'section' => ($view === 'manage' && $sectionnum > 0) ? $sectionnum : null,
+    'trackid' => (($view === 'builder' || $view === 'manage' || $view === 'activity' || $view === 'courseops')
+        && $trackid > 0) ? $trackid : null,
+    'section' => $coursopssectionparam,
     'cmid' => ($view === 'activity' && $cmid > 0) ? $cmid : null,
     'cal' => ($view === 'calendar' && $calmode !== 'month') ? $calmode : null,
     'filter' => ($view === 'calendar' && ($calfilter === 'course' || $calfilter === 'personal')) ? $calfilter : null,
@@ -297,7 +431,7 @@ $nav = [
             [
                 'label' => get_string('admin_nav_tracks', 'local_launchpad'),
                 'url' => $tracksurl,
-                'current' => $view === 'tracks',
+                'current' => ($view === 'tracks' || $view === 'courseops'),
                 'key' => 'tracks',
                 'icon_svg' => $icon(
                     '<path d="M4 6h16M4 12h10M4 18h14"/>'
@@ -392,6 +526,23 @@ if ($view === 'tracks') {
         'local_launchpad/admin_tracks',
         admin_dashboard::tracks_context($USER)
     );
+} else if ($view === 'courseops') {
+    $pagetitle = get_string('admin_courseops_heading', 'local_launchpad');
+    // Grades user report: section=grades&userid=… (not the logged-in admin id).
+    $courseopsreportuserid = 0;
+    if ($courseopssection === 'grades') {
+        $courseopsreportuserid = optional_param('userid', 0, PARAM_INT);
+    }
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_courseops',
+        admin_dashboard::courseops_context(
+            $USER,
+            $trackid,
+            $courseopssection,
+            $flash,
+            $courseopsreportuserid
+        )
+    );
 } else if ($view === 'builder') {
     $pagetitle = get_string('admin_nav_builder', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
@@ -470,7 +621,7 @@ if ($view === 'tracks') {
     $pagetitle = get_string('admin_nav_cohorts', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_cohorts',
-        admin_dashboard::cohorts_context($USER, $flash)
+        admin_dashboard::cohorts_context($USER, $flash, $trackid)
     );
 } else if ($view === 'people') {
     $pagetitle = get_string('admin_nav_people', 'local_launchpad');
@@ -482,7 +633,7 @@ if ($view === 'tracks') {
     $pagetitle = get_string('admin_nav_mentors', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_mentors',
-        admin_dashboard::mentors_context($USER, $flash)
+        admin_dashboard::mentors_context($USER, $flash, $trackid)
     );
 } else if ($view === 'reviews') {
     $pagetitle = get_string('admin_nav_reviews', 'local_launchpad');
@@ -501,6 +652,10 @@ if ($view === 'tracks') {
 
 $unread = messaging::notification_unread_count($userid);
 $notificationslabel = messaging::notifications_label($unread);
+$pagesub = '';
+if ($view === 'home') {
+    $pagesub = get_string('admin_overview_page_sub', 'local_launchpad');
+}
 
 $mismatch = portal_gate::consume_modal_context();
 $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merge([
@@ -511,6 +666,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'nav_groups' => $nav,
     'content' => $content,
     'pagetitle' => $pagetitle,
+    'pagesub' => $pagesub,
     'home_url' => $homeurl,
     'logout_url' => $logouturl,
     'profile_url' => $profileurl,

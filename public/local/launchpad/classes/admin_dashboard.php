@@ -69,6 +69,19 @@ final class admin_dashboard {
         $visibility = self::visibility_context($tracks);
         $attention = self::needs_attention($tracks);
 
+        $ready = (int) $kpis['tracks_ready'];
+        $total = (int) $kpis['tracks_total'];
+        $pendingsetup = max(0, $total - $ready);
+        $trackspct = $total > 0 ? (int) round(($ready / $total) * 100) : 0;
+        $reviewspending = (int) $kpis['reviews_pending'];
+        $fellows = (int) $kpis['fellows'];
+        $teachers = (int) $kpis['teachers'];
+
+        $kpiicon = static function (string $paths): string {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+                . $paths . '</svg>';
+        };
+
         return [
             'firstname' => $firstname,
             'welcome_back' => get_string('admin_welcome_back', 'local_launchpad', $firstname),
@@ -77,11 +90,18 @@ final class admin_dashboard {
             'lead' => get_string('admin_overview_lead', 'local_launchpad'),
             'moodle_admin_url' => (new \moodle_url('/admin/search.php'))->out(false),
             'moodle_admin_label' => get_string('admin_open_moodle_admin', 'local_launchpad'),
-            'kpi_tracks_ready' => $kpis['tracks_ready'],
-            'kpi_tracks_total' => $kpis['tracks_total'],
-            'kpi_fellows' => $kpis['fellows'],
-            'kpi_teachers' => $kpis['teachers'],
-            'kpi_reviews_pending' => $kpis['reviews_pending'],
+            'tracks_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false),
+            'tracks_cta_label' => get_string('admin_overview_tracks_cta', 'local_launchpad'),
+            'fellows_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'people', 'tab' => 'fellow']))->out(false),
+            'mentors_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false),
+            'reviews_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false),
+            'kpi_tracks_ready' => $ready,
+            'kpi_tracks_total' => $total,
+            'kpi_tracks_pct' => $trackspct,
+            'kpi_tracks_pending' => $pendingsetup,
+            'kpi_fellows' => $fellows,
+            'kpi_teachers' => $teachers,
+            'kpi_reviews_pending' => $reviewspending,
             'kpi_tracks_label' => get_string('admin_kpi_tracks_ready', 'local_launchpad'),
             'kpi_fellows_label' => get_string('admin_kpi_fellows', 'local_launchpad'),
             'kpi_teachers_label' => get_string('admin_kpi_teachers', 'local_launchpad'),
@@ -89,7 +109,37 @@ final class admin_dashboard {
             'kpi_tracks_meta' => get_string(
                 'admin_kpi_tracks_meta',
                 'local_launchpad',
-                (object) ['ready' => $kpis['tracks_ready'], 'total' => $kpis['tracks_total']]
+                (object) ['ready' => $ready, 'total' => $total]
+            ),
+            'kpi_tracks_sub' => $pendingsetup > 0
+                ? get_string('admin_kpi_tracks_pending_sub', 'local_launchpad', $pendingsetup)
+                : get_string('admin_kpi_tracks_ready_sub', 'local_launchpad'),
+            'kpi_fellows_sub' => get_string('admin_kpi_fellows_sub', 'local_launchpad'),
+            'kpi_teachers_sub' => get_string('admin_kpi_teachers_sub', 'local_launchpad'),
+            'kpi_reviews_sub' => $reviewspending > 0
+                ? get_string('admin_kpi_reviews_sub', 'local_launchpad', $reviewspending)
+                : get_string('admin_kpi_reviews_sub_clear', 'local_launchpad'),
+            'kpi_reviews_needs_action' => $reviewspending > 0,
+            'kpi_reviews_badge' => get_string('admin_kpi_reviews_badge', 'local_launchpad'),
+            'kpi_icon_tracks' => $kpiicon(
+                '<polygon points="12 2 2 7 12 12 22 7 12 2"/>'
+                . '<polyline points="2 17 12 22 22 17"/>'
+                . '<polyline points="2 12 12 17 22 12"/>'
+            ),
+            'kpi_icon_fellows' => $kpiicon(
+                '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+                . '<circle cx="9" cy="7" r="4"/>'
+                . '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/>'
+                . '<path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+            ),
+            'kpi_icon_teachers' => $kpiicon(
+                '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>'
+                . '<circle cx="12" cy="7" r="4"/>'
+            ),
+            'kpi_icon_reviews' => $kpiicon(
+                '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>'
+                . '<path d="M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>'
+                . '<path d="M9 14l2 2 4-4"/>'
             ),
         ] + $visibility + $attention;
     }
@@ -131,6 +181,16 @@ final class admin_dashboard {
         if ($e instanceof \required_capability_exception) {
             return get_string('admin_err_capability', 'local_launchpad');
         }
+        if ($e instanceof account_provision_exception) {
+            $raw = trim($e->getMessage());
+            $prefix = $e->errorcode . ': ';
+            if (str_starts_with($raw, $prefix)) {
+                $raw = trim(substr($raw, strlen($prefix)));
+            }
+            if ($raw !== '') {
+                return $raw;
+            }
+        }
         $msg = trim($e->getMessage());
         return $msg !== '' ? $msg : get_string('admin_err_generic', 'local_launchpad');
     }
@@ -145,10 +205,21 @@ final class admin_dashboard {
         $firstname = format_string($user->firstname ?? '');
         $tracks = self::list_track_courses();
         $cards = [];
+        $readycount = 0;
+        $outlinecount = 0;
+        $fellowstotal = 0;
         foreach ($tracks as $course) {
-            $cards[] = self::track_card_context($course);
+            $card = self::track_card_context($course);
+            $cards[] = $card;
+            if (!empty($card['ready'])) {
+                $readycount++;
+            } else {
+                $outlinecount++;
+            }
+            $fellowstotal += (int) ($card['fellows_count'] ?? 0);
         }
 
+        $trackcount = count($cards);
         $root = self::fellowship_root_category();
         $catvisible = $root && (int) $root->visible === 1;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
@@ -164,12 +235,1643 @@ final class admin_dashboard {
             'category_chip_ok' => $catvisible,
             'has_tracks' => $cards !== [],
             'tracks' => $cards,
+            // Hero summary (computed from live track cards — no fake export/sync CTAs).
+            'stat_tracks_label' => get_string('admin_tracks_stat_tracks', 'local_launchpad'),
+            'stat_tracks_value' => (string) $trackcount,
+            'stat_ready_label' => get_string('admin_tracks_stat_ready', 'local_launchpad'),
+            'stat_ready_value' => (string) $readycount,
+            'stat_ready_sub' => get_string('admin_tracks_stat_ready_sub', 'local_launchpad'),
+            'stat_outline_label' => get_string('admin_tracks_stat_outline', 'local_launchpad'),
+            'stat_outline_value' => (string) $outlinecount,
+            'stat_outline_sub' => get_string('admin_tracks_stat_outline_sub', 'local_launchpad'),
+            'stat_fellows_label' => get_string('admin_tracks_stat_fellows', 'local_launchpad'),
+            'stat_fellows_value' => (string) $fellowstotal,
+            'stat_fellows_sub' => get_string('admin_tracks_stat_fellows_sub', 'local_launchpad'),
+            // Grid filters (client-side; counts are real).
+            'grid_title' => get_string('admin_tracks_grid_title', 'local_launchpad'),
+            'grid_lead' => get_string('admin_tracks_grid_lead', 'local_launchpad'),
+            'filter_all_label' => get_string('admin_tracks_filter_all', 'local_launchpad', $trackcount),
+            'filter_ready_label' => get_string('admin_tracks_filter_ready', 'local_launchpad', $readycount),
+            'filter_outline_label' => get_string('admin_tracks_filter_outline', 'local_launchpad', $outlinecount),
+            'filter_empty' => get_string('admin_tracks_filter_empty', 'local_launchpad'),
+            // Builder CTA tile (real Course builder link — not a fake create-track flow).
+            'builder_tile_title' => get_string('admin_tracks_builder_tile_title', 'local_launchpad'),
+            'builder_tile_body' => get_string('admin_tracks_builder_tile_body', 'local_launchpad'),
+            'builder_tile_cta' => get_string('admin_tracks_builder_tile_cta', 'local_launchpad'),
+            'builder_url' => $builderurl,
+            'footer_tip' => get_string('admin_tracks_footer_tip', 'local_launchpad'),
         ], self::empty_state(
             'admin_tracks_empty',
             'admin_empty_title_no_tracks',
             $builderurl,
             'admin_empty_cta_builder'
         ));
+    }
+
+    /**
+     * Resolve a LaunchPad track course by id (0 / invalid → first track or null).
+     */
+    public static function resolve_track_course(int $trackid): ?\stdClass {
+        $tracks = self::list_track_courses();
+        if ($tracks === []) {
+            return null;
+        }
+        if ($trackid > 0) {
+            foreach ($tracks as $course) {
+                if ((int) $course->id === $trackid) {
+                    return $course;
+                }
+            }
+        }
+        return $tracks[0];
+    }
+
+    /**
+     * M5 Course ops hub — track-scoped in-shell home (not a Moodle link farm).
+     *
+     * @param \stdClass $user
+     * @param int $trackid
+     * @param string $section hub|settings|participants|grades|completion|reports|qbank
+     * @param array{ok?:string,error?:string} $flash
+     * @return array<string, mixed>
+     */
+    public static function courseops_context(
+        \stdClass $user,
+        int $trackid = 0,
+        string $section = 'hub',
+        array $flash = [],
+        int $reportuserid = 0
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $allowed = ['hub', 'settings', 'participants', 'grades', 'completion', 'reports', 'qbank'];
+        if (!in_array($section, $allowed, true)) {
+            $section = 'hub';
+        }
+
+        $tracks = self::list_track_courses();
+        if ($tracks === []) {
+            $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+            return array_merge([
+                'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
+                'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
+                'lead' => get_string('admin_courseops_lead', 'local_launchpad'),
+                'has_tracks' => false,
+                'is_hub' => true,
+                'is_settings' => false,
+                'is_participants' => false,
+                'is_grades' => false,
+                'is_completion' => false,
+                'is_reports' => false,
+                'is_qbank' => false,
+                'is_soon' => false,
+                'flash_ok' => !empty($flash['ok']),
+                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+                'flash_err' => !empty($flash['error']),
+                'flash_err_body' => (string) ($flash['error'] ?? ''),
+            ], self::empty_state(
+                'admin_tracks_empty',
+                'admin_empty_title_no_tracks',
+                $builderurl,
+                'admin_empty_cta_builder'
+            ));
+        }
+
+        $selected = self::resolve_track_course($trackid);
+        $trackid = (int) $selected->id;
+        // Full row for settings (list query is slim).
+        $fullcourse = $DB->get_record('course', ['id' => $trackid], '*', MUST_EXIST);
+        $visible = (int) ($fullcourse->visible ?? 0) === 1;
+        $teachers = self::teacher_names($trackid);
+        $fellows = self::fellow_count($trackid);
+        $foundationsready = self::foundations_ready($trackid);
+
+        $opsurl = static function (string $sec) use ($trackid): string {
+            return (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'courseops',
+                'trackid' => $trackid,
+                'section' => $sec,
+            ]))->out(false);
+        };
+
+        $icon = static function (string $paths): string {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
+                . $paths . '</svg>';
+        };
+
+        $primary = [
+            [
+                'key' => 'settings',
+                'label' => get_string('admin_courseops_nav_settings', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_settings_blurb', 'local_launchpad'),
+                'url' => $opsurl('settings'),
+                'current' => $section === 'settings',
+                'icon_svg' => $icon('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>'),
+            ],
+            [
+                'key' => 'participants',
+                'label' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_participants_blurb', 'local_launchpad'),
+                'url' => $opsurl('participants'),
+                'current' => $section === 'participants',
+                'icon_svg' => $icon(
+                    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>'
+                    . '<circle cx="9" cy="7" r="4"/>'
+                    . '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>'
+                    . '<path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+                ),
+            ],
+            [
+                'key' => 'grades',
+                'label' => get_string('admin_courseops_nav_grades', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_grades_blurb', 'local_launchpad'),
+                'url' => $opsurl('grades'),
+                'current' => $section === 'grades',
+                'icon_svg' => $icon('<path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/>'),
+            ],
+            [
+                'key' => 'completion',
+                'label' => get_string('admin_courseops_nav_completion', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_completion_blurb', 'local_launchpad'),
+                'url' => $opsurl('completion'),
+                'current' => $section === 'completion',
+                'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),
+            ],
+            [
+                'key' => 'reports',
+                'label' => get_string('admin_courseops_nav_reports', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_reports_blurb', 'local_launchpad'),
+                'url' => $opsurl('reports'),
+                'current' => $section === 'reports',
+                'icon_svg' => $icon('<path d="M4 19V5h4v14H4zM10 19V9h4v10h-4zM16 19v-6h4v6h-4z"/>'),
+            ],
+            [
+                'key' => 'qbank',
+                'label' => get_string('admin_courseops_nav_qbank', 'local_launchpad'),
+                'blurb' => get_string('admin_courseops_nav_qbank_blurb', 'local_launchpad'),
+                'url' => $opsurl('qbank'),
+                'current' => $section === 'qbank',
+                'icon_svg' => $icon('<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/><circle cx="17" cy="16" r="1.5"/>'),
+            ],
+        ];
+
+        $tracktabs = [];
+        foreach ($tracks as $course) {
+            $cid = (int) $course->id;
+            $tracktabs[] = [
+                'id' => $cid,
+                'label' => self::builder_track_tab_label($course),
+                'title' => format_string($course->fullname),
+                'url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => $cid,
+                    'section' => $section === 'hub' ? 'hub' : $section,
+                ]))->out(false),
+                'current' => $cid === $trackid,
+            ];
+        }
+
+        $ishub = $section === 'hub';
+        $issettings = $section === 'settings';
+        $isparticipants = $section === 'participants';
+        $isgrades = $section === 'grades';
+        $iscompletion = $section === 'completion';
+        $isreports = $section === 'reports';
+        $isqbank = $section === 'qbank';
+
+        $sitecompletion = !empty($CFG->enablecompletion);
+        $coursecompletion = $sitecompletion
+            && (int) ($fullcourse->enablecompletion ?? 0) === COMPLETION_ENABLED;
+        $startdate = (int) ($fullcourse->startdate ?? 0);
+        $enddate = (int) ($fullcourse->enddate ?? 0);
+        $summaryplain = trim(html_to_text((string) ($fullcourse->summary ?? ''), 0, false));
+
+        $ctx = [
+            'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
+            'lead' => get_string('admin_courseops_lead', 'local_launchpad'),
+            'has_tracks' => true,
+            'track_name' => format_string($fullcourse->fullname),
+            'track_idnumber' => s($fullcourse->idnumber ?? ''),
+            'trackid' => $trackid,
+            'track_tabs' => $tracktabs,
+            'is_visible' => $visible,
+            'visibility_chip' => $visible
+                ? get_string('admin_courseops_visible', 'local_launchpad')
+                : get_string('admin_courseops_hidden', 'local_launchpad'),
+            'ready_chip' => $foundationsready
+                ? get_string('admin_tracks_foundations_ready', 'local_launchpad')
+                : get_string('admin_tracks_outline_only', 'local_launchpad'),
+            'ready_ok' => $foundationsready,
+            'teacher_kv_label' => get_string('admin_builder_kv_teacher', 'local_launchpad'),
+            'teacher_summary' => $teachers !== []
+                ? implode(', ', $teachers)
+                : get_string('admin_tracks_no_teacher', 'local_launchpad'),
+            'has_teacher' => $teachers !== [],
+            'fellows_kv_label' => get_string('admin_builder_kv_enrolled', 'local_launchpad'),
+            'fellows_summary' => get_string('admin_tracks_fellows', 'local_launchpad', $fellows),
+            'hub_url' => $opsurl('hub'),
+            'back_tracks_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false),
+            'back_tracks_label' => get_string('admin_courseops_back_tracks', 'local_launchpad'),
+            'preview_url' => (new \moodle_url('/course/view.php', ['id' => $trackid]))->out(false),
+            'preview_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
+            'status_title' => get_string('admin_courseops_status_title', 'local_launchpad'),
+            'ops_title' => get_string('admin_courseops_ops_title', 'local_launchpad'),
+            'ops_lead' => get_string('admin_courseops_ops_lead', 'local_launchpad'),
+            'primary_nav' => $primary,
+            'is_hub' => $ishub,
+            'is_settings' => $issettings,
+            'is_participants' => $isparticipants,
+            'is_grades' => $isgrades,
+            'is_completion' => $iscompletion,
+            'is_reports' => $isreports,
+            'is_qbank' => $isqbank,
+            'is_soon' => false,
+            'section' => $section,
+            'section_title' => '',
+            'section_body' => '',
+            'soon_badge' => get_string('admin_courseops_soon_badge', 'local_launchpad'),
+            'back_hub_label' => get_string('admin_courseops_back_hub', 'local_launchpad'),
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+            // Settings form (Slice B).
+            'settings_title' => get_string('admin_courseops_nav_settings', 'local_launchpad'),
+            'settings_lead' => get_string('admin_courseops_settings_lead', 'local_launchpad'),
+            'form_action' => $opsurl('settings'),
+            'sesskey' => sesskey(),
+            'fullname_label' => get_string('admin_courseops_field_fullname', 'local_launchpad'),
+            'fullname_value' => (string) $fullcourse->fullname,
+            'shortname_label' => get_string('admin_courseops_field_shortname', 'local_launchpad'),
+            'shortname_value' => (string) $fullcourse->shortname,
+            'idnumber_label' => get_string('admin_courseops_field_idnumber', 'local_launchpad'),
+            'idnumber_help' => get_string('admin_courseops_field_idnumber_help', 'local_launchpad'),
+            'visible_label' => get_string('admin_courseops_field_visible', 'local_launchpad'),
+            'visible_help' => get_string('admin_courseops_field_visible_help', 'local_launchpad'),
+            'visible_checked' => $visible,
+            'startdate_label' => get_string('admin_courseops_field_startdate', 'local_launchpad'),
+            'startdate_value' => self::format_course_date_value($startdate),
+            'enddate_label' => get_string('admin_courseops_field_enddate', 'local_launchpad'),
+            'enddate_help' => get_string('admin_courseops_field_enddate_help', 'local_launchpad'),
+            'enddate_value' => self::format_course_date_value($enddate),
+            'completion_site_on' => $sitecompletion,
+            'completion_label' => get_string('admin_courseops_field_completion', 'local_launchpad'),
+            'completion_help' => get_string('admin_courseops_field_completion_help', 'local_launchpad'),
+            'completion_checked' => $coursecompletion,
+            'completion_site_off' => get_string('admin_courseops_completion_site_off', 'local_launchpad'),
+            'summary_label' => get_string('admin_courseops_field_summary', 'local_launchpad'),
+            'summary_value' => $summaryplain,
+            'save_label' => get_string('admin_courseops_settings_save', 'local_launchpad'),
+            'advanced_url' => (new \moodle_url('/course/edit.php', ['id' => $trackid]))->out(false),
+            'advanced_label' => get_string('admin_courseops_settings_advanced', 'local_launchpad'),
+            'advanced_help' => get_string('admin_courseops_settings_advanced_help', 'local_launchpad'),
+        ];
+
+        // Keep the user's draft after a failed save (validate → error → reload).
+        $posted = $flash['posted'] ?? null;
+        if (is_array($posted)) {
+            if (array_key_exists('fullname', $posted)) {
+                $ctx['fullname_value'] = (string) $posted['fullname'];
+            }
+            if (array_key_exists('shortname', $posted)) {
+                $ctx['shortname_value'] = (string) $posted['shortname'];
+            }
+            if (array_key_exists('visible', $posted)) {
+                $ctx['visible_checked'] = !empty($posted['visible']);
+            }
+            if (array_key_exists('startdate', $posted)) {
+                $ctx['startdate_value'] = (string) $posted['startdate'];
+            }
+            if (array_key_exists('enddate', $posted)) {
+                $ctx['enddate_value'] = (string) $posted['enddate'];
+            }
+            if (array_key_exists('enablecompletion', $posted)) {
+                $ctx['completion_checked'] = !empty($posted['enablecompletion']);
+            }
+            if (array_key_exists('summary', $posted)) {
+                $ctx['summary_value'] = (string) $posted['summary'];
+            }
+        }
+
+        if ($isparticipants) {
+            $ctx = array_merge($ctx, self::courseops_participants_context($user, $trackid, $fullcourse));
+        }
+        if ($isgrades) {
+            $ctx = array_merge(
+                $ctx,
+                self::courseops_grades_context($user, $trackid, $fullcourse, $reportuserid)
+            );
+        }
+        if ($iscompletion) {
+            $ctx = array_merge($ctx, self::courseops_completion_context($user, $trackid, $fullcourse));
+        }
+        if ($isreports) {
+            $ctx = array_merge($ctx, self::courseops_reports_context($user, $trackid, $fullcourse));
+        }
+        if ($isqbank) {
+            $ctx = array_merge($ctx, self::courseops_qbank_context($user, $trackid, $fullcourse));
+        }
+
+        return $ctx;
+    }
+
+    /**
+     * Participants section: track roster + reuse links to Cohorts / Mentors (Slice C).
+     *
+     * @return array<string, mixed>
+     */
+    public static function courseops_participants_context(
+        \stdClass $user,
+        int $trackid,
+        \stdClass $course
+    ): array {
+        $canunenrol = account_provision::actor_may_unenrol($user, $trackid);
+        $fellows = self::list_track_fellows($trackid);
+        $mentors = self::list_track_roster_mentors($trackid);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'participants',
+        ]))->out(false);
+        $sk = sesskey();
+        $unenrollabel = get_string('admin_courseops_unenrol', 'local_launchpad');
+        $removementorlabel = get_string('admin_courseops_remove_mentor', 'local_launchpad');
+
+        $fellowrows = [];
+        foreach ($fellows as $row) {
+            $fellowrows[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'email' => $row['email'],
+                'initials' => $row['initials'],
+                'role_label' => get_string('admin_courseops_role_fellow', 'local_launchpad'),
+                'can_remove' => $canunenrol,
+                'remove_confirm' => get_string(
+                    'admin_courseops_unenrol_confirm',
+                    'local_launchpad',
+                    $row['name']
+                ),
+                'trackid' => $trackid,
+                'sesskey' => $sk,
+                'participants_form_action' => $formaction,
+                'unenrol_label' => $unenrollabel,
+            ];
+        }
+
+        $mentorrows = [];
+        foreach ($mentors as $row) {
+            $mentorrows[] = [
+                'id' => $row['id'],
+                'name' => $row['name'],
+                'email' => $row['email'],
+                'initials' => $row['initials'],
+                'role_label' => $row['role_label'],
+                'can_remove' => $canunenrol,
+                'remove_confirm' => get_string(
+                    'admin_courseops_remove_mentor_confirm',
+                    'local_launchpad',
+                    $row['name']
+                ),
+                'trackid' => $trackid,
+                'sesskey' => $sk,
+                'participants_form_action' => $formaction,
+                'remove_mentor_label' => $removementorlabel,
+            ];
+        }
+
+        $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'cohorts',
+            'trackid' => $trackid,
+        ]))->out(false);
+
+        $chat = messaging::get_track_chat_status($trackid);
+        $statuskey = (string) ($chat['status_key'] ?? 'off');
+        $statuslabel = match ($statuskey) {
+            'on' => get_string('admin_track_chat_status_on', 'local_launchpad'),
+            'disabled' => get_string('admin_track_chat_status_disabled', 'local_launchpad'),
+            'site_off' => get_string('admin_track_chat_status_site_off', 'local_launchpad'),
+            default => get_string('admin_track_chat_status_off', 'local_launchpad'),
+        };
+        $chatconvid = (int) ($chat['conversation_id'] ?? 0);
+        $chatenabled = $statuskey === 'on';
+
+        return [
+            'participants_title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
+            'participants_lead' => get_string('admin_courseops_participants_lead', 'local_launchpad'),
+            'participants_form_action' => $formaction,
+            'enrol_fellow_url' => $cohortsurl,
+            'enrol_fellow_label' => get_string('admin_courseops_enrol_fellow', 'local_launchpad'),
+            'enrol_fellow_help' => get_string('admin_courseops_enrol_fellow_help', 'local_launchpad'),
+            'assign_mentor_url' => self::assign_mentor_url($trackid),
+            'assign_mentor_label' => get_string('admin_courseops_assign_mentor', 'local_launchpad'),
+            'assign_mentor_help' => get_string('admin_courseops_assign_mentor_help', 'local_launchpad'),
+            'fellows_section_title' => get_string('admin_courseops_fellows_title', 'local_launchpad', count($fellowrows)),
+            'mentors_section_title' => get_string('admin_courseops_mentors_title', 'local_launchpad', count($mentorrows)),
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_email' => get_string('admin_people_col_email', 'local_launchpad'),
+            'col_role' => get_string('admin_people_col_role', 'local_launchpad'),
+            'col_actions' => get_string('admin_courseops_col_actions', 'local_launchpad'),
+            'unenrol_label' => $unenrollabel,
+            'remove_mentor_label' => $removementorlabel,
+            'fellow_rows' => $fellowrows,
+            'has_fellows' => $fellowrows !== [],
+            'fellows_empty' => get_string('admin_courseops_fellows_empty', 'local_launchpad'),
+            'mentor_rows' => $mentorrows,
+            'has_mentors' => $mentorrows !== [],
+            'mentors_empty' => get_string('admin_courseops_mentors_empty', 'local_launchpad'),
+            'can_unenrol' => $canunenrol,
+            'unenrol_no_cap' => get_string('admin_courseops_err_unenrol_cap', 'local_launchpad'),
+            'track_fullname_plain' => format_string($course->fullname),
+            'track_chat_title' => get_string('admin_track_chat_title', 'local_launchpad'),
+            'track_chat_lead' => get_string('admin_track_chat_lead', 'local_launchpad'),
+            'track_chat_status_label' => $statuslabel,
+            'track_chat_status_on' => $statuskey === 'on',
+            'track_chat_status_disabled' => $statuskey === 'disabled',
+            'track_chat_status_site_off' => $statuskey === 'site_off',
+            'track_chat_status_off' => $statuskey === 'off',
+            'track_chat_member_count' => (int) ($chat['member_count'] ?? 0),
+            'track_chat_members_label' => get_string(
+                'admin_track_chat_members',
+                'local_launchpad',
+                (int) ($chat['member_count'] ?? 0)
+            ),
+            'track_chat_can_toggle' => !empty($chat['messaging_site_on']),
+            'track_chat_enable_label' => get_string('admin_track_chat_enable', 'local_launchpad'),
+            'track_chat_disable_label' => get_string('admin_track_chat_disable', 'local_launchpad'),
+            'track_chat_sesskey' => $sk,
+            'track_chat_trackid' => $trackid,
+            'track_chat_has_open_link' => $chatenabled,
+            'track_chat_open_label' => get_string('admin_track_chat_open_group', 'local_launchpad'),
+            'track_chat_open_fellow_label' => get_string('admin_track_chat_open_fellow', 'local_launchpad'),
+            'track_chat_open_mentor_label' => get_string('admin_track_chat_open_mentor', 'local_launchpad'),
+            'track_chat_open_fellow_url' => messaging::messages_url(null, 'fellow', 'group', $chatconvid),
+            'track_chat_open_mentor_url' => messaging::messages_url(null, 'mentor', 'group', $chatconvid),
+        ];
+    }
+
+    /**
+     * Enable or disable track group chat (Admin Course ops only).
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function set_track_chat_enabled(\stdClass $actor, int $trackid, bool $on): array {
+        global $DB;
+
+        $adminid = (int) ($actor->id ?? 0);
+        if ($adminid <= 0 || (!self::can_access($adminid) && !is_siteadmin($adminid))) {
+            return ['error' => get_string('admin_courseops_err_cap', 'local_launchpad')];
+        }
+        if ($trackid <= 0) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        $course = $DB->get_record('course', ['id' => $trackid], 'id,idnumber', IGNORE_MISSING);
+        if (!$course || !self::is_track_idnumber((string) ($course->idnumber ?? ''))) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        return messaging::set_track_chat_enabled($trackid, $on);
+    }
+
+    /**
+     * Grades section: course-total roster + in-shell fellow user report (LP boundary).
+     * Reviews owns pending assign grading — not a second review queue.
+     * One Advanced escape: Moodle gradebook setup (weights/scales/categories).
+     *
+     * @return array<string, mixed>
+     */
+    public static function courseops_grades_context(
+        \stdClass $user,
+        int $trackid,
+        \stdClass $course,
+        int $reportuserid = 0
+    ): array {
+        global $CFG;
+
+        require_once($CFG->libdir . '/gradelib.php');
+        require_once($CFG->libdir . '/grade/grade_item.php');
+        require_once($CFG->libdir . '/grade/grade_grade.php');
+
+        $context = \context_course::instance($trackid);
+        $canview = has_capability('moodle/grade:viewall', $context, $user);
+        $reviewsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
+        $advancedurl = (new \moodle_url('/grade/edit/tree/index.php', ['id' => $trackid]))->out(false);
+        $rosterurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'grades',
+        ]))->out(false);
+
+        $base = [
+            'grades_title' => get_string('admin_courseops_nav_grades', 'local_launchpad'),
+            'grades_lead' => get_string('admin_courseops_grades_lead', 'local_launchpad'),
+            'grades_can_view' => $canview,
+            'grades_no_cap' => get_string('admin_courseops_err_grades_cap', 'local_launchpad'),
+            'grades_reviews_url' => $reviewsurl,
+            'grades_reviews_label' => get_string('admin_courseops_grades_reviews', 'local_launchpad'),
+            'grades_reviews_help' => get_string('admin_courseops_grades_reviews_help', 'local_launchpad'),
+            'grades_advanced_url' => $advancedurl,
+            'grades_advanced_label' => get_string('admin_courseops_grades_advanced', 'local_launchpad'),
+            'grades_advanced_help' => get_string('admin_courseops_grades_advanced_help', 'local_launchpad'),
+            'grades_fellows_title' => get_string('admin_courseops_grades_fellows_title', 'local_launchpad'),
+            'grades_items_title' => get_string('admin_courseops_grades_items_title', 'local_launchpad'),
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_grade' => get_string('admin_courseops_col_grade', 'local_launchpad'),
+            'col_item_grade' => get_string('admin_courseops_col_item_grade', 'local_launchpad'),
+            'col_percent' => get_string('admin_courseops_col_percent', 'local_launchpad'),
+            'col_actions' => get_string('admin_courseops_col_actions', 'local_launchpad'),
+            'col_activity' => get_string('admin_courseops_col_activity', 'local_launchpad'),
+            'col_type' => get_string('admin_courseops_col_type', 'local_launchpad'),
+            'col_max' => get_string('admin_courseops_col_max', 'local_launchpad'),
+            'col_feedback' => get_string('admin_courseops_col_feedback', 'local_launchpad'),
+            'grades_empty_fellows' => get_string('admin_courseops_grades_empty_fellows', 'local_launchpad'),
+            'grades_empty_items' => get_string('admin_courseops_grades_empty_items', 'local_launchpad'),
+            'grades_open_user_label' => get_string('admin_courseops_grades_open_user', 'local_launchpad'),
+            'grades_hidden_course' => get_string('admin_courseops_grades_hidden_course', 'local_launchpad'),
+            'grades_back_roster_label' => get_string('admin_courseops_grades_back_roster', 'local_launchpad'),
+            'grades_back_roster_url' => $rosterurl,
+            'grades_report_heading' => get_string('admin_courseops_grades_report_heading', 'local_launchpad'),
+            'grades_course_total_label' => get_string('admin_courseops_grades_course_total', 'local_launchpad'),
+            'grades_not_graded' => get_string('admin_courseops_grades_not_graded', 'local_launchpad'),
+            'grades_empty_detail' => get_string('admin_courseops_grades_empty_detail', 'local_launchpad'),
+            'grades_unknown_fellow' => get_string('admin_courseops_grades_unknown_fellow', 'local_launchpad'),
+            'grade_rows' => [],
+            'has_grade_rows' => false,
+            'item_rows' => [],
+            'has_item_rows' => false,
+            'grades_stat_graded' => '',
+            'grades_stat_avg' => '',
+            'grades_showgrades' => !empty($course->showgrades),
+            'grades_is_user_report' => false,
+            'grades_report_name' => '',
+            'grades_report_initials' => '',
+            'grades_report_total' => '—',
+            'grades_report_percent' => '—',
+            'grades_report_has_total' => false,
+            'grades_report_rows' => [],
+            'has_grades_report_rows' => false,
+            'grades_report_ok' => false,
+        ];
+
+        if (!$canview) {
+            return $base;
+        }
+
+        $fellows = self::list_track_fellows($trackid);
+
+        // In-shell user report for one fellow (section=grades&userid=…).
+        if ($reportuserid > 0) {
+            $fellow = null;
+            foreach ($fellows as $row) {
+                if ((int) $row['id'] === $reportuserid) {
+                    $fellow = $row;
+                    break;
+                }
+            }
+            $base['grades_is_user_report'] = true;
+            $base['grades_lead'] = get_string('admin_courseops_grades_detail_lead', 'local_launchpad');
+            if ($fellow === null) {
+                return $base;
+            }
+            $detail = self::courseops_grades_user_detail($trackid, $reportuserid);
+            return array_merge($base, [
+                'grades_report_ok' => true,
+                'grades_report_name' => $fellow['name'],
+                'grades_report_initials' => $fellow['initials'],
+                'grades_report_total' => $detail['course_total'],
+                'grades_report_percent' => $detail['course_percent'],
+                'grades_report_has_total' => $detail['has_course_total'],
+                'grades_report_rows' => $detail['rows'],
+                'has_grades_report_rows' => $detail['rows'] !== [],
+            ]);
+        }
+
+        $courseitem = \grade_item::fetch_course_item($trackid);
+        $graderows = [];
+        $gradedcount = 0;
+        $pctsum = 0.0;
+        $pctn = 0;
+
+        foreach ($fellows as $fellow) {
+            $uid = (int) $fellow['id'];
+            $display = '—';
+            $pctlabel = '—';
+            $hasgrade = false;
+            if ($courseitem) {
+                $grade = new \grade_grade(['itemid' => $courseitem->id, 'userid' => $uid]);
+                $grade->grade_item = $courseitem;
+                $final = $grade->finalgrade;
+                if ($final !== null) {
+                    $hasgrade = true;
+                    $gradedcount++;
+                    $display = grade_format_gradevalue($final, $courseitem);
+                    if ($courseitem->grademax > $courseitem->grademin) {
+                        $fraction = ((float) $final - (float) $courseitem->grademin)
+                            / ((float) $courseitem->grademax - (float) $courseitem->grademin);
+                        $pct = (int) round($fraction * 100);
+                        $pctlabel = $pct . '%';
+                        $pctsum += $pct;
+                        $pctn++;
+                    }
+                }
+            }
+            $graderows[] = [
+                'id' => $uid,
+                'name' => $fellow['name'],
+                'initials' => $fellow['initials'],
+                'grade_display' => $display,
+                'percent_display' => $pctlabel,
+                'has_grade' => $hasgrade,
+                'user_report_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => $trackid,
+                    'section' => 'grades',
+                    'userid' => $uid,
+                ]))->out(false),
+            ];
+        }
+
+        $itemrows = [];
+        $items = \grade_item::fetch_all(['courseid' => $trackid]) ?: [];
+        foreach ($items as $item) {
+            if ($item->itemtype !== 'mod' || (int) $item->gradetype === GRADE_TYPE_NONE) {
+                continue;
+            }
+            if (!empty($item->outcomeid)) {
+                continue;
+            }
+            $modlabel = '';
+            if (!empty($item->itemmodule)) {
+                $modlabel = get_string('pluginname', 'mod_' . $item->itemmodule);
+            }
+            $isassign = $item->itemmodule === 'assign';
+            $itemrows[] = [
+                'name' => $item->get_name(),
+                'type_label' => $modlabel !== '' ? $modlabel : (string) $item->itemtype,
+                'max_display' => format_float((float) $item->grademax, 2),
+                'is_assign' => $isassign,
+                'reviews_url' => $reviewsurl,
+            ];
+        }
+
+        $avglabel = $pctn > 0
+            ? get_string('admin_courseops_grades_stat_avg', 'local_launchpad', (int) round($pctsum / $pctn))
+            : get_string('admin_courseops_grades_stat_avg_na', 'local_launchpad');
+
+        return array_merge($base, [
+            'grade_rows' => $graderows,
+            'has_grade_rows' => $graderows !== [],
+            'item_rows' => $itemrows,
+            'has_item_rows' => $itemrows !== [],
+            'grades_stat_graded' => get_string(
+                'admin_courseops_grades_stat_graded',
+                'local_launchpad',
+                (object) ['graded' => $gradedcount, 'total' => count($fellows)]
+            ),
+            'grades_stat_avg' => $avglabel,
+            'grades_open_item_label' => get_string('admin_courseops_grades_reviews', 'local_launchpad'),
+        ]);
+    }
+
+    /**
+     * In-shell per-fellow grade items for Course ops Grades (grade_item / grade_grade).
+     *
+     * @return array{course_total:string,course_percent:string,has_course_total:bool,rows:array<int,array<string,mixed>>}
+     */
+    private static function courseops_grades_user_detail(int $trackid, int $userid): array {
+        $notgraded = get_string('admin_courseops_grades_not_graded', 'local_launchpad');
+        $coursetotal = '—';
+        $coursepercent = '—';
+        $hascoursetotal = false;
+        $rows = [];
+
+        $courseitem = \grade_item::fetch_course_item($trackid);
+        if ($courseitem) {
+            $grade = new \grade_grade(['itemid' => $courseitem->id, 'userid' => $userid]);
+            $grade->grade_item = $courseitem;
+            if ($grade->finalgrade !== null) {
+                $hascoursetotal = true;
+                $coursetotal = grade_format_gradevalue($grade->finalgrade, $courseitem);
+                if ($courseitem->grademax > $courseitem->grademin) {
+                    $fraction = ((float) $grade->finalgrade - (float) $courseitem->grademin)
+                        / ((float) $courseitem->grademax - (float) $courseitem->grademin);
+                    $coursepercent = ((int) round($fraction * 100)) . '%';
+                }
+            }
+        }
+
+        $items = \grade_item::fetch_all(['courseid' => $trackid]) ?: [];
+        foreach ($items as $item) {
+            if ($item->itemtype !== 'mod' || (int) $item->gradetype === GRADE_TYPE_NONE) {
+                continue;
+            }
+            if (!empty($item->outcomeid)) {
+                continue;
+            }
+            $modlabel = '';
+            if (!empty($item->itemmodule)) {
+                $modlabel = get_string('pluginname', 'mod_' . $item->itemmodule);
+            }
+            $gg = new \grade_grade(['itemid' => $item->id, 'userid' => $userid]);
+            $gg->grade_item = $item;
+            $gradedisplay = $notgraded;
+            $pctdisplay = '—';
+            $hasgrade = false;
+            if ($gg->finalgrade !== null) {
+                $hasgrade = true;
+                $gradedisplay = grade_format_gradevalue($gg->finalgrade, $item);
+                if ($item->grademax > $item->grademin) {
+                    $fraction = ((float) $gg->finalgrade - (float) $item->grademin)
+                        / ((float) $item->grademax - (float) $item->grademin);
+                    $pctdisplay = ((int) round($fraction * 100)) . '%';
+                }
+            }
+            $feedback = trim(html_to_text((string) ($gg->feedback ?? ''), 0, false));
+            $rows[] = [
+                'name' => $item->get_name(),
+                'type_label' => $modlabel !== '' ? $modlabel : (string) $item->itemtype,
+                'grade_display' => $gradedisplay,
+                'percent_display' => $pctdisplay,
+                'feedback_display' => $feedback !== '' ? $feedback : '—',
+                'has_feedback' => $feedback !== '',
+                'has_grade' => $hasgrade,
+                'is_assign' => $item->itemmodule === 'assign',
+            ];
+        }
+
+        return [
+            'course_total' => $coursetotal,
+            'course_percent' => $coursepercent,
+            'has_course_total' => $hascoursetotal,
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * Course module id for a mod instance on a track (0 if missing).
+     */
+    private static function courseops_cmid_for_mod(int $courseid, string $modname, int $instanceid): int {
+        try {
+            $modinfo = get_fast_modinfo($courseid);
+            foreach ($modinfo->get_instances_of($modname) as $cm) {
+                if ((int) $cm->instance === $instanceid) {
+                    return (int) $cm->id;
+                }
+            }
+        } catch (\Throwable $e) {
+            debugging('courseops_cmid_for_mod: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+        return 0;
+    }
+
+    /**
+     * Completion section: fellow status table + enable toggle (Slice E).
+     * Activity-level completion rules stay in Manage.
+     *
+     * @return array<string, mixed>
+     */
+    public static function courseops_completion_context(
+        \stdClass $user,
+        int $trackid,
+        \stdClass $course
+    ): array {
+        global $CFG;
+
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $context = \context_course::instance($trackid);
+        $canview = has_capability('report/completion:view', $context, $user)
+            || has_capability('moodle/course:view', $context, $user)
+            || has_capability('moodle/course:update', $context, $user);
+        $canupdate = has_capability('moodle/course:update', $context, $user);
+        $siteon = !empty($CFG->enablecompletion);
+        $courseon = $siteon && (int) ($course->enablecompletion ?? 0) === COMPLETION_ENABLED;
+        $manageurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'manage',
+            'trackid' => $trackid,
+        ]))->out(false);
+        $settingsurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'settings',
+        ]))->out(false);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'completion',
+        ]))->out(false);
+
+        $base = [
+            'completion_section_title' => get_string('admin_courseops_nav_completion', 'local_launchpad'),
+            'completion_section_lead' => get_string('admin_courseops_completion_lead', 'local_launchpad'),
+            'completion_can_view' => $canview,
+            'completion_no_cap' => get_string('admin_courseops_err_completion_cap', 'local_launchpad'),
+            'completion_site_on' => $siteon,
+            'completion_course_on' => $courseon,
+            'completion_site_off' => get_string('admin_courseops_completion_site_off', 'local_launchpad'),
+            'completion_course_off' => get_string('admin_courseops_completion_course_off', 'local_launchpad'),
+            'completion_enable_label' => get_string('admin_courseops_field_completion', 'local_launchpad'),
+            'completion_enable_help' => get_string('admin_courseops_field_completion_help', 'local_launchpad'),
+            'completion_enable_save' => get_string('admin_courseops_completion_enable_save', 'local_launchpad'),
+            'completion_can_update' => $canupdate,
+            'completion_form_action' => $formaction,
+            'sesskey' => sesskey(),
+            'trackid' => $trackid,
+            'completion_checked' => $courseon,
+            'completion_manage_url' => $manageurl,
+            'completion_manage_label' => get_string('admin_courseops_completion_manage', 'local_launchpad'),
+            'completion_manage_help' => get_string('admin_courseops_completion_manage_help', 'local_launchpad'),
+            'completion_settings_url' => $settingsurl,
+            'completion_settings_label' => get_string('admin_courseops_nav_settings', 'local_launchpad'),
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_status' => get_string('admin_courseops_col_status', 'local_launchpad'),
+            'col_progress' => get_string('admin_courseops_col_progress', 'local_launchpad'),
+            'completion_empty_fellows' => get_string('admin_courseops_completion_empty_fellows', 'local_launchpad'),
+            'completion_rows' => [],
+            'has_completion_rows' => false,
+            'completion_stat_complete' => '',
+            'completion_stat_progress' => '',
+            'completion_stat_new' => '',
+        ];
+
+        if (!$canview) {
+            return $base;
+        }
+
+        $fellows = self::list_track_fellows($trackid);
+        $rows = [];
+        $ncomplete = 0;
+        $nprogress = 0;
+        $nnew = 0;
+
+        if ($courseon && $fellows !== []) {
+            $fullcourse = get_course($trackid);
+            foreach ($fellows as $fellow) {
+                $uid = (int) $fellow['id'];
+                $outline = fellowship_dashboard::course_outline($fullcourse, $uid);
+                $completed = (int) ($outline['completed'] ?? 0);
+                $trackable = (int) ($outline['trackable'] ?? 0);
+                $percent = $outline['percent'] ?? null;
+                $haspercent = $percent !== null;
+
+                if ($haspercent && (int) $percent >= 100) {
+                    $status = 'complete';
+                    $statuslabel = get_string('admin_courseops_completion_status_complete', 'local_launchpad');
+                    $chip = 'ok';
+                    $ncomplete++;
+                } else if (($haspercent && (int) $percent > 0) || $completed > 0) {
+                    $status = 'progress';
+                    $statuslabel = get_string('admin_courseops_completion_status_progress', 'local_launchpad');
+                    $chip = 'warn';
+                    $nprogress++;
+                } else {
+                    $status = 'new';
+                    $statuslabel = get_string('admin_courseops_completion_status_new', 'local_launchpad');
+                    $chip = 'line';
+                    $nnew++;
+                }
+
+                $progresslabel = $haspercent
+                    ? get_string('admin_courseops_completion_progress', 'local_launchpad', [
+                        'done' => $completed,
+                        'total' => $trackable,
+                        'pct' => (int) $percent,
+                    ])
+                    : ($trackable > 0
+                        ? get_string('admin_courseops_completion_progress', 'local_launchpad', [
+                            'done' => $completed,
+                            'total' => $trackable,
+                            'pct' => (int) round(($completed / max(1, $trackable)) * 100),
+                        ])
+                        : get_string('admin_courseops_completion_progress_untracked', 'local_launchpad'));
+
+                $rows[] = [
+                    'id' => $uid,
+                    'name' => $fellow['name'],
+                    'initials' => $fellow['initials'],
+                    'status' => $status,
+                    'status_label' => $statuslabel,
+                    'chip' => $chip,
+                    'progress_label' => $progresslabel,
+                    'percent' => $haspercent ? (int) $percent : ($trackable > 0
+                        ? (int) round(($completed / max(1, $trackable)) * 100) : 0),
+                    'has_percent' => $haspercent || $trackable > 0,
+                ];
+            }
+        } else if (!$courseon) {
+            $nnew = count($fellows);
+        }
+
+        return array_merge($base, [
+            'completion_rows' => $rows,
+            'has_completion_rows' => $rows !== [],
+            'completion_stat_complete' => get_string(
+                'admin_courseops_completion_stat_complete',
+                'local_launchpad',
+                $ncomplete
+            ),
+            'completion_stat_progress' => get_string(
+                'admin_courseops_completion_stat_progress',
+                'local_launchpad',
+                $nprogress
+            ),
+            'completion_stat_new' => get_string(
+                'admin_courseops_completion_stat_new',
+                'local_launchpad',
+                $nnew
+            ),
+            'has_completion_stats' => $courseon && $fellows !== [],
+        ]);
+    }
+
+    /**
+     * Toggle course-level completion enablement from Course ops (Slice E).
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function save_courseops_completion(\stdClass $user, int $trackid, bool $enablecompletion): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $course = self::resolve_track_course($trackid);
+        if ($course === null || (int) $course->id !== $trackid) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        $full = $DB->get_record('course', ['id' => $trackid], '*', IGNORE_MISSING);
+        if (!$full || !self::is_track_idnumber((string) ($full->idnumber ?? ''))) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        $modcontext = \context_course::instance($trackid);
+        if (!has_capability('moodle/course:update', $modcontext, $user)) {
+            return ['error' => get_string('admin_courseops_err_cap', 'local_launchpad')];
+        }
+        if (empty($CFG->enablecompletion)) {
+            return ['error' => get_string('admin_courseops_completion_site_off', 'local_launchpad')];
+        }
+
+        $data = (object) [
+            'id' => $trackid,
+            'enablecompletion' => $enablecompletion ? COMPLETION_ENABLED : COMPLETION_DISABLED,
+        ];
+        try {
+            update_course($data);
+        } catch (\Throwable $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        return ['ok' => $enablecompletion
+            ? get_string('admin_courseops_completion_enable_ok', 'local_launchpad')
+            : get_string('admin_courseops_completion_disable_ok', 'local_launchpad')];
+    }
+
+    /**
+     * Reports section: participation + activity completion scans (Slice F).
+     * Does not re-clone the completion roster — links to Slice E.
+     *
+     * @return array<string, mixed>
+     */
+    public static function courseops_reports_context(
+        \stdClass $user,
+        int $trackid,
+        \stdClass $course
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $context = \context_course::instance($trackid);
+        $canview = has_capability('report/participation:view', $context, $user)
+            || has_capability('report/outline:view', $context, $user)
+            || has_capability('moodle/course:view', $context, $user)
+            || has_capability('moodle/course:update', $context, $user);
+
+        $completionurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'completion',
+        ]))->out(false);
+        $participationurl = (new \moodle_url('/report/participation/index.php', ['id' => $trackid]))->out(false);
+        $outlineurl = (new \moodle_url('/report/outline/index.php', ['id' => $trackid]))->out(false);
+        $progressurl = (new \moodle_url('/report/progress/index.php', ['course' => $trackid]))->out(false);
+
+        $base = [
+            'reports_title' => get_string('admin_courseops_nav_reports', 'local_launchpad'),
+            'reports_lead' => get_string('admin_courseops_reports_lead', 'local_launchpad'),
+            'reports_can_view' => $canview,
+            'reports_no_cap' => get_string('admin_courseops_err_reports_cap', 'local_launchpad'),
+            'reports_engagement_title' => get_string('admin_courseops_reports_engagement_title', 'local_launchpad'),
+            'reports_activity_title' => get_string('admin_courseops_reports_activity_title', 'local_launchpad'),
+            'reports_completion_url' => $completionurl,
+            'reports_completion_label' => get_string('admin_courseops_reports_completion_link', 'local_launchpad'),
+            'reports_completion_help' => get_string('admin_courseops_reports_completion_help', 'local_launchpad'),
+            'reports_advanced_participation_url' => $participationurl,
+            'reports_advanced_outline_url' => $outlineurl,
+            'reports_advanced_progress_url' => $progressurl,
+            'reports_advanced_participation' => get_string('admin_courseops_reports_adv_participation', 'local_launchpad'),
+            'reports_advanced_outline' => get_string('admin_courseops_reports_adv_outline', 'local_launchpad'),
+            'reports_advanced_progress' => get_string('admin_courseops_reports_adv_progress', 'local_launchpad'),
+            'reports_advanced_help' => get_string('admin_courseops_reports_advanced_help', 'local_launchpad'),
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_lastaccess' => get_string('admin_courseops_col_lastaccess', 'local_launchpad'),
+            'col_activity' => get_string('admin_courseops_col_activity', 'local_launchpad'),
+            'col_type' => get_string('admin_courseops_col_type', 'local_launchpad'),
+            'col_complete' => get_string('admin_courseops_col_complete', 'local_launchpad'),
+            'reports_empty_fellows' => get_string('admin_courseops_reports_empty_fellows', 'local_launchpad'),
+            'reports_empty_activities' => get_string('admin_courseops_reports_empty_activities', 'local_launchpad'),
+            'engagement_rows' => [],
+            'has_engagement_rows' => false,
+            'activity_rows' => [],
+            'has_activity_rows' => false,
+        ];
+
+        if (!$canview) {
+            return $base;
+        }
+
+        $fellows = self::list_track_fellows($trackid);
+        $engagement = [];
+        if ($fellows !== []) {
+            $ids = array_map(static fn(array $f): int => (int) $f['id'], $fellows);
+            list($insql, $params) = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED);
+            $params['courseid'] = $trackid;
+            $access = $DB->get_records_select(
+                'user_lastaccess',
+                "courseid = :courseid AND userid $insql",
+                $params,
+                '',
+                'userid, timeaccess'
+            );
+            foreach ($fellows as $fellow) {
+                $uid = (int) $fellow['id'];
+                $ts = isset($access[$uid]) ? (int) $access[$uid]->timeaccess : 0;
+                $engagement[] = [
+                    'id' => $uid,
+                    'name' => $fellow['name'],
+                    'initials' => $fellow['initials'],
+                    'lastaccess_label' => $ts > 0
+                        ? userdate($ts, get_string('strftimedatetimeshort', 'langconfig'))
+                        : get_string('admin_courseops_reports_never', 'local_launchpad'),
+                    'has_access' => $ts > 0,
+                    'lastaccess_ts' => $ts,
+                ];
+            }
+            usort($engagement, static function (array $a, array $b): int {
+                return ((int) $b['lastaccess_ts']) <=> ((int) $a['lastaccess_ts']);
+            });
+        }
+
+        $activityrows = [];
+        $siteon = !empty($CFG->enablecompletion);
+        $courseon = $siteon && (int) ($course->enablecompletion ?? 0) === COMPLETION_ENABLED;
+        if ($courseon && $fellows !== []) {
+            $fullcourse = get_course($trackid);
+            $completion = new \completion_info($fullcourse);
+            $modinfo = get_fast_modinfo($fullcourse);
+            $fellowids = array_map(static fn(array $f): int => (int) $f['id'], $fellows);
+            $fellowtotal = count($fellowids);
+            foreach ($modinfo->get_cms() as $cm) {
+                if (!$cm->uservisible || $cm->deletioninprogress || $cm->modname === 'label') {
+                    continue;
+                }
+                if ($completion->is_enabled($cm) == COMPLETION_TRACKING_NONE) {
+                    continue;
+                }
+                $done = 0;
+                foreach ($fellowids as $uid) {
+                    $data = $completion->get_data($cm, false, $uid);
+                    $state = (int) $data->completionstate;
+                    if ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS) {
+                        $done++;
+                    }
+                }
+                $pct = $fellowtotal > 0 ? (int) round(($done / $fellowtotal) * 100) : 0;
+                $activityrows[] = [
+                    'name' => format_string($cm->get_formatted_name()),
+                    'modlabel' => get_string('modulename', 'mod_' . $cm->modname),
+                    'complete_label' => get_string(
+                        'admin_courseops_reports_activity_complete',
+                        'local_launchpad',
+                        (object) ['done' => $done, 'total' => $fellowtotal, 'pct' => $pct]
+                    ),
+                    'pct' => $pct,
+                ];
+            }
+            usort($activityrows, static function (array $a, array $b): int {
+                return ((int) $a['pct']) <=> ((int) $b['pct']);
+            });
+        }
+
+        return array_merge($base, [
+            'engagement_rows' => $engagement,
+            'has_engagement_rows' => $engagement !== [],
+            'activity_rows' => $activityrows,
+            'has_activity_rows' => $activityrows !== [],
+            'reports_completion_off' => !$courseon
+                ? get_string('admin_courseops_reports_completion_off', 'local_launchpad')
+                : '',
+            'reports_completion_off_show' => !$courseon,
+        ]);
+    }
+
+    /**
+     * Question bank subset: browse track banks + recent questions (Slice F).
+     *
+     * @return array<string, mixed>
+     */
+    public static function courseops_qbank_context(
+        \stdClass $user,
+        int $trackid,
+        \stdClass $course
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/questionlib.php');
+
+        $coursecontext = \context_course::instance($trackid);
+        $bankslisturl = \core_question\local\bank\question_bank_helper::get_url_for_qbank_list($trackid)->out(false);
+
+        $caps = ['moodle/question:viewall', 'moodle/question:viewmine', 'moodle/question:add'];
+        $shared = [];
+        $private = [];
+        try {
+            $shared = \core_question\local\bank\question_bank_helper::get_activity_instances_with_shareable_questions(
+                [$trackid],
+                [],
+                $caps,
+                true
+            );
+            $private = \core_question\local\bank\question_bank_helper::get_activity_instances_with_private_questions(
+                [$trackid],
+                [],
+                $caps,
+                true
+            );
+        } catch (\Throwable $e) {
+            debugging('courseops_qbank banks: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+
+        $canview = $shared !== [] || $private !== []
+            || has_capability('moodle/course:manageactivities', $coursecontext, $user)
+            || has_capability('moodle/question:add', $coursecontext, $user);
+
+        $bankrows = [];
+        $questionrows = [];
+        $firstaddurl = '';
+        $allbanks = array_merge($shared, $private);
+        foreach ($allbanks as $bank) {
+            /** @var \core_question\local\bank\formatted_bank $bank */
+            $cm = $bank->cminfo;
+            $modcontext = \context_module::instance((int) $cm->id);
+            $qcount = 0;
+            try {
+                $qcount = (int) $DB->count_records_sql(
+                    "SELECT COUNT(1)
+                       FROM {question_bank_entries} qbe
+                       JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
+                      WHERE qc.contextid = ?",
+                    [$modcontext->id]
+                );
+            } catch (\Throwable $e) {
+                $qcount = 0;
+            }
+            $openurl = (new \moodle_url('/question/edit.php', ['cmid' => (int) $cm->id]))->out(false);
+            $cats = $bank->questioncategories ?? [];
+            $firstcat = $cats[0] ?? null;
+            $addurl = '';
+            if ($firstcat && has_capability('moodle/question:add', $modcontext, $user)) {
+                $addurl = (new \moodle_url('/question/bank/editquestion/addquestion.php', [
+                    'category' => (int) $firstcat->id,
+                    'cmid' => (int) $cm->id,
+                ]))->out(false);
+                if ($firstaddurl === '') {
+                    $firstaddurl = $addurl;
+                }
+            }
+            $bankrows[] = [
+                'name' => $cm->get_formatted_name(),
+                'shared' => !empty($bank->shared),
+                'kind_label' => !empty($bank->shared)
+                    ? get_string('admin_courseops_qbank_shared', 'local_launchpad')
+                    : get_string('admin_courseops_qbank_private', 'local_launchpad'),
+                'question_count' => $qcount,
+                'count_label' => get_string('admin_courseops_qbank_count', 'local_launchpad', $qcount),
+                'open_url' => $openurl,
+                'open_label' => get_string('admin_courseops_qbank_open', 'local_launchpad'),
+                'add_url' => $addurl,
+                'has_add' => $addurl !== '',
+                'add_label' => get_string('admin_courseops_qbank_add', 'local_launchpad'),
+            ];
+        }
+
+        // Browse recent questions across shared banks (cap for scan).
+        $contextids = [];
+        foreach ($shared as $bank) {
+            $contextids[] = \context_module::instance((int) $bank->cminfo->id)->id;
+        }
+        if ($contextids !== []) {
+            list($insql, $params) = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED);
+            $sql = "SELECT q.id, q.name, q.qtype, qc.name AS categoryname, qbe.idnumber
+                      FROM {question} q
+                      JOIN {question_versions} qv ON qv.questionid = q.id
+                      JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
+                      JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
+                      JOIN (
+                            SELECT questionbankentryid, MAX(version) AS maxversion
+                              FROM {question_versions}
+                          GROUP BY questionbankentryid
+                      ) latest ON latest.questionbankentryid = qbe.id AND latest.maxversion = qv.version
+                     WHERE qc.contextid $insql
+                       AND q.parent = 0
+                  ORDER BY q.timemodified DESC, q.id DESC";
+            try {
+                $records = $DB->get_records_sql($sql, $params, 0, 40);
+                foreach ($records as $q) {
+                    $typename = $q->qtype;
+                    try {
+                        $typename = \question_bank::get_qtype_name($q->qtype);
+                    } catch (\Throwable $e) {
+                        // Keep raw qtype.
+                    }
+                    $questionrows[] = [
+                        'name' => format_string($q->name),
+                        'type_label' => $typename,
+                        'category' => format_string($q->categoryname),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                debugging('courseops_qbank questions: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            }
+        }
+
+        return [
+            'qbank_title' => get_string('admin_courseops_nav_qbank', 'local_launchpad'),
+            'qbank_lead' => get_string('admin_courseops_qbank_lead', 'local_launchpad'),
+            'qbank_can_view' => $canview,
+            'qbank_no_cap' => get_string('admin_courseops_err_qbank_cap', 'local_launchpad'),
+            'qbank_banks_title' => get_string('admin_courseops_qbank_banks_title', 'local_launchpad'),
+            'qbank_questions_title' => get_string('admin_courseops_qbank_questions_title', 'local_launchpad'),
+            'qbank_banks_url' => $bankslisturl,
+            'qbank_banks_label' => get_string('admin_courseops_qbank_manage_banks', 'local_launchpad'),
+            'qbank_banks_help' => get_string('admin_courseops_qbank_manage_banks_help', 'local_launchpad'),
+            'qbank_add_url' => $firstaddurl,
+            'qbank_has_add' => $firstaddurl !== '',
+            'qbank_add_label' => get_string('admin_courseops_qbank_add', 'local_launchpad'),
+            'bank_rows' => $bankrows,
+            'has_bank_rows' => $bankrows !== [],
+            'qbank_empty_banks' => get_string('admin_courseops_qbank_empty_banks', 'local_launchpad'),
+            'question_rows' => $questionrows,
+            'has_question_rows' => $questionrows !== [],
+            'qbank_empty_questions' => get_string('admin_courseops_qbank_empty_questions', 'local_launchpad'),
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_type' => get_string('admin_courseops_col_type', 'local_launchpad'),
+            'col_category' => get_string('admin_courseops_col_category', 'local_launchpad'),
+            'col_count' => get_string('admin_courseops_col_count', 'local_launchpad'),
+            'col_actions' => get_string('admin_courseops_col_actions', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Active student enrolments on one track (roster rows).
+     *
+     * @return list<array{id:int,name:string,email:string,initials:string}>
+     */
+    public static function list_track_fellows(int $courseid): array {
+        global $CFG, $DB;
+
+        if ($courseid <= 0) {
+            return [];
+        }
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email
+                  FROM {user_enrolments} ue
+                  JOIN {enrol} e ON e.id = ue.enrolid
+                  JOIN {context} ctx ON ctx.instanceid = e.courseid AND ctx.contextlevel = :ctxlevel
+                  JOIN {role_assignments} ra ON ra.contextid = ctx.id AND ra.userid = ue.userid
+                  JOIN {role} r ON r.id = ra.roleid AND r.archetype = :arch
+                  JOIN {user} u ON u.id = ue.userid
+                 WHERE e.courseid = :courseid
+                   AND ue.status = :uestatus
+                   AND e.status = :estatus
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $users = $DB->get_records_sql($sql, [
+            'courseid' => $courseid,
+            'ctxlevel' => CONTEXT_COURSE,
+            'arch' => 'student',
+            'uestatus' => ENROL_USER_ACTIVE,
+            'estatus' => ENROL_INSTANCE_ENABLED,
+        ]);
+        $out = [];
+        foreach ($users as $u) {
+            $out[] = [
+                'id' => (int) $u->id,
+                'name' => fullname($u),
+                'email' => s($u->email),
+                'initials' => fellowship_dashboard::initials($u),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Mentors on one track for the Course ops roster (includes email + role label).
+     *
+     * @return list<array{id:int,name:string,email:string,initials:string,role_label:string}>
+     */
+    public static function list_track_roster_mentors(int $courseid): array {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return [];
+        }
+        $context = \context_course::instance($courseid);
+        $sql = "SELECT DISTINCT u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email, r.shortname AS roleshortname, r.archetype
+                  FROM {role_assignments} ra
+                  JOIN {role} r ON r.id = ra.roleid
+                  JOIN {user} u ON u.id = ra.userid
+                 WHERE ra.contextid = :ctx
+                   AND r.archetype IN ('teacher', 'editingteacher')
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $users = $DB->get_records_sql($sql, ['ctx' => $context->id]);
+        $out = [];
+        $seen = [];
+        foreach ($users as $u) {
+            $uid = (int) $u->id;
+            if (isset($seen[$uid])) {
+                continue;
+            }
+            $seen[$uid] = true;
+            $rolelabel = ((string) ($u->roleshortname ?? '') === 'editingteacher')
+                ? get_string('admin_courseops_role_editingteacher', 'local_launchpad')
+                : get_string('admin_courseops_role_teacher', 'local_launchpad');
+            $out[] = [
+                'id' => $uid,
+                'name' => fullname($u),
+                'email' => s($u->email),
+                'initials' => fellowship_dashboard::initials($u),
+                'role_label' => $rolelabel,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Unenrol a fellow from this track (Course ops roster). Caps fail-closed.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function unenrol_fellow_from_track(\stdClass $actor, int $userid, int $trackcourseid): array {
+        if ($userid <= 0 || $trackcourseid <= 0) {
+            return ['error' => get_string('admin_courseops_err_roster_params', 'local_launchpad')];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+
+        try {
+            $result = account_provision::unenrol_fellow($actor, $userid, $trackcourseid);
+        } catch (account_provision_exception $e) {
+            if ($e->errorcode === 'forbidden') {
+                return ['error' => get_string('admin_courseops_err_unenrol_cap', 'local_launchpad')];
+            }
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $target = \core_user::get_user($userid, '*', IGNORE_MISSING);
+        $name = $target ? fullname($target) : (string) $userid;
+        if ($result['status'] === 'not_enrolled') {
+            return ['error' => get_string('admin_courseops_err_not_fellow', 'local_launchpad', $name)];
+        }
+
+        return [
+            'ok' => get_string('admin_courseops_unenrol_ok', 'local_launchpad', (object) [
+                'name' => $name,
+                'track' => format_string($course->fullname),
+            ]),
+        ];
+    }
+
+    /**
+     * Remove a mentor from this track (Course ops roster). Caps fail-closed.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function remove_mentor_from_track(\stdClass $actor, int $userid, int $trackcourseid): array {
+        if ($userid <= 0 || $trackcourseid <= 0) {
+            return ['error' => get_string('admin_courseops_err_roster_params', 'local_launchpad')];
+        }
+
+        try {
+            $course = account_provision::require_launchpad_course($trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+        if (!self::is_track_idnumber((string) $course->idnumber)) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+
+        try {
+            $result = account_provision::remove_mentor($actor, $userid, $trackcourseid);
+        } catch (account_provision_exception $e) {
+            if ($e->errorcode === 'forbidden') {
+                return ['error' => get_string('admin_courseops_err_unenrol_cap', 'local_launchpad')];
+            }
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $target = \core_user::get_user($userid, '*', IGNORE_MISSING);
+        $name = $target ? fullname($target) : (string) $userid;
+        if ($result['status'] === 'not_enrolled') {
+            return ['error' => get_string('admin_courseops_err_not_mentor', 'local_launchpad', $name)];
+        }
+
+        return [
+            'ok' => get_string('admin_courseops_remove_mentor_ok', 'local_launchpad', (object) [
+                'name' => $name,
+                'track' => format_string($course->fullname),
+            ]),
+        ];
+    }
+
+    /**
+     * Save LaunchPad weekly course settings for a track (Slice B).
+     *
+     * @return array{ok?:string,error?:string,posted?:array<string,mixed>}
+     */
+    public static function save_courseops_settings(
+        \stdClass $user,
+        int $trackid,
+        string $fullname,
+        string $shortname,
+        bool $visible,
+        string $startraw,
+        string $endraw,
+        bool $enablecompletion,
+        string $summary
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $posted = self::courseops_settings_posted(
+            $fullname,
+            $shortname,
+            $visible,
+            $startraw,
+            $endraw,
+            $enablecompletion,
+            $summary
+        );
+        $fail = static function (string $error) use ($posted): array {
+            return ['error' => $error, 'posted' => $posted];
+        };
+
+        $fullname = trim($fullname);
+        $shortname = trim($shortname);
+        if ($fullname === '') {
+            return $fail(get_string('admin_courseops_err_fullname', 'local_launchpad'));
+        }
+        if ($shortname === '') {
+            return $fail(get_string('admin_courseops_err_shortname', 'local_launchpad'));
+        }
+
+        $course = self::resolve_track_course($trackid);
+        if ($course === null || (int) $course->id !== $trackid) {
+            return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
+        }
+        $full = $DB->get_record('course', ['id' => $trackid], '*', IGNORE_MISSING);
+        if (!$full || !self::is_track_idnumber((string) ($full->idnumber ?? ''))) {
+            return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
+        }
+
+        $modcontext = \context_course::instance($trackid);
+        if (!has_capability('moodle/course:update', $modcontext, $user)) {
+            return $fail(get_string('admin_courseops_err_cap', 'local_launchpad'));
+        }
+        $wantvisible = $visible ? 1 : 0;
+        if ($wantvisible !== (int) $full->visible
+                && !has_capability('moodle/course:visibility', $modcontext, $user)) {
+            return $fail(get_string('admin_courseops_err_cap_visibility', 'local_launchpad'));
+        }
+
+        $startdate = self::parse_course_date($startraw);
+        if ($startdate === null && trim($startraw) !== '') {
+            return $fail(get_string('admin_courseops_err_startdate', 'local_launchpad'));
+        }
+        if ($startdate === null) {
+            $startdate = (int) ($full->startdate ?? 0);
+        }
+
+        $enddate = self::parse_course_date($endraw);
+        if ($enddate === null && trim($endraw) !== '') {
+            return $fail(get_string('admin_courseops_err_enddate', 'local_launchpad'));
+        }
+        if (trim($endraw) === '') {
+            $enddate = 0;
+        }
+        if ($enddate > 0 && $startdate > 0 && $enddate < $startdate) {
+            return $fail(get_string('admin_courseops_err_date_order', 'local_launchpad'));
+        }
+
+        $completion = COMPLETION_DISABLED;
+        if (!empty($CFG->enablecompletion) && $enablecompletion) {
+            $completion = COMPLETION_ENABLED;
+        }
+
+        $data = (object) [
+            'id' => $trackid,
+            'fullname' => $fullname,
+            'shortname' => $shortname,
+            'visible' => $wantvisible,
+            'startdate' => $startdate,
+            'enddate' => $enddate,
+            'enablecompletion' => $completion,
+            'summary' => clean_text($summary, FORMAT_HTML),
+            'summaryformat' => FORMAT_HTML,
+        ];
+
+        try {
+            update_course($data);
+        } catch (\Throwable $e) {
+            return $fail(self::flash_error_message($e));
+        }
+
+        return ['ok' => get_string('admin_courseops_settings_ok', 'local_launchpad')];
+    }
+
+    /**
+     * Snapshot of Settings form fields to re-show after a failed save.
+     *
+     * @return array<string, mixed>
+     */
+    private static function courseops_settings_posted(
+        string $fullname,
+        string $shortname,
+        bool $visible,
+        string $startraw,
+        string $endraw,
+        bool $enablecompletion,
+        string $summary
+    ): array {
+        return [
+            'fullname' => $fullname,
+            'shortname' => $shortname,
+            'visible' => $visible,
+            'startdate' => $startraw,
+            'enddate' => $endraw,
+            'enablecompletion' => $enablecompletion,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Parse HTML date (YYYY-MM-DD) in the current user's timezone → unix midnight.
+     * Empty → null.
+     */
+    public static function parse_course_date(string $raw): ?int {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $raw, $m)) {
+            return null;
+        }
+        $year = (int) $m[1];
+        $month = (int) $m[2];
+        $day = (int) $m[3];
+        if ($year < 1970 || $month < 1 || $month > 12 || $day < 1 || $day > 31) {
+            return null;
+        }
+        return make_timestamp($year, $month, $day, 0, 0, 0);
+    }
+
+    /**
+     * Value for HTML date inputs.
+     */
+    public static function format_course_date_value(int $ts): string {
+        if ($ts <= 0) {
+            return '';
+        }
+        return sprintf(
+            '%04d-%02d-%02d',
+            (int) userdate($ts, '%Y'),
+            (int) userdate($ts, '%m'),
+            (int) userdate($ts, '%d')
+        );
     }
 
     /**
@@ -268,9 +1970,16 @@ final class admin_dashboard {
                     $act['trackid'] = $cid;
                 $act['edit_label'] = $editlabel;
                 $act['mark_label'] = $marklabel;
-                // Prefer LaunchPad manage deep-link when present.
+                // Edit must open the LaunchPad activity page for this cmid.
+                if (empty($act['activity_url'])) {
+                    $act['activity_url'] = (new \moodle_url(persona_home::ADMIN_PATH, [
+                        'view' => 'activity',
+                        'trackid' => $cid,
+                        'cmid' => (int) ($act['cmid'] ?? 0),
+                    ]))->out(false);
+                }
                 if (empty($act['manage_url'])) {
-                    $act['manage_url'] = $act['edit_url'];
+                    $act['manage_url'] = $act['activity_url'];
                 }
             }
             unset($act);
@@ -486,7 +2195,16 @@ final class admin_dashboard {
         $duplicatelabel = get_string('admin_manage_duplicate', 'local_launchpad');
         $renamelabel = get_string('admin_manage_rename', 'local_launchpad');
         $draghandlelabel = get_string('admin_manage_drag_handle', 'local_launchpad');
+        $activitycount = count($activities);
+        $draftcount = 0;
+        $showncount = 0;
         foreach ($activities as &$act) {
+            $modname = (string) ($act['modname'] ?? '');
+            $kindkey = $modname === 'resource' ? 'file' : $modname;
+            if ($kindkey === '') {
+                $kindkey = 'page';
+            }
+            $act['kind_key'] = $kindkey;
             $act['form_action'] = $formaction;
             $act['sesskey'] = $sesskey;
             $act['trackid'] = $trackid;
@@ -507,14 +2225,35 @@ final class admin_dashboard {
                 'cmid' => (int) $act['cmid'],
             ]))->out(false);
             $act['open_label'] = get_string('admin_manage_open', 'local_launchpad');
+            if (!empty($act['is_draft'])) {
+                $draftcount++;
+            }
+            if ($sectionvisible && !empty($act['cm_visible']) && empty($act['is_draft'])) {
+                $showncount++;
+            }
         }
         unset($act);
 
+        $quickletters = [
+            'page' => 'P',
+            'resource' => 'F',
+            'quiz' => 'Q',
+            'assign' => 'A',
+        ];
+        $quicklabels = [
+            'page' => get_string('admin_manage_quick_page', 'local_launchpad'),
+            'resource' => get_string('admin_manage_quick_file', 'local_launchpad'),
+            'quiz' => get_string('admin_manage_quick_quiz', 'local_launchpad'),
+            'assign' => get_string('admin_manage_quick_assign', 'local_launchpad'),
+        ];
         $addtypes = [];
         foreach (['page', 'resource', 'quiz', 'assign'] as $mod) {
             $addtypes[] = [
                 'mod' => $mod,
                 'label' => self::builder_mod_kind($mod),
+                'kind_key' => $mod === 'resource' ? 'file' : $mod,
+                'letter' => $quickletters[$mod],
+                'quick_label' => $quicklabels[$mod],
                 'form_action' => $formaction,
                 'sesskey' => $sesskey,
                 'trackid' => $trackid,
@@ -536,21 +2275,32 @@ final class admin_dashboard {
             ];
         }
 
+        $tracklabel = self::builder_track_tab_label($course);
+        $hasdraftqueue = $draftcount > 0;
+
         return [
             'has_course' => true,
             'eyebrow' => get_string('admin_manage_eyebrow', 'local_launchpad'),
+            'page_heading' => get_string('admin_manage_page_heading', 'local_launchpad'),
             'heading' => $phasetitle,
-            'lead' => get_string('admin_manage_lead', 'local_launchpad'),
+            'lead' => get_string('admin_manage_hero_lead', 'local_launchpad'),
+            'safe_chip' => get_string('admin_manage_safe_chip', 'local_launchpad'),
             'track_name' => format_string($course->fullname),
-            'track_tab_label' => self::builder_track_tab_label($course),
+            'track_tab_label' => $tracklabel,
             'section_state' => $sectionvisible
                 ? get_string('admin_builder_section_shown', 'local_launchpad')
                 : get_string('admin_builder_section_hidden', 'local_launchpad'),
+            'section_state_label' => $sectionvisible
+                ? get_string('admin_manage_section_visible', 'local_launchpad')
+                : get_string('admin_manage_section_hidden', 'local_launchpad'),
             'section_shown' => $sectionvisible,
+            'sectionnum' => $sectionnum,
             'activities' => $activities,
             'has_activities' => $activities !== [],
             'empty_acts' => get_string('admin_builder_no_activities', 'local_launchpad'),
             'phase_links' => $phaselinks,
+            'phases_label' => get_string('admin_manage_phases_label', 'local_launchpad'),
+            'phase_count_label' => get_string('admin_manage_phase_count', 'local_launchpad', $activitycount),
             'add_types' => $addtypes,
             'add_label' => get_string('admin_builder_add', 'local_launchpad'),
             'add_chooser_title' => get_string('admin_manage_add_chooser', 'local_launchpad'),
@@ -565,10 +2315,31 @@ final class admin_dashboard {
             ]))->out(false),
             'builder_label' => get_string('admin_nav_builder', 'local_launchpad'),
             'back_label' => get_string('admin_manage_back', 'local_launchpad'),
+            'preview_url' => (new \moodle_url('/course/view.php', ['id' => $trackid]))->out(false),
+            'preview_label' => get_string('admin_manage_preview_course', 'local_launchpad'),
+            'stat_track_label' => get_string('admin_manage_stat_track', 'local_launchpad'),
+            'stat_track_value' => $tracklabel,
+            'stat_activities_label' => get_string('admin_manage_stat_activities', 'local_launchpad'),
+            'stat_activities_value' => (string) $activitycount,
+            'stat_activities_sub' => get_string('admin_manage_stat_activities_sub', 'local_launchpad'),
+            'stat_shown_label' => get_string('admin_manage_stat_shown', 'local_launchpad'),
+            'stat_shown_value' => (string) $showncount,
+            'stat_shown_sub' => get_string('admin_manage_stat_shown_sub', 'local_launchpad'),
+            'stat_draft_label' => get_string('admin_manage_stat_draft', 'local_launchpad'),
+            'stat_draft_value' => (string) $draftcount,
+            'stat_draft_sub' => $hasdraftqueue
+                ? get_string('admin_manage_stat_draft_sub', 'local_launchpad')
+                : get_string('admin_manage_stat_draft_none', 'local_launchpad'),
+            'has_draft_queue' => $hasdraftqueue,
+            'quick_title' => get_string('admin_manage_quick_title', 'local_launchpad'),
+            'safety_title' => get_string('admin_manage_safety_title', 'local_launchpad'),
+            'safety_body' => get_string('admin_manage_safety_body', 'local_launchpad'),
+            'safety_draft' => get_string('admin_manage_safety_draft', 'local_launchpad'),
+            'safety_ready' => get_string('admin_manage_safety_ready', 'local_launchpad'),
+            'safety_shown' => get_string('admin_manage_safety_shown', 'local_launchpad'),
             'form_action' => $formaction,
             'sesskey' => $sesskey,
             'trackid' => $trackid,
-            'sectionnum' => $sectionnum,
             'reorder_hint' => get_string('admin_manage_reorder_hint', 'local_launchpad'),
             'save_order_label' => get_string('admin_manage_save_order', 'local_launchpad'),
             'cancel_order_label' => get_string('admin_manage_cancel_order', 'local_launchpad'),
@@ -1874,10 +3645,18 @@ final class admin_dashboard {
                 $hasfile = !empty($filesummary['has_file']);
                 $filestatus = (string) $filesummary['file_status_label'];
             }
+            $kindkey = match ($modname) {
+                'page' => 'page',
+                'resource' => 'file',
+                'quiz' => 'quiz',
+                'assign' => 'assign',
+                default => 'other',
+            };
             $out[] = [
                 'cmid' => $cmid,
                 'modname' => $modname,
                 'kind' => self::builder_mod_kind($modname),
+                'kind_key' => $kindkey,
                 'title' => format_string($instancename !== '' ? $instancename : $modname),
                 'name_raw' => $instancename !== '' ? $instancename : $modname,
                 'state' => $state,
@@ -1890,6 +3669,13 @@ final class admin_dashboard {
                 'has_file' => $hasfile,
                 'file_missing' => $isresource && !$hasfile,
                 'file_status_label' => $filestatus,
+                // Edit on a builder row opens this one activity (not Manage phase).
+                'activity_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'activity',
+                    'trackid' => $courseid,
+                    'cmid' => $cmid,
+                ]))->out(false),
+                // Phase list / deep-link (add, reorder, hide) — not per-activity Edit.
                 'manage_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
                     'view' => 'manage',
                     'trackid' => $courseid,
@@ -2076,7 +3862,8 @@ final class admin_dashboard {
      * @param array{ok?:string,error?:string} $flash
      * @return array<string, mixed>
      */
-    public static function cohorts_context(\stdClass $user, array $flash = []): array {
+    public static function cohorts_context(\stdClass $user, array $flash = [], int $preselecttrackid = 0): array {
+        unset($user);
         $tracks = self::list_track_courses();
         $slug = self::primary_cohort_slug($tracks);
         $totalfellows = 0;
@@ -2108,19 +3895,37 @@ final class admin_dashboard {
 
         $hasready = false;
         $selectedset = false;
-        foreach ($options as &$opt) {
-            if (!$selectedset && empty($opt['disabled'])) {
-                $opt['selected'] = true;
-                $selectedset = true;
-                $hasready = true;
-            } else {
-                $opt['selected'] = false;
-                if (empty($opt['disabled'])) {
+        // Prefer Course ops trackid when that track is ready; else first ready track.
+        if ($preselecttrackid > 0) {
+            foreach ($options as &$opt) {
+                if ((int) $opt['id'] === $preselecttrackid && empty($opt['disabled'])) {
+                    $opt['selected'] = true;
+                    $selectedset = true;
                     $hasready = true;
+                } else {
+                    $opt['selected'] = false;
+                    if (empty($opt['disabled'])) {
+                        $hasready = true;
+                    }
                 }
             }
+            unset($opt);
         }
-        unset($opt);
+        if (!$selectedset) {
+            foreach ($options as &$opt) {
+                if (!$selectedset && empty($opt['disabled'])) {
+                    $opt['selected'] = true;
+                    $selectedset = true;
+                    $hasready = true;
+                } else {
+                    $opt['selected'] = false;
+                    if (empty($opt['disabled'])) {
+                        $hasready = true;
+                    }
+                }
+            }
+            unset($opt);
+        }
 
         $startdate = self::earliest_track_startdate($tracks);
         $selfon = self::any_self_enrolment_enabled($tracks);
@@ -2550,15 +4355,10 @@ final class admin_dashboard {
         unset($user);
         $pending = self::list_pending_reviews(50);
         $pendingtotal = self::count_reviews_pending();
+        $overduetotal = self::count_reviews_overdue();
         $released = self::count_reviews_released();
         $tracks = self::list_track_courses();
         $bytrackpending = self::pending_counts_by_course($tracks);
-        $other = 0;
-        foreach ($tracks as $course) {
-            if (empty($bytrackpending[(int) $course->id])) {
-                $other++;
-            }
-        }
 
         $toptrack = get_string('admin_reviews_tile_pending_sub_none', 'local_launchpad');
         if ($bytrackpending !== []) {
@@ -2577,47 +4377,115 @@ final class admin_dashboard {
                 . $paths . '</svg>';
         };
 
+        $sladays = (int) max(1, (int) round(self::REVIEW_SLA_SECONDS / DAYSECS));
+        $slahours = (int) max(1, (int) round(self::REVIEW_SLA_SECONDS / HOURSECS));
+        $releasedrows = self::list_released_reviews(25);
+        $pendingnotoverdue = 0;
+        $pendingoverdue = 0;
+        foreach ($pending as $row) {
+            if (!empty($row['is_overdue'])) {
+                $pendingoverdue++;
+            } else {
+                $pendingnotoverdue++;
+            }
+        }
+        $queuerows = array_merge($pending, $releasedrows);
+        $trackoptions = self::reviews_track_filter_options($queuerows, $tracks);
+        $allcount = count($queuerows);
+        $releasedlisted = count($releasedrows);
         $tiles = [
             [
                 'label' => get_string('admin_reviews_tile_pending', 'local_launchpad'),
                 'value' => (string) $pendingtotal,
                 'sub' => $toptrack,
+                'foot' => get_string('admin_reviews_tile_pending_foot', 'local_launchpad', $pendingtotal),
+                'badge' => $pendingtotal > 0
+                    ? get_string('admin_reviews_tile_badge_action', 'local_launchpad')
+                    : get_string('admin_reviews_tile_badge_clear', 'local_launchpad'),
+                'badge_tone' => $pendingtotal > 0 ? 'warn' : 'ok',
+                'tone' => $pendingtotal > 0 ? 'warn' : '',
                 'icon_svg' => $icon(
                     '<path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_reviews_tile_overdue', 'local_launchpad'),
+                'value' => (string) $overduetotal,
+                'sub' => get_string('admin_reviews_tile_overdue_sub', 'local_launchpad', $sladays),
+                'foot' => get_string(
+                    'admin_reviews_tile_overdue_foot',
+                    'local_launchpad',
+                    (object) ['days' => $sladays, 'count' => $overduetotal]
+                ),
+                'badge' => $overduetotal > 0
+                    ? get_string('admin_reviews_tile_badge_overdue', 'local_launchpad')
+                    : get_string('admin_reviews_tile_badge_within', 'local_launchpad'),
+                'badge_tone' => $overduetotal > 0 ? 'danger' : 'ok',
+                'tone' => $overduetotal > 0 ? 'warn' : '',
+                'icon_svg' => $icon(
+                    '<circle cx="12" cy="12" r="9"/>'
+                    . '<path d="M12 7v6l4 2"/>'
                 ),
             ],
             [
                 'label' => get_string('admin_reviews_tile_released', 'local_launchpad'),
                 'value' => (string) $released,
                 'sub' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
+                'foot' => get_string('admin_reviews_tile_released_foot', 'local_launchpad'),
+                'badge' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
+                'badge_tone' => 'info',
+                'tone' => '',
                 'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),
-            ],
-            [
-                'label' => get_string('admin_reviews_tile_other', 'local_launchpad'),
-                'value' => (string) $other,
-                'sub' => get_string('admin_reviews_tile_other_sub', 'local_launchpad'),
-                'icon_svg' => $icon(
-                    '<path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/>'
-                    . '<path d="M8 12h8M12 8v8"/>'
-                ),
             ],
         ];
 
         return array_merge([
             'eyebrow' => get_string('admin_reviews_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_reviews_heading', 'local_launchpad'),
-            'lead' => get_string('admin_reviews_lead', 'local_launchpad'),
+            'lead' => get_string('admin_reviews_lead', 'local_launchpad', $sladays),
+            'sla_badge' => get_string('admin_reviews_sla_badge', 'local_launchpad', $slahours),
+            'has_action_required' => $pendingtotal > 0,
+            'action_required' => get_string('admin_reviews_action_required', 'local_launchpad', $pendingtotal),
+            'queue_title' => get_string('admin_reviews_queue_title', 'local_launchpad'),
+            'queue_count_label' => get_string(
+                'admin_reviews_queue_count',
+                'local_launchpad',
+                (object) ['shown' => $allcount, 'pending' => $pendingtotal]
+            ),
+            'filter_all_label' => get_string('admin_reviews_filter_all', 'local_launchpad', $allcount),
+            'filter_pending_label' => get_string('admin_reviews_filter_pending', 'local_launchpad', $pendingnotoverdue),
+            'filter_overdue_label' => get_string('admin_reviews_filter_overdue', 'local_launchpad', $pendingoverdue),
+            'filter_released_label' => get_string('admin_reviews_filter_released', 'local_launchpad', $releasedlisted),
+            'filter_all_count' => $allcount,
+            'filter_pending_count' => $pendingnotoverdue,
+            'filter_overdue_count' => $pendingoverdue,
+            'filter_released_count' => $releasedlisted,
+            'track_filter_label' => get_string('admin_reviews_track_filter', 'local_launchpad'),
+            'track_filter_all' => get_string('admin_reviews_track_filter_all', 'local_launchpad'),
+            'track_filter_options' => $trackoptions,
+            'has_track_filter' => count($trackoptions) > 1,
+            'search_placeholder' => get_string('admin_reviews_search_placeholder', 'local_launchpad'),
+            'filter_empty' => get_string('admin_reviews_filter_empty', 'local_launchpad'),
+            'protocol_title' => get_string('admin_reviews_protocol_title', 'local_launchpad'),
+            'protocol_body' => get_string(
+                'admin_reviews_protocol_body',
+                'local_launchpad',
+                (object) ['hours' => $slahours, 'days' => $sladays]
+            ),
             'tiles' => $tiles,
             'col_fellow' => get_string('admin_reviews_col_fellow', 'local_launchpad'),
             'col_track' => get_string('admin_reviews_col_track', 'local_launchpad'),
             'col_submitted' => get_string('admin_reviews_col_submitted', 'local_launchpad'),
             'col_teacher' => get_string('admin_reviews_col_teacher', 'local_launchpad'),
             'col_state' => get_string('admin_reviews_col_state', 'local_launchpad'),
-            'pending' => $pending,
-            'has_pending' => $pending !== [],
+            'pending' => $queuerows,
+            'has_pending' => $queuerows !== [],
+            'released_done_label' => get_string('admin_reviews_released_done', 'local_launchpad'),
             'open_label' => get_string('admin_reviews_open', 'local_launchpad'),
             'ping_label' => get_string('admin_reviews_ping', 'local_launchpad'),
             'ping_cooled_label' => get_string('admin_reviews_ping_cooled', 'local_launchpad'),
+            'ping_target_help' => get_string('admin_reviews_ping_target_help', 'local_launchpad'),
+            'ping_target_scope' => get_string('admin_reviews_ping_target_scope', 'local_launchpad'),
             'sesskey' => sesskey(),
             'ping_action_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false),
             'flash_ok' => !empty($flash['ok']),
@@ -2631,7 +4499,36 @@ final class admin_dashboard {
     }
 
     /**
-     * Pending assign submissions on LaunchPad courses (oldest first).
+     * Track options for the Review oversight queue filter.
+     *
+     * @param list<array<string, mixed>> $queuerows
+     * @param list<\stdClass> $tracks
+     * @return list<array{id:int,label:string}>
+     */
+    private static function reviews_track_filter_options(array $queuerows, array $tracks): array {
+        $seen = [];
+        foreach ($queuerows as $row) {
+            $cid = (int) ($row['courseid'] ?? 0);
+            if ($cid > 0) {
+                $seen[$cid] = true;
+            }
+        }
+        $options = [];
+        foreach ($tracks as $course) {
+            $cid = (int) $course->id;
+            if (!isset($seen[$cid])) {
+                continue;
+            }
+            $options[] = [
+                'id' => $cid,
+                'label' => format_string($course->fullname),
+            ];
+        }
+        return $options;
+    }
+
+    /**
+     * Pending assign submissions on LaunchPad courses (overdue first, then oldest).
      *
      * @return list<array<string, mixed>>
      */
@@ -2647,7 +4544,8 @@ final class admin_dashboard {
 
         [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
         $params['status'] = 'submitted';
-        $limit = max(1, min(100, $limit));
+        // Fetch a bit more than the page limit so overdue-first sort is meaningful.
+        $fetch = max(1, min(100, $limit * 2));
 
         $sql = "SELECT s.id, s.userid, s.timemodified, s.timecreated, a.id AS assignid, a.name AS assignname,
                        a.course AS courseid, c.fullname AS coursefullname,
@@ -2672,23 +4570,59 @@ final class admin_dashboard {
                    AND c.id {$insql}
               ORDER BY s.timemodified ASC, s.id ASC";
 
-        $rows = $DB->get_records_sql($sql, $params, 0, $limit);
+        $rows = $DB->get_records_sql($sql, $params, 0, $fetch);
         $teachercache = [];
         $out = [];
+        $now = time();
         foreach ($rows as $row) {
             $courseid = (int) $row->courseid;
             if (!isset($teachercache[$courseid])) {
                 $teachercache[$courseid] = self::teacher_rows($courseid);
             }
             $teachers = $teachercache[$courseid];
-            $primary = $teachers[0] ?? null;
-            $teacherid = $primary ? (int) $primary['id'] : 0;
-            $teacherlabel = $teachers !== []
-                ? implode(', ', array_map(static fn(array $t): string => (string) $t['name'], $teachers))
-                : get_string('admin_tracks_no_teacher', 'local_launchpad');
             $submissionid = (int) $row->id;
+            $preferred = self::get_review_ping_target($submissionid);
+            $teacherids = [];
+            foreach ($teachers as $t) {
+                $teacherids[(int) $t['id']] = true;
+            }
+            $teacherid = ($preferred > 0 && isset($teacherids[$preferred]))
+                ? $preferred
+                : (int) (($teachers[0]['id'] ?? 0));
+            $teacheroptions = [];
+            $teacherlabel = get_string('admin_tracks_no_teacher', 'local_launchpad');
+            foreach ($teachers as $t) {
+                $tid = (int) $t['id'];
+                $selected = $tid === $teacherid;
+                if ($selected) {
+                    $teacherlabel = (string) $t['name'];
+                }
+                $teacheroptions[] = [
+                    'id' => $tid,
+                    'name' => (string) $t['name'],
+                    'selected' => $selected,
+                    'cooled' => self::review_ping_is_cooled($submissionid, $tid),
+                ];
+            }
             $cooled = $teacherid > 0 && self::review_ping_is_cooled($submissionid, $teacherid);
             $submitted = (int) ($row->timemodified ?: $row->timecreated);
+            $age = $submitted > 0 ? max(0, $now - $submitted) : 0;
+            $isoverdue = $submitted > 0 && $age >= self::REVIEW_SLA_SECONDS;
+            $slaseconds = self::REVIEW_SLA_SECONDS;
+            $slahours = (int) max(1, (int) round($slaseconds / HOURSECS));
+            $slapct = $submitted > 0
+                ? (int) min(100, max(0, round(($age / $slaseconds) * 100)))
+                : 0;
+            $slabarlabel = '';
+            if ($submitted > 0) {
+                $slabarlabel = $isoverdue
+                    ? get_string('admin_reviews_sla_bar_overdue', 'local_launchpad', $slapct)
+                    : get_string(
+                        'admin_reviews_sla_bar_ontrack',
+                        'local_launchpad',
+                        (object) ['pct' => $slapct, 'hours' => $slahours]
+                    );
+            }
             $out[] = [
                 'submissionid' => $submissionid,
                 'courseid' => $courseid,
@@ -2696,14 +4630,38 @@ final class admin_dashboard {
                 'email' => s($row->email),
                 'track' => format_string($row->coursefullname),
                 'assign' => format_string($row->assignname),
+                'submitted_ts' => $submitted,
                 'submitted' => $submitted > 0
                     ? userdate($submitted, get_string('strftimedatetimeshort', 'langconfig'))
                     : '—',
+                'age_seconds' => $age,
+                'age_label' => $submitted > 0
+                    ? get_string('admin_reviews_age', 'local_launchpad', format_time($age))
+                    : '',
+                'has_age' => $submitted > 0,
+                'sla_pct' => $slapct,
+                'sla_bar_label' => $slabarlabel,
+                'has_sla_bar' => $submitted > 0,
+                'is_overdue' => $isoverdue,
+                'overdue_badge' => $isoverdue
+                    ? get_string('admin_reviews_overdue_badge', 'local_launchpad')
+                    : '',
                 'teacher' => $teacherlabel,
                 'teacherid' => $teacherid,
+                'teacher_options' => $teacheroptions,
+                'has_teacher_choice' => count($teacheroptions) > 1,
+                'has_teachers' => $teacheroptions !== [],
                 'can_ping' => $teacherid > 0 && !$cooled,
                 'ping_cooled' => $cooled,
-                'state' => get_string('admin_reviews_state_pending', 'local_launchpad'),
+                'state' => $isoverdue
+                    ? get_string('admin_reviews_state_overdue', 'local_launchpad')
+                    : get_string('admin_reviews_state_pending', 'local_launchpad'),
+                'state_chip_class' => $isoverdue ? 'is-overdue' : 'warn',
+                'filter_state' => $isoverdue ? 'overdue' : 'pending',
+                'is_released' => false,
+                'search_blob' => s(\core_text::strtolower(
+                    fullname($row) . ' ' . $row->email . ' ' . $row->assignname . ' ' . $row->coursefullname
+                )),
                 'grader_url' => (new \moodle_url('/mod/assign/view.php', [
                     'id' => (int) $row->cmid,
                     'action' => 'grader',
@@ -2711,14 +4669,136 @@ final class admin_dashboard {
                 ]))->out(false),
             ];
         }
+
+        usort($out, static function (array $a, array $b): int {
+            $oa = !empty($a['is_overdue']) ? 1 : 0;
+            $ob = !empty($b['is_overdue']) ? 1 : 0;
+            if ($oa !== $ob) {
+                return $ob <=> $oa;
+            }
+            $ta = (int) ($a['submitted_ts'] ?? 0);
+            $tb = (int) ($b['submitted_ts'] ?? 0);
+            if ($ta !== $tb) {
+                return $ta <=> $tb;
+            }
+            return ((int) ($a['submissionid'] ?? 0)) <=> ((int) ($b['submissionid'] ?? 0));
+        });
+
+        return array_slice($out, 0, max(1, min(100, $limit)));
+    }
+
+    /**
+     * Recently released (graded) assign submissions on LaunchPad tracks.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function list_released_reviews(int $limit = 25): array {
+        global $DB;
+
+        $tracks = self::list_track_courses();
+        $ids = array_map(static fn($c) => (int) $c->id, $tracks);
+        $ids = array_values(array_filter($ids));
+        if ($ids === []) {
+            return [];
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED, 'c');
+        $params['status'] = 'submitted';
+        $fetch = max(1, min(50, $limit));
+
+        $sql = "SELECT s.id, s.userid, s.timemodified, s.timecreated, a.id AS assignid, a.name AS assignname,
+                       a.course AS courseid, c.fullname AS coursefullname,
+                       u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic,
+                       u.middlename, u.alternatename, u.email,
+                       cm.id AS cmid,
+                       g.timemodified AS graded_ts, g.grader AS graderid
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+                  JOIN {user} u ON u.id = s.userid AND u.deleted = 0
+                  JOIN {modules} m ON m.name = 'assign'
+                  JOIN {course_modules} cm ON cm.module = m.id AND cm.instance = a.id AND cm.course = a.course
+                  JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.latest = 1
+                   AND s.status = :status
+                   AND c.id {$insql}
+              ORDER BY g.timemodified DESC, s.id DESC";
+
+        $rows = $DB->get_records_sql($sql, $params, 0, $fetch);
+        $out = [];
+        foreach ($rows as $row) {
+            $submitted = (int) ($row->timemodified ?: $row->timecreated);
+            $graded = (int) ($row->graded_ts ?: 0);
+            $turnaround = ($submitted > 0 && $graded > $submitted) ? ($graded - $submitted) : 0;
+            $gradername = '';
+            if (!empty($row->graderid)) {
+                $grader = \core_user::get_user((int) $row->graderid);
+                if ($grader) {
+                    $gradername = fullname($grader);
+                }
+            }
+            $out[] = [
+                'submissionid' => (int) $row->id,
+                'courseid' => (int) $row->courseid,
+                'fellow' => fullname($row),
+                'email' => s($row->email),
+                'track' => format_string($row->coursefullname),
+                'assign' => format_string($row->assignname),
+                'submitted_ts' => $submitted,
+                'submitted' => $graded > 0
+                    ? userdate($graded, get_string('strftimedatetimeshort', 'langconfig'))
+                    : '—',
+                'age_seconds' => $turnaround,
+                'age_label' => $turnaround > 0
+                    ? get_string('admin_reviews_released_age', 'local_launchpad', format_time($turnaround))
+                    : '',
+                'has_age' => $turnaround > 0,
+                'sla_pct' => 0,
+                'sla_bar_label' => '',
+                'has_sla_bar' => false,
+                'is_overdue' => false,
+                'overdue_badge' => '',
+                'teacher' => $gradername !== ''
+                    ? $gradername
+                    : get_string('admin_reviews_released_grader_unknown', 'local_launchpad'),
+                'teacherid' => 0,
+                'teacher_options' => [],
+                'has_teacher_choice' => false,
+                'has_teachers' => false,
+                'can_ping' => false,
+                'ping_cooled' => false,
+                'state' => get_string('admin_reviews_state_released', 'local_launchpad'),
+                'state_chip_class' => 'ok',
+                'filter_state' => 'released',
+                'is_released' => true,
+                'search_blob' => s(\core_text::strtolower(
+                    fullname($row) . ' ' . $row->email . ' ' . $row->assignname . ' ' . $row->coursefullname
+                )),
+                'grader_url' => (new \moodle_url('/mod/assign/view.php', [
+                    'id' => (int) $row->cmid,
+                    'action' => 'grader',
+                    'userid' => (int) $row->userid,
+                ]))->out(false),
+            ];
+        }
+
         return $out;
     }
+
+    /** Pending review older than this is overdue (3 days). */
+    public const REVIEW_SLA_SECONDS = 259200;
 
     /** Seconds before the same admin→teacher review ping may fire again. */
     public const REVIEW_PING_COOLDOWN = 1800;
 
     /**
-     * Teachers on a course (id + display name), ordered by name.
+     * Teachers/mentors on one LaunchPad track only (that course context).
+     * Never includes mentors from other tracks or site-wide roles.
      *
      * @return list<array{id:int,name:string}>
      */
@@ -2737,6 +4817,7 @@ final class admin_dashboard {
                  WHERE ra.contextid = :ctx
                    AND r.archetype IN ('teacher', 'editingteacher')
                    AND u.deleted = 0
+                   AND u.suspended = 0
               ORDER BY u.lastname ASC, u.firstname ASC";
         $users = $DB->get_records_sql($sql, ['ctx' => $context->id]);
         $out = [];
@@ -2772,6 +4853,72 @@ final class admin_dashboard {
             'local_launchpad_review_ping_' . $submissionid . '_' . $teacherid,
             time()
         );
+    }
+
+    /**
+     * Last soft ping-target teacher for a pending submission (this admin).
+     */
+    public static function get_review_ping_target(int $submissionid): int {
+        if ($submissionid <= 0) {
+            return 0;
+        }
+        return (int) get_user_preferences('local_launchpad_review_ping_target_' . $submissionid, 0);
+    }
+
+    /**
+     * Remember soft ping-target for reload (grading stays shared — not Moodle allocation).
+     */
+    public static function set_review_ping_target(int $submissionid, int $teacherid): void {
+        if ($submissionid <= 0 || $teacherid <= 0) {
+            return;
+        }
+        set_user_preference('local_launchpad_review_ping_target_' . $submissionid, $teacherid);
+    }
+
+    /**
+     * Persist ping-target after validating the teacher is on that submission's track.
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function save_review_ping_target(\stdClass $admin, int $submissionid, int $teacherid): array {
+        global $DB;
+
+        $adminid = (int) ($admin->id ?? 0);
+        if ($adminid <= 0 || (!self::can_access($adminid) && !is_siteadmin($adminid))) {
+            return ['error' => get_string('admin_reviews_ping_err_permission', 'local_launchpad')];
+        }
+        if ($submissionid <= 0 || $teacherid <= 0) {
+            return ['error' => get_string('admin_reviews_ping_err_params', 'local_launchpad')];
+        }
+
+        $sql = "SELECT s.id, a.course AS courseid, c.idnumber AS courseidn
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+                 WHERE s.id = :sid
+                   AND s.latest = 1
+                   AND s.status = :status";
+        $row = $DB->get_record_sql($sql, [
+            'sid' => $submissionid,
+            'status' => 'submitted',
+        ]);
+        if (!$row || !self::is_track_idnumber((string) ($row->courseidn ?? ''))) {
+            return ['error' => get_string('admin_reviews_ping_err_gone', 'local_launchpad')];
+        }
+
+        $isteacher = false;
+        foreach (self::teacher_rows((int) $row->courseid) as $t) {
+            if ((int) $t['id'] === $teacherid) {
+                $isteacher = true;
+                break;
+            }
+        }
+        if (!$isteacher) {
+            return ['error' => get_string('admin_reviews_ping_err_teacher', 'local_launchpad')];
+        }
+
+        self::set_review_ping_target($submissionid, $teacherid);
+        return ['ok' => '1'];
     }
 
     /**
@@ -2873,6 +5020,7 @@ final class admin_dashboard {
         }
 
         self::review_ping_mark($submissionid, $teacherid);
+        self::set_review_ping_target($submissionid, $teacherid);
         $teacher = \core_user::get_user($teacherid, '*', IGNORE_MISSING);
         $teachername = $teacher ? fullname($teacher) : get_string('admin_reviews_col_teacher', 'local_launchpad');
         return [
@@ -2957,14 +5105,31 @@ final class admin_dashboard {
      * @param array{ok?:string,error?:string} $flash
      * @return array<string, mixed>
      */
-    public static function mentors_context(\stdClass $user, array $flash = []): array {
+    public static function mentors_context(\stdClass $user, array $flash = [], int $highlighttrackid = 0): array {
+        unset($user);
         $tracks = self::list_track_courses();
         $cards = [];
+        $mentorsusedtotal = 0;
+        $needscount = 0;
+        $overcount = 0;
         foreach ($tracks as $course) {
-            $cards[] = self::mentor_track_card_context($course);
+            $card = self::mentor_track_card_context($course, $highlighttrackid);
+            $cards[] = $card;
+            $mentorsusedtotal += (int) ($card['mentors_used'] ?? 0);
+            if (!empty($card['needs_mentor'])) {
+                $needscount++;
+            }
+            if (!empty($card['is_over_capacity'])) {
+                $overcount++;
+            }
         }
 
+        $trackcount = count($cards);
+        $maxmentors = account_provision::pilot_max_mentors_per_track();
+        $maxfellows = account_provision::pilot_max_fellows_per_track();
+        $seats = $trackcount * $maxmentors;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
         return array_merge([
             'eyebrow' => get_string('admin_mentors_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_mentors_heading', 'local_launchpad'),
@@ -2975,8 +5140,46 @@ final class admin_dashboard {
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
-            'form_action' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false),
+            'form_action' => $formaction,
             'sesskey' => sesskey(),
+            // Hero summary (computed from live track cards).
+            'stat_tracks_label' => get_string('admin_mentors_stat_tracks', 'local_launchpad'),
+            'stat_tracks_value' => (string) $trackcount,
+            'stat_tracks_sub' => get_string('admin_mentors_stat_tracks_sub', 'local_launchpad'),
+            'stat_mentors_label' => get_string('admin_mentors_stat_mentors', 'local_launchpad'),
+            'stat_mentors_value' => (string) $mentorsusedtotal,
+            'stat_mentors_sub' => get_string(
+                'admin_mentors_stat_mentors_sub',
+                'local_launchpad',
+                (object) ['seats' => $seats]
+            ),
+            'has_over_stat' => $overcount > 0,
+            'stat_over_label' => get_string('admin_mentors_stat_over', 'local_launchpad', $overcount),
+            // Grid filters (client-side; counts are real).
+            'grid_title' => get_string('admin_mentors_grid_title', 'local_launchpad'),
+            'grid_lead' => get_string('admin_mentors_grid_lead', 'local_launchpad'),
+            'filter_all_label' => get_string('admin_mentors_filter_all', 'local_launchpad', $trackcount),
+            'filter_needs_label' => get_string('admin_mentors_filter_needs', 'local_launchpad', $needscount),
+            'filter_over_label' => get_string('admin_mentors_filter_over', 'local_launchpad', $overcount),
+            'filter_empty' => get_string('admin_mentors_filter_empty', 'local_launchpad'),
+            // Builder CTA tile (real Course builder link — not a fake allocator).
+            'builder_tile_title' => get_string('admin_mentors_builder_tile_title', 'local_launchpad'),
+            'builder_tile_body' => get_string('admin_mentors_builder_tile_body', 'local_launchpad'),
+            'builder_tile_cta' => get_string('admin_mentors_builder_tile_cta', 'local_launchpad'),
+            'builder_url' => $builderurl,
+            'footer_tip' => get_string('admin_mentors_footer_tip', 'local_launchpad'),
+            // Pilot capacity card (admin-managed; no deploy to change later).
+            'pilot_title' => get_string('admin_pilot_title', 'local_launchpad'),
+            'pilot_lead' => get_string('admin_pilot_lead', 'local_launchpad'),
+            'pilot_mentors_label' => get_string('admin_pilot_mentors_label', 'local_launchpad'),
+            'pilot_mentors_help' => get_string('admin_pilot_mentors_help', 'local_launchpad'),
+            'pilot_mentors_value' => $maxmentors,
+            'pilot_fellows_label' => get_string('admin_pilot_fellows_label', 'local_launchpad'),
+            'pilot_fellows_help' => get_string('admin_pilot_fellows_help', 'local_launchpad'),
+            'pilot_fellows_value' => $maxfellows,
+            'pilot_save_label' => get_string('admin_pilot_save', 'local_launchpad'),
+            'pilot_live_note' => get_string('admin_pilot_live_note', 'local_launchpad'),
+            'pilot_form_action' => $formaction,
         ], self::empty_state(
             'admin_mentors_empty',
             'admin_empty_title_no_tracks',
@@ -2986,23 +5189,103 @@ final class admin_dashboard {
     }
 
     /**
+     * Save pilot mentor/fellow caps from Mentors & capacity (LaunchPad admin).
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function save_pilot_capacity(\stdClass $actor, int $maxmentors, int $maxfellows): array {
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return ['error' => get_string('admin_err_capability', 'local_launchpad')];
+        }
+        if ($maxmentors < 1) {
+            return ['error' => get_string('admin_pilot_err_mentors_min', 'local_launchpad')];
+        }
+        if ($maxfellows < 0) {
+            return ['error' => get_string('admin_pilot_err_fellows_min', 'local_launchpad')];
+        }
+        $saved = account_provision::set_pilot_capacity($maxmentors, $maxfellows);
+        return [
+            'ok' => get_string(
+                'admin_pilot_ok_saved',
+                'local_launchpad',
+                (object) [
+                    'mentors' => $saved['mentors'],
+                    'fellows' => $saved['fellows'] === 0
+                        ? get_string('admin_pilot_fellows_unlimited', 'local_launchpad')
+                        : (string) $saved['fellows'],
+                ]
+            ),
+        ];
+    }
+
+    /**
      * One Mentors & capacity track card.
      *
      * @param \stdClass $course
      * @return array<string, mixed>
      */
-    public static function mentor_track_card_context(\stdClass $course): array {
+    public static function mentor_track_card_context(\stdClass $course, int $highlighttrackid = 0): array {
         $courseid = (int) $course->id;
         $teachers = self::list_track_teachers($courseid);
-        $fellows = self::fellow_count($courseid);
+        $mentorsused = count($teachers);
+        $fellowsused = self::fellow_count($courseid);
+        $maxmentors = account_provision::pilot_max_mentors_per_track();
+        $maxfellows = account_provision::pilot_max_fellows_per_track();
         $hasteacher = $teachers !== [];
         $primary = $hasteacher ? $teachers[0] : null;
+        $mentorover = $mentorsused > $maxmentors;
+        $fellowover = $maxfellows > 0 && $fellowsused > $maxfellows;
+        $canassign = $mentorsused < $maxmentors;
+        $participantsurl = (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $courseid,
+            'section' => 'participants',
+        ]))->out(false);
+
+        $fellowsvalue = $maxfellows > 0
+            ? get_string(
+                'admin_mentors_slots_used',
+                'local_launchpad',
+                (object) ['used' => $fellowsused, 'max' => $maxfellows]
+            )
+            : get_string('admin_mentors_fellows_uncapped', 'local_launchpad', $fellowsused);
+
+        $isover = $mentorover || $fellowover;
+        $needsmentor = $mentorsused < $maxmentors;
+        $openseats = max(0, $maxmentors - $mentorsused);
+        $mentorpct = $maxmentors > 0
+            ? (int) min(100, round(($mentorsused / $maxmentors) * 100))
+            : 0;
+        $statuskey = $isover ? 'over' : ($needsmentor ? 'needs' : 'staffed');
+        $statuslabel = match ($statuskey) {
+            'over' => get_string('admin_mentors_status_over', 'local_launchpad'),
+            'needs' => get_string('admin_mentors_status_needs', 'local_launchpad'),
+            default => get_string('admin_mentors_status_staffed', 'local_launchpad'),
+        };
+        $mentorhint = $isover
+            ? get_string('admin_mentors_hint_over', 'local_launchpad')
+            : ($openseats > 0
+                ? get_string('admin_mentors_hint_open', 'local_launchpad', $openseats)
+                : get_string('admin_mentors_hint_full', 'local_launchpad'));
+
+        $teacherrows = [];
+        foreach ($teachers as $t) {
+            $teacherrows[] = [
+                'name' => $t['name'],
+                'initials' => $t['initials'],
+                'role_label' => get_string('admin_mentors_teacher_role', 'local_launchpad'),
+                'active_label' => get_string('admin_mentors_active', 'local_launchpad'),
+            ];
+        }
 
         return [
             'id' => $courseid,
+            'anchor_id' => 'lp-mentor-track-' . $courseid,
+            'is_highlight' => $highlighttrackid > 0 && $highlighttrackid === $courseid,
             'name' => format_string($course->fullname),
             'idnumber' => s($course->idnumber),
             'has_teacher' => $hasteacher,
+            'teachers' => $teacherrows,
             'teacher_name' => $primary ? $primary['name'] : '',
             'teacher_initials' => $primary ? $primary['initials'] : '',
             'teacher_role_label' => get_string('admin_mentors_teacher_role', 'local_launchpad'),
@@ -3010,15 +5293,36 @@ final class admin_dashboard {
                 ? get_string('admin_mentors_more_teachers', 'local_launchpad', count($teachers) - 1)
                 : '',
             'has_more_teachers' => count($teachers) > 1,
+            'teachers_section_label' => get_string('admin_mentors_assigned_teachers', 'local_launchpad'),
+            'mentors_used' => $mentorsused,
+            'mentors_max' => $maxmentors,
+            'mentor_pct' => $mentorpct,
             'capacity_label' => get_string('admin_mentors_capacity', 'local_launchpad'),
-            'capacity_value' => get_string('admin_mentors_capacity_unset', 'local_launchpad'),
+            'capacity_value' => get_string(
+                'admin_mentors_slots_used',
+                'local_launchpad',
+                (object) ['used' => $mentorsused, 'max' => $maxmentors]
+            ),
+            'mentor_hint' => $mentorhint,
             'fellows_label' => get_string('admin_mentors_fellows', 'local_launchpad'),
-            'fellows_value' => (string) $fellows,
+            'fellows_value' => $fellowsvalue,
+            'fellows_hint' => $maxfellows > 0
+                ? get_string('admin_mentors_hint_fellow_cap', 'local_launchpad')
+                : get_string('admin_mentors_hint_fellow_uncapped', 'local_launchpad'),
+            'is_over_capacity' => $isover,
+            'needs_mentor' => $needsmentor,
+            'is_staffed' => !$isover && !$needsmentor,
+            'status_key' => $statuskey,
+            'status_label' => $statuslabel,
+            'over_capacity_label' => get_string('admin_mentors_over_capacity', 'local_launchpad'),
+            'can_assign_mentor' => $canassign,
+            'assign_full_label' => get_string('admin_mentors_assign_full', 'local_launchpad'),
+            'participants_url' => $participantsurl,
+            'participants_label' => get_string('admin_mentors_participants', 'local_launchpad'),
+            'manage_participants_label' => get_string('admin_mentors_manage_participants', 'local_launchpad'),
             'email_label' => get_string('admin_mentors_email_label', 'local_launchpad'),
             'email_placeholder' => get_string('admin_mentors_email_placeholder', 'local_launchpad'),
             'submit_label' => get_string('admin_mentors_submit', 'local_launchpad'),
-            'assign_teacher_url' => self::assign_teacher_url($courseid)->out(false),
-            'assign_moodle_label' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
         ];
     }
 
@@ -3138,35 +5442,55 @@ final class admin_dashboard {
         $teachers = self::teacher_names($courseid);
         $fellows = self::fellow_count($courseid);
         $capstone = self::capstone_line($course);
+        $isvisible = (int) ($course->visible ?? 0) === 1;
+        $idnumber = trim((string) ($course->idnumber ?? ''));
+        $shortname = trim((string) ($course->shortname ?? ''));
+        // Prefer idnumber; show shortname only when it adds information.
+        $showshortname = $shortname !== '' && strcasecmp($shortname, $idnumber) !== 0;
 
         return [
             'id' => $courseid,
             'name' => format_string($course->fullname),
-            'idnumber' => s($course->idnumber),
+            'idnumber' => $idnumber !== '' ? s($idnumber) : '',
+            'shortname' => $showshortname ? s($shortname) : '',
             'ready' => $foundationsready,
+            'status_key' => $foundationsready ? 'ready' : 'outline',
             'ready_label' => $foundationsready
                 ? get_string('admin_tracks_foundations_ready', 'local_launchpad')
                 : get_string('admin_tracks_outline_only', 'local_launchpad'),
+            'is_visible' => $isvisible,
+            'visibility_label' => $isvisible
+                ? get_string('admin_tracks_course_visible', 'local_launchpad')
+                : get_string('admin_tracks_course_hidden', 'local_launchpad'),
             'phases_shown_label' => get_string(
                 'admin_tracks_phases_shown',
                 'local_launchpad',
                 (object) ['shown' => $shown, 'total' => 4]
             ),
+            'phases_section_label' => get_string('admin_tracks_phases_section', 'local_launchpad'),
             'capstone' => $capstone,
             'phases' => $phases,
+            'mentors_section_label' => get_string('admin_tracks_mentors_section', 'local_launchpad'),
+            'enrolled_section_label' => get_string('admin_tracks_enrolled_section', 'local_launchpad'),
             'has_teacher' => $teachers !== [],
             'teacher_label' => $teachers !== []
                 ? implode(', ', $teachers)
                 : get_string('admin_tracks_no_teacher', 'local_launchpad'),
+            'fellows_count' => $fellows,
             'fellows_label' => get_string('admin_tracks_fellows', 'local_launchpad', $fellows),
             'course_url' => (new \moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
             'open_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
+            'courseops_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'courseops',
+                'trackid' => $courseid,
+            ]))->out(false),
+            'courseops_label' => get_string('admin_tracks_course_ops', 'local_launchpad'),
             'builder_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
                 'view' => 'builder',
                 'trackid' => $courseid,
             ]))->out(false),
             'builder_label' => get_string('admin_tracks_open_builder', 'local_launchpad'),
-            'assign_teacher_url' => self::assign_teacher_url($courseid)->out(false),
+            'assign_teacher_url' => self::assign_mentor_url($courseid),
             'assign_teacher_label' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
         ];
     }
@@ -3326,38 +5650,60 @@ final class admin_dashboard {
     public static function visibility_context(array $tracks): array {
         $hidden = [];
         $shown = [];
+        $statushidden = get_string('admin_visibility_status_hidden', 'local_launchpad');
+        $statusshown = get_string('admin_visibility_status_shown', 'local_launchpad');
+        $badgehidden = get_string('admin_visibility_badge_hidden', 'local_launchpad');
+        $badgelive = get_string('admin_visibility_badge_live', 'local_launchpad');
+        $openlabel = get_string('admin_visibility_open_track', 'local_launchpad');
+
         foreach ($tracks as $course) {
+            $isvisible = (int) $course->visible === 1;
             $row = [
                 'id' => (int) $course->id,
                 'name' => format_string($course->fullname),
                 'idnumber' => s($course->idnumber),
-                'edit_url' => (new \moodle_url('/course/edit.php', ['id' => (int) $course->id]))->out(false),
-                'view_url' => (new \moodle_url('/course/view.php', ['id' => (int) $course->id]))->out(false),
+                'view_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => (int) $course->id,
+                ]))->out(false),
+                'is_hidden' => !$isvisible,
+                'is_shown' => $isvisible,
+                'status_label' => $isvisible ? $statusshown : $statushidden,
+                'badge_label' => $isvisible ? $badgelive : $badgehidden,
+                'open_label' => $openlabel,
             ];
-            if ((int) $course->visible === 1) {
+            if ($isvisible) {
                 $shown[] = $row;
             } else {
                 $hidden[] = $row;
             }
         }
 
+        $rows = array_merge($hidden, $shown);
+        $total = count($tracks);
+
         return [
             'visibility_title' => get_string('admin_visibility_title', 'local_launchpad'),
             'visibility_lead' => get_string('admin_visibility_lead', 'local_launchpad'),
             'visibility_hint' => get_string('admin_visibility_hint', 'local_launchpad'),
+            'visibility_card_sub' => get_string('admin_visibility_card_sub', 'local_launchpad'),
             'hidden_count' => count($hidden),
             'shown_count' => count($shown),
+            'visibility_total' => $total,
+            'visibility_total_label' => get_string('admin_visibility_total', 'local_launchpad', $total),
             'hidden_label' => get_string('admin_visibility_hidden', 'local_launchpad', count($hidden)),
             'shown_label' => get_string('admin_visibility_shown', 'local_launchpad', count($shown)),
             'has_hidden' => $hidden !== [],
             'has_shown' => $shown !== [],
             'hidden_courses' => $hidden,
             'shown_courses' => $shown,
+            'visibility_rows' => $rows,
+            'has_visibility_rows' => $rows !== [],
             'hidden_list_label' => get_string('admin_visibility_hidden_list', 'local_launchpad'),
             'shown_list_label' => get_string('admin_visibility_shown_list', 'local_launchpad'),
-            'settings_label' => get_string('admin_visibility_course_settings', 'local_launchpad'),
             'visibility_empty' => $tracks === [],
             'visibility_empty_body' => get_string('admin_visibility_empty', 'local_launchpad'),
+            'visibility_footer_tip' => get_string('admin_visibility_footer_tip', 'local_launchpad'),
         ];
     }
 
@@ -3385,8 +5731,11 @@ final class admin_dashboard {
                     'idnumber' => s($course->idnumber),
                     'issue' => get_string('admin_attention_no_teacher', 'local_launchpad'),
                     'hint' => get_string('admin_attention_no_teacher_hint', 'local_launchpad'),
-                    'url' => self::assign_teacher_url($courseid)->out(false),
+                    'url' => self::assign_mentor_url($courseid),
                     'cta' => get_string('admin_attention_assign_teacher', 'local_launchpad'),
+                    'badge' => get_string('admin_attention_badge_no_teacher', 'local_launchpad'),
+                    'is_teacher_gap' => true,
+                    'is_activity_gap' => false,
                 ];
             }
             if ($activities === 0) {
@@ -3397,44 +5746,55 @@ final class admin_dashboard {
                     'hint' => get_string('admin_attention_no_activities_hint', 'local_launchpad'),
                     'url' => $coursehomeurl,
                     'cta' => get_string('admin_attention_open_course', 'local_launchpad'),
+                    'badge' => get_string('admin_attention_badge_no_activities', 'local_launchpad'),
+                    'is_teacher_gap' => false,
+                    'is_activity_gap' => true,
                 ];
             }
         }
 
+        $count = count($items);
         return [
             'attention_title' => get_string('admin_attention_title', 'local_launchpad'),
             'attention_lead' => get_string('admin_attention_lead', 'local_launchpad'),
+            'attention_card_sub' => get_string('admin_attention_card_sub', 'local_launchpad'),
             'has_attention' => $items !== [],
             'attention_items' => $items,
+            'attention_count' => $count,
+            'attention_count_label' => get_string('admin_attention_count', 'local_launchpad', $count),
             'attention_empty' => get_string('admin_attention_empty', 'local_launchpad'),
+            'attention_footer_tip' => get_string('admin_attention_footer_tip', 'local_launchpad'),
         ];
     }
 
     /**
-     * Deep link: Moodle “Assign role” for Editing teacher on this course.
+     * In-shell Mentors & capacity deep link for a track (non-editing teacher assign).
      *
-     * Lands on the picker where the admin selects a user — not the generic
-     * Participants roster. Falls back to Teacher, then Participants.
+     * Same destination Course ops “Assign mentor” uses: Mentors view + track card anchor.
+     */
+    public static function assign_mentor_url(int $trackid): string {
+        if ($trackid <= 0) {
+            return (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
+        }
+
+        return (new \moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'mentors',
+            'trackid' => $trackid,
+        ]))->out(false) . '#lp-mentor-track-' . $trackid;
+    }
+
+    /**
+     * Assign teacher CTA → Mentors & capacity for this track (alias of assign_mentor_url).
+     *
+     * Kept for callers/tests that expect a moodle_url; day-to-day seating stays in-shell.
      */
     public static function assign_teacher_url(int $courseid): \moodle_url {
-        global $DB;
-
-        if ($courseid <= 0) {
-            return new \moodle_url('/user/index.php');
+        $url = new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']);
+        if ($courseid > 0) {
+            $url->param('trackid', $courseid);
+            $url->set_anchor('lp-mentor-track-' . $courseid);
         }
-
-        $context = \context_course::instance($courseid);
-        foreach (['editingteacher', 'teacher'] as $shortname) {
-            $roleid = (int) $DB->get_field('role', 'id', ['shortname' => $shortname]);
-            if ($roleid > 0) {
-                return new \moodle_url('/admin/roles/assign.php', [
-                    'contextid' => $context->id,
-                    'roleid' => $roleid,
-                ]);
-            }
-        }
-
-        return new \moodle_url('/user/index.php', ['id' => $courseid]);
+        return $url;
     }
 
     /**
@@ -3544,6 +5904,36 @@ final class admin_dashboard {
         return (int) $DB->count_records_sql($sql, [
             'status' => 'submitted',
             'idn' => $DB->sql_like_escape(account_persona::COURSE_IDNUMBER_PREFIX) . '%',
+        ]);
+    }
+
+    /**
+     * Pending LaunchPad reviews older than {@see REVIEW_SLA_SECONDS}.
+     */
+    public static function count_reviews_overdue(): int {
+        global $DB;
+
+        $like = $DB->sql_like('c.idnumber', ':idn', false);
+        $sql = "SELECT COUNT(1)
+                  FROM {assign_submission} s
+                  JOIN {assign} a ON a.id = s.assignment
+                  JOIN {course} c ON c.id = a.course
+             LEFT JOIN {assign_grades} g
+                    ON g.assignment = s.assignment
+                   AND g.userid = s.userid
+                   AND g.attemptnumber = s.attemptnumber
+                   AND g.grade IS NOT NULL
+                   AND g.grade >= 0
+                 WHERE s.latest = 1
+                   AND s.status = :status
+                   AND g.id IS NULL
+                   AND {$like}
+                   AND COALESCE(NULLIF(s.timemodified, 0), s.timecreated) > 0
+                   AND COALESCE(NULLIF(s.timemodified, 0), s.timecreated) <= :cutoff";
+        return (int) $DB->count_records_sql($sql, [
+            'status' => 'submitted',
+            'idn' => $DB->sql_like_escape(account_persona::COURSE_IDNUMBER_PREFIX) . '%',
+            'cutoff' => time() - self::REVIEW_SLA_SECONDS,
         ]);
     }
 
