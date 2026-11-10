@@ -1680,6 +1680,17 @@ body.local-launchpad-mentor {
   transition: background .15s;
 }
 .lp-act-row:hover { background: rgba(26, 97, 242, .04); }
+.lp-act-row.is-locked {
+  opacity: 0.72;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.lp-act-row.is-locked:hover { background: transparent; }
+.lp-act-card.is-locked {
+  opacity: 0.72;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .lp-act-ico {
   width: 44px;
   height: 44px;

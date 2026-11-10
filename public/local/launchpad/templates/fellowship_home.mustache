@@ -168,19 +168,33 @@
   <ul class="lp-act-rows">
     {{#scoped_activities}}
       <li>
-        <a class="lp-act-row" href="{{url}}">
-          <span class="lp-act-ico tone-{{tone}}" aria-hidden="true">
-            <iconify-icon icon="hugeicons:{{icon}}" width="20" height="20"></iconify-icon>
-          </span>
-          <span class="lp-act-row-main">
-            <b>{{{name}}}</b>
-            {{#meta}}<span class="lp-muted lp-sm">{{meta}}</span>{{/meta}}
-          </span>
-          {{#status_label}}
-            <span class="lp-act-row-status {{statustone}}">{{status_label}}</span>
-          {{/status_label}}
-          <iconify-icon class="lp-act-chev" icon="hugeicons:arrow-right-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-        </a>
+        {{#is_locked}}
+          <div class="lp-act-row is-locked" aria-disabled="true" title="{{unlock_reason}}">
+            <span class="lp-act-ico tone-{{tone}}" aria-hidden="true">
+              <iconify-icon icon="hugeicons:square-lock-02" width="20" height="20"></iconify-icon>
+            </span>
+            <span class="lp-act-row-main">
+              <b>{{{name}}}</b>
+              <span class="lp-muted lp-sm">{{unlock_reason}}</span>
+            </span>
+            <span class="lp-act-row-status line">{{#str}} fellowship_sequence_locked_chip, local_launchpad {{/str}}</span>
+          </div>
+        {{/is_locked}}
+        {{^is_locked}}
+          <a class="lp-act-row" href="{{url}}">
+            <span class="lp-act-ico tone-{{tone}}" aria-hidden="true">
+              <iconify-icon icon="hugeicons:{{icon}}" width="20" height="20"></iconify-icon>
+            </span>
+            <span class="lp-act-row-main">
+              <b>{{{name}}}</b>
+              {{#meta}}<span class="lp-muted lp-sm">{{meta}}</span>{{/meta}}
+            </span>
+            {{#status_label}}
+              <span class="lp-act-row-status {{statustone}}">{{status_label}}</span>
+            {{/status_label}}
+            <iconify-icon class="lp-act-chev" icon="hugeicons:arrow-right-01" width="18" height="18" aria-hidden="true"></iconify-icon>
+          </a>
+        {{/is_locked}}
       </li>
     {{/scoped_activities}}
   </ul>

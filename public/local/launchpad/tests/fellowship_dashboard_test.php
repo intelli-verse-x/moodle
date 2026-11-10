@@ -190,6 +190,76 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $this->assertStringContainsString('Not in this course', $journey['gates'][2]['sublabel']);
     }
 
+    public function test_apply_sequence_locks_keeps_current_open(): void {
+        $course = (object) ['id' => 1, 'idnumber' => 'lp-ai-pilot'];
+        $outline = [
+            'sections' => [
+                [
+                    'sectionnum' => 1,
+                    'name' => 'Foundations',
+                    'activities' => [
+                        [
+                            'cmid' => 11,
+                            'modname' => 'page',
+                            'name' => 'Lesson 1',
+                            'url' => '/a/1',
+                            'access_complete' => true,
+                            'tracked' => true,
+                            'complete' => true,
+                        ],
+                        [
+                            'cmid' => 12,
+                            'modname' => 'assign',
+                            'name' => 'Submit 1',
+                            'url' => '/a/2',
+                            'access_complete' => false,
+                            'tracked' => true,
+                            'complete' => false,
+                        ],
+                    ],
+                ],
+                [
+                    'sectionnum' => 2,
+                    'name' => 'Guided',
+                    'activities' => [
+                        [
+                            'cmid' => 21,
+                            'modname' => 'page',
+                            'name' => 'Lesson 2',
+                            'url' => '/a/3',
+                            'access_complete' => false,
+                            'tracked' => true,
+                            'complete' => false,
+                        ],
+                    ],
+                ],
+            ],
+            'next' => null,
+        ];
+        $out = fellowship_dashboard::apply_sequence_locks($outline, $course);
+        $p1 = $out['sections'][0]['activities'];
+        $p2 = $out['sections'][1]['activities'];
+        $this->assertFalse(!empty($p1[0]['locked']));
+        $this->assertFalse(!empty($p1[1]['locked']), 'Current incomplete assign stays open');
+        $this->assertTrue(!empty($p2[0]['locked']), 'Later phase locks until assign fellow-complete');
+        $this->assertSame('', $p2[0]['url']);
+        $this->assertSame(12, (int) ($out['next']['cmid'] ?? 0));
+    }
+
+    public function test_assign_pending_is_access_complete_not_met(): void {
+        // Submit unlocks next access; Met chip remains separate (complete=false).
+        $this->assertTrue(fellowship_dashboard::activity_access_complete([
+            'modname' => 'assign',
+            'access_complete' => true,
+            'complete' => false,
+        ]));
+        $this->assertFalse(fellowship_dashboard::activity_access_complete([
+            'modname' => 'assign',
+            'access_complete' => false,
+            'complete' => false,
+        ]));
+    }
+
     public function test_section_activities_from_outline_picks_section(): void {
         $outline = [
             'sections' => [

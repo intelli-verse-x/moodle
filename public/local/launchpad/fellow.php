@@ -416,6 +416,19 @@ switch ($view) {
             'view' => 'track',
             'id' => $courseid > 0 ? $courseid : null,
         ])))->out(false);
+        // Sequential unlock: do not open a later CM until earlier ones are fellow-complete.
+        $cmcourse = get_course((int) $cmrecord->course);
+        if (fellowship_dashboard::is_cm_sequence_locked($cmcourse, $userid, $cmid)) {
+            redirect(
+                new moodle_url(persona_home::FELLOW_PATH, array_filter([
+                    'view' => 'track',
+                    'id' => (int) $cmrecord->course,
+                ])),
+                get_string('fellowship_sequence_locked_redirect', 'local_launchpad'),
+                null,
+                \core\output\notification::NOTIFY_INFO
+            );
+        }
         try {
             $activityctx = activity_portal::export($USER, $cmid, ['courseurl' => $trackurl]);
         } catch (\moodle_exception $e) {
