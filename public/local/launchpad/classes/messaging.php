@@ -1630,6 +1630,31 @@ final class messaging {
     }
 
     /**
+     * Soft-sync membership when the track chat group already exists (enrol/assign hooks).
+     * Does not create the group — admin Enable owns creation.
+     */
+    public static function maybe_sync_track_chat_members(int $courseid): void {
+        global $CFG, $DB;
+
+        if ($courseid <= 0) {
+            return;
+        }
+        try {
+            $idnumber = (string) ($DB->get_field('course', 'idnumber', ['id' => $courseid]) ?: '');
+            if ($idnumber !== '' && account_provision::is_orientation_idnumber($idnumber)) {
+                return;
+            }
+            require_once($CFG->dirroot . '/group/lib.php');
+            if (!groups_get_group_by_idnumber($courseid, self::TRACK_CHAT_IDNUMBER)) {
+                return;
+            }
+            self::sync_track_chat_members($courseid);
+        } catch (\Throwable $e) {
+            // Soft-fail — roster ops must not break if messaging/group sync fails.
+        }
+    }
+
+    /**
      * Set course-group members to LaunchPad fellows + mentors on this track.
      *
      * @return int Active member count after sync

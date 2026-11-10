@@ -381,7 +381,9 @@ final class account_provision {
             self::assert_fellow_capacity_allows($userid, $courseid);
         }
 
-        return self::enrol_with_role($userid, $courseid, 'student');
+        $result = self::enrol_with_role($userid, $courseid, 'student');
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
     }
 
     /**
@@ -417,6 +419,7 @@ final class account_provision {
 
         $result = self::enrol_with_role($userid, $courseid, $roleshortname);
         $result['role'] = $roleshortname;
+        messaging::maybe_sync_track_chat_members($courseid);
         return $result;
     }
 
@@ -431,7 +434,9 @@ final class account_provision {
         self::require_user($userid);
         self::require_launchpad_course($courseid);
 
-        return self::unenrol_with_archetype($userid, $courseid, 'student');
+        $result = self::unenrol_with_archetype($userid, $courseid, 'student');
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
     }
 
     /**
@@ -445,7 +450,9 @@ final class account_provision {
         self::require_user($userid);
         self::require_launchpad_course($courseid);
 
-        return self::unenrol_with_archetype($userid, $courseid, 'teacher');
+        $result = self::unenrol_with_archetype($userid, $courseid, 'teacher');
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
     }
 
     /**
