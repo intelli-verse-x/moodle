@@ -68,6 +68,7 @@
     data-sesskey="{{sesskey}}"
     data-portal="{{portal}}"
     data-other-id="{{other_id}}"
+    data-convid="{{conversation_id}}"
     data-can-delete="{{#can_delete_messages}}1{{/can_delete_messages}}{{^can_delete_messages}}0{{/can_delete_messages}}">
 
     <div class="lp-msg-layout{{#has_thread}} is-split has-thread{{/has_thread}}">
@@ -301,6 +302,7 @@
                 <input type="hidden" name="sesskey" value="{{sesskey}}">
                 <input type="hidden" name="view" value="messages">
                 <input type="hidden" name="id" value="{{other_id}}">
+                <input type="hidden" name="convid" value="{{conversation_id}}">
                 <input type="hidden" name="mtab" value="{{mtab}}">
                 <input type="hidden" name="msgaction" value="send">
                 <label class="visually-hidden" for="lp-msg-body">{{strings.compose}}</label>

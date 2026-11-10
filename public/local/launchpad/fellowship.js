@@ -1636,6 +1636,7 @@
         var sesskey = layout.getAttribute('data-sesskey') || '';
         var portal = layout.getAttribute('data-portal') || 'fellow';
         var otherId = layout.getAttribute('data-other-id') || '';
+        var convId = layout.getAttribute('data-convid') || '';
         var canDelete = layout.getAttribute('data-can-delete') === '1';
 
         if (msgScroll) {
@@ -1643,13 +1644,16 @@
         }
 
         function postAction(action, fields) {
-            if (!ajaxUrl || !sesskey || !otherId) {
+            if (!ajaxUrl || !sesskey || (!otherId && !convId)) {
                 return Promise.reject(new Error('no ajax'));
             }
             var body = new URLSearchParams();
             body.set('sesskey', sesskey);
             body.set('portal', portal);
-            body.set('id', otherId);
+            body.set('id', otherId || '0');
+            if (convId) {
+                body.set('convid', convId);
+            }
             body.set('action', action);
             Object.keys(fields || {}).forEach(function (key) {
                 var val = fields[key];

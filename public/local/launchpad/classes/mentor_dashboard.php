@@ -390,10 +390,6 @@ final class mentor_dashboard {
                     'has_waiting' => $q['waiting'] > 0,
                     'grade_display' => $q['grade_display'] !== '' ? $q['grade_display'] : '—',
                     'detail_url' => self::fellow_detail_url($studentid, $courseid),
-                    'profile_url' => (new \moodle_url('/user/view.php', [
-                        'id' => $studentid,
-                        'course' => $courseid,
-                    ]))->out(false),
                     'can_message' => messaging::can_message($userid, $studentid),
                     'message_url' => messaging::messages_url($studentid, 'mentor'),
                     'review_url' => $q['first_waiting_url'] !== ''
@@ -554,10 +550,6 @@ final class mentor_dashboard {
             'review_url' => $firstWaitingUrl !== ''
                 ? $firstWaitingUrl
                 : (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false),
-            'profile_url' => (new \moodle_url('/user/view.php', [
-                'id' => $fellowid,
-                'course' => $courseid,
-            ]))->out(false),
             'can_message' => messaging::can_message($mentorid, $fellowid),
             'message_url' => messaging::messages_url($fellowid, 'mentor'),
             'assigns' => $assigns,

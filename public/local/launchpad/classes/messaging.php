@@ -679,6 +679,13 @@ final class messaging {
             } catch (\Throwable $e) {
                 $cansend = false;
             }
+        } else if ($portal === 'mentor' && $convid > 0 && $otherid <= 0) {
+            // Personal space (self) / group: Moodle allows members to post; LaunchPad was blocking other_id=0.
+            try {
+                $cansend = \core_message\api::can_send_message_to_conversation($userid, $convid);
+            } catch (\Throwable $e) {
+                $cansend = false;
+            }
         }
 
         $ctx['has_thread'] = true;
@@ -871,6 +878,77 @@ final class messaging {
         }
         return has_capability('moodle/site:deleteownmessage', \context_system::instance())
             || has_capability('moodle/site:deleteanymessage', \context_system::instance());
+    }
+
+    /**
+     * Mentor: post into an existing conversation by id (personal space / group).
+     *
+     * @return array{ok:bool,error:?string,message?:array}
+     */
+    public static function send_to_conversation(int $fromid, int $convid, string $text, string $portal = 'mentor'): array {
+        $text = trim($text);
+        if ($text === '') {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_empty', 'local_launchpad'),
+            ];
+        }
+        if ($portal !== 'mentor' || $fromid <= 0 || $convid <= 0) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+            ];
+        }
+        if (!account_persona::is_mentor($fromid) && !is_siteadmin($fromid)) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+            ];
+        }
+
+        $clean = clean_param($text, PARAM_TEXT);
+        if (trim($clean) === '') {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_empty', 'local_launchpad'),
+            ];
+        }
+
+        try {
+            if (!\core_message\api::can_send_message_to_conversation($fromid, $convid)) {
+                return [
+                    'ok' => false,
+                    'error' => get_string('fellowship_messages_err_permission', 'local_launchpad'),
+                ];
+            }
+            $sent = \core_message\api::send_message_to_conversation($fromid, $convid, $clean, FORMAT_PLAIN);
+            $mid = (int) ($sent->id ?? 0);
+            $when = !empty($sent->timecreated)
+                ? userdate((int) $sent->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
+                : '';
+            $youlabel = get_string_manager()->string_exists('employer_messages_you', 'local_launchpad')
+                ? get_string('employer_messages_you', 'local_launchpad')
+                : 'You';
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'message' => [
+                    'id' => $mid,
+                    'text' => (string) ($sent->text ?? $clean),
+                    'is_mine' => true,
+                    'from_label' => $youlabel,
+                    'can_delete' => $mid > 0 && self::user_can_delete_own_messages($fromid)
+                        && \core_message\api::can_delete_message($fromid, $mid),
+                    'when' => $when,
+                ],
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'error' => get_string('fellowship_messages_err_save', 'local_launchpad'),
+            ];
+        }
     }
 
     /**
@@ -1205,7 +1283,7 @@ final class messaging {
             } else if ($isself) {
                 $preview = $str(
                     'employer_messages_self_empty',
-                    'Your personal space in Moodle — open it to add a note.'
+                    'Your personal space — add a note here.'
                 );
             }
 

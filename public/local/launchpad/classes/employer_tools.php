@@ -803,7 +803,7 @@ final class employer_tools {
             $preview = self::str(
                 'employer_messages_self_empty',
                 null,
-                'Your personal space in Moodle — open it to add a note.'
+                'Your personal space — add a note here.'
             );
         }
 
