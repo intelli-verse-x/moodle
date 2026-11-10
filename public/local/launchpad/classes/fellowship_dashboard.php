@@ -769,7 +769,12 @@ final class fellowship_dashboard {
             } else if (!$hasmoodlesection) {
                 $statustext = get_string('fellowship_journey_section_missing', 'local_launchpad');
             } else {
-                $statustext = 'Not released';
+                // Has a section but this gate is not current/done — locked behind prior work,
+                // or waiting on published activities (empty section still "has" a Moodle section).
+                $actcount = count($section['activities'] ?? []);
+                $statustext = $actcount > 0
+                    ? get_string('fellowship_sequence_locked_chip', 'local_launchpad')
+                    : get_string('fellowship_track_coming_soon_chip', 'local_launchpad');
             }
             $weight = (int) ($weights[$num] ?? 0);
             $gates[] = [
@@ -1149,6 +1154,8 @@ final class fellowship_dashboard {
         $trackphases = [];
         $firstopen = true;
         $currentset = false;
+        // Prior phases fellow-complete (access) — used for "you're ready / coming soon" copy.
+        $prioraccessready = true;
 
         // Shared orientation: show section-0 activities as one honest phase (not four locked gates).
         $sourcephases = $progress['phases'] ?? [];
@@ -1205,10 +1212,11 @@ final class fellowship_dashboard {
                     array_values($section['activities'] ?? [])
                 );
             }
-            $released = $activities !== [];
+            $hascontent = $activities !== [];
+            $contentpending = !$hascontent;
             // Sequence lock: phase opens only after prior phases are fellow-complete.
             $sequencelocked = false;
-            if ($released && !$isorient) {
+            if ($hascontent && !$isorient) {
                 foreach ($activities as $act) {
                     if (!self::activity_counts_for_sequence($act)) {
                         continue;
@@ -1219,7 +1227,7 @@ final class fellowship_dashboard {
                     break;
                 }
             }
-            $phaseavailable = $released && !$sequencelocked;
+            $phaseavailable = $hascontent && !$sequencelocked;
             $isopen = $phaseavailable && $firstopen;
             if ($phaseavailable) {
                 $firstopen = false;
@@ -1227,7 +1235,7 @@ final class fellowship_dashboard {
             $phasedone = !empty($phase['is_met']) || !empty($phase['is_phase_done']);
             // Access "done" for advancing current: all sequence activities fellow-complete.
             $accessdone = false;
-            if ($released && !$isorient) {
+            if ($hascontent && !$isorient) {
                 $seq = 0;
                 $seqdone = 0;
                 foreach ($activities as $act) {
@@ -1248,17 +1256,29 @@ final class fellowship_dashboard {
                 $iscurrent = true;
                 $currentset = true;
             }
+            $fellowreadyforphase = $prioraccessready && !$isorient;
             $iconmeta = $phaseicons[$num] ?? ['icon' => 'book-open-01', 'tone' => 'blue'];
-            if (!$released || $sequencelocked) {
+            if ($contentpending) {
+                $iconmeta = ['icon' => 'hourglass', 'tone' => 'slate'];
+            } else if ($sequencelocked) {
                 $iconmeta = ['icon' => 'square-lock-02', 'tone' => 'slate'];
             }
             unset($phase['_orient_activities']);
-            if (!$released) {
-                $lockednote = get_string('fellowship_track_phase_locked', 'local_launchpad', $phase['weight']);
+            $weight = $phase['weight'] ?? 0;
+            if ($contentpending) {
+                $lockednote = $fellowreadyforphase
+                    ? get_string('fellowship_track_coming_soon_ready_note', 'local_launchpad', $weight)
+                    : get_string('fellowship_track_coming_soon_note', 'local_launchpad', $weight);
+                $unavailablechip = get_string('fellowship_track_coming_soon_chip', 'local_launchpad');
+                $unavailableicon = 'hourglass';
             } else if ($sequencelocked) {
                 $lockednote = get_string('fellowship_sequence_locked_phase', 'local_launchpad');
+                $unavailablechip = get_string('fellowship_sequence_locked_chip', 'local_launchpad');
+                $unavailableicon = 'square-lock-02';
             } else {
-                $lockednote = get_string('fellowship_track_phase_locked', 'local_launchpad', $phase['weight']);
+                $lockednote = get_string('fellowship_track_phase_locked', 'local_launchpad', $weight);
+                $unavailablechip = get_string('fellowship_track_coming_soon_chip', 'local_launchpad');
+                $unavailableicon = 'hourglass';
             }
             $trackphases[] = array_merge($phase, [
                 'index' => $num > 0 ? $num : 1,
@@ -1266,8 +1286,12 @@ final class fellowship_dashboard {
                 'blurb' => $blurbs[$num] ?? ($blurbs[1] ?? ''),
                 // Template "released" means openable content (not sequence-locked).
                 'released' => $phaseavailable,
-                'has_content' => $released,
+                'has_content' => $hascontent,
+                'content_pending' => $contentpending,
                 'sequence_locked' => $sequencelocked,
+                'fellow_ready' => $fellowreadyforphase,
+                'unavailable_chip' => $unavailablechip,
+                'unavailable_icon' => $unavailableicon,
                 'is_open' => $isopen,
                 'is_current' => $iscurrent,
                 'activities' => $activities,
@@ -1277,6 +1301,10 @@ final class fellowship_dashboard {
                 'icon_tone' => $iconmeta['tone'],
                 'show_lock' => !$phaseavailable,
             ]);
+            // Next phase readiness: empty phases are skipped (they neither unlock nor block).
+            if (!$isorient && !$contentpending) {
+                $prioraccessready = $accessdone;
+            }
         }
 
         $weights = [];

@@ -121,8 +121,8 @@
                   {{/released}}
                   {{^released}}
                     <span class="lp-chip line has-ico">
-                      <iconify-icon icon="hugeicons:square-lock-02" width="12" height="12" aria-hidden="true"></iconify-icon>
-                      {{#str}} fellowship_track_not_released_short, local_launchpad {{/str}}
+                      <iconify-icon icon="hugeicons:{{unavailable_icon}}" width="12" height="12" aria-hidden="true"></iconify-icon>
+                      {{unavailable_chip}}
                     </span>
                   {{/released}}
                   <iconify-icon class="lp-phase-chev" icon="hugeicons:arrow-up-01" width="18" height="18" aria-hidden="true"></iconify-icon>
