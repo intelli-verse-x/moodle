@@ -190,6 +190,14 @@
               <span class="lp-chip{{#track_chat_status_on}} ok{{/track_chat_status_on}}">{{track_chat_status_label}}</span>
               <span class="lp-muted"> · {{track_chat_members_label}}</span>
             </p>
+            {{#track_chat_has_open_link}}
+              <p class="lp-sm" style="margin:6px 0 0">
+                <span class="lp-muted">{{track_chat_open_label}}:</span>
+                <a href="{{track_chat_open_mentor_url}}">{{track_chat_open_mentor_label}}</a>
+                <span class="lp-muted"> · </span>
+                <a href="{{track_chat_open_fellow_url}}">{{track_chat_open_fellow_label}}</a>
+              </p>
+            {{/track_chat_has_open_link}}
           </div>
           <div class="lp-courseops-roster-actions" style="margin:0">
             {{#track_chat_can_toggle}}

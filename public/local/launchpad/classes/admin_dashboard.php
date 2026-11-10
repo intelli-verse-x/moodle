@@ -655,6 +655,8 @@ final class admin_dashboard {
             'site_off' => get_string('admin_track_chat_status_site_off', 'local_launchpad'),
             default => get_string('admin_track_chat_status_off', 'local_launchpad'),
         };
+        $chatconvid = (int) ($chat['conversation_id'] ?? 0);
+        $chatenabled = $statuskey === 'on';
 
         return [
             'participants_title' => get_string('admin_courseops_nav_participants', 'local_launchpad'),
@@ -701,6 +703,12 @@ final class admin_dashboard {
             'track_chat_disable_label' => get_string('admin_track_chat_disable', 'local_launchpad'),
             'track_chat_sesskey' => $sk,
             'track_chat_trackid' => $trackid,
+            'track_chat_has_open_link' => $chatenabled,
+            'track_chat_open_label' => get_string('admin_track_chat_open_group', 'local_launchpad'),
+            'track_chat_open_fellow_label' => get_string('admin_track_chat_open_fellow', 'local_launchpad'),
+            'track_chat_open_mentor_label' => get_string('admin_track_chat_open_mentor', 'local_launchpad'),
+            'track_chat_open_fellow_url' => messaging::messages_url(null, 'fellow', 'group', $chatconvid),
+            'track_chat_open_mentor_url' => messaging::messages_url(null, 'mentor', 'group', $chatconvid),
         ];
     }
 

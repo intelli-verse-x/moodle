@@ -490,6 +490,14 @@ final class messaging {
         $ctx['unread_conversations'] = $unreadconversations;
         $ctx['has_unread_conversations'] = $unreadconversations > 0;
         $ctx['has_filter_empty'] = $allconversations !== [] && $filtered === [];
+        // Group tab: honest empty copy when track chat is off / disabled / pending sync.
+        if ($mtab === 'group' && $filtered === []) {
+            $groupempty = self::group_tab_empty_copy($userid, $portal);
+            $ctx['strings']['empty_filter_title'] = $groupempty['title'];
+            $ctx['strings']['empty_filter_body'] = $groupempty['body'];
+            $ctx['strings']['inbox_empty_title'] = $groupempty['title'];
+            $ctx['strings']['inbox_empty_body'] = $groupempty['body'];
+        }
         // People picker only on All — otherwise classmates look like chats under every filter.
         $ctx['show_people_picker'] = $portal === 'fellow' && $mtab === 'all';
 
@@ -1627,6 +1635,68 @@ final class messaging {
             return null;
         }
         return groups_get_group($gid, '*', IGNORE_MISSING) ?: null;
+    }
+
+    /**
+     * Empty-state title/body for Messages → Group when the filtered list is empty.
+     *
+     * Distinguishes track chat never enabled vs disabled vs enabled-but-missing.
+     *
+     * @return array{title:string,body:string}
+     */
+    public static function group_tab_empty_copy(int $userid, string $portal = 'fellow'): array {
+        $title = get_string_manager()->string_exists('fellowship_messages_group_empty_title', 'local_launchpad')
+            ? get_string('fellowship_messages_group_empty_title', 'local_launchpad')
+            : 'No group chats';
+
+        $courses = $portal === 'mentor'
+            ? persona_home::list_mentor_courses($userid)
+            : fellowship_dashboard::list_courses($userid);
+
+        $sawon = false;
+        $sawdisabled = false;
+        $sawoff = false;
+        $sawsiteoff = false;
+        foreach ($courses as $course) {
+            if (fellowship_dashboard::is_orientation_course($course)) {
+                continue;
+            }
+            $status = self::get_track_chat_status((int) ($course->id ?? 0));
+            switch ((string) ($status['status_key'] ?? 'off')) {
+                case 'on':
+                    $sawon = true;
+                    break;
+                case 'disabled':
+                    $sawdisabled = true;
+                    break;
+                case 'site_off':
+                    $sawsiteoff = true;
+                    break;
+                default:
+                    $sawoff = true;
+                    break;
+            }
+        }
+
+        if ($sawon) {
+            $body = get_string_manager()->string_exists('fellowship_messages_group_empty_pending', 'local_launchpad')
+                ? get_string('fellowship_messages_group_empty_pending', 'local_launchpad')
+                : 'Track group chat is enabled, but it is not in your inbox yet. Refresh, or ask a programme admin to check membership.';
+        } else if ($sawdisabled) {
+            $body = get_string_manager()->string_exists('fellowship_messages_group_empty_disabled', 'local_launchpad')
+                ? get_string('fellowship_messages_group_empty_disabled', 'local_launchpad')
+                : 'Track group chat is turned off right now. Ask a programme admin to enable it again — history returns with it.';
+        } else if ($sawsiteoff && !$sawoff) {
+            $body = get_string_manager()->string_exists('fellowship_messages_disabled_body', 'local_launchpad')
+                ? get_string('fellowship_messages_disabled_body', 'local_launchpad')
+                : 'Site messaging is disabled. Ask an admin to enable it.';
+        } else {
+            $body = get_string_manager()->string_exists('fellowship_messages_group_empty_off', 'local_launchpad')
+                ? get_string('fellowship_messages_group_empty_off', 'local_launchpad')
+                : 'No track group chat yet. When a programme admin enables it for your course, it appears here.';
+        }
+
+        return ['title' => $title, 'body' => $body];
     }
 
     /**
