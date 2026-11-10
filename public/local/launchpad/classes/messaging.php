@@ -725,7 +725,7 @@ final class messaging {
             'inbox_heading' => $str('fellowship_messages_inbox', 'Conversations'),
             'intro' => $str(
                 'fellowship_messages_intro',
-                'Read and reply here — conversations sync with Moodle messaging.'
+                'Private messages with mentors and peers. This page is LaunchPad\'s view of those conversations.'
             ),
             'open_moodle' => $str('fellowship_messages_open_moodle', 'Open Moodle messenger'),
             'open_thread' => $str('employer_messages_open_thread', 'Open in Moodle'),
@@ -756,7 +756,7 @@ final class messaging {
             ),
             'cannot_reply' => $str(
                 'employer_messages_cannot_reply',
-                'You cannot reply here. Open Moodle Messages or check messaging permissions.'
+                'You cannot reply here. Open Messages or check messaging permissions.'
             ),
             'readonly' => $str(
                 'fellowship_messages_readonly',
@@ -775,7 +775,7 @@ final class messaging {
             'disabled_title' => $str('fellowship_messages_disabled_title', 'Messaging is off'),
             'disabled_body' => $str(
                 'fellowship_messages_disabled_body',
-                'Site messaging is disabled in Moodle. Ask an admin to enable it.'
+                'Site messaging is disabled. Ask an admin to enable it.'
             ),
             'delete' => $str('fellowship_messages_delete', 'Delete'),
             'delete_cancel' => $str('fellowship_messages_delete_cancel', 'Cancel'),
