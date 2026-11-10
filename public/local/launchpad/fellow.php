@@ -636,9 +636,82 @@ switch ($view) {
             $prefsaved > 0,
             $preferr
         );
+        // Fellowship: LaunchPad profile is enough — no Moodle escape buttons.
+        $profilestrings = employer_tools::profile_strings();
+        $profilestrings['profile_intro'] = $lpstr(
+            'fellowship_profile_intro',
+            null,
+            'Name, contact details, and preferences for your LaunchPad account.'
+        );
+        $profilestrings['profile_edit_help'] = $lpstr(
+            'fellowship_profile_edit_help',
+            null,
+            'Changes save to your account. Locked fields are controlled by your login method.'
+        );
+        $profilestrings['profile_edit_note'] = $lpstr(
+            'fellowship_profile_edit_note',
+            null,
+            'Use Edit for name, contact, and bio. Preferences covers messages, notifications, and language.'
+        );
+        $profilestrings['profile_edit_unavailable_title'] = $lpstr(
+            'fellowship_profile_edit_unavailable_title',
+            null,
+            'Profile edit is managed by your login method'
+        );
+        $profilestrings['profile_edit_unavailable_body'] = $lpstr(
+            'fellowship_profile_edit_unavailable_body',
+            null,
+            'Your organisation controls this account. Use Preferences for what LaunchPad allows, or ask your programme admin.'
+        );
+        $profilestrings['profile_prefs_lead'] = $lpstr(
+            'fellowship_profile_prefs_lead',
+            null,
+            'Account, communication, and system preferences — edit here when available.'
+        );
+        $profilestrings['native_tools_note'] = $lpstr(
+            'fellowship_profile_prefs_note',
+            null,
+            'Some advanced preference tools open outside LaunchPad when your programme requires them.'
+        );
+        $profilestrings['pref_open_moodle'] = $lpstr(
+            'fellowship_pref_open_advanced',
+            null,
+            'Open advanced settings'
+        );
+        $profilestrings['pref_advanced_moodle'] = $lpstr(
+            'fellowship_pref_advanced',
+            null,
+            'Advanced settings'
+        );
+        $profilestrings['profile_course_details_title'] = $lpstr(
+            'fellowship_profile_course_details_title',
+            null,
+            'Course details'
+        );
+        $profilestrings['profile_course_details_help'] = $lpstr(
+            'fellowship_profile_course_details_help',
+            null,
+            'Tracks you are enrolled on for this programme. Open one to continue on My track.'
+        );
+        $profilerole = $lpstr('fellowship_profile_course_role', null, 'Fellow');
+        $coursedetails = [];
+        foreach ($coursecards as $card) {
+            $meta = trim((string) ($card['idnumber'] ?? ''));
+            $coursedetails[] = [
+                'name' => (string) ($card['fullname'] ?? ''),
+                'url' => (string) ($card['url'] ?? ''),
+                'role' => $profilerole,
+                'meta' => $meta,
+            ];
+        }
         $content = $OUTPUT->render_from_template('local_launchpad/employer_profile', array_merge(
             $profilectx,
-            ['strings' => employer_tools::profile_strings()]
+            [
+                'hide_moodle_escapes' => true,
+                'course_details' => $coursedetails,
+                'has_course_details' => $coursedetails !== [],
+                'strings' => $profilestrings,
+            ]
         ));
         break;
 
@@ -1057,7 +1130,7 @@ $orbittips = [
     'profile' => $lpstr(
         'fellowship_orbit_tip_profile',
         null,
-        'Profile saves to your Moodle account. Use <b>Preferences</b> for messages, notifications, and language.'
+        'Profile saves to your LaunchPad account. Use <b>Preferences</b> for messages, notifications, and language.'
     ),
     'messages' => $lpstr(
         'fellowship_orbit_tip_messages',
