@@ -2278,7 +2278,7 @@ final class employer_tools {
                             null,
                             'Email and popup notification channels.'
                         ),
-                        'url' => $prefurl('notifications'),
+                        'url' => (new \moodle_url($portalpath, ['view' => 'notificationprefs']))->out(false),
                         'icon' => 'notification-01',
                     ],
                     [
@@ -2481,12 +2481,7 @@ final class employer_tools {
             if ($pref === 'password' && !empty($CFG->passwordpolicy)) {
                 $base['pref_password_policy'] = trim(strip_tags(print_password_policy()));
             }
-            if ($pref === 'notifications') {
-                $adv = (string) ($urls['moodle_notification_prefs']
-                    ?? (new \moodle_url('/message/notificationpreferences.php'))->out(false));
-                $base['pref_advanced_url'] = $adv;
-                $base['pref_has_advanced'] = $adv !== '';
-            }
+            // Notifications matrix lives at view=notificationprefs (no Moodle Advanced escape).
             if ($pref === 'messages') {
                 $adv = (new \moodle_url('/message/edit.php', ['id' => $userid]))->out(false);
                 $base['pref_advanced_url'] = $adv;

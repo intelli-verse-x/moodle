@@ -764,7 +764,52 @@ final class messaging {
     }
 
     /**
-     * Notification preferences (popup + email quick toggles).
+     * Channels exposed in the LaunchPad notification preferences matrix.
+     *
+     * @return list<string>
+     */
+    public static function notification_preference_channels(): array {
+        return ['popup', 'email'];
+    }
+
+    /**
+     * Read notification-preferences POST payload (matrix + disable-all).
+     *
+     * @return array{disable_all:bool,matrix:array<string,array{popup:bool,email:bool}>}
+     */
+    public static function notification_preferences_request_payload(): array {
+        $providerlist = optional_param_array('providers', [], PARAM_ALPHANUMEXT);
+        $rawmatrix = $_POST['matrix'] ?? [];
+        if (!is_array($rawmatrix)) {
+            $rawmatrix = [];
+        }
+
+        $matrix = [];
+        foreach ($providerlist as $prefbase) {
+            $prefbase = clean_param((string) $prefbase, PARAM_ALPHANUMEXT);
+            if ($prefbase === '') {
+                continue;
+            }
+            $channels = $rawmatrix[$prefbase] ?? [];
+            if (!is_array($channels)) {
+                $channels = [];
+            }
+            $matrix[$prefbase] = [
+                'popup' => !empty($channels['popup']),
+                'email' => !empty($channels['email']),
+            ];
+        }
+
+        return [
+            'disable_all' => (bool) optional_param('disable_all', 0, PARAM_BOOL),
+            'matrix' => $matrix,
+        ];
+    }
+
+    /**
+     * Notification preferences — full Web/Email matrix (Moodle storage, LaunchPad chrome).
+     *
+     * No Advanced Moodle escape: fellow/mentor/admin/employer manage prefs here.
      *
      * @return array<string,mixed>
      */
@@ -774,6 +819,8 @@ final class messaging {
         bool $saved = false,
         string $err = ''
     ): array {
+        global $CFG;
+
         $portal = in_array($portal, ['fellow', 'mentor', 'admin', 'employer'], true) ? $portal : 'fellow';
         $back = self::notifications_page_url($portal);
 
@@ -787,75 +834,324 @@ final class messaging {
             ];
         }
 
-        $emailpref = (string) get_user_preferences('message_provider_moodle_instantmessage_enabled', '', $userid);
-        $popupon = $emailpref === '' || strpos($emailpref, 'popup') !== false;
-        $emailon = $emailpref === '' || strpos($emailpref, 'email') !== false;
-        if ($emailpref === 'none') {
-            $popupon = false;
-            $emailon = false;
+        require_once($CFG->dirroot . '/message/lib.php');
+
+        $user = \core_user::get_user($userid, '*', MUST_EXIST);
+        $allprocessors = get_message_processors();
+        $channelnames = self::notification_preference_channels();
+        $channels = [];
+        foreach ($channelnames as $name) {
+            if (empty($allprocessors[$name])) {
+                continue;
+            }
+            $processor = $allprocessors[$name];
+            if (empty($processor->enabled) || empty($processor->configured)) {
+                continue;
+            }
+            $channels[$name] = $processor;
         }
+
+        $providers = message_get_providers_for_user($userid);
+        $preferences = \core_message\api::get_all_message_preferences($allprocessors, $providers, $user);
+        $defaults = get_message_output_default_preferences();
+        $disableall = !empty($user->emailstop);
+
+        $columnheaders = [];
+        foreach ($channels as $name => $processor) {
+            $columnheaders[] = [
+                'name' => $name,
+                'label' => $name === 'popup'
+                    ? get_string('fellowship_notif_pref_web', 'local_launchpad')
+                    : get_string('fellowship_notif_pref_email_short', 'local_launchpad'),
+            ];
+        }
+
+        $colspan = count($columnheaders) + 1;
+        $groups = self::build_notification_preference_groups(
+            $providers,
+            $channels,
+            $preferences,
+            $defaults,
+            $colspan
+        );
 
         return [
             'action_url' => (new \moodle_url(self::portal_path($portal)))->out(false),
             'sesskey' => sesskey(),
             'back_url' => $back,
-            'advanced_url' => self::notification_preferences_url(),
             'has_flash' => $flash !== null,
             'flash' => $flash,
-            'popup_checked' => $popupon,
-            'email_checked' => $emailon,
+            'disable_all_checked' => $disableall,
+            'has_groups' => $groups !== [],
+            'groups' => $groups,
+            'column_headers' => $columnheaders,
+            'column_count' => $colspan,
             'title' => get_string('fellowship_notif_preferences', 'local_launchpad'),
             'help' => get_string('fellowship_notif_prefs_help', 'local_launchpad'),
-            'popup_label' => get_string('fellowship_notif_pref_popup', 'local_launchpad'),
-            'email_label' => get_string('fellowship_notif_pref_email', 'local_launchpad'),
+            'disable_all_label' => get_string('disableall', 'message'),
+            'disable_all_help' => get_string('fellowship_notif_prefs_disable_help', 'local_launchpad'),
+            'provider_col_label' => get_string('fellowship_notif_prefs_provider_col', 'local_launchpad'),
+            'empty_label' => get_string('fellowship_notif_prefs_empty', 'local_launchpad'),
             'save_label' => get_string('fellowship_notif_prefs_save', 'local_launchpad'),
             'back_label' => get_string('fellowship_notif_back_inbox', 'local_launchpad'),
-            'advanced_label' => get_string('fellowship_notif_prefs_advanced', 'local_launchpad'),
         ];
     }
 
     /**
-     * Save simplified notification processor toggles.
+     * Group providers for the LaunchPad prefs matrix (activities → system → other).
      *
-     * @param array<string,mixed> $raw
+     * @param list<\stdClass> $providers
+     * @param array<string,\stdClass> $channels popup/email processors only
+     * @param \stdClass $preferences
+     * @param \stdClass $defaults
+     * @return list<array<string,mixed>>
+     */
+    private static function build_notification_preference_groups(
+        array $providers,
+        array $channels,
+        \stdClass $preferences,
+        \stdClass $defaults,
+        int $colspan
+    ): array {
+        $activitycomponents = [];
+        $othercomponents = [];
+        foreach ($providers as $provider) {
+            $component = (string) ($provider->component ?? '');
+            if ($component === '' || $component === 'moodle') {
+                continue;
+            }
+            if (str_starts_with($component, 'mod_')) {
+                $activitycomponents[] = $component;
+            } else {
+                $othercomponents[] = $component;
+            }
+        }
+        $activitycomponents = array_values(array_unique($activitycomponents));
+        $othercomponents = array_values(array_unique($othercomponents));
+        sort($activitycomponents);
+        sort($othercomponents);
+        $componentorder = array_merge($activitycomponents, ['moodle'], $othercomponents);
+
+        $grouped = [];
+        foreach ($componentorder as $component) {
+            $rows = [];
+            foreach ($providers as $provider) {
+                if ((string) ($provider->component ?? '') !== $component) {
+                    continue;
+                }
+                // Match Moodle notification preferences page: IM belongs to message prefs.
+                if ($component === 'moodle' && (string) ($provider->name ?? '') === 'instantmessage') {
+                    continue;
+                }
+                $prefbase = $component . '_' . $provider->name;
+                if (!empty($defaults->{$prefbase . '_disable'})) {
+                    continue;
+                }
+
+                $channelcells = [];
+                foreach ($channels as $procname => $processor) {
+                    $lockedkey = $procname . '_provider_' . $prefbase . '_locked';
+                    $locked = !empty($defaults->{$lockedkey});
+                    $enabled = self::is_notification_channel_enabled(
+                        $prefbase,
+                        $procname,
+                        $locked,
+                        $preferences,
+                        $defaults
+                    );
+                    $lockedlabel = '';
+                    if ($locked) {
+                        $lockedlabel = $enabled
+                            ? get_string('forcedmessage', 'message')
+                            : get_string('disallowed', 'message');
+                    }
+                    $channelcells[] = [
+                        'name' => $procname,
+                        'prefbase' => $prefbase,
+                        'checked' => $enabled,
+                        'locked' => $locked,
+                        'locked_on' => $locked && $enabled,
+                        'locked_off' => $locked && !$enabled,
+                        'locked_label' => $lockedlabel,
+                        'editable' => !$locked,
+                    ];
+                }
+
+                try {
+                    $displayname = get_string('messageprovider:' . $provider->name, $component);
+                } catch (\Throwable $e) {
+                    $displayname = $prefbase;
+                }
+
+                $rows[] = [
+                    'displayname' => $displayname,
+                    'prefbase' => $prefbase,
+                    'channels' => $channelcells,
+                ];
+            }
+
+            if ($rows === []) {
+                continue;
+            }
+
+            try {
+                $groupname = ($component === 'moodle')
+                    ? get_string('coresystem')
+                    : get_string('pluginname', $component);
+            } catch (\Throwable $e) {
+                $groupname = $component;
+            }
+
+            $grouped[] = [
+                'displayname' => $groupname,
+                'component' => $component,
+                'providers' => $rows,
+                'provider_count' => count($rows),
+                'column_count' => $colspan,
+            ];
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Whether a processor channel is enabled for a provider (user pref or site default).
+     */
+    private static function is_notification_channel_enabled(
+        string $prefbase,
+        string $processorname,
+        bool $locked,
+        \stdClass $preferences,
+        \stdClass $defaults
+    ): bool {
+        $prefkey = $prefbase . '_enabled';
+        if (!$locked && isset($preferences->{$prefkey}) && is_array($preferences->{$prefkey})) {
+            return !empty($preferences->{$prefkey}[$processorname]);
+        }
+
+        $defaultkey = 'message_provider_' . $prefbase . '_enabled';
+        if (!isset($defaults->{$defaultkey}) || $defaults->{$defaultkey} === '' || $defaults->{$defaultkey} === 'none') {
+            return false;
+        }
+        return in_array($processorname, explode(',', (string) $defaults->{$defaultkey}), true);
+    }
+
+    /**
+     * Save LaunchPad notification preference matrix into Moodle user prefs.
+     *
+     * @param array<string,mixed> $raw disable_all + matrix[prefbase][popup|email]
      */
     public static function save_notification_preferences(int $userid, array $raw): string {
-        global $CFG, $DB;
+        global $CFG, $DB, $USER;
 
         if ($userid <= 0) {
             return 'denied';
         }
         require_once($CFG->dirroot . '/message/lib.php');
-        if (!has_capability('moodle/user:editownmessageprofile', \context_system::instance(), $userid)) {
+        require_once($CFG->dirroot . '/user/lib.php');
+
+        $user = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
+        if (!\core_message_can_edit_message_profile($user)) {
             return 'denied';
         }
 
-        $emailon = !empty($raw['email_enabled']) ? 1 : 0;
-        $popupon = !empty($raw['popup_enabled']) ? 1 : 0;
-        $providers = ['moodle_instantmessage', 'moodle_badgeawarded'];
-
-        foreach ($providers as $componentprovider) {
-            $pref = 'message_provider_' . $componentprovider . '_enabled';
-            $enabled = [];
-            if ($popupon) {
-                $enabled[] = 'popup';
+        $disableall = !empty($raw['disable_all']);
+        if ((int) $user->emailstop !== ($disableall ? 1 : 0)) {
+            $update = (object) [
+                'id' => $userid,
+                'emailstop' => $disableall ? 1 : 0,
+            ];
+            user_update_user($update, false, false);
+            if ((int) $USER->id === $userid) {
+                $USER->emailstop = $disableall ? 1 : 0;
             }
-            if ($emailon) {
-                $enabled[] = 'email';
-            }
-            set_user_preference($pref, $enabled === [] ? 'none' : implode(',', $enabled), $userid);
         }
 
-        $processors = $DB->get_records('message_processors', null, '', 'name');
-        foreach (['popup', 'email'] as $proc) {
-            if (!isset($processors[$proc])) {
+        $allprocessors = get_message_processors();
+        $channelnames = self::notification_preference_channels();
+        $available = [];
+        foreach ($channelnames as $name) {
+            if (!empty($allprocessors[$name]) && !empty($allprocessors[$name]->enabled)
+                    && !empty($allprocessors[$name]->configured)) {
+                $available[$name] = true;
+            }
+        }
+
+        $providers = message_get_providers_for_user($userid);
+        $defaults = get_message_output_default_preferences();
+        $matrix = is_array($raw['matrix'] ?? null) ? $raw['matrix'] : [];
+
+        $allowedbases = [];
+        foreach ($providers as $provider) {
+            $component = (string) ($provider->component ?? '');
+            $name = (string) ($provider->name ?? '');
+            if ($component === '' || $name === '') {
                 continue;
             }
-            $on = ($proc === 'popup') ? $popupon : $emailon;
-            foreach ($providers as $componentprovider) {
-                set_user_preference('message_provider_' . $componentprovider . '_loggedin', $on ? $proc : 'none', $userid);
-                set_user_preference('message_provider_' . $componentprovider . '_loggedoff', $on ? $proc : 'none', $userid);
+            if ($component === 'moodle' && $name === 'instantmessage') {
+                continue;
             }
+            $prefbase = $component . '_' . $name;
+            if (!empty($defaults->{$prefbase . '_disable'})) {
+                continue;
+            }
+            $allowedbases[$prefbase] = true;
+        }
+
+        foreach ($matrix as $prefbase => $channels) {
+            $prefbase = clean_param((string) $prefbase, PARAM_ALPHANUMEXT);
+            if ($prefbase === '' || empty($allowedbases[$prefbase])) {
+                continue;
+            }
+            if (!is_array($channels)) {
+                $channels = [];
+            }
+
+            $defaultkey = 'message_provider_' . $prefbase . '_enabled';
+            $defaultparts = [];
+            if (!empty($defaults->{$defaultkey}) && $defaults->{$defaultkey} !== 'none') {
+                $defaultparts = array_filter(array_map('trim', explode(',', (string) $defaults->{$defaultkey})));
+            }
+
+            $userpref = get_user_preferences('message_provider_' . $prefbase . '_enabled', null, $userid);
+            if ($userpref === null || $userpref === '') {
+                $baseline = $defaultparts;
+            } else if ($userpref === 'none') {
+                $baseline = [];
+            } else {
+                $baseline = array_filter(array_map('trim', explode(',', (string) $userpref)));
+            }
+
+            $new = [];
+            foreach ($baseline as $proc) {
+                if ($proc !== '' && !isset($available[$proc])) {
+                    // Preserve processors outside the LaunchPad Web/Email matrix (sms, etc.).
+                    $new[] = $proc;
+                }
+            }
+
+            foreach ($channelnames as $procname) {
+                if (empty($available[$procname])) {
+                    continue;
+                }
+                $locked = !empty($defaults->{$procname . '_provider_' . $prefbase . '_locked'});
+                if ($locked) {
+                    if (in_array($procname, $defaultparts, true)) {
+                        $new[] = $procname;
+                    }
+                    continue;
+                }
+                if (!empty($channels[$procname])) {
+                    $new[] = $procname;
+                }
+            }
+
+            $new = array_values(array_unique($new));
+            set_user_preference(
+                'message_provider_' . $prefbase . '_enabled',
+                $new === [] ? 'none' : implode(',', $new),
+                $userid
+            );
         }
 
         return '';

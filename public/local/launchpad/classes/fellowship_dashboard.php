@@ -2785,10 +2785,20 @@ final class fellowship_dashboard {
      *   items: list<array>,
      *   has_items: bool,
      *   has_posts: bool,
+     *   has_pinned: bool,
      *   count_posts: int,
+     *   count_pinned: int,
      *   count_courses: int,
      *   moodle_news_url: string,
-     *   has_moodle_news: bool
+     *   has_moodle_news: bool,
+     *   filter_label: string,
+     *   filter_all: string,
+     *   filter_pinned: string,
+     *   search_placeholder: string,
+     *   sort_label: string,
+     *   stats_foot: string,
+     *   list_footer: string,
+     *   list_footer_empty: string
      * }
      */
     public static function list_announcements(int $userid, array $courses): array {
@@ -2831,25 +2841,41 @@ final class fellowship_dashboard {
                     }
                     $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
                     $authorname = $author ? fullname($author) : '';
+                    $authorinitials = $author ? self::initials($author) : '';
                     $tagrows = announcement_service::tag_chips_for_post((int) $post->id);
                     $ispinned = (int) ($discussion->pinned ?? 0) === 1;
                     $modcontext = \context_module::instance((int) $cm->id);
                     $attachments = announcement_service::attachment_rows_for_post($modcontext, (int) $post->id);
                     $attachcount = count($attachments);
+                    $subject = format_string($discussion->name);
+                    $coursename = format_string($course->fullname);
+                    $excerpt = shorten_text(format_text(
+                        $post->message,
+                        (int) $post->messageformat,
+                        ['context' => $modcontext, 'para' => false]
+                    ), 180);
+                    $tagnames = [];
+                    foreach ($tagrows as $tagrow) {
+                        $tagnames[] = (string) ($tagrow['name'] ?? '');
+                    }
+                    $searchbits = array_filter([
+                        html_to_text($subject, 0, false),
+                        html_to_text($excerpt, 0, false),
+                        html_to_text($coursename, 0, false),
+                        $authorname,
+                        implode(' ', $tagnames),
+                    ]);
                     $items[] = [
                         'id' => (int) $discussion->id,
-                        'subject' => format_string($discussion->name),
-                        'excerpt' => shorten_text(format_text(
-                            $post->message,
-                            (int) $post->messageformat,
-                            ['context' => $modcontext, 'para' => false]
-                        ), 180),
+                        'subject' => $subject,
+                        'excerpt' => $excerpt,
                         'author' => $authorname,
+                        'author_initials' => $authorinitials,
                         'has_author' => $authorname !== '',
                         'when' => userdate((int) $discussion->timemodified, get_string('strftimedatetimeshort', 'langconfig')),
                         'timemodified' => (int) $discussion->timemodified,
                         'url' => (new \moodle_url('/mod/forum/discuss.php', ['d' => $discussion->id]))->out(false),
-                        'course_name' => format_string($course->fullname),
+                        'course_name' => $coursename,
                         'cta_label' => $ctalabel,
                         'icon' => 'news',
                         'tags' => $tagrows,
@@ -2863,6 +2889,7 @@ final class fellowship_dashboard {
                         'attach_badge' => $attachcount > 0
                             ? get_string('admin_announcements_attach_badge', 'local_launchpad', $attachcount)
                             : '',
+                        'search_text' => \core_text::strtolower(implode(' ', $searchbits)),
                     ];
                 }
             }
@@ -2872,24 +2899,52 @@ final class fellowship_dashboard {
         $items = array_slice($items, 0, 15);
 
         $coursenames = [];
+        $pinnedcount = 0;
         foreach ($items as $item) {
             $name = (string) ($item['course_name'] ?? '');
             if ($name !== '') {
                 $coursenames[$name] = true;
             }
+            if (!empty($item['is_pinned'])) {
+                $pinnedcount++;
+            }
         }
 
         $hasitems = $items !== [];
         $hasmoodlenews = $firstforumurl !== '';
+        $postcount = count($items);
+        $listfooter = $hasitems
+            ? get_string('fellowship_news_list_footer', 'local_launchpad', (object) [
+                'shown' => $postcount,
+                'total' => $postcount,
+            ])
+            : '';
+        // JS-safe pattern: Moodle already interpolates {$a->…} in list_footer.
+        $listfooterpattern = get_string('fellowship_news_list_footer', 'local_launchpad', (object) [
+            'shown' => '{shown}',
+            'total' => '{total}',
+        ]);
 
         return [
             'items' => $items,
             'has_items' => $hasitems,
             'has_posts' => $hasitems,
-            'count_posts' => count($items),
+            'has_pinned' => $pinnedcount > 0,
+            'count_posts' => $postcount,
+            'count_pinned' => $pinnedcount,
             'count_courses' => count($coursenames),
             'moodle_news_url' => $firstforumurl,
             'has_moodle_news' => $hasmoodlenews,
+            'filter_label' => get_string('fellowship_news_filter_label', 'local_launchpad'),
+            'filter_all' => get_string('fellowship_news_filter_all', 'local_launchpad'),
+            'filter_pinned' => get_string('fellowship_news_filter_pinned', 'local_launchpad'),
+            'search_placeholder' => get_string('fellowship_news_search_ph', 'local_launchpad'),
+            'sort_label' => get_string('fellowship_news_sort_newest', 'local_launchpad'),
+            'stats_foot' => get_string('fellowship_news_stats_foot', 'local_launchpad'),
+            'list_footer' => $listfooter,
+            'list_footer_pattern' => $listfooterpattern,
+            'list_footer_empty' => get_string('fellowship_news_list_footer_empty', 'local_launchpad'),
+            'list_filtered_empty' => get_string('fellowship_news_list_filtered_empty', 'local_launchpad'),
         ];
     }
 

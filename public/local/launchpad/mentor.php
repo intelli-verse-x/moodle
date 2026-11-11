@@ -92,10 +92,10 @@ if (($view === 'notifications' || $view === 'notificationprefs')
         ])));
     }
     if ($view === 'notificationprefs' && $naction === 'save_notification_preferences') {
-        $errsave = messaging::save_notification_preferences($userid, [
-            'popup_enabled' => optional_param('popup_enabled', 0, PARAM_BOOL),
-            'email_enabled' => optional_param('email_enabled', 0, PARAM_BOOL),
-        ]);
+        $errsave = messaging::save_notification_preferences(
+            $userid,
+            messaging::notification_preferences_request_payload()
+        );
         redirect(new moodle_url(persona_home::MENTOR_PATH, array_filter([
             'view' => 'notificationprefs',
             'notifprefsaved' => $errsave === '' ? 1 : null,

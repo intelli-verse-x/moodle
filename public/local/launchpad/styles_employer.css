@@ -5650,6 +5650,86 @@ a.lp-emp-gate:focus-visible,
   .lp-notif-layout.is-split .lp-notif-back { display: inline-flex; }
 }
 
+/* Notification preferences matrix (Web / Email) */
+.lp-notif-pref-form .lp-notif-pref-disable-all {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 18px 8px;
+}
+.lp-notif-pref-form:has(#lp-disable-all:checked) .lp-notif-pref-matrix {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.lp-notif-pref-matrix {
+  margin: 4px 18px 8px;
+  overflow-x: auto;
+  border: 1px solid var(--lp-line, #E3E9F4);
+  border-radius: 12px;
+  background: #fff;
+}
+.lp-notif-pref-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 420px;
+}
+.lp-notif-pref-table th,
+.lp-notif-pref-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--lp-line, #E3E9F4);
+  text-align: left;
+  vertical-align: middle;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.lp-notif-pref-table thead th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--lp-muted, #5C667A);
+  background: var(--lp-blue-soft, #F3F6FC);
+}
+.lp-notif-pref-table .lp-notif-pref-channel {
+  width: 88px;
+  text-align: center;
+}
+.lp-notif-pref-group th {
+  background: var(--lp-blue-soft, #F3F6FC);
+  color: var(--lp-ink, #0D1429);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.lp-notif-pref-row th {
+  font-weight: 600;
+  color: var(--lp-ink, #0D1429);
+}
+.lp-notif-pref-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+.lp-notif-pref-toggle input {
+  width: auto;
+  margin: 0;
+}
+.lp-notif-pref-locked {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--lp-muted, #5C667A);
+}
+.lp-notif-pref-locked.is-on {
+  color: var(--lp-blue, #1A61F2);
+}
+.lp-notif-pref-table tbody tr:last-child th,
+.lp-notif-pref-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 /* Wrong-portal mismatch modal (over the user's real home). */
 .lp-portal-mismatch {
   position: fixed;
