@@ -54,6 +54,64 @@
         </table>
       </div>
     </section>
+
+    <section class="lp-card soft lp-st-danger" aria-label="{{danger_title}}">
+      <div class="lp-card-head">
+        <h3>{{danger_title}}</h3>
+        <p class="lp-muted lp-sm">{{danger_lead}}</p>
+      </div>
+      <div class="lp-st-danger-list">
+        {{#existing_rows}}
+          <article class="lp-st-danger-row">
+            <div class="lp-st-danger-meta">
+              <p class="lp-st-danger-name"><b>{{fullname}}</b>
+                <span class="lp-muted lp-sm"> · {{kind_label}}</span>
+              </p>
+              <p class="lp-sm lp-muted">
+                <code class="lp-tr-idn">{{idnumber}}</code>
+                · {{enrol_count_label}}
+                ·
+                <span class="lp-st-vis{{#is_visible}} is-on{{/is_visible}}{{^is_visible}} is-off{{/is_visible}}">{{visibility_label}}</span>
+              </p>
+            </div>
+            <div class="lp-st-danger-actions">
+              {{#is_visible}}
+                <form method="post" action="{{form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_hide">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{courseid}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{danger_hide_label}}</button>
+                </form>
+                <p class="lp-sm lp-muted">{{danger_delete_need_hide}}</p>
+              {{/is_visible}}
+              {{#is_hidden}}
+                <form method="post" action="{{form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_unhide">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{courseid}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{danger_unhide_label}}</button>
+                </form>
+                <form method="post" action="{{form_action}}" class="lp-st-danger-delete">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_delete">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{courseid}}">
+                  <p class="lp-sm lp-st-danger-warn">{{danger_delete_warn}}</p>
+                  <label class="lp-field">
+                    <span>{{danger_confirm_label}}</span>
+                    <input type="text" name="confirmtext" value="" required maxlength="200" autocomplete="off" placeholder="{{idnumber}}">
+                  </label>
+                  <p class="lp-sm lp-muted">{{danger_confirm_help}}</p>
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{danger_delete_label}}</button>
+                </form>
+              {{/is_hidden}}
+            </div>
+          </article>
+        {{/existing_rows}}
+      </div>
+    </section>
   {{/has_existing}}
 
   <div class="lp-st-grid">

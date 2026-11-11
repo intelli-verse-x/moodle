@@ -12859,8 +12859,52 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.lp-st-danger {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  border-color: color-mix(in srgb, #b42318 28%, transparent);
+}
+.lp-st-danger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lp-st-danger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 12px 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e6edf5;
+  background: #fff;
+}
+.lp-st-danger-name {
+  margin: 0 0 4px;
+}
+.lp-st-danger-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.lp-st-danger-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, #b42318 18%, transparent);
+}
+.lp-st-danger-warn {
+  margin: 0;
+  color: #912018;
+  font-weight: 600;
+}
 @media (max-width: 900px) {
   .lp-st-grid {
+    grid-template-columns: 1fr;
+  }
+  .lp-st-danger-row {
     grid-template-columns: 1fr;
   }
 }

@@ -454,18 +454,29 @@ $crumbhome = [
 ];
 
 $selected = null;
+$trackunavailable = false;
 if ($courseid > 0) {
-    if (!in_array($courseid, $courseids, true) && !is_siteadmin()) {
-        throw new \moodle_exception('fellowship_course_denied', 'local_launchpad');
-    }
     foreach ($courses as $c) {
         if ((int) $c->id === $courseid) {
             $selected = $c;
             break;
         }
     }
-    if ($selected === null && is_siteadmin()) {
-        $selected = get_course($courseid);
+    if ($selected === null) {
+        // Hidden, deleted, or not enrolled: LaunchPad-friendly empty — never raw Moodle error.
+        $courseexists = $DB->record_exists('course', ['id' => $courseid]);
+        if ($courseexists && is_siteadmin()) {
+            try {
+                $selected = get_course($courseid);
+            } catch (\Throwable $e) {
+                $selected = null;
+                $trackunavailable = true;
+                $courseid = 0;
+            }
+        } else {
+            $trackunavailable = true;
+            $courseid = 0;
+        }
     }
 } else if ($courses !== []) {
     // Prefer a track course over Shared orientation when no ?id= is given.
@@ -507,6 +518,12 @@ $nocourses = $lpstr(
     null,
     'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.'
 );
+$trackgone = $lpstr(
+    'fellowship_track_unavailable',
+    null,
+    'This track is no longer available. It may have been hidden or removed by your programme admin.'
+);
+$emptycoursesmessage = $trackunavailable ? $trackgone : $nocourses;
 
 switch ($view) {
     case 'activity':
@@ -686,10 +703,15 @@ switch ($view) {
         break;
 
     case 'track':
-        $pagetitle = $lpstr('fellowship_nav_track', null, 'My track');
+        $pagetitle = $trackunavailable
+            ? $lpstr('fellowship_track_unavailable_heading', null, 'Track unavailable')
+            : $lpstr('fellowship_nav_track', null, 'My track');
         if ($selected === null) {
             $content = $OUTPUT->render_from_template('local_launchpad/fellowship_empty_courses', [
-                'message' => $nocourses,
+                'heading' => $trackunavailable
+                    ? $lpstr('fellowship_track_unavailable_heading', null, 'Track unavailable')
+                    : '',
+                'message' => $emptycoursesmessage,
             ]);
         } else {
             $trackdata = fellowship_dashboard::track_for_user($userid, $selected);

@@ -57,6 +57,15 @@ final class admin_dashboard {
     }
 
     /**
+     * Whether an idnumber is a LaunchPad structure course (track or orientation).
+     */
+    public static function is_structure_idnumber(string $idnumber): bool {
+        $idnumber = strtolower(trim($idnumber));
+        return $idnumber !== ''
+            && str_starts_with($idnumber, account_persona::COURSE_IDNUMBER_PREFIX);
+    }
+
+    /**
      * Overview page context from live Moodle data.
      *
      * @param \stdClass $user
@@ -377,6 +386,16 @@ final class admin_dashboard {
             'existing_col_kind' => get_string('admin_structure_existing_col_kind', 'local_launchpad'),
             'existing_col_visibility' => get_string('admin_structure_existing_col_visibility', 'local_launchpad'),
             'existing_rows' => $existing,
+            'danger_title' => get_string('admin_structure_danger_title', 'local_launchpad'),
+            'danger_lead' => get_string('admin_structure_danger_lead', 'local_launchpad'),
+            'danger_hide_label' => get_string('admin_structure_danger_hide', 'local_launchpad'),
+            'danger_unhide_label' => get_string('admin_structure_danger_unhide', 'local_launchpad'),
+            'danger_delete_label' => get_string('admin_structure_danger_delete', 'local_launchpad'),
+            'danger_delete_warn' => get_string('admin_structure_danger_delete_warn', 'local_launchpad'),
+            'danger_delete_need_hide' => get_string('admin_structure_danger_need_hide', 'local_launchpad'),
+            'danger_confirm_label' => get_string('admin_structure_danger_confirm_label', 'local_launchpad'),
+            'danger_confirm_help' => get_string('admin_structure_danger_confirm_help', 'local_launchpad'),
+            'danger_enrol_label' => get_string('admin_structure_danger_enrol_label', 'local_launchpad'),
             'show_builder_cta' => $applied || $trackcount > 0 || $hasexisting,
             'show_cohorts_cta' => $hasexisting || $trackcount > 0,
             'flash_ok' => !empty($flash['ok']),
@@ -395,7 +414,7 @@ final class admin_dashboard {
     /**
      * Existing orientation + track courses for a cohort label (by idnumber slug).
      *
-     * @return list<array{fullname:string,idnumber:string,kind_label:string,visibility_label:string,is_visible:bool,is_orientation:bool}>
+     * @return list<array<string, mixed>>
      */
     public static function structure_existing_rows(string $cohort): array {
         try {
@@ -407,17 +426,7 @@ final class admin_dashboard {
         $rows = [];
         $orient = self::orientation_course_for_slug($slug);
         if ($orient) {
-            $visible = (int) ($orient->visible ?? 0) === 1;
-            $rows[] = [
-                'fullname' => format_string($orient->fullname),
-                'idnumber' => (string) ($orient->idnumber ?? ''),
-                'kind_label' => get_string('admin_structure_kind_orientation', 'local_launchpad'),
-                'visibility_label' => $visible
-                    ? get_string('admin_visibility_badge_live', 'local_launchpad')
-                    : get_string('admin_visibility_badge_hidden', 'local_launchpad'),
-                'is_visible' => $visible,
-                'is_orientation' => true,
-            ];
+            $rows[] = self::structure_danger_row($orient, true);
         }
 
         foreach (self::list_track_courses() as $course) {
@@ -425,20 +434,39 @@ final class admin_dashboard {
             if ($courseslug !== $slug) {
                 continue;
             }
-            $visible = (int) ($course->visible ?? 0) === 1;
-            $rows[] = [
-                'fullname' => format_string($course->fullname),
-                'idnumber' => (string) ($course->idnumber ?? ''),
-                'kind_label' => get_string('admin_structure_kind_track', 'local_launchpad'),
-                'visibility_label' => $visible
-                    ? get_string('admin_visibility_badge_live', 'local_launchpad')
-                    : get_string('admin_visibility_badge_hidden', 'local_launchpad'),
-                'is_visible' => $visible,
-                'is_orientation' => false,
-            ];
+            $rows[] = self::structure_danger_row($course, false);
         }
 
         return $rows;
+    }
+
+    /**
+     * One Structure status / danger-zone row for a LaunchPad course.
+     *
+     * @return array<string, mixed>
+     */
+    private static function structure_danger_row(\stdClass $course, bool $isorientation): array {
+        $visible = (int) ($course->visible ?? 0) === 1;
+        $courseid = (int) ($course->id ?? 0);
+        $enrolcount = self::fellow_count($courseid);
+        return [
+            'courseid' => $courseid,
+            'fullname' => format_string($course->fullname),
+            'shortname' => (string) ($course->shortname ?? ''),
+            'idnumber' => (string) ($course->idnumber ?? ''),
+            'kind_label' => $isorientation
+                ? get_string('admin_structure_kind_orientation', 'local_launchpad')
+                : get_string('admin_structure_kind_track', 'local_launchpad'),
+            'visibility_label' => $visible
+                ? get_string('admin_visibility_badge_live', 'local_launchpad')
+                : get_string('admin_visibility_badge_hidden', 'local_launchpad'),
+            'is_visible' => $visible,
+            'is_hidden' => !$visible,
+            'is_orientation' => $isorientation,
+            'enrol_count' => $enrolcount,
+            'enrol_count_label' => get_string('admin_structure_danger_enrols', 'local_launchpad', $enrolcount),
+            'can_delete' => !$visible,
+        ];
     }
 
     /**
@@ -543,6 +571,171 @@ final class admin_dashboard {
                 'cohort' => $label,
             ];
         }
+    }
+
+    /**
+     * Resolve a LaunchPad track or orientation course by id for Structure danger zone.
+     */
+    public static function resolve_structure_course(int $courseid): ?\stdClass {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return null;
+        }
+        $course = $DB->get_record('course', ['id' => $courseid], '*', IGNORE_MISSING);
+        if (!$course || !self::is_structure_idnumber((string) ($course->idnumber ?? ''))) {
+            return null;
+        }
+        return $course;
+    }
+
+    /**
+     * Hide or unhide a LaunchPad structure course (track or orientation).
+     *
+     * @return array{ok?:string,error?:string,cohort:string}
+     */
+    public static function run_structure_set_visible(
+        \stdClass $actor,
+        int $courseid,
+        bool $visible,
+        string $cohort
+    ): array {
+        global $CFG;
+
+        $label = trim($cohort);
+        $out = static function (?string $ok, ?string $error) use ($label): array {
+            $flash = ['cohort' => $label];
+            if ($ok !== null) {
+                $flash['ok'] = $ok;
+            }
+            if ($error !== null) {
+                $flash['error'] = $error;
+            }
+            return $flash;
+        };
+
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return $out(null, get_string('admin_err_capability', 'local_launchpad'));
+        }
+
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        $course = self::resolve_structure_course($courseid);
+        if ($course === null) {
+            return $out(null, get_string('admin_structure_danger_err_course', 'local_launchpad'));
+        }
+
+        $ctx = \context_course::instance($courseid);
+        if (!has_capability('moodle/course:visibility', $ctx, $actor)
+                && !has_capability('moodle/course:update', $ctx, $actor)) {
+            return $out(null, get_string('admin_courseops_err_cap_visibility', 'local_launchpad'));
+        }
+
+        $want = $visible ? 1 : 0;
+        if ((int) ($course->visible ?? 0) === $want) {
+            return $out(
+                $visible
+                    ? get_string('admin_structure_danger_unhide_ok', 'local_launchpad', format_string($course->fullname))
+                    : get_string('admin_structure_danger_hide_ok', 'local_launchpad', format_string($course->fullname)),
+                null
+            );
+        }
+
+        try {
+            update_course((object) [
+                'id' => $courseid,
+                'visible' => $want,
+            ]);
+        } catch (\Throwable $e) {
+            return $out(null, self::flash_error_message($e));
+        }
+
+        return $out(
+            $visible
+                ? get_string('admin_structure_danger_unhide_ok', 'local_launchpad', format_string($course->fullname))
+                : get_string('admin_structure_danger_hide_ok', 'local_launchpad', format_string($course->fullname)),
+            null
+        );
+    }
+
+    /**
+     * Permanently delete a LaunchPad structure course after type-confirm.
+     * Requires the course to be hidden first. Confirm must match shortname or idnumber.
+     *
+     * @return array{ok?:string,error?:string,cohort:string}
+     */
+    public static function run_structure_delete(
+        \stdClass $actor,
+        int $courseid,
+        string $confirmtext,
+        string $cohort
+    ): array {
+        global $CFG;
+
+        $label = trim($cohort);
+        $out = static function (?string $ok, ?string $error) use ($label): array {
+            $flash = ['cohort' => $label];
+            if ($ok !== null) {
+                $flash['ok'] = $ok;
+            }
+            if ($error !== null) {
+                $flash['error'] = $error;
+            }
+            return $flash;
+        };
+
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return $out(null, get_string('admin_err_capability', 'local_launchpad'));
+        }
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/moodlelib.php');
+
+        $course = self::resolve_structure_course($courseid);
+        if ($course === null) {
+            return $out(null, get_string('admin_structure_danger_err_course', 'local_launchpad'));
+        }
+
+        $ctx = \context_course::instance($courseid);
+        if (!has_capability('moodle/course:delete', $ctx, $actor)) {
+            return $out(null, get_string('admin_structure_danger_err_cap_delete', 'local_launchpad'));
+        }
+
+        if ((int) ($course->visible ?? 0) === 1) {
+            return $out(null, get_string('admin_structure_danger_err_not_hidden', 'local_launchpad'));
+        }
+
+        $confirm = trim($confirmtext);
+        $shortname = trim((string) ($course->shortname ?? ''));
+        $idnumber = trim((string) ($course->idnumber ?? ''));
+        $matched = $confirm !== '' && (
+            \core_text::strtolower($confirm) === \core_text::strtolower($shortname)
+            || \core_text::strtolower($confirm) === \core_text::strtolower($idnumber)
+        );
+        if (!$matched) {
+            // Wrong confirm is a no-op with a clear error — course stays.
+            return $out(null, get_string('admin_structure_danger_err_confirm', 'local_launchpad'));
+        }
+
+        $displayname = format_string($course->fullname);
+        $idnumberlabel = $idnumber;
+
+        try {
+            $ok = delete_course($course, false);
+        } catch (\Throwable $e) {
+            return $out(null, self::flash_error_message($e));
+        }
+        if (!$ok) {
+            return $out(null, get_string('admin_structure_danger_err_delete', 'local_launchpad'));
+        }
+
+        return $out(
+            get_string('admin_structure_danger_delete_ok', 'local_launchpad', (object) [
+                'name' => $displayname,
+                'idnumber' => $idnumberlabel,
+            ]),
+            null
+        );
     }
 
     /**

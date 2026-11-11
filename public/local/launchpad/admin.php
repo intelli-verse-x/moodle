@@ -127,6 +127,26 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
     }
+    if ($view === 'structure' && ($action === 'structure_hide' || $action === 'structure_unhide')) {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $courseid = optional_param('courseid', 0, PARAM_INT);
+        $flash = admin_dashboard::run_structure_set_visible(
+            $USER,
+            $courseid,
+            $action === 'structure_unhide',
+            $cohort
+        );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+    }
+    if ($view === 'structure' && $action === 'structure_delete') {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $courseid = optional_param('courseid', 0, PARAM_INT);
+        $confirmtext = optional_param('confirmtext', '', PARAM_TEXT);
+        $flash = admin_dashboard::run_structure_delete($USER, $courseid, $confirmtext, $cohort);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+    }
     if ($view === 'courseops' && $action === 'save_course_settings') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $fullname = optional_param('fullname', '', PARAM_TEXT);

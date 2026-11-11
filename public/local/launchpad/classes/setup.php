@@ -136,8 +136,8 @@ final class setup {
     private function line(string $message): void {
         $this->log[] = $message;
         // Web/admin callers use get_log(); CLI setup_structure still prints.
-        if (defined('CLI_SCRIPT') && CLI_SCRIPT) {
-            cli_writeln($message);
+        if (defined('CLI_SCRIPT') && CLI_SCRIPT && \function_exists('cli_writeln')) {
+            \cli_writeln($message);
         }
     }
 
