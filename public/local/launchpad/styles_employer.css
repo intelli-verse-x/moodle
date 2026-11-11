@@ -5791,29 +5791,10 @@ body.lp-portal-mismatch-lock {
   .lp-card.lift:hover { transform: none; }
 }
 
-/* Notification dropdown (shared with Fellowship compare chrome). */
-.lp-notif-pair {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
+/* Notification dropdown (portal topbar). */
 .lp-notif-dd { position: relative; }
 .lp-notif-toggle { cursor: pointer; }
 .lp-notif-dot.is-hidden { display: none; }
-.lp-notif-moodle-ref {
-  width: auto;
-  min-width: 40px;
-  padding: 0 8px;
-  gap: 4px;
-  grid-auto-flow: column;
-}
-.lp-notif-ref-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .02em;
-  color: var(--lp-muted, #5C667A);
-  text-transform: uppercase;
-}
 .lp-notif-panel {
   position: absolute;
   top: calc(100% + 8px);

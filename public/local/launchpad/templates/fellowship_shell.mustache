@@ -27,22 +27,7 @@
             <b>{{xp_total}}</b> <span>XP</span>
           </a>
         {{/has_courses}}
-        <div class="lp-notif-pair" data-region="lp-notif-compare">
-          {{> local_launchpad/notification_dropdown }}
-          <a class="lp-iconbtn lp-notif-moodle-ref"
-             href="{{notif_moodle_compare_url}}"
-             aria-label="{{#str}} fellowship_notif_moodle_ref, local_launchpad {{/str}}"
-             title="{{#str}} fellowship_notif_moodle_ref, local_launchpad {{/str}}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-              <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/>
-              <path d="M10 20a2 2 0 004 0"/>
-            </svg>
-            {{#has_unread_notifications}}
-              <span class="lp-notif-dot">{{unread_notifications}}</span>
-            {{/has_unread_notifications}}
-            <span class="lp-notif-ref-tag">Moodle</span>
-          </a>
-        </div>
+        {{> local_launchpad/notification_dropdown }}
         {{> local_launchpad/profile_menu }}
       </div>
     </header>

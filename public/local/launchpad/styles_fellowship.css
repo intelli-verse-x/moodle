@@ -463,11 +463,6 @@ body.local-launchpad-mentor {
 }
 .lp-iconbtn svg { width: 18px; height: 18px; }
 .lp-iconbtn:hover { background: var(--lp-blue-softer); border-color: var(--lp-blue-soft); }
-.lp-notif-pair {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .lp-notif-dd {
   position: relative;
 }
@@ -491,20 +486,6 @@ body.local-launchpad-mentor {
   line-height: 1;
 }
 .lp-notif-dot.is-hidden { display: none; }
-.lp-notif-moodle-ref {
-  width: auto;
-  min-width: 40px;
-  padding: 0 8px;
-  gap: 4px;
-  grid-auto-flow: column;
-}
-.lp-notif-ref-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .02em;
-  color: var(--lp-muted, #5C667A);
-  text-transform: uppercase;
-}
 .lp-notif-panel {
   position: absolute;
   top: calc(100% + 8px);
