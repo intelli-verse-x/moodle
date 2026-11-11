@@ -128,57 +128,59 @@
                   <iconify-icon class="lp-phase-chev" icon="hugeicons:arrow-up-01" width="18" height="18" aria-hidden="true"></iconify-icon>
                 </summary>
                 <div class="lp-phase-body">
-                  {{#released}}
-                    {{#has_activities}}
-                      <ul class="lp-act-cards">
-                        {{#activities}}
-                          <li>
-                            {{#is_locked}}
-                              <div class="lp-act-card is-locked" aria-disabled="true" title="{{unlock_reason}}">
-                                <span class="lp-act-k tone-{{tone}}">{{meta}}</span>
-                                <span class="lp-act-card-row">
-                                  <span class="lp-act-ico tone-{{tone}}" aria-hidden="true">
-                                    <iconify-icon icon="hugeicons:square-lock-02" width="18" height="18"></iconify-icon>
+                  <div class="lp-phase-scroll">
+                    {{#released}}
+                      {{#has_activities}}
+                        <ul class="lp-act-cards">
+                          {{#activities}}
+                            <li>
+                              {{#is_locked}}
+                                <div class="lp-act-card is-locked" aria-disabled="true" title="{{unlock_reason}}">
+                                  <span class="lp-act-k tone-{{tone}}">{{meta}}</span>
+                                  <span class="lp-act-card-row">
+                                    <span class="lp-act-ico tone-{{tone}}" aria-hidden="true">
+                                      <iconify-icon icon="hugeicons:square-lock-02" width="18" height="18"></iconify-icon>
+                                    </span>
+                                    <span class="lp-act-card-main">
+                                      <b>{{{name}}}</b>
+                                      <span class="lp-sm lp-muted">{{unlock_reason}}</span>
+                                    </span>
+                                    <span class="lp-chip line">{{#str}} fellowship_sequence_locked_chip, local_launchpad {{/str}}</span>
                                   </span>
-                                  <span class="lp-act-card-main">
-                                    <b>{{{name}}}</b>
-                                    <span class="lp-sm lp-muted">{{unlock_reason}}</span>
+                                </div>
+                              {{/is_locked}}
+                              {{^is_locked}}
+                                <a class="lp-act-card{{#complete}} is-done{{/complete}}" href="{{url}}">
+                                  <span class="lp-act-k tone-{{tone}}">{{meta}}</span>
+                                  <span class="lp-act-card-row">
+                                    <span class="lp-act-ico tone-{{tone}}" aria-hidden="true">
+                                      <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+                                    </span>
+                                    <span class="lp-act-card-main">
+                                      <b>{{{name}}}</b>
+                                    </span>
+                                    {{#show_status}}
+                                      <span class="lp-chip{{#status_chip}} {{status_chip}}{{/status_chip}}{{^status_chip}} {{statustone}}{{/status_chip}}">{{status_label}}</span>
+                                    {{/show_status}}
+                                    {{^show_status}}
+                                      <span class="lp-chip {{statustone}}">{{status_label}}</span>
+                                    {{/show_status}}
+                                    <iconify-icon class="lp-act-chev" icon="hugeicons:arrow-right-01" width="18" height="18" aria-hidden="true"></iconify-icon>
                                   </span>
-                                  <span class="lp-chip line">{{#str}} fellowship_sequence_locked_chip, local_launchpad {{/str}}</span>
-                                </span>
-                              </div>
-                            {{/is_locked}}
-                            {{^is_locked}}
-                              <a class="lp-act-card{{#complete}} is-done{{/complete}}" href="{{url}}">
-                                <span class="lp-act-k tone-{{tone}}">{{meta}}</span>
-                                <span class="lp-act-card-row">
-                                  <span class="lp-act-ico tone-{{tone}}" aria-hidden="true">
-                                    <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
-                                  </span>
-                                  <span class="lp-act-card-main">
-                                    <b>{{{name}}}</b>
-                                  </span>
-                                  {{#show_status}}
-                                    <span class="lp-chip{{#status_chip}} {{status_chip}}{{/status_chip}}{{^status_chip}} {{statustone}}{{/status_chip}}">{{status_label}}</span>
-                                  {{/show_status}}
-                                  {{^show_status}}
-                                    <span class="lp-chip {{statustone}}">{{status_label}}</span>
-                                  {{/show_status}}
-                                  <iconify-icon class="lp-act-chev" icon="hugeicons:arrow-right-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-                                </span>
-                              </a>
-                            {{/is_locked}}
-                          </li>
-                        {{/activities}}
-                      </ul>
-                    {{/has_activities}}
-                    {{^has_activities}}
-                      <p class="lp-sm lp-muted">{{#str}} fellowship_no_activities, local_launchpad {{/str}}</p>
-                    {{/has_activities}}
-                  {{/released}}
-                  {{^released}}
-                    <p class="lp-sm lp-muted">{{locked_note}}</p>
-                  {{/released}}
+                                </a>
+                              {{/is_locked}}
+                            </li>
+                          {{/activities}}
+                        </ul>
+                      {{/has_activities}}
+                      {{^has_activities}}
+                        <p class="lp-sm lp-muted">{{#str}} fellowship_no_activities, local_launchpad {{/str}}</p>
+                      {{/has_activities}}
+                    {{/released}}
+                    {{^released}}
+                      <p class="lp-sm lp-muted">{{locked_note}}</p>
+                    {{/released}}
+                  </div>
                 </div>
               </details>
             </li>

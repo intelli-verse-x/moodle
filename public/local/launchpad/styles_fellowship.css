@@ -1667,6 +1667,47 @@ body.local-launchpad-mentor {
   margin: 4px 0 0;
   padding: 0;
 }
+/* Home Current gate: header separated from list; list scrolls with soft bottom cut. */
+[data-region="fellowship-scoped"] > .lp-card-head {
+  margin-bottom: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--lp-line);
+  box-shadow: 0 10px 14px -14px rgba(23, 33, 51, .22);
+}
+[data-region="fellowship-scoped"] .lp-scoped-scroll {
+  position: relative;
+  margin-top: 0;
+  padding-top: 6px;
+}
+[data-region="fellowship-scoped"] .lp-scoped-scroll .lp-act-rows {
+  max-height: min(20rem, 42vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  margin: 0;
+  padding-right: 4px;
+  padding-bottom: 10px;
+}
+[data-region="fellowship-scoped"] .lp-scoped-scroll .lp-act-rows::-webkit-scrollbar {
+  width: 8px;
+}
+[data-region="fellowship-scoped"] .lp-scoped-scroll .lp-act-rows::-webkit-scrollbar-thumb {
+  background: rgba(23, 33, 51, .18);
+  border-radius: 999px;
+}
+[data-region="fellowship-scoped"] .lp-scoped-scroll .lp-act-rows::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-region="fellowship-scoped"] .lp-scoped-scroll::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #fff 78%);
+}
 .lp-act-rows > li + li { border-top: 1px solid var(--lp-line); }
 .lp-act-row {
   display: grid;
@@ -4006,8 +4047,55 @@ body.local-launchpad-mentor {
 .lp-course-outline .lp-phase-body {
   padding: 0 16px 16px;
 }
+/* Open phase: hairline + soft smoke under the heading so title and activities stay separate. */
+.lp-course-outline .lp-phase-acc[open] > summary {
+  border-bottom: 1px solid var(--lp-line);
+  box-shadow: 0 10px 14px -14px rgba(23, 33, 51, .22);
+}
+.lp-course-outline .lp-phase-acc[open] .lp-phase-body {
+  position: relative;
+  padding: 12px 16px 0;
+}
+.lp-course-outline .lp-phase-acc[open] .lp-phase-scroll {
+  max-height: min(20rem, 42vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 10px;
+  padding-bottom: 12px;
+}
+.lp-course-outline .lp-phase-acc[open] .lp-phase-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.lp-course-outline .lp-phase-acc[open] .lp-phase-scroll::-webkit-scrollbar-thumb {
+  background: rgba(23, 33, 51, .18);
+  border-radius: 999px;
+}
+.lp-course-outline .lp-phase-acc[open] .lp-phase-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* Light fade only at the scroll cut — main separator is under the heading. */
+.lp-course-outline .lp-phase-acc[open] .lp-phase-body::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 0;
+  height: 28px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #fff 78%);
+}
 .lp-course-outline .lp-phase-acc.is-off .lp-phase-body {
   padding-left: 16px;
+}
+.lp-course-outline .lp-phase-acc.is-off .lp-phase-body::after,
+.lp-course-outline .lp-phase-acc:not([open]) .lp-phase-body::after {
+  display: none;
+}
+.lp-course-outline .lp-phase-acc.is-off .lp-phase-scroll {
+  max-height: none;
+  overflow: visible;
+  padding-bottom: 0;
 }
 .lp-act-cards {
   list-style: none;
