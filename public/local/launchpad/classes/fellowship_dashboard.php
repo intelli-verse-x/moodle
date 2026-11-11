@@ -3449,16 +3449,21 @@ final class fellowship_dashboard {
                     $attention++;
                 }
 
+                // Pill text mirrors color: Done (green ≥70) vs Below pass bar (orange <70).
                 $statuslabel = match ($status) {
                     'pending' => get_string('fellowship_feedback_status_pending', 'local_launchpad'),
-                    'reviewed' => get_string('fellowship_feedback_status_reviewed', 'local_launchpad'),
+                    'reviewed' => $passedgate
+                        ? get_string('fellowship_feedback_status_done', 'local_launchpad')
+                        : get_string('fellowship_feedback_status_below', 'local_launchpad'),
                     'changes' => get_string('fellowship_feedback_status_changes', 'local_launchpad'),
                     default => get_string('fellowship_feedback_status_none', 'local_launchpad'),
                 };
 
                 $summary = match ($status) {
                     'pending' => get_string('fellowship_feedback_summary_pending', 'local_launchpad'),
-                    'reviewed' => get_string('fellowship_feedback_summary_reviewed', 'local_launchpad'),
+                    'reviewed' => $passedgate
+                        ? get_string('fellowship_feedback_summary_reviewed_done', 'local_launchpad')
+                        : get_string('fellowship_feedback_summary_reviewed_below', 'local_launchpad'),
                     'changes' => get_string('fellowship_feedback_summary_changes', 'local_launchpad'),
                     default => get_string('fellowship_feedback_summary_none', 'local_launchpad'),
                 };

@@ -250,20 +250,22 @@
         </div>
       </div>
       {{#has_xp_log}}
-        <ul class="lp-xp-history-list">
-          {{#xp_log}}
-            <li class="lp-xp-history-row">
-              <span class="lp-xp-history-icon" aria-hidden="true">
-                <iconify-icon icon="hugeicons:flash" width="18" height="18"></iconify-icon>
-              </span>
-              <span class="lp-xp-history-copy">
-                <b>{{title}}</b>
-                <small class="lp-muted">{{at}}</small>
-              </span>
-              <span class="lp-xp-chip lp-xp-chip-static lp-xp-chip-sm">+{{xp}}</span>
-            </li>
-          {{/xp_log}}
-        </ul>
+        <div class="lp-xp-history-scroll">
+          <ul class="lp-xp-history-list">
+            {{#xp_log}}
+              <li class="lp-xp-history-row">
+                <span class="lp-xp-history-icon" aria-hidden="true">
+                  <iconify-icon icon="hugeicons:flash" width="18" height="18"></iconify-icon>
+                </span>
+                <span class="lp-xp-history-copy">
+                  <b>{{title}}</b>
+                  <small class="lp-muted">{{at}}</small>
+                </span>
+                <span class="lp-xp-chip lp-xp-chip-static lp-xp-chip-sm">+{{xp}}</span>
+              </li>
+            {{/xp_log}}
+          </ul>
+        </div>
       {{/has_xp_log}}
       {{^has_xp_log}}
         <div class="lp-xp-empty-state">
