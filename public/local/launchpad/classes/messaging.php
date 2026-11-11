@@ -435,7 +435,6 @@ final class messaging {
             'unread_notifications' => $unread,
             'has_unread_notifications' => $unread > 0,
             'notif_limit' => 20,
-            'notif_moodle_compare_url' => self::moodle_notifications_url(),
         ];
     }
 

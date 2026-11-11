@@ -811,7 +811,6 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'str_signout' => get_string('fellowship_nav_signout', 'local_launchpad'),
     'str_menu' => get_string('fellowship_menu', 'local_launchpad'),
     'str_account' => get_string('fellowship_nav_account', 'local_launchpad'),
-    'str_notif_moodle_ref' => get_string('fellowship_notif_moodle_ref', 'local_launchpad'),
 ], messaging::notification_dropdown_context($userid, 'admin'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
