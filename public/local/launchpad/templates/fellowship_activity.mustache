@@ -1,8 +1,7 @@
 {{!
     @template local_launchpad/fellowship_activity
 
-    Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource in-shell;
-    quiz/assign open Moodle engine from CTA).
+    Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource/quiz/assign in-shell).
 }}
 {{#activity}}
   <div class="lp-activity-page" data-region="fellowship-activity">
@@ -175,6 +174,108 @@
         {{/isinportal}}
 
         {{#is_quiz}}
+          {{#quiz_attempting}}
+            <div class="lp-quiz-attempt" data-region="quiz-attempt" data-timeleft="{{attempt_timeleft}}">
+              <div class="lp-quiz-attempt-bar">
+                <span class="lp-quiz-attempt-page">{{attempt_page_label}}</span>
+                {{#attempt_has_timer}}
+                  <span class="lp-quiz-attempt-timer" data-lp-quiz-timer>{{attempt_timeleft_label}}</span>
+                {{/attempt_has_timer}}
+              </div>
+              <form method="post" action="{{attempt_form_action}}" class="lp-quiz-attempt-form" data-lp-quiz-form data-confirm-finish="{{strings.quizconfirmfinish}}">
+                <input type="hidden" name="sesskey" value="{{attempt_sesskey}}">
+                <input type="hidden" name="action" value="quiz_process">
+                <input type="hidden" name="cmid" value="{{attempt_cmid}}">
+                <input type="hidden" name="attempt" value="{{attemptid}}">
+                <input type="hidden" name="thispage" value="{{attempt_page}}">
+                <input type="hidden" name="nextpage" value="{{attempt_nextpage}}">
+                <input type="hidden" name="timeup" value="0" data-lp-quiz-timeup>
+                {{#attempt_questions}}
+                  <div class="lp-quiz-question" data-slot="{{slot}}">{{{html}}}</div>
+                {{/attempt_questions}}
+                <div class="lp-quiz-attempt-actions">
+                  {{#attempt_has_prev}}
+                    <button type="submit" name="previous" value="1" class="lp-btn lp-btn-light">{{strings.quizprev}}</button>
+                  {{/attempt_has_prev}}
+                  {{^attempt_is_last}}
+                    <button type="submit" name="next" value="1" class="lp-btn lp-btn-solid">{{strings.quiznext}}</button>
+                  {{/attempt_is_last}}
+                  {{#attempt_is_last}}
+                    <button type="submit" name="opensummary" value="1" class="lp-btn lp-btn-solid">{{strings.quizopensummary}}</button>
+                  {{/attempt_is_last}}
+                </div>
+              </form>
+              {{{end_code}}}
+            </div>
+          {{/quiz_attempting}}
+
+          {{#quiz_summarising}}
+            <div class="lp-quiz-summary" data-region="quiz-summary" data-timeleft="{{attempt_timeleft}}">
+              <aside class="lp-judge-note" aria-label="{{strings.quizopensummary}}">
+                <b>{{strings.quizopensummary}}</b>
+                <p>{{strings.quizsummarylead}}</p>
+                <p class="lp-quiz-summary-counts">
+                  <span>{{summary_flagged_label}}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{{summary_unanswered_label}}</span>
+                </p>
+                {{#attempt_has_timer}}
+                  <p class="lp-quiz-attempt-timer" data-lp-quiz-timer>{{attempt_timeleft_label}}</p>
+                {{/attempt_has_timer}}
+              </aside>
+              {{#summary_has_rows}}
+                <ul class="lp-quiz-summary-list">
+                  {{#summary_rows}}
+                    <li class="lp-quiz-summary-row is-{{status_key}}">
+                      <div class="lp-quiz-summary-row-main">
+                        <span class="lp-quiz-summary-q">{{number_label}}</span>
+                        <span class="lp-chip is-{{status_key}}">{{status_label}}</span>
+                      </div>
+                      <a class="lp-btn lp-btn-light lp-btn-sm" href="{{jump_url}}">{{strings.quizsummaryjump}}</a>
+                    </li>
+                  {{/summary_rows}}
+                </ul>
+              {{/summary_has_rows}}
+              <form method="post" action="{{summary_form_action}}" class="lp-quiz-summary-form" data-lp-quiz-form data-confirm-finish="{{strings.quizconfirmfinish}}">
+                <input type="hidden" name="sesskey" value="{{summary_sesskey}}">
+                <input type="hidden" name="action" value="quiz_process">
+                <input type="hidden" name="cmid" value="{{summary_cmid}}">
+                <input type="hidden" name="attempt" value="{{attemptid}}">
+                <input type="hidden" name="fromsummary" value="1">
+                <input type="hidden" name="timeup" value="0" data-lp-quiz-timeup>
+                <div class="lp-quiz-attempt-actions">
+                  <a class="lp-btn lp-btn-light" href="{{summary_back_url}}">{{strings.quizbackattempt}}</a>
+                  <button type="submit" name="finishattempt" value="1" class="lp-btn lp-btn-solid" data-lp-quiz-finish>{{strings.quizsubmit}}</button>
+                </div>
+              </form>
+            </div>
+          {{/quiz_summarising}}
+
+          {{#quiz_reviewing}}
+            <div class="lp-quiz-review" data-region="quiz-review">
+              <aside class="lp-judge-note" aria-label="{{strings.quizstatus}}">
+                <b>{{strings.quizstatus}}</b>
+                <p>{{review_summary}}</p>
+                {{#review_has_grade}}
+                  <p class="lp-quiz-review-grade">{{review_grade}}</p>
+                {{/review_has_grade}}
+              </aside>
+              {{#review_has_questions}}
+                {{#review_questions}}
+                  <div class="lp-quiz-question is-review" data-slot="{{slot}}">{{{html}}}</div>
+                {{/review_questions}}
+              {{/review_has_questions}}
+              <div class="lp-activity-head-actions" style="margin-top:16px">
+                <a class="lp-btn lp-btn-light" href="{{review_back_url}}">{{strings.quizbackbrief}}</a>
+                <a class="lp-btn lp-btn-solid" href="{{courseurl}}">{{strings.backtotrack}}</a>
+              </div>
+              {{{end_code}}}
+            </div>
+          {{/quiz_reviewing}}
+
+          {{^quiz_attempting}}
+          {{^quiz_summarising}}
+          {{^quiz_reviewing}}
           <div class="lp-assign-layout" data-region="quiz-brief">
             <p class="lp-lesson-meta">
               <span>{{quiz_track_label}}</span>
@@ -249,11 +350,32 @@
                 </div>
               {{/quiz_has_attempt_status}}
             </dl>
+
+            <div class="lp-quiz-cta">
+              {{#quiz_no_questions}}
+                <p class="lp-muted lp-sm">{{strings.quiznoquestions}}</p>
+              {{/quiz_no_questions}}
+              {{#quiz_exhausted}}
+                <p class="lp-muted lp-sm">{{strings.quizexhausted}}</p>
+              {{/quiz_exhausted}}
+              {{#quiz_can_continue}}
+                <a class="lp-btn lp-btn-solid" href="{{quiz_continue_url}}">{{strings.quizresume}}</a>
+              {{/quiz_can_continue}}
+              {{#quiz_can_start}}
+                <a class="lp-btn lp-btn-solid" href="{{quiz_start_url}}">{{strings.quizstart}}</a>
+              {{/quiz_can_start}}
+              {{#quiz_can_review}}
+                <a class="lp-btn lp-btn-light" href="{{quiz_review_url}}">{{strings.quizreview}}</a>
+              {{/quiz_can_review}}
+            </div>
           </div>
+          {{/quiz_reviewing}}
+          {{/quiz_summarising}}
+          {{/quiz_attempting}}
         {{/is_quiz}}
 
         {{#is_assign}}
-          <div class="lp-assign-layout" data-region="assign-brief">
+          <div class="lp-assign-layout" data-region="assign-workspace">
             <p class="lp-lesson-meta">
               <span>{{assign_track_label}}</span>
               {{#assign_has_phase}}
@@ -261,6 +383,13 @@
                 <span>{{assign_phase_label}}</span>
               {{/assign_has_phase}}
             </p>
+
+            {{#assign_has_flash_ok}}
+              <p class="lp-flash ok" role="status">{{assign_flash_ok}}</p>
+            {{/assign_has_flash_ok}}
+            {{#assign_has_flash_err}}
+              <p class="lp-flash err" role="alert">{{assign_flash_err}}</p>
+            {{/assign_has_flash_err}}
 
             <section class="lp-lesson-block">
               <h3 class="lp-lesson-block-title">{{strings.assignbrief}}</h3>
@@ -315,18 +444,137 @@
                   <dd><span class="lp-chip {{#assign_sub_status_key}}is-{{assign_sub_status_key}}{{/assign_sub_status_key}}">{{assign_sub_status}}</span></dd>
                 </div>
               {{/assign_has_sub_status}}
+              <div>
+                <dt>{{strings.assignattempt}}</dt>
+                <dd>{{assign_attempt_label}}</dd>
+              </div>
+              <div>
+                <dt>{{strings.assigncompletion}}</dt>
+                <dd>{{assign_completion_note}}</dd>
+              </div>
             </dl>
+
+            {{#assign_has_feedback}}
+              <section class="lp-lesson-block lp-assign-feedback" data-region="assign-feedback">
+                <h3 class="lp-lesson-block-title">{{strings.assignfeedback}}</h3>
+                {{#assign_has_feedback_attempt}}
+                  <p class="lp-sm lp-muted">{{assign_feedback_attempt_label}}</p>
+                {{/assign_has_feedback_attempt}}
+                {{#assign_has_feedback_grade}}
+                  <p class="lp-assign-feedback-grade"><b>{{strings.assigngrade}}:</b> {{assign_feedback_grade}}</p>
+                {{/assign_has_feedback_grade}}
+                {{#assign_feedback_when}}
+                  <p class="lp-sm lp-muted">{{assign_feedback_when}}{{#assign_has_feedback_by}} · {{assign_feedback_by}}{{/assign_has_feedback_by}}</p>
+                {{/assign_feedback_when}}
+                {{#assign_has_feedback_html}}
+                  <div class="lp-lesson-block-body">{{{assign_feedback_html}}}</div>
+                {{/assign_has_feedback_html}}
+              </section>
+            {{/assign_has_feedback}}
+
+            {{#assign_has_current_files}}
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.assignfiles}}</h3>
+                <ul class="lp-assign-file-list">
+                  {{#assign_current_files}}
+                    <li><a href="{{url}}" target="_blank" rel="noopener">{{filename}}</a> <span class="lp-muted lp-sm">{{filesize}}</span></li>
+                  {{/assign_current_files}}
+                </ul>
+              </section>
+            {{/assign_has_current_files}}
+
+            {{#assign_can_edit}}
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.assignsubmitsection}}</h3>
+                {{#assign_prefilled}}
+                  <p class="lp-sm lp-assign-prefill-note">{{assign_prefilled_label}}</p>
+                {{/assign_prefilled}}
+                <form method="post" action="{{assign_form_action}}" enctype="multipart/form-data" class="lp-assign-submit-form" data-region="assign-submit">
+                  <input type="hidden" name="sesskey" value="{{assign_sesskey}}">
+                  <input type="hidden" name="action" value="assign_process">
+                  <input type="hidden" name="cmid" value="{{assign_cmid}}">
+                  <input type="hidden" name="lastmodified" value="{{assign_lastmodified}}">
+                  {{#assign_has_text}}
+                    <label class="lp-field">
+                      <span>{{strings.assignonlinetext}}</span>
+                      <textarea name="onlinetext" rows="10" maxlength="100000">{{assign_draft_text}}</textarea>
+                    </label>
+                  {{/assign_has_text}}
+                  {{#assign_has_file}}
+                    <label class="lp-field">
+                      <span>{{strings.assignfileupload}}</span>
+                      <input type="file" name="assignfile">
+                      <span class="lp-sm lp-muted">{{strings.assignfilehint}}</span>
+                    </label>
+                  {{/assign_has_file}}
+                  {{#assign_require_statement}}
+                    <label class="lp-field lp-field-check">
+                      <span class="lp-field-check-row">
+                        <input type="checkbox" name="submissionstatement" value="1" required>
+                        <span>{{assign_statement_label}}</span>
+                      </span>
+                    </label>
+                  {{/assign_require_statement}}
+                  <div class="lp-quiz-attempt-actions">
+                    <button type="submit" name="assign_save" value="1" class="lp-btn lp-btn-light">{{strings.assignsavedraft}}</button>
+                    <button type="submit" name="assign_submit" value="1" class="lp-btn lp-btn-solid">{{strings.assignsubmit}}</button>
+                  </div>
+                </form>
+              </section>
+            {{/assign_can_edit}}
+            {{^assign_can_edit}}
+              {{#assign_has_draft_html}}
+                <section class="lp-lesson-block">
+                  <h3 class="lp-lesson-block-title">{{strings.assignonlinetext}}</h3>
+                  <div class="lp-lesson-block-body">{{{assign_draft_html}}}</div>
+                </section>
+              {{/assign_has_draft_html}}
+              <p class="lp-muted lp-sm">{{strings.assignlockednote}}</p>
+            {{/assign_can_edit}}
+
+            {{#assign_has_prior_attempts}}
+              <section class="lp-lesson-block">
+                <h3 class="lp-lesson-block-title">{{strings.assignpriors}}</h3>
+                <ul class="lp-assign-prior-list">
+                  {{#assign_prior_attempts}}
+                    <li class="lp-assign-prior">
+                      <div class="lp-assign-prior-head">
+                        <b>{{attempt_label}}</b>
+                        <span class="lp-chip">{{status_label}}</span>
+                        <span class="lp-sm lp-muted">{{modified}}</span>
+                      </div>
+                      {{#has_grade}}
+                        <p class="lp-sm"><b>{{strings.assigngrade}}:</b> {{grade_label}}</p>
+                      {{/has_grade}}
+                      {{#has_feedback}}
+                        <div class="lp-assign-prior-feedback">
+                          <p class="lp-sm"><b>{{strings.assignfeedback}}:</b></p>
+                          <div class="lp-lesson-block-body">{{{feedback_html}}}</div>
+                        </div>
+                      {{/has_feedback}}
+                      {{#has_text}}
+                        <div class="lp-lesson-block-body">{{{text_html}}}</div>
+                      {{/has_text}}
+                    </li>
+                  {{/assign_prior_attempts}}
+                </ul>
+              </section>
+            {{/assign_has_prior_attempts}}
           </div>
         {{/is_assign}}
 
         {{#needsengine}}
+          {{^is_quiz}}
+          {{^is_assign}}
           <div class="lp-activity-callout" role="status">
             <div class="lp-activity-callout-text">
-              <b>{{#is_quiz}}{{strings.quizcontinue}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}{{/is_quiz}}</b>
-              <p>{{#is_quiz}}{{strings.quizenginehelp}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assignenginehelp}}{{/is_assign}}{{^is_assign}}{{strings.activityenginehelp}}{{/is_assign}}{{/is_quiz}}</p>
-              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{#is_quiz}}{{strings.quizcontinue}}{{/is_quiz}}{{^is_quiz}}{{#is_assign}}{{strings.assigncontinue}}{{/is_assign}}{{^is_assign}}{{strings.openactivity}}{{/is_assign}}{{/is_quiz}}</a>
+              <b>{{strings.openactivity}}</b>
+              <p>{{strings.activityenginehelp}}</p>
+              <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
             </div>
           </div>
+          {{/is_assign}}
+          {{/is_quiz}}
         {{/needsengine}}
       </div>
     </article>

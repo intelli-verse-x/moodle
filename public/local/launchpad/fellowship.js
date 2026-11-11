@@ -3408,4 +3408,69 @@
             });
         });
     })();
+
+    /* Quiz attempt / summary: confirm finish + optional countdown */
+    (function () {
+        var root = document.querySelector('[data-region="quiz-attempt"], [data-region="quiz-summary"]');
+        if (!root) {
+            return;
+        }
+        var form = root.querySelector('[data-lp-quiz-form]');
+        if (form) {
+            form.addEventListener('submit', function (ev) {
+                var submitter = ev.submitter || document.activeElement;
+                if (submitter && submitter.getAttribute('name') === 'finishattempt') {
+                    var msg = form.getAttribute('data-confirm-finish') || 'Submit this attempt?';
+                    if (!window.confirm(msg)) {
+                        ev.preventDefault();
+                    }
+                }
+            });
+        }
+        var timerEl = root.querySelector('[data-lp-quiz-timer]');
+        var timeupInput = root.querySelector('[data-lp-quiz-timeup]');
+        var left = parseInt(root.getAttribute('data-timeleft') || '0', 10);
+        if (!timerEl || !left || left <= 0) {
+            return;
+        }
+        function fmt(sec) {
+            var h = Math.floor(sec / 3600);
+            var m = Math.floor((sec % 3600) / 60);
+            var s = sec % 60;
+            var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+            return h > 0 ? h + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+        }
+        function tick() {
+            if (left <= 0) {
+                timerEl.textContent = 'Time up';
+                timerEl.classList.add('is-urgent');
+                if (timeupInput) {
+                    timeupInput.value = '1';
+                }
+                if (form) {
+                    var fin = document.createElement('input');
+                    fin.type = 'hidden';
+                    fin.name = 'finishattempt';
+                    fin.value = '1';
+                    form.appendChild(fin);
+                    if (!form.querySelector('input[name="fromsummary"]') && root.getAttribute('data-region') === 'quiz-summary') {
+                        var fs = document.createElement('input');
+                        fs.type = 'hidden';
+                        fs.name = 'fromsummary';
+                        fs.value = '1';
+                        form.appendChild(fs);
+                    }
+                    form.submit();
+                }
+                return;
+            }
+            timerEl.textContent = 'Time left: ' + fmt(left);
+            if (left <= 60) {
+                timerEl.classList.add('is-urgent');
+            }
+            left -= 1;
+            window.setTimeout(tick, 1000);
+        }
+        tick();
+    })();
 })();
