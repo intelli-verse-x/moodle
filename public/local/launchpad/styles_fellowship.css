@@ -12722,3 +12722,95 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   color: #4a5a70;
 }
 
+/* Admin Structure (lp-st-*) — preview dry-run panel */
+.lp-st-hero {
+  margin-bottom: 8px;
+}
+.lp-st-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+.lp-st-form {
+  gap: 10px;
+}
+.lp-st-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.lp-st-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp-st-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp-st-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e6edf5;
+}
+.lp-st-phases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp-st-phases li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+}
+.lp-st-phase-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #0b3b6c;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.lp-st-log {
+  margin-top: 16px;
+}
+.lp-st-log-body {
+  margin: 0;
+  padding: 12px 14px;
+  max-height: 320px;
+  overflow: auto;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 900px) {
+  .lp-st-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

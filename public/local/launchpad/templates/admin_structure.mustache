@@ -1,0 +1,106 @@
+{{!
+    @template local_launchpad/admin_structure
+
+    Admin LaunchPad Structure — cohort preview (dry-run). Apply is Phase 2.
+    Navbar stays in admin_shell. Keep comments free of Mustache braces.
+}}
+<div class="lp-st" data-region="local-launchpad-admin-structure">
+
+  <section class="lp-hero lp-st-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+      </div>
+    </div>
+  </section>
+
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
+
+  <div class="lp-st-grid">
+    <section class="lp-card lift lp-stack-lg">
+      <div class="lp-card-head">
+        <h3>{{cohort_label}}</h3>
+      </div>
+      <form method="post" action="{{form_action}}" class="lp-stack lp-st-form">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="action" value="structure_preview">
+        <label class="lp-field">
+          <span>{{cohort_label}}</span>
+          <input type="text" name="cohort" value="{{cohort_value}}" required maxlength="120" autocomplete="off">
+        </label>
+        <p class="lp-sm lp-muted">{{cohort_help}}</p>
+        <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{preview_label}}</button>
+      </form>
+      <div class="lp-st-links">
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{tracks_url}}">{{tracks_label}}</a>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-stack-lg">
+      <div class="lp-card-head">
+        <h3>{{summary_title}}</h3>
+      </div>
+
+      <div class="lp-st-block">
+        <p class="lp-eyebrow">{{categories_title}}</p>
+        <ul class="lp-st-list">
+          {{#categories}}
+            <li>
+              <span>{{name}}</span>
+              <code class="lp-tr-idn">{{idnumber}}</code>
+            </li>
+          {{/categories}}
+        </ul>
+      </div>
+
+      <div class="lp-st-block">
+        <p class="lp-eyebrow">{{courses_title}}</p>
+        {{#has_courses}}
+          <ul class="lp-st-list">
+            {{#courses}}
+              <li>
+                <span>
+                  <b>{{fullname}}</b>
+                  <span class="lp-muted lp-sm"> · {{kind_label}}</span>
+                </span>
+                <code class="lp-tr-idn">{{idnumber}}</code>
+              </li>
+            {{/courses}}
+          </ul>
+        {{/has_courses}}
+        {{^has_courses}}
+          <p class="lp-muted lp-sm">{{cohort_help}}</p>
+        {{/has_courses}}
+      </div>
+
+      <div class="lp-st-block">
+        <p class="lp-eyebrow">{{phases_title}}</p>
+        <ol class="lp-st-phases">
+          {{#phases}}
+            <li><span class="lp-st-phase-num">{{num}}</span> {{name}}</li>
+          {{/phases}}
+        </ol>
+        <p class="lp-sm lp-muted">{{phases_note}}</p>
+      </div>
+    </section>
+  </div>
+
+  {{#has_preview}}
+    <section class="lp-card soft lp-st-log" aria-label="{{preview_title}}">
+      <div class="lp-card-head">
+        <h3>{{preview_title}}</h3>
+      </div>
+      <pre class="lp-st-log-body" tabindex="0">{{#log_lines}}{{text}}
+{{/log_lines}}</pre>
+    </section>
+  {{/has_preview}}
+
+</div>

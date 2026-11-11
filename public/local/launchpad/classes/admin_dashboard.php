@@ -223,6 +223,7 @@ final class admin_dashboard {
         $root = self::fellowship_root_category();
         $catvisible = $root && (int) $root->visible === 1;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
 
         return array_merge([
             'firstname' => $firstname,
@@ -254,7 +255,7 @@ final class admin_dashboard {
             'filter_ready_label' => get_string('admin_tracks_filter_ready', 'local_launchpad', $readycount),
             'filter_outline_label' => get_string('admin_tracks_filter_outline', 'local_launchpad', $outlinecount),
             'filter_empty' => get_string('admin_tracks_filter_empty', 'local_launchpad'),
-            // Builder CTA tile (real Course builder link — not a fake create-track flow).
+            // Builder CTA tile (authors inside existing tracks — Structure owns create/sync).
             'builder_tile_title' => get_string('admin_tracks_builder_tile_title', 'local_launchpad'),
             'builder_tile_body' => get_string('admin_tracks_builder_tile_body', 'local_launchpad'),
             'builder_tile_cta' => get_string('admin_tracks_builder_tile_cta', 'local_launchpad'),
@@ -263,9 +264,150 @@ final class admin_dashboard {
         ], self::empty_state(
             'admin_tracks_empty',
             'admin_empty_title_no_tracks',
-            $builderurl,
-            'admin_empty_cta_builder'
+            $structureurl,
+            'admin_empty_cta_structure'
         ));
+    }
+
+    /**
+     * Admin Structure page — blueprint summary + dry-run preview (Phase 1; no apply).
+     *
+     * @param \stdClass $user
+     * @param array{ok?:string,error?:string,cohort?:string,log_lines?:list<string>} $flash
+     * @return array<string, mixed>
+     */
+    public static function structure_context(\stdClass $user, array $flash = []): array {
+        unset($user);
+
+        $cohort = trim((string) ($flash['cohort'] ?? 'Pilot'));
+        if ($cohort === '') {
+            $cohort = 'Pilot';
+        }
+
+        $categories = [
+            [
+                'name' => blueprint::ROOT_CATEGORY,
+                'idnumber' => blueprint::ROOT_IDNUMBER,
+            ],
+        ];
+        foreach (blueprint::track_categories() as $idnumber => $name) {
+            $categories[] = [
+                'name' => $name,
+                'idnumber' => $idnumber,
+            ];
+        }
+
+        $courses = [];
+        try {
+            foreach (blueprint::courses($cohort) as $coursedef) {
+                $courses[] = [
+                    'fullname' => $coursedef['fullname'],
+                    'shortname' => $coursedef['shortname'],
+                    'idnumber' => $coursedef['idnumber'],
+                    'kind_label' => $coursedef['kind'] === 'orientation'
+                        ? get_string('admin_structure_kind_orientation', 'local_launchpad')
+                        : get_string('admin_structure_kind_track', 'local_launchpad'),
+                    'is_orientation' => $coursedef['kind'] === 'orientation',
+                ];
+            }
+        } catch (cohort_exception $e) {
+            $courses = [];
+        }
+
+        $phases = [];
+        foreach (blueprint::phase_sections() as $num => $name) {
+            $phases[] = [
+                'num' => (int) $num,
+                'name' => $name,
+            ];
+        }
+
+        $loglines = [];
+        if (!empty($flash['log_lines']) && is_array($flash['log_lines'])) {
+            foreach ($flash['log_lines'] as $line) {
+                $text = (string) $line;
+                if ($text === '') {
+                    continue;
+                }
+                $loglines[] = ['text' => $text];
+            }
+        }
+
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
+        $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $tracksurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+
+        return [
+            'eyebrow' => get_string('admin_structure_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_structure_heading', 'local_launchpad'),
+            'lead' => get_string('admin_structure_lead', 'local_launchpad'),
+            'form_action' => $formaction,
+            'sesskey' => sesskey(),
+            'cohort_label' => get_string('admin_structure_cohort_label', 'local_launchpad'),
+            'cohort_help' => get_string('admin_structure_cohort_help', 'local_launchpad'),
+            'cohort_value' => $cohort,
+            'preview_label' => get_string('admin_structure_preview_cta', 'local_launchpad'),
+            'summary_title' => get_string('admin_structure_summary_title', 'local_launchpad'),
+            'categories_title' => get_string('admin_structure_categories_title', 'local_launchpad'),
+            'categories' => $categories,
+            'courses_title' => get_string('admin_structure_courses_title', 'local_launchpad'),
+            'courses' => $courses,
+            'has_courses' => $courses !== [],
+            'phases_title' => get_string('admin_structure_phases_title', 'local_launchpad'),
+            'phases' => $phases,
+            'phases_note' => get_string('admin_structure_phases_note', 'local_launchpad'),
+            'preview_title' => get_string('admin_structure_preview_title', 'local_launchpad'),
+            'has_preview' => $loglines !== [],
+            'log_lines' => $loglines,
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+            'builder_url' => $builderurl,
+            'builder_label' => get_string('admin_structure_open_builder', 'local_launchpad'),
+            'tracks_url' => $tracksurl,
+            'tracks_label' => get_string('admin_nav_tracks', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Dry-run LaunchPad structure for a cohort (web-safe via setup::line gating).
+     *
+     * @return array{ok?:string,error?:string,cohort:string,log_lines?:list<string>}
+     */
+    public static function run_structure_preview(\stdClass $actor, string $cohort): array {
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return [
+                'error' => get_string('admin_err_capability', 'local_launchpad'),
+                'cohort' => trim($cohort),
+            ];
+        }
+
+        $label = trim($cohort);
+        try {
+            $runner = new setup($label, true);
+            $runner->execute();
+            return [
+                'ok' => get_string('admin_structure_preview_ok', 'local_launchpad'),
+                'cohort' => $label,
+                'log_lines' => $runner->get_log(),
+            ];
+        } catch (cohort_exception $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        } catch (operation_failure $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        }
     }
 
     /**
@@ -313,7 +455,7 @@ final class admin_dashboard {
 
         $tracks = self::list_track_courses();
         if ($tracks === []) {
-            $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
             return array_merge([
                 'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
                 'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
@@ -334,8 +476,8 @@ final class admin_dashboard {
             ], self::empty_state(
                 'admin_tracks_empty',
                 'admin_empty_title_no_tracks',
-                $builderurl,
-                'admin_empty_cta_builder'
+                $structureurl,
+                'admin_empty_cta_structure'
             ));
         }
 
@@ -1886,6 +2028,7 @@ final class admin_dashboard {
         unset($user);
         $tracks = self::list_track_courses();
         if ($tracks === []) {
+            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
             return array_merge([
                 'eyebrow' => get_string('admin_builder_eyebrow', 'local_launchpad'),
                 'heading' => get_string('admin_builder_heading', 'local_launchpad'),
@@ -1897,7 +2040,9 @@ final class admin_dashboard {
                 'flash_err_body' => (string) ($flash['error'] ?? ''),
             ], self::empty_state(
                 'admin_builder_empty',
-                'admin_empty_title_no_tracks'
+                'admin_empty_title_no_tracks',
+                $structureurl,
+                'admin_empty_cta_structure'
             ));
         }
 
@@ -2148,6 +2293,7 @@ final class admin_dashboard {
             $trackid = (int) $course->id;
         }
         if ($course === null) {
+            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
             $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
             return array_merge([
                 'has_course' => false,
@@ -2160,8 +2306,8 @@ final class admin_dashboard {
             ], self::empty_state(
                 'admin_builder_empty',
                 'admin_empty_title_no_tracks',
-                $builderurl,
-                'admin_empty_cta_builder'
+                $structureurl,
+                'admin_empty_cta_structure'
             ));
         }
 
@@ -5129,6 +5275,7 @@ final class admin_dashboard {
         $maxfellows = account_provision::pilot_max_fellows_per_track();
         $seats = $trackcount * $maxmentors;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
         return array_merge([
             'eyebrow' => get_string('admin_mentors_eyebrow', 'local_launchpad'),
@@ -5183,8 +5330,8 @@ final class admin_dashboard {
         ], self::empty_state(
             'admin_mentors_empty',
             'admin_empty_title_no_tracks',
-            $builderurl,
-            'admin_empty_cta_builder'
+            $structureurl,
+            'admin_empty_cta_structure'
         ));
     }
 
