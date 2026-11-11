@@ -12722,9 +12722,43 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   color: #4a5a70;
 }
 
-/* Admin Structure (lp-st-*) — preview + confirm/apply */
+/* Admin Structure (lp-st-*) — preview + confirm/apply + existing status */
 .lp-st-hero {
   margin-bottom: 8px;
+}
+.lp-st-existing {
+  margin-bottom: 16px;
+}
+.lp-st-table-wrap {
+  overflow-x: auto;
+}
+.lp-st-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.lp-st-table th,
+.lp-st-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--lp-ink, #1a1a1a) 10%, transparent);
+  vertical-align: top;
+}
+.lp-st-table th {
+  font-weight: 600;
+  color: #4a5a70;
+  white-space: nowrap;
+}
+.lp-st-vis {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.lp-st-vis.is-on {
+  color: #1f6b3a;
+}
+.lp-st-vis.is-off {
+  color: #6b7280;
 }
 .lp-st-grid {
   display: grid;

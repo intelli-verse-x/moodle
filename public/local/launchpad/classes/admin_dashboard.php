@@ -270,7 +270,7 @@ final class admin_dashboard {
     }
 
     /**
-     * Admin Structure page — blueprint summary, dry-run preview, confirm + apply.
+     * Admin Structure page — blueprint summary, dry-run preview, confirm + apply/sync.
      *
      * @param \stdClass $user
      * @param array{ok?:string,error?:string,cohort?:string,log_lines?:list<string>,applied?:bool} $flash
@@ -336,8 +336,14 @@ final class admin_dashboard {
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
         $tracksurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+        $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
         $applied = !empty($flash['applied']);
-        $trackcount = count(self::list_track_courses());
+        $alltracks = self::list_track_courses();
+        $trackcount = count($alltracks);
+        $existing = self::structure_existing_rows($cohort);
+        $hasexisting = $existing !== [];
+        $confirmkey = $hasexisting ? 'admin_structure_confirm_sync' : 'admin_structure_confirm';
+        $applykey = $hasexisting ? 'admin_structure_sync_cta' : 'admin_structure_apply_cta';
 
         return [
             'eyebrow' => get_string('admin_structure_eyebrow', 'local_launchpad'),
@@ -349,8 +355,8 @@ final class admin_dashboard {
             'cohort_help' => get_string('admin_structure_cohort_help', 'local_launchpad'),
             'cohort_value' => $cohort,
             'preview_label' => get_string('admin_structure_preview_cta', 'local_launchpad'),
-            'confirm_label' => get_string('admin_structure_confirm', 'local_launchpad', $cohort),
-            'apply_label' => get_string('admin_structure_apply_cta', 'local_launchpad'),
+            'confirm_label' => get_string($confirmkey, 'local_launchpad', $cohort),
+            'apply_label' => get_string($applykey, 'local_launchpad'),
             'summary_title' => get_string('admin_structure_summary_title', 'local_launchpad'),
             'categories_title' => get_string('admin_structure_categories_title', 'local_launchpad'),
             'categories' => $categories,
@@ -363,16 +369,76 @@ final class admin_dashboard {
             'preview_title' => get_string('admin_structure_preview_title', 'local_launchpad'),
             'has_preview' => $loglines !== [],
             'log_lines' => $loglines,
-            'show_builder_cta' => $applied || $trackcount > 0,
+            'has_existing' => $hasexisting,
+            'existing_title' => get_string('admin_structure_existing_title', 'local_launchpad', $cohort),
+            'existing_lead' => get_string('admin_structure_existing_lead', 'local_launchpad'),
+            'existing_col_name' => get_string('admin_structure_existing_col_name', 'local_launchpad'),
+            'existing_col_idnumber' => get_string('admin_structure_existing_col_idnumber', 'local_launchpad'),
+            'existing_col_kind' => get_string('admin_structure_existing_col_kind', 'local_launchpad'),
+            'existing_col_visibility' => get_string('admin_structure_existing_col_visibility', 'local_launchpad'),
+            'existing_rows' => $existing,
+            'show_builder_cta' => $applied || $trackcount > 0 || $hasexisting,
+            'show_cohorts_cta' => $hasexisting || $trackcount > 0,
             'flash_ok' => !empty($flash['ok']),
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
             'builder_url' => $builderurl,
             'builder_label' => get_string('admin_structure_open_builder', 'local_launchpad'),
+            'cohorts_url' => $cohortsurl,
+            'cohorts_label' => get_string('admin_nav_cohorts', 'local_launchpad'),
             'tracks_url' => $tracksurl,
             'tracks_label' => get_string('admin_nav_tracks', 'local_launchpad'),
         ];
+    }
+
+    /**
+     * Existing orientation + track courses for a cohort label (by idnumber slug).
+     *
+     * @return list<array{fullname:string,idnumber:string,kind_label:string,visibility_label:string,is_visible:bool,is_orientation:bool}>
+     */
+    public static function structure_existing_rows(string $cohort): array {
+        try {
+            $slug = blueprint::cohort_slug($cohort);
+        } catch (cohort_exception $e) {
+            return [];
+        }
+
+        $rows = [];
+        $orient = self::orientation_course_for_slug($slug);
+        if ($orient) {
+            $visible = (int) ($orient->visible ?? 0) === 1;
+            $rows[] = [
+                'fullname' => format_string($orient->fullname),
+                'idnumber' => (string) ($orient->idnumber ?? ''),
+                'kind_label' => get_string('admin_structure_kind_orientation', 'local_launchpad'),
+                'visibility_label' => $visible
+                    ? get_string('admin_visibility_badge_live', 'local_launchpad')
+                    : get_string('admin_visibility_badge_hidden', 'local_launchpad'),
+                'is_visible' => $visible,
+                'is_orientation' => true,
+            ];
+        }
+
+        foreach (self::list_track_courses() as $course) {
+            $courseslug = self::cohort_slug_from_track_idnumber((string) ($course->idnumber ?? ''));
+            if ($courseslug !== $slug) {
+                continue;
+            }
+            $visible = (int) ($course->visible ?? 0) === 1;
+            $rows[] = [
+                'fullname' => format_string($course->fullname),
+                'idnumber' => (string) ($course->idnumber ?? ''),
+                'kind_label' => get_string('admin_structure_kind_track', 'local_launchpad'),
+                'visibility_label' => $visible
+                    ? get_string('admin_visibility_badge_live', 'local_launchpad')
+                    : get_string('admin_visibility_badge_hidden', 'local_launchpad'),
+                'is_visible' => $visible,
+                'is_orientation' => false,
+            ];
+        }
+
+        return $rows;
     }
 
     /**

@@ -1,7 +1,7 @@
 {{!
     @template local_launchpad/admin_structure
 
-    Admin LaunchPad Structure — cohort preview (dry-run) + confirm/apply.
+    Admin LaunchPad Structure — preview, create/sync, existing status table.
     Navbar stays in admin_shell. Keep comments free of Mustache braces.
 }}
 <div class="lp-st" data-region="local-launchpad-admin-structure">
@@ -22,6 +22,39 @@
   {{#flash_err}}
     <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
   {{/flash_err}}
+
+  {{#has_existing}}
+    <section class="lp-card soft lp-st-existing" aria-label="{{existing_title}}">
+      <div class="lp-card-head">
+        <h3>{{existing_title}}</h3>
+        <p class="lp-muted lp-sm">{{existing_lead}}</p>
+      </div>
+      <div class="lp-st-table-wrap">
+        <table class="lp-st-table">
+          <thead>
+            <tr>
+              <th scope="col">{{existing_col_name}}</th>
+              <th scope="col">{{existing_col_kind}}</th>
+              <th scope="col">{{existing_col_idnumber}}</th>
+              <th scope="col">{{existing_col_visibility}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#existing_rows}}
+              <tr>
+                <td><b>{{fullname}}</b></td>
+                <td>{{kind_label}}</td>
+                <td><code class="lp-tr-idn">{{idnumber}}</code></td>
+                <td>
+                  <span class="lp-st-vis{{#is_visible}} is-on{{/is_visible}}{{^is_visible}} is-off{{/is_visible}}">{{visibility_label}}</span>
+                </td>
+              </tr>
+            {{/existing_rows}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {{/has_existing}}
 
   <div class="lp-st-grid">
     <section class="lp-card lift lp-stack-lg">
@@ -54,6 +87,9 @@
         {{#show_builder_cta}}
           <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
         {{/show_builder_cta}}
+        {{#show_cohorts_cta}}
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{cohorts_url}}">{{cohorts_label}}</a>
+        {{/show_cohorts_cta}}
         <a class="lp-btn lp-btn-light lp-btn-sm" href="{{tracks_url}}">{{tracks_label}}</a>
       </div>
     </section>
