@@ -218,6 +218,42 @@ if ($view === 'messages') {
 $courses = fellowship_dashboard::list_courses($userid);
 $courseids = array_map(static fn($c) => (int) $c->id, $courses);
 
+$ntab = optional_param('ntab', 'all', PARAM_ALPHA);
+if (!in_array($ntab, ['all', 'unread'], true)) {
+    $ntab = 'all';
+}
+$notifid = optional_param('notifid', 0, PARAM_INT);
+$notifdone = optional_param('notifdone', 0, PARAM_INT);
+$notiferr = optional_param('notiferr', '', PARAM_ALPHAEXT);
+$notifprefsaved = optional_param('notifprefsaved', 0, PARAM_INT);
+$notifpreferr = optional_param('notifpreferr', '', PARAM_ALPHAEXT);
+
+// Notifications inbox / preferences posts.
+if (($view === 'notifications' || $view === 'notificationprefs')
+        && data_submitted() && confirm_sesskey()) {
+    $naction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'notifications' && $naction === 'mark_all_notifications_read') {
+        $result = messaging::mark_all_popup_notifications_read($userid);
+        redirect(new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'notifications',
+            'ntab' => $ntab !== 'all' ? $ntab : null,
+            'notifdone' => !empty($result['ok']) ? 1 : null,
+            'notiferr' => empty($result['ok']) ? 'failed' : null,
+        ])));
+    }
+    if ($view === 'notificationprefs' && $naction === 'save_notification_preferences') {
+        $err = messaging::save_notification_preferences($userid, [
+            'popup_enabled' => optional_param('popup_enabled', 0, PARAM_BOOL),
+            'email_enabled' => optional_param('email_enabled', 0, PARAM_BOOL),
+        ]);
+        redirect(new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'notificationprefs',
+            'notifprefsaved' => $err === '' ? 1 : null,
+            'notifpreferr' => $err !== '' ? $err : null,
+        ])));
+    }
+}
+
 // Send / delete LaunchPad messages (Moodle-backed) before rendering.
 if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
     $toid = optional_param('id', 0, PARAM_INT);
@@ -283,9 +319,10 @@ $preferencesurl = (new moodle_url(persona_home::FELLOW_PATH, [
 ]))->out(false);
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
 $progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false);
-$notificationsurl = messaging::moodle_notifications_url();
+$notificationsurl = messaging::notifications_page_url('fellow');
 $messagesurl = messaging::messages_url(null, 'fellow');
 $msgunread = messaging::conversation_unread_count($userid);
+$unread = messaging::notification_unread_count($userid);
 // Opening Announcements clears the news badge (Messages use Moodle read state; Feedback stays until revise).
 if ($view === 'news') {
     announcement_service::mark_seen($userid);
@@ -382,6 +419,15 @@ $nav = [
                 'icon_svg' => $icon('message-01'),
                 'has_badge' => $msgunread > 0,
                 'badge' => $msgunread > 0 ? (string) $msgunread : '',
+            ],
+            [
+                'label' => $lpstr('fellowship_nav_notifications', null, 'Notifications'),
+                'url' => messaging::notifications_page_url('fellow'),
+                'current' => ($view === 'notifications' || $view === 'notificationprefs'),
+                'key' => 'notifications',
+                'icon_svg' => $icon('notification-01'),
+                'has_badge' => $unread > 0,
+                'badge' => $unread > 0 ? (string) $unread : '',
             ],
             [
                 'label' => $lpstr('fellowship_nav_profile', null, 'Profile'),
@@ -689,6 +735,34 @@ switch ($view) {
             $pagetitle = (string) $msgdata['other_name'];
         }
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', $msgdata);
+        break;
+
+    case 'notifications':
+        $pagetitle = $lpstr('fellowship_nav_notifications', null, 'Notifications');
+        $content = $OUTPUT->render_from_template(
+            'local_launchpad/portal_notifications',
+            messaging::notifications_inbox_page(
+                $userid,
+                'fellow',
+                $ntab,
+                $notifid,
+                $notifdone > 0,
+                $notiferr
+            )
+        );
+        break;
+
+    case 'notificationprefs':
+        $pagetitle = $lpstr('fellowship_notif_preferences', null, 'Notification preferences');
+        $content = $OUTPUT->render_from_template(
+            'local_launchpad/portal_notification_prefs',
+            messaging::notification_preferences_page(
+                $userid,
+                'fellow',
+                $notifprefsaved > 0,
+                $notifpreferr
+            )
+        );
         break;
 
     case 'calendar':
@@ -1232,7 +1306,6 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = messaging::notification_unread_count($userid);
 $notificationslabel = messaging::notifications_label($unread);
 
 $orbittips = [
@@ -1362,7 +1435,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     ],
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,
-], $mismatch));
+], messaging::notification_dropdown_context($userid, 'fellow'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";

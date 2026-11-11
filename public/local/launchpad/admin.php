@@ -48,9 +48,45 @@ $view = optional_param('view', 'home', PARAM_ALPHA);
 $allowedviews = [
     'home', 'tracks', 'courseops', 'builder', 'manage', 'activity', 'calendar',
     'announcements', 'cohorts', 'people', 'mentors', 'reviews',
+    'notifications', 'notificationprefs',
 ];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+
+$ntab = optional_param('ntab', 'all', PARAM_ALPHA);
+if (!in_array($ntab, ['all', 'unread'], true)) {
+    $ntab = 'all';
+}
+$notifid = optional_param('notifid', 0, PARAM_INT);
+$notifdone = optional_param('notifdone', 0, PARAM_INT);
+$notiferr = optional_param('notiferr', '', PARAM_ALPHAEXT);
+$notifprefsaved = optional_param('notifprefsaved', 0, PARAM_INT);
+$notifpreferr = optional_param('notifpreferr', '', PARAM_ALPHAEXT);
+
+if (($view === 'notifications' || $view === 'notificationprefs')
+        && data_submitted() && confirm_sesskey()) {
+    $naction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'notifications' && $naction === 'mark_all_notifications_read') {
+        $result = messaging::mark_all_popup_notifications_read($userid);
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'notifications',
+            'ntab' => $ntab !== 'all' ? $ntab : null,
+            'notifdone' => !empty($result['ok']) ? 1 : null,
+            'notiferr' => empty($result['ok']) ? 'failed' : null,
+        ])));
+    }
+    if ($view === 'notificationprefs' && $naction === 'save_notification_preferences') {
+        $errsave = messaging::save_notification_preferences($userid, [
+            'popup_enabled' => optional_param('popup_enabled', 0, PARAM_BOOL),
+            'email_enabled' => optional_param('email_enabled', 0, PARAM_BOOL),
+        ]);
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'notificationprefs',
+            'notifprefsaved' => $errsave === '' ? 1 : null,
+            'notifpreferr' => $errsave !== '' ? $errsave : null,
+        ])));
+    }
 }
 
 $courseopssection = optional_param('section', 'hub', PARAM_ALPHANUMEXT);
@@ -405,7 +441,7 @@ $mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))-
 $reviewsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
 $calendarurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'calendar']))->out(false);
 $announcementsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']))->out(false);
-$notificationsurl = messaging::moodle_notifications_url();
+$notificationsurl = messaging::notifications_page_url('admin');
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -641,6 +677,18 @@ if ($view === 'tracks') {
         'local_launchpad/admin_reviews',
         admin_dashboard::reviews_context($USER, $flash)
     );
+} else if ($view === 'notifications') {
+    $pagetitle = get_string('fellowship_nav_notifications', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/portal_notifications',
+        messaging::notifications_inbox_page($userid, 'admin', $ntab, $notifid, $notifdone > 0, $notiferr)
+    );
+} else if ($view === 'notificationprefs') {
+    $pagetitle = get_string('fellowship_notif_preferences', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/portal_notification_prefs',
+        messaging::notification_preferences_page($userid, 'admin', $notifprefsaved > 0, $notifpreferr)
+    );
 } else {
     $view = 'home';
     $pagetitle = get_string('admin_nav_overview', 'local_launchpad');
@@ -682,7 +730,8 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'str_signout' => get_string('fellowship_nav_signout', 'local_launchpad'),
     'str_menu' => get_string('fellowship_menu', 'local_launchpad'),
     'str_account' => get_string('fellowship_nav_account', 'local_launchpad'),
-], $mismatch));
+    'str_notif_moodle_ref' => get_string('fellowship_notif_moodle_ref', 'local_launchpad'),
+], messaging::notification_dropdown_context($userid, 'admin'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";

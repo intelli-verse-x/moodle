@@ -5305,7 +5305,9 @@ a.lp-emp-gate:focus-visible,
 }
 
 /* Notifications — Moodle popup feed (Messages-style workspace) */
-.lp-tools-page[data-region="employer-notifications"] {
+.lp-tools-page[data-region="employer-notifications"],
+.lp-tools-page[data-region="portal-notifications"],
+.lp-tools-page[data-region="portal-notification-prefs"] {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -5415,7 +5417,7 @@ a.lp-emp-gate:focus-visible,
   line-height: 1.45;
   font-size: 13.5px;
 }
-.lp-notif-list {
+.lp-notif-inbox .lp-notif-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -5554,7 +5556,7 @@ a.lp-emp-gate:focus-visible,
   background: var(--lp-blue-soft, #E5EDFA);
   color: var(--lp-blue, #1A61F2);
 }
-.lp-notif-scroll {
+.lp-notif-detail .lp-notif-scroll {
   flex: 1;
   overflow: auto;
   padding: 18px;
@@ -5687,4 +5689,141 @@ body.lp-portal-mismatch-lock {
     animation: none;
   }
   .lp-card.lift:hover { transform: none; }
+}
+
+/* Notification dropdown (shared with Fellowship compare chrome). */
+.lp-notif-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lp-notif-dd { position: relative; }
+.lp-notif-toggle { cursor: pointer; }
+.lp-notif-dot.is-hidden { display: none; }
+.lp-notif-moodle-ref {
+  width: auto;
+  min-width: 40px;
+  padding: 0 8px;
+  gap: 4px;
+  grid-auto-flow: column;
+}
+.lp-notif-ref-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--lp-muted, #5C667A);
+  text-transform: uppercase;
+}
+.lp-notif-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(520px, 70vh);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid var(--lp-line, #E4E8EF);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(23, 33, 51, .16);
+  overflow: hidden;
+}
+.lp-notif-panel[hidden] { display: none !important; }
+.lp-notif-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--lp-line, #E4E8EF);
+}
+.lp-notif-panel-head h2 {
+  margin: 0;
+  font-family: var(--lp-head);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lp-navy, #172133);
+}
+.lp-notif-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.lp-notif-action {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lp-muted, #5C667A);
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lp-notif-action svg { width: 16px; height: 16px; }
+.lp-notif-action:hover {
+  background: var(--lp-blue-softer, #F0F5FF);
+  color: var(--lp-blue, #1A61F2);
+}
+.lp-notif-action.is-loading { opacity: .55; pointer-events: none; }
+.lp-notif-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.lp-notif-item {
+  display: block;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--lp-line, #E4E8EF);
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+}
+.lp-notif-item:hover { background: rgba(26, 97, 242, .04); }
+.lp-notif-item.is-unread { background: #F5F9FF; }
+.lp-notif-item-subject {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--lp-ink, #12161F);
+  line-height: 1.35;
+}
+.lp-notif-item.is-unread .lp-notif-item-subject { font-weight: 700; }
+.lp-notif-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+.lp-notif-item-when {
+  font-size: 12px;
+  color: var(--lp-muted, #5C667A);
+}
+.lp-notif-item-more {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lp-blue, #1A61F2);
+  text-decoration: none;
+}
+.lp-notif-empty,
+.lp-notif-loading {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--lp-muted, #5C667A);
+  font-size: 13.5px;
+}
+.lp-notif-panel-foot {
+  border-top: 1px solid var(--lp-line, #E4E8EF);
+  padding: 10px 14px;
+  text-align: center;
+}
+.lp-notif-seeall {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-blue, #1A61F2);
+  text-decoration: none;
 }

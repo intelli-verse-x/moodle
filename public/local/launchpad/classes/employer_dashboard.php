@@ -84,7 +84,10 @@ final class employer_dashboard {
         require_once($CFG->libdir . '/enrollib.php');
         require_once($CFG->libdir . '/completionlib.php');
 
-        $allowed = ['home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages', 'notifications', 'profile'];
+        $allowed = [
+            'home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages',
+            'notifications', 'notificationprefs', 'profile',
+        ];
         $view = in_array($view, $allowed, true) ? $view : 'home';
         $tab = ($tab === 'earned') ? 'earned' : 'all';
         $mtab = in_array($mtab, ['all', 'starred', 'private', 'group'], true) ? $mtab : 'all';
@@ -181,13 +184,20 @@ final class employer_dashboard {
         } else if ($view === 'messages') {
             $toolpage = employer_tools::messages_page($userid, $urls, $mtab, $convid, $msgsent, $msgerr);
         } else if ($view === 'notifications') {
-            $toolpage = employer_tools::notifications_page(
+            $toolpage = messaging::notifications_inbox_page(
                 $userid,
-                $urls,
+                'employer',
                 $ntab,
                 $notifid,
                 $notifdone,
                 $notiferr
+            );
+        } else if ($view === 'notificationprefs') {
+            $toolpage = messaging::notification_preferences_page(
+                $userid,
+                'employer',
+                $prefsaved,
+                $preferr
             );
         } else if ($view === 'profile') {
             $toolpage = employer_tools::profile_page(
@@ -304,6 +314,7 @@ final class employer_dashboard {
             'calendar' => self::str('employer_nav_calendar', null, 'Calendar'),
             'messages' => self::str('employer_nav_messages', null, 'Messages'),
             'notifications' => self::str('employer_nav_notifications', null, 'Notifications'),
+            'notificationprefs' => self::str('fellowship_notif_preferences', null, 'Notification preferences'),
             'profile' => self::str('employer_nav_profile', null, 'Profile'),
         ];
 
@@ -358,6 +369,7 @@ final class employer_dashboard {
             'is_calendar' => $view === 'calendar',
             'is_messages' => $view === 'messages',
             'is_notifications' => $view === 'notifications',
+            'is_notificationprefs' => $view === 'notificationprefs',
             'is_profile' => $view === 'profile',
             'hascourses' => $hascourses,
             'coursecount' => count($courses),
@@ -418,7 +430,7 @@ final class employer_dashboard {
                 'body' => self::str('employer_empty_body', null, 'When your organisation enrols you, your courses will show here.'),
             ],
             'strings' => $strings,
-        ], $homesummary, $toolpage);
+        ], $homesummary, $toolpage, messaging::notification_dropdown_context($userid, 'employer'));
     }
 
     /**
@@ -543,6 +555,7 @@ final class employer_dashboard {
             'skiptomain' => self::str('employer_skip_main', null, 'Skip to main content'),
             'navaria' => self::str('employer_nav_aria', null, 'Employer portal navigation'),
             'notifications' => self::str('employer_nav_notifications', null, 'Notifications'),
+            'notificationprefs' => self::str('fellowship_notif_preferences', null, 'Notification preferences'),
             'linkdashboard' => self::str('employer_link_dashboard', null, 'Dashboard'),
             'linkgrades' => self::str('employer_link_grades', null, 'Grades'),
             'linkcalendar' => self::str('employer_link_calendar', null, 'Calendar'),

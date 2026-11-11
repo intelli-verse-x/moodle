@@ -1,0 +1,168 @@
+{{!
+    @template local_launchpad/portal_notifications
+
+    LaunchPad notifications inbox + detail (fellow / mentor / admin / employer).
+}}
+<div class="lp-tools-page lp-reveal" data-region="portal-notifications" style="--lp-d:0">
+  {{#has_flash}}
+    {{#flash}}
+      <div class="lp-flash{{#ok}} is-ok{{/ok}}{{^ok}} is-err{{/ok}}" role="status">{{text}}</div>
+    {{/flash}}
+  {{/has_flash}}
+
+  <div class="lp-notif-system">
+    <section class="lp-card lift lp-theme-hero lp-notif-overview">
+      <div class="lp-theme-hero-main">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:notification-01" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <div class="lp-theme-hero-heading">
+              <h3>{{strings.notifications_total_label}}</h3>
+            </div>
+            <p>{{strings.notifications_intro}}</p>
+          </div>
+        </div>
+        <p class="lp-sm lp-theme-hero-body">{{strings.notifications_inbox_lead}}</p>
+        <div class="lp-notif-hero-actions">
+          {{#can_mark_all}}
+            <form method="post" action="{{action_url}}" class="lp-notif-mark-all">
+              <input type="hidden" name="sesskey" value="{{sesskey}}">
+              <input type="hidden" name="view" value="notifications">
+              <input type="hidden" name="action" value="mark_all_notifications_read">
+              <input type="hidden" name="ntab" value="{{ntab}}">
+              <button type="submit" class="lp-btn lp-btn-primary">{{strings.notifications_mark_all}}</button>
+            </form>
+          {{/can_mark_all}}
+          <a class="lp-btn lp-btn-light" href="{{prefs_url}}">{{strings.notifications_preferences}}</a>
+        </div>
+      </div>
+      <div class="lp-theme-hero-art" aria-hidden="true">
+        <span class="lp-theme-hero-orb"></span>
+        <iconify-icon icon="hugeicons:notification-01" width="88" height="88"></iconify-icon>
+      </div>
+    </section>
+
+    <section class="lp-card lift lp-theme-panel lp-notif-stats">
+      <div class="lp-card-head lp-card-head-stack">
+        <div class="lp-theme-hero-title-row">
+          <span class="lp-grade-progress-icon" aria-hidden="true">
+            <iconify-icon icon="hugeicons:inbox" width="22" height="22"></iconify-icon>
+          </span>
+          <div class="lp-card-copy">
+            <h3>{{strings.notifications_inbox_heading}}</h3>
+          </div>
+        </div>
+      </div>
+      <dl class="lp-theme-kv lp-notif-overview-kv">
+        <div class="lp-theme-kv-row">
+          <dt>{{strings.notifications_total_label}}</dt>
+          <dd><b class="lp-num">{{notification_count}}</b></dd>
+        </div>
+        <div class="lp-theme-kv-row{{#has_unread}} is-hot{{/has_unread}}">
+          <dt>{{strings.notifications_unread_label}}</dt>
+          <dd><b class="lp-num">{{unread_count}}</b></dd>
+        </div>
+      </dl>
+    </section>
+  </div>
+
+  <section class="lp-card lift lp-notif-workspace">
+    <div class="lp-notif-layout{{#has_selected}} is-split{{/has_selected}}">
+      <aside class="lp-notif-inbox lp-scroll" aria-label="{{strings.notifications_inbox_heading}}">
+        <div class="lp-tabs lp-tabs-block lp-notif-tabs" role="tablist" aria-label="{{strings.notifications_inbox_heading}}">
+          <a class="lp-tab{{#ntab_all}} is-on{{/ntab_all}}"
+             role="tab"
+             href="{{tab_all_url}}"
+             aria-selected="{{#ntab_all}}true{{/ntab_all}}{{^ntab_all}}false{{/ntab_all}}">
+            {{strings.notifications_tab_all}}
+            <span class="lp-tab-count">{{notification_count}}</span>
+          </a>
+          <a class="lp-tab{{#ntab_unread}} is-on{{/ntab_unread}}"
+             role="tab"
+             href="{{tab_unread_url}}"
+             aria-selected="{{#ntab_unread}}true{{/ntab_unread}}{{^ntab_unread}}false{{/ntab_unread}}">
+            {{strings.notifications_tab_unread}}
+            <span class="lp-tab-count">{{unread_count}}</span>
+          </a>
+        </div>
+        {{#has_items}}
+          <ul class="lp-notif-list">
+            {{#page_items}}
+              <li>
+                <a class="lp-notif-row{{#is_selected}} is-selected{{/is_selected}}{{#unread}} is-unread{{/unread}}"
+                   href="{{url}}">
+                  <span class="lp-notif-icon" aria-hidden="true">
+                    <iconify-icon icon="hugeicons:notification-01" width="18" height="18"></iconify-icon>
+                  </span>
+                  <span class="lp-notif-body">
+                    <span class="lp-notif-top">
+                      <b class="lp-notif-name">{{name}}</b>
+                      {{#has_when}}<time class="lp-notif-when">{{when}}</time>{{/has_when}}
+                    </span>
+                    {{#has_preview}}
+                      <span class="lp-notif-preview">{{preview}}</span>
+                    {{/has_preview}}
+                    <span class="lp-notif-meta-row">
+                      {{#unread}}<span class="lp-notif-unread">{{unread_label}}</span>{{/unread}}
+                    </span>
+                  </span>
+                </a>
+              </li>
+            {{/page_items}}
+          </ul>
+        {{/has_items}}
+        {{^has_items}}
+          <div class="lp-notif-inbox-empty" role="status">
+            <div class="lp-empty-mark" aria-hidden="true">
+              <iconify-icon icon="hugeicons:notification-01" width="18" height="18"></iconify-icon>
+            </div>
+            {{#notification_count}}
+              <h3>{{strings.notifications_empty_filter_title}}</h3>
+              <p>{{strings.notifications_empty_filter_body}}</p>
+            {{/notification_count}}
+            {{^notification_count}}
+              <h3>{{strings.notifications_empty_title}}</h3>
+              <p>{{strings.notifications_empty_body}}</p>
+            {{/notification_count}}
+          </div>
+        {{/has_items}}
+      </aside>
+
+      <div class="lp-notif-detail" aria-label="{{strings.notifications_detail_heading}}">
+        {{#has_selected}}
+          {{#selected}}
+            <div class="lp-notif-detail-head">
+              <a class="lp-notif-back" href="{{back_url}}">{{strings.notifications_back}}</a>
+              <div class="lp-notif-detail-meta">
+                <div class="lp-theme-hero-heading">
+                  <h3>{{name}}</h3>
+                  {{#unread}}<span class="lp-chip is-hot">{{strings.notifications_tab_unread}}</span>{{/unread}}
+                </div>
+                {{#has_when}}<p class="lp-muted lp-sm">{{when}}</p>{{/has_when}}
+              </div>
+            </div>
+            <div class="lp-notif-scroll lp-scroll">
+              <div class="lp-notif-content">{{{body_html}}}</div>
+            </div>
+            <div class="lp-notif-detail-actions">
+              {{#has_context}}
+                <a class="lp-btn lp-btn-primary" href="{{context_url}}">{{context_label}}</a>
+              {{/has_context}}
+            </div>
+          {{/selected}}
+        {{/has_selected}}
+        {{^has_selected}}
+          <div class="lp-notif-detail-empty">
+            <div class="lp-empty-mark" aria-hidden="true">
+              <iconify-icon icon="hugeicons:notification-01" width="26" height="26"></iconify-icon>
+            </div>
+            <h2>{{strings.notifications_detail_empty_title}}</h2>
+            <p>{{strings.notifications_detail_empty_body}}</p>
+          </div>
+        {{/has_selected}}
+      </div>
+    </div>
+  </section>
+</div>

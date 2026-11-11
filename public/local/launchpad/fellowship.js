@@ -3473,4 +3473,284 @@
         }
         tick();
     })();
+
+    /* LaunchPad notification dropdown (Moodle popup APIs; Moodle link kept beside for compare). */
+    (function () {
+        var root = document.querySelector('[data-region="lp-notif-dropdown"]');
+        if (!root) {
+            return;
+        }
+        var toggle = root.querySelector('[data-lp-notif-toggle]');
+        var panel = root.querySelector('#lp-notif-panel');
+        var list = root.querySelector('[data-lp-notif-list]');
+        var empty = root.querySelector('[data-lp-notif-empty]');
+        var loading = root.querySelector('[data-lp-notif-loading]');
+        var countEl = root.querySelector('[data-lp-notif-count]');
+        var markAllBtn = root.querySelector('[data-lp-notif-markall]');
+        var closeBtn = root.querySelector('[data-lp-notif-close]');
+        var scrollEl = root.querySelector('[data-lp-notif-scroll]');
+        var liveEl = root.querySelector('[data-lp-notif-live]');
+        var ajaxUrl = root.getAttribute('data-ajax') || '';
+        var sesskey = root.getAttribute('data-sesskey') || '';
+        var portal = root.getAttribute('data-portal') || 'fellow';
+        var limit = parseInt(root.getAttribute('data-limit') || '20', 10) || 20;
+        var unreadCount = parseInt(root.getAttribute('data-unread') || '0', 10) || 0;
+        var offset = 0;
+        var loadedAll = false;
+        var initialLoad = false;
+        var isLoading = false;
+        var lastQueried = 0;
+        var viewFullLabel = 'View full notification';
+
+        function setOpen(open) {
+            if (!panel || !toggle) {
+                return;
+            }
+            if (open) {
+                panel.removeAttribute('hidden');
+                toggle.setAttribute('aria-expanded', 'true');
+                if (countEl) {
+                    countEl.classList.add('is-hidden');
+                }
+                if (!initialLoad) {
+                    loadMore();
+                }
+            } else {
+                panel.setAttribute('hidden', 'hidden');
+                toggle.setAttribute('aria-expanded', 'false');
+                renderCount();
+            }
+        }
+
+        function isOpen() {
+            return panel && !panel.hasAttribute('hidden');
+        }
+
+        function renderCount() {
+            if (!countEl) {
+                return;
+            }
+            if (unreadCount > 0) {
+                countEl.textContent = String(unreadCount);
+                countEl.classList.remove('is-hidden');
+            } else {
+                countEl.classList.add('is-hidden');
+            }
+            root.setAttribute('data-unread', String(unreadCount));
+        }
+
+        function setBusy(busy) {
+            isLoading = busy;
+            if (list) {
+                list.setAttribute('aria-busy', busy ? 'true' : 'false');
+            }
+            if (loading) {
+                if (busy) {
+                    loading.removeAttribute('hidden');
+                } else {
+                    loading.setAttribute('hidden', 'hidden');
+                }
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function renderItems(items) {
+            if (!list || !items || !items.length) {
+                return;
+            }
+            var html = items.map(function (n) {
+                var unread = !!n.unread;
+                var open = n.openurl || n.contexturl || n.viewmoreurl || '#';
+                var more = n.viewmoreurl
+                    ? '<a class="lp-notif-item-more" href="' + escapeHtml(n.viewmoreurl) + '" data-lp-notif-more>' +
+                        escapeHtml(viewFullLabel) + '</a>'
+                    : '';
+                return '<a class="lp-notif-item' + (unread ? ' is-unread' : '') + '"' +
+                    ' href="' + escapeHtml(open) + '"' +
+                    ' data-id="' + escapeHtml(n.id) + '"' +
+                    ' data-lp-notif-item' +
+                    ' role="listitem">' +
+                    '<span class="lp-notif-item-subject">' + escapeHtml(n.shortenedsubject || n.subject) + '</span>' +
+                    '<span class="lp-notif-item-meta">' +
+                    '<span class="lp-notif-item-when">' + escapeHtml(n.timecreatedpretty || '') + '</span>' +
+                    more +
+                    '</span></a>';
+            }).join('');
+            list.insertAdjacentHTML('beforeend', html);
+        }
+
+        function updateEmpty() {
+            if (!empty || !list) {
+                return;
+            }
+            var has = list.children.length > 0;
+            if (has) {
+                empty.setAttribute('hidden', 'hidden');
+            } else if (initialLoad && !isLoading) {
+                empty.removeAttribute('hidden');
+            }
+        }
+
+        function loadMore() {
+            if (isLoading || loadedAll || !ajaxUrl) {
+                return Promise.resolve();
+            }
+            setBusy(true);
+            var url = ajaxUrl +
+                '?action=list&limit=' + encodeURIComponent(limit) +
+                '&offset=' + encodeURIComponent(offset) +
+                '&portal=' + encodeURIComponent(portal) +
+                '&sesskey=' + encodeURIComponent(sesskey);
+            return fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    initialLoad = true;
+                    lastQueried = Math.floor(Date.now() / 1000);
+                    if (!data || !data.ok) {
+                        loadedAll = true;
+                        updateEmpty();
+                        return;
+                    }
+                    unreadCount = parseInt(data.unreadcount || 0, 10) || 0;
+                    var items = data.notifications || [];
+                    if (items.length) {
+                        renderItems(items);
+                        offset += items.length;
+                    }
+                    if (!items.length || items.length < limit) {
+                        loadedAll = true;
+                    }
+                    updateEmpty();
+                })
+                .catch(function () {
+                    initialLoad = true;
+                    loadedAll = true;
+                    updateEmpty();
+                })
+                .finally(function () {
+                    setBusy(false);
+                    if (isOpen() && countEl) {
+                        countEl.classList.add('is-hidden');
+                    } else {
+                        renderCount();
+                    }
+                });
+        }
+
+        function markAll() {
+            if (!ajaxUrl || unreadCount <= 0) {
+                return;
+            }
+            if (markAllBtn) {
+                markAllBtn.classList.add('is-loading');
+            }
+            var body = new URLSearchParams();
+            body.set('action', 'markall');
+            body.set('sesskey', sesskey);
+            body.set('timecreatedto', String(lastQueried || Math.floor(Date.now() / 1000)));
+            fetch(ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                },
+                body: body.toString()
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data && data.ok) {
+                        unreadCount = parseInt(data.unreadcount || 0, 10) || 0;
+                        root.querySelectorAll('.lp-notif-item.is-unread').forEach(function (el) {
+                            el.classList.remove('is-unread');
+                        });
+                        if (liveEl) {
+                            liveEl.textContent = 'Notifications marked as read';
+                        }
+                    }
+                })
+                .finally(function () {
+                    if (markAllBtn) {
+                        markAllBtn.classList.remove('is-loading');
+                    }
+                    if (isOpen() && countEl) {
+                        countEl.classList.add('is-hidden');
+                    } else {
+                        renderCount();
+                    }
+                });
+        }
+
+        if (toggle) {
+            toggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpen(!isOpen());
+            });
+        }
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                setOpen(false);
+                if (toggle) {
+                    toggle.focus();
+                }
+            });
+        }
+        if (markAllBtn) {
+            markAllBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                markAll();
+            });
+        }
+        if (list) {
+            list.addEventListener('click', function (e) {
+                var item = e.target.closest('[data-lp-notif-item]');
+                if (!item) {
+                    return;
+                }
+                if (e.target.closest('[data-lp-notif-more]')) {
+                    return;
+                }
+                if (item.classList.contains('is-unread')) {
+                    unreadCount = Math.max(0, unreadCount - 1);
+                    item.classList.remove('is-unread');
+                    root.setAttribute('data-unread', String(unreadCount));
+                }
+            });
+        }
+        if (scrollEl) {
+            scrollEl.addEventListener('scroll', function () {
+                if (isLoading || loadedAll) {
+                    return;
+                }
+                if (scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 48) {
+                    loadMore();
+                }
+            });
+        }
+        document.addEventListener('click', function (e) {
+            if (!isOpen()) {
+                return;
+            }
+            if (!root.contains(e.target)) {
+                setOpen(false);
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && isOpen()) {
+                setOpen(false);
+                if (toggle) {
+                    toggle.focus();
+                }
+            }
+        });
+    })();
 })();

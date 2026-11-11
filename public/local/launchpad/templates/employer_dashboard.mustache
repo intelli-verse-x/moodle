@@ -27,10 +27,17 @@
             <b>{{sidecard.chip_value}}</b> <span>{{sidecard.chip_label}}</span>
           </a>
         {{/hascourses}}
-        <a class="lp-iconbtn" href="{{urls.notifications}}" aria-label="{{notifications_label}}">
-          <iconify-icon icon="hugeicons:notification-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-          {{#hasunread}}<span class="lp-notif-dot">{{unread}}</span>{{/hasunread}}
-        </a>
+        <div class="lp-notif-pair" data-region="lp-notif-compare">
+          {{> local_launchpad/notification_dropdown }}
+          <a class="lp-iconbtn lp-notif-moodle-ref"
+             href="{{notif_moodle_compare_url}}"
+             aria-label="{{#str}} fellowship_notif_moodle_ref, local_launchpad {{/str}}"
+             title="{{#str}} fellowship_notif_moodle_ref, local_launchpad {{/str}}">
+            <iconify-icon icon="hugeicons:notification-01" width="18" height="18" aria-hidden="true"></iconify-icon>
+            {{#hasunread}}<span class="lp-notif-dot">{{unread}}</span>{{/hasunread}}
+            <span class="lp-notif-ref-tag">Moodle</span>
+          </a>
+        </div>
         {{> local_launchpad/profile_menu }}
       </div>
     </header>
@@ -67,8 +74,11 @@
           {{> local_launchpad/employer_messages }}
         {{/is_messages}}
         {{#is_notifications}}
-          {{> local_launchpad/employer_notifications }}
+          {{> local_launchpad/portal_notifications }}
         {{/is_notifications}}
+        {{#is_notificationprefs}}
+          {{> local_launchpad/portal_notification_prefs }}
+        {{/is_notificationprefs}}
         {{#is_profile}}
           {{> local_launchpad/employer_profile }}
         {{/is_profile}}

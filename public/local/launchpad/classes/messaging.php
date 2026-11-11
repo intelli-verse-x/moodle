@@ -377,6 +377,556 @@ final class messaging {
     }
 
     /**
+     * Moodle notification preference page (advanced matrix escape).
+     */
+    public static function notification_preferences_url(): string {
+        return (new \moodle_url('/message/notificationpreferences.php'))->out(false);
+    }
+
+    /**
+     * Portal script path for fellow|mentor|admin|employer.
+     */
+    public static function portal_path(string $portal): string {
+        return match ($portal) {
+            'mentor' => persona_home::MENTOR_PATH,
+            'admin' => persona_home::ADMIN_PATH,
+            'employer' => persona_home::EMPLOYEE_PATH,
+            default => persona_home::FELLOW_PATH,
+        };
+    }
+
+    /**
+     * LaunchPad notifications inbox URL.
+     *
+     * @param array<string,scalar|null> $params
+     */
+    public static function notifications_page_url(string $portal = 'fellow', array $params = []): string {
+        $params = array_merge(['view' => 'notifications'], $params);
+        return (new \moodle_url(self::portal_path($portal), array_filter(
+            $params,
+            static fn($v) => $v !== null && $v !== '' && $v !== false
+        )))->out(false);
+    }
+
+    /**
+     * LaunchPad notification preferences URL.
+     */
+    public static function notification_prefs_page_url(string $portal = 'fellow'): string {
+        return (new \moodle_url(self::portal_path($portal), ['view' => 'notificationprefs']))->out(false);
+    }
+
+    /**
+     * Shell topbar context for LaunchPad notification dropdown (+ Moodle compare link).
+     *
+     * @return array<string,mixed>
+     */
+    public static function notification_dropdown_context(int $userid, string $portal = 'fellow'): array {
+        $unread = self::notification_unread_count($userid);
+        $seeall = self::notifications_page_url($portal);
+        return [
+            'notif_userid' => $userid,
+            'notif_portal' => $portal,
+            'notif_ajax_url' => (new \moodle_url('/local/launchpad/ajax_notifications.php'))->out(false),
+            'notif_sesskey' => sesskey(),
+            'notif_prefs_url' => self::notification_prefs_page_url($portal),
+            'notif_see_all_url' => $seeall,
+            'notifications_url' => $seeall,
+            'notifications_label' => self::notifications_label($unread),
+            'unread_notifications' => $unread,
+            'has_unread_notifications' => $unread > 0,
+            'notif_limit' => 20,
+            'notif_moodle_compare_url' => self::moodle_notifications_url(),
+        ];
+    }
+
+    /**
+     * Popup notifications page (Moodle message_popup API), export-shaped for the custom dropdown.
+     *
+     * @return array{ok:bool,notifications:list<array>,unreadcount:int,error?:string}
+     */
+    public static function list_popup_notifications(
+        int $userid,
+        int $limit = 20,
+        int $offset = 0,
+        string $portal = 'fellow'
+    ): array {
+        global $PAGE;
+
+        if ($userid <= 0 || !class_exists('\message_popup\api')) {
+            return ['ok' => false, 'notifications' => [], 'unreadcount' => 0, 'error' => 'unavailable'];
+        }
+
+        $limit = max(1, min(50, $limit));
+        $offset = max(0, $offset);
+        if (!in_array($portal, ['fellow', 'mentor', 'admin', 'employer'], true)) {
+            $portal = 'fellow';
+        }
+
+        try {
+            $PAGE->set_context(\context_system::instance());
+            $renderer = $PAGE->get_renderer('core_message');
+            $records = \message_popup\api::get_popup_notifications($userid, 'DESC', $limit, $offset);
+            $items = [];
+            foreach ($records as $notification) {
+                $output = new \message_popup\output\popup_notification($notification);
+                $ctx = $output->export_for_template($renderer);
+                $id = (int) ($ctx->id ?? 0);
+                $contexturl = trim((string) ($ctx->contexturl ?? ''));
+                $detail = self::notifications_page_url($portal, ['notifid' => $id]);
+                $items[] = [
+                    'id' => $id,
+                    'subject' => (string) ($ctx->subject ?? ''),
+                    'shortenedsubject' => (string) ($ctx->shortenedsubject ?? $ctx->subject ?? ''),
+                    'timecreatedpretty' => (string) ($ctx->timecreatedpretty ?? ''),
+                    'timecreated' => (int) ($ctx->timecreated ?? 0),
+                    'read' => !empty($ctx->read),
+                    'unread' => empty($ctx->read),
+                    'contexturl' => $contexturl,
+                    'has_contexturl' => $contexturl !== '',
+                    'openurl' => $detail,
+                    'viewmoreurl' => $detail,
+                    'iconurl' => (string) ($ctx->iconurl ?? ''),
+                ];
+            }
+            return [
+                'ok' => true,
+                'notifications' => $items,
+                'unreadcount' => self::notification_unread_count($userid),
+            ];
+        } catch (\Throwable $e) {
+            debugging('list_popup_notifications: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return [
+                'ok' => false,
+                'notifications' => [],
+                'unreadcount' => self::notification_unread_count($userid),
+                'error' => 'loadfailed',
+            ];
+        }
+    }
+
+    /**
+     * Mark every unread popup notification as read (core_message API).
+     *
+     * @return array{ok:bool,unreadcount:int,error?:string}
+     */
+    public static function mark_all_popup_notifications_read(int $userid, int $timecreatedto = 0): array {
+        if ($userid <= 0 || !class_exists('\core_message\api')) {
+            return ['ok' => false, 'unreadcount' => 0, 'error' => 'unavailable'];
+        }
+        try {
+            if ($timecreatedto <= 0) {
+                $timecreatedto = time();
+            }
+            // Signature: touserid, fromuserid=null|0 (all senders), timecreatedto.
+            \core_message\api::mark_all_notifications_as_read($userid, 0, $timecreatedto);
+            return ['ok' => true, 'unreadcount' => self::notification_unread_count($userid)];
+        } catch (\Throwable $e) {
+            debugging('mark_all_popup_notifications_read: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return [
+                'ok' => false,
+                'unreadcount' => self::notification_unread_count($userid),
+                'error' => 'markfailed',
+            ];
+        }
+    }
+
+    /**
+     * Full-page notifications inbox + detail (LaunchPad chrome for every portal).
+     *
+     * @return array<string,mixed>
+     */
+    public static function notifications_inbox_page(
+        int $userid,
+        string $portal = 'fellow',
+        string $ntab = 'all',
+        int $notifid = 0,
+        bool $notifdone = false,
+        string $notiferr = ''
+    ): array {
+        global $DB;
+
+        if (!in_array($portal, ['fellow', 'mentor', 'admin', 'employer'], true)) {
+            $portal = 'fellow';
+        }
+        $ntab = in_array($ntab, ['all', 'unread'], true) ? $ntab : 'all';
+        $notifid = max(0, $notifid);
+        $script = self::portal_path($portal);
+        $prefsurl = self::notification_prefs_page_url($portal);
+        $actionurl = (new \moodle_url($script))->out(false);
+
+        $taburls = [
+            'all' => self::notifications_page_url($portal, array_filter([
+                'ntab' => null,
+                'notifid' => $notifid > 0 ? $notifid : null,
+            ])),
+            'unread' => self::notifications_page_url($portal, array_filter([
+                'ntab' => 'unread',
+                'notifid' => $notifid > 0 ? $notifid : null,
+            ])),
+        ];
+
+        $flash = null;
+        if ($notifdone) {
+            $flash = ['ok' => true, 'text' => get_string('fellowship_notif_marked_all', 'local_launchpad')];
+        } else if ($notiferr !== '') {
+            $flash = [
+                'ok' => false,
+                'text' => get_string('fellowship_notif_action_failed', 'local_launchpad'),
+            ];
+        }
+
+        $strings = [
+            'notifications_total_label' => get_string('fellowship_notifications', 'local_launchpad'),
+            'notifications_intro' => get_string('fellowship_notif_page_intro', 'local_launchpad'),
+            'notifications_inbox_lead' => get_string('fellowship_notif_page_lead', 'local_launchpad'),
+            'notifications_mark_all' => get_string('fellowship_notif_mark_all', 'local_launchpad'),
+            'notifications_preferences' => get_string('fellowship_notif_preferences', 'local_launchpad'),
+            'notifications_inbox_heading' => get_string('fellowship_notif_inbox', 'local_launchpad'),
+            'notifications_unread_label' => get_string('fellowship_notif_unread_label', 'local_launchpad'),
+            'notifications_tab_all' => get_string('fellowship_notif_tab_all', 'local_launchpad'),
+            'notifications_tab_unread' => get_string('fellowship_notif_tab_unread', 'local_launchpad'),
+            'notifications_empty_title' => get_string('fellowship_notif_empty', 'local_launchpad'),
+            'notifications_empty_body' => get_string('fellowship_notif_empty_body', 'local_launchpad'),
+            'notifications_empty_filter_title' => get_string('fellowship_notif_empty_filter_title', 'local_launchpad'),
+            'notifications_empty_filter_body' => get_string('fellowship_notif_empty_filter_body', 'local_launchpad'),
+            'notifications_detail_heading' => get_string('fellowship_notif_detail', 'local_launchpad'),
+            'notifications_detail_empty_title' => get_string('fellowship_notif_detail_empty_title', 'local_launchpad'),
+            'notifications_detail_empty_body' => get_string('fellowship_notif_detail_empty_body', 'local_launchpad'),
+            'notifications_back' => get_string('fellowship_notif_back', 'local_launchpad'),
+            'notifications_open_related' => get_string('fellowship_notif_open_related', 'local_launchpad'),
+            'notifications_unread_chip' => get_string('fellowship_notif_tab_unread', 'local_launchpad'),
+        ];
+
+        $empty = [
+            'strings' => $strings,
+            'page_items' => [],
+            'has_items' => false,
+            'notification_count' => 0,
+            'unread_count' => 0,
+            'has_unread' => false,
+            'prefs_url' => $prefsurl,
+            'ntab_all' => $ntab === 'all',
+            'ntab_unread' => $ntab === 'unread',
+            'tab_all_url' => $taburls['all'],
+            'tab_unread_url' => $taburls['unread'],
+            'has_selected' => false,
+            'selected' => null,
+            'can_mark_all' => false,
+            'action_url' => $actionurl,
+            'sesskey' => sesskey(),
+            'ntab' => $ntab,
+            'has_flash' => $flash !== null,
+            'flash' => $flash,
+        ];
+
+        if ($userid <= 0 || !class_exists('\message_popup\api')) {
+            return $empty;
+        }
+
+        try {
+            $unreadcount = self::notification_unread_count($userid);
+            $records = \message_popup\api::get_popup_notifications($userid, 'DESC', 80, 0);
+
+            if ($notifid > 0) {
+                $selectedrecord = self::find_popup_notification_record($userid, $notifid, $records);
+                if ($selectedrecord !== null && empty($selectedrecord->timeread)) {
+                    try {
+                        \core_message\api::mark_notification_as_read($selectedrecord);
+                        $selectedrecord->timeread = time();
+                        if ($unreadcount > 0) {
+                            $unreadcount--;
+                        }
+                        foreach ($records as $idx => $rec) {
+                            if ((int) ($rec->id ?? 0) === $notifid) {
+                                $records[$idx]->timeread = $selectedrecord->timeread;
+                                break;
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        debugging('notifications_inbox mark read: ' . $e->getMessage(), DEBUG_DEVELOPER);
+                    }
+                }
+            }
+
+            $allitems = [];
+            $selected = null;
+            foreach ($records as $n) {
+                $row = self::format_inbox_row($n, $portal, $ntab, $notifid);
+                if ($row === null) {
+                    continue;
+                }
+                $allitems[] = $row;
+                if (!empty($row['is_selected'])) {
+                    $selected = self::format_inbox_detail($n, $portal, $ntab);
+                }
+            }
+
+            if ($selected === null && $notifid > 0) {
+                $extra = self::find_popup_notification_record($userid, $notifid, $records);
+                if ($extra === null) {
+                    $extra = $DB->get_record('notifications', ['id' => $notifid, 'useridto' => $userid]);
+                }
+                if ($extra !== null) {
+                    $selected = self::format_inbox_detail($extra, $portal, $ntab);
+                    $extrarow = self::format_inbox_row($extra, $portal, $ntab, $notifid);
+                    if ($extrarow !== null) {
+                        array_unshift($allitems, $extrarow);
+                    }
+                }
+            }
+
+            $items = [];
+            foreach ($allitems as $row) {
+                if ($ntab === 'unread' && empty($row['unread'])) {
+                    continue;
+                }
+                $items[] = $row;
+            }
+
+            return array_merge($empty, [
+                'page_items' => $items,
+                'has_items' => $items !== [],
+                'notification_count' => count($records),
+                'unread_count' => $unreadcount,
+                'has_unread' => $unreadcount > 0,
+                'can_mark_all' => $unreadcount > 0,
+                'has_selected' => $selected !== null,
+                'selected' => $selected,
+            ]);
+        } catch (\Throwable $e) {
+            debugging('notifications_inbox_page: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return $empty;
+        }
+    }
+
+    /**
+     * Notification preferences (popup + email quick toggles).
+     *
+     * @return array<string,mixed>
+     */
+    public static function notification_preferences_page(
+        int $userid,
+        string $portal = 'fellow',
+        bool $saved = false,
+        string $err = ''
+    ): array {
+        $portal = in_array($portal, ['fellow', 'mentor', 'admin', 'employer'], true) ? $portal : 'fellow';
+        $back = self::notifications_page_url($portal);
+
+        $flash = null;
+        if ($saved) {
+            $flash = ['ok' => true, 'text' => get_string('fellowship_notif_prefs_saved', 'local_launchpad')];
+        } else if ($err !== '') {
+            $flash = [
+                'ok' => false,
+                'text' => get_string('fellowship_notif_prefs_failed', 'local_launchpad'),
+            ];
+        }
+
+        $emailpref = (string) get_user_preferences('message_provider_moodle_instantmessage_enabled', '', $userid);
+        $popupon = $emailpref === '' || strpos($emailpref, 'popup') !== false;
+        $emailon = $emailpref === '' || strpos($emailpref, 'email') !== false;
+        if ($emailpref === 'none') {
+            $popupon = false;
+            $emailon = false;
+        }
+
+        return [
+            'action_url' => (new \moodle_url(self::portal_path($portal)))->out(false),
+            'sesskey' => sesskey(),
+            'back_url' => $back,
+            'advanced_url' => self::notification_preferences_url(),
+            'has_flash' => $flash !== null,
+            'flash' => $flash,
+            'popup_checked' => $popupon,
+            'email_checked' => $emailon,
+            'title' => get_string('fellowship_notif_preferences', 'local_launchpad'),
+            'help' => get_string('fellowship_notif_prefs_help', 'local_launchpad'),
+            'popup_label' => get_string('fellowship_notif_pref_popup', 'local_launchpad'),
+            'email_label' => get_string('fellowship_notif_pref_email', 'local_launchpad'),
+            'save_label' => get_string('fellowship_notif_prefs_save', 'local_launchpad'),
+            'back_label' => get_string('fellowship_notif_back_inbox', 'local_launchpad'),
+            'advanced_label' => get_string('fellowship_notif_prefs_advanced', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Save simplified notification processor toggles.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function save_notification_preferences(int $userid, array $raw): string {
+        global $CFG, $DB;
+
+        if ($userid <= 0) {
+            return 'denied';
+        }
+        require_once($CFG->dirroot . '/message/lib.php');
+        if (!has_capability('moodle/user:editownmessageprofile', \context_system::instance(), $userid)) {
+            return 'denied';
+        }
+
+        $emailon = !empty($raw['email_enabled']) ? 1 : 0;
+        $popupon = !empty($raw['popup_enabled']) ? 1 : 0;
+        $providers = ['moodle_instantmessage', 'moodle_badgeawarded'];
+
+        foreach ($providers as $componentprovider) {
+            $pref = 'message_provider_' . $componentprovider . '_enabled';
+            $enabled = [];
+            if ($popupon) {
+                $enabled[] = 'popup';
+            }
+            if ($emailon) {
+                $enabled[] = 'email';
+            }
+            set_user_preference($pref, $enabled === [] ? 'none' : implode(',', $enabled), $userid);
+        }
+
+        $processors = $DB->get_records('message_processors', null, '', 'name');
+        foreach (['popup', 'email'] as $proc) {
+            if (!isset($processors[$proc])) {
+                continue;
+            }
+            $on = ($proc === 'popup') ? $popupon : $emailon;
+            foreach ($providers as $componentprovider) {
+                set_user_preference('message_provider_' . $componentprovider . '_loggedin', $on ? $proc : 'none', $userid);
+                set_user_preference('message_provider_' . $componentprovider . '_loggedoff', $on ? $proc : 'none', $userid);
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param list<\stdClass> $records
+     */
+    private static function find_popup_notification_record(int $userid, int $notifid, array $records): ?\stdClass {
+        global $DB;
+
+        if ($notifid <= 0 || $userid <= 0) {
+            return null;
+        }
+        foreach ($records as $n) {
+            if ((int) ($n->id ?? 0) === $notifid) {
+                return $n;
+            }
+        }
+        try {
+            $sql = "SELECT n.*
+                      FROM {notifications} n
+                     WHERE n.id = ?
+                       AND n.useridto = ?
+                       AND n.id IN (SELECT notificationid FROM {message_popup_notifications})";
+            $rec = $DB->get_record_sql($sql, [$notifid, $userid]);
+            return $rec ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private static function format_inbox_row(\stdClass $n, string $portal, string $ntab, int $selectedid): ?array {
+        $id = (int) ($n->id ?? 0);
+        if ($id <= 0) {
+            return null;
+        }
+        $subject = trim(strip_tags((string) ($n->subject ?? '')));
+        if ($subject === '') {
+            $subject = trim(strip_tags((string) ($n->smallmessage ?? '')));
+        }
+        if ($subject === '') {
+            $subject = get_string('fellowship_notifications', 'local_launchpad');
+        }
+        $preview = trim(strip_tags((string) ($n->smallmessage ?? '')));
+        if ($preview === '' || $preview === $subject) {
+            $preview = trim(strip_tags((string) ($n->fullmessage ?? '')));
+        }
+        if (\core_text::strlen($preview) > 120) {
+            $preview = \core_text::substr($preview, 0, 117) . '…';
+        }
+        $isunread = empty($n->timeread);
+        $when = !empty($n->timecreated)
+            ? userdate((int) $n->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
+            : '';
+
+        return [
+            'id' => $id,
+            'name' => $subject,
+            'preview' => $preview,
+            'has_preview' => $preview !== '',
+            'when' => $when,
+            'has_when' => $when !== '',
+            'type_label' => '',
+            'has_type' => false,
+            'unread' => $isunread,
+            'unread_label' => $isunread ? get_string('fellowship_notif_tab_unread', 'local_launchpad') : '',
+            'is_selected' => $id === $selectedid,
+            'url' => self::notifications_page_url($portal, array_filter([
+                'ntab' => $ntab !== 'all' ? $ntab : null,
+                'notifid' => $id,
+            ])),
+        ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private static function format_inbox_detail(\stdClass $n, string $portal, string $ntab): array {
+        $id = (int) ($n->id ?? 0);
+        $subject = trim(strip_tags((string) ($n->subject ?? '')));
+        if ($subject === '') {
+            $subject = trim(strip_tags((string) ($n->smallmessage ?? '')));
+        }
+        if ($subject === '') {
+            $subject = get_string('fellowship_notifications', 'local_launchpad');
+        }
+        $contexturl = trim((string) ($n->contexturl ?? ''));
+        $contextname = trim(strip_tags((string) ($n->contexturlname ?? '')));
+        if ($contextname === '') {
+            $contextname = get_string('fellowship_notif_open_related', 'local_launchpad');
+        }
+
+        $bodyhtml = '';
+        $html = trim((string) ($n->fullmessagehtml ?? ''));
+        if ($html !== '') {
+            $bodyhtml = format_text($html, FORMAT_HTML, ['filter' => false, 'para' => false]);
+        } else {
+            $bodyhtml = format_text(
+                (string) ($n->fullmessage ?? ''),
+                (int) ($n->fullmessageformat ?? FORMAT_MOODLE),
+                ['filter' => false]
+            );
+        }
+        if (trim(strip_tags($bodyhtml)) === '') {
+            $small = trim(strip_tags((string) ($n->smallmessage ?? '')));
+            $bodyhtml = s($small !== '' ? $small : get_string('fellowship_notif_no_body', 'local_launchpad'));
+        }
+
+        $when = !empty($n->timecreated)
+            ? userdate((int) $n->timecreated, get_string('strftimedatetimeshort', 'langconfig'))
+            : '';
+
+        return [
+            'id' => $id,
+            'name' => $subject,
+            'body_html' => $bodyhtml,
+            'when' => $when,
+            'has_when' => $when !== '',
+            'type_label' => '',
+            'has_type' => false,
+            'unread' => empty($n->timeread),
+            'has_context' => $contexturl !== '',
+            'context_url' => $contexturl,
+            'context_label' => $contextname,
+            'back_url' => self::notifications_page_url($portal, array_filter([
+                'ntab' => $ntab !== 'all' ? $ntab : null,
+            ])),
+        ];
+    }
+
+    /**
      * Page context: inbox list and/or open thread with another user / conversation.
      *
      * @param string $portal fellow|mentor

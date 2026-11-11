@@ -49,12 +49,19 @@
         </div>
       </div>
       <div class="lp-topbar-actions">
-        <a class="lp-iconbtn" href="{{notifications_url}}" aria-label="{{notifications_label}}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/><path d="M10 20a2 2 0 004 0"/></svg>
-          {{#has_unread_notifications}}
-            <span class="lp-notif-dot">{{unread_notifications}}</span>
-          {{/has_unread_notifications}}
-        </a>
+        <div class="lp-notif-pair" data-region="lp-notif-compare">
+          {{> local_launchpad/notification_dropdown }}
+          <a class="lp-iconbtn lp-notif-moodle-ref"
+             href="{{notif_moodle_compare_url}}"
+             aria-label="{{str_notif_moodle_ref}}"
+             title="{{str_notif_moodle_ref}}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/><path d="M10 20a2 2 0 004 0"/></svg>
+            {{#has_unread_notifications}}
+              <span class="lp-notif-dot">{{unread_notifications}}</span>
+            {{/has_unread_notifications}}
+            <span class="lp-notif-ref-tag">Moodle</span>
+          </a>
+        </div>
         <a class="lp-profile-icon" href="{{profile_url}}" aria-label="{{str_account}}" title="{{str_account}}">
           <span class="lp-av lp-av-sm" aria-hidden="true">{{initials}}</span>
         </a>
