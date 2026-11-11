@@ -1,8 +1,8 @@
 {{!
     @template local_launchpad/admin_structure
 
-    Admin LaunchPad Structure — preview, create/sync, existing status table.
-    Navbar stays in admin_shell. Keep comments free of Mustache braces.
+    Admin Structure — manage existing tracks (hide / delete).
+    Create tracks in Course builder (not a CLI dump).
 }}
 <div class="lp-st" data-region="local-launchpad-admin-structure">
 
@@ -12,6 +12,16 @@
         <span class="lp-eyebrow">{{eyebrow}}</span>
         <h2>{{heading}}</h2>
         <p class="lp-hero-lead">{{lead}}</p>
+        <div class="lp-st-links" style="margin-top:12px">
+          {{#show_builder_cta}}
+            <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{builder_url}}">{{create_in_builder_label}}</a>
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
+          {{/show_builder_cta}}
+          {{#show_cohorts_cta}}
+            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{cohorts_url}}">{{cohorts_label}}</a>
+          {{/show_cohorts_cta}}
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{tracks_url}}">{{tracks_label}}</a>
+        </div>
       </div>
     </div>
   </section>
@@ -114,101 +124,14 @@
     </section>
   {{/has_existing}}
 
-  <div class="lp-st-grid">
-    <section class="lp-card lift lp-stack-lg">
-      <div class="lp-card-head">
-        <h3>{{cohort_label}}</h3>
-      </div>
-      <form method="post" action="{{form_action}}" class="lp-stack lp-st-form">
-        <input type="hidden" name="sesskey" value="{{sesskey}}">
-        <input type="hidden" name="action" value="structure_preview">
-        <label class="lp-field">
-          <span>{{cohort_label}}</span>
-          <input type="text" name="cohort" value="{{cohort_value}}" required maxlength="120" autocomplete="off">
-        </label>
-        <p class="lp-sm lp-muted">{{cohort_help}}</p>
-        <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{preview_label}}</button>
-      </form>
-
-      <form method="post" action="{{form_action}}" class="lp-stack lp-st-form lp-st-apply">
-        <input type="hidden" name="sesskey" value="{{sesskey}}">
-        <input type="hidden" name="action" value="structure_apply">
-        <input type="hidden" name="cohort" value="{{cohort_value}}">
-        <label class="lp-st-confirm">
-          <input type="checkbox" name="structure_confirm" value="1" required>
-          <span>{{confirm_label}}</span>
-        </label>
-        <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{apply_label}}</button>
-      </form>
-
-      <div class="lp-st-links">
-        {{#show_builder_cta}}
-          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
-        {{/show_builder_cta}}
-        {{#show_cohorts_cta}}
-          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{cohorts_url}}">{{cohorts_label}}</a>
-        {{/show_cohorts_cta}}
-        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{tracks_url}}">{{tracks_label}}</a>
-      </div>
+  {{^has_existing}}
+    <section class="lp-card soft lp-st-empty" role="status">
+      <h3>{{empty_manage_title}}</h3>
+      <p class="lp-muted">{{empty_manage_body}}</p>
+      <p class="lp-empty-actions" style="margin-top:12px">
+        <a class="lp-btn lp-btn-solid" href="{{builder_url}}">{{create_in_builder_label}}</a>
+      </p>
     </section>
-
-    <section class="lp-card lift lp-stack-lg">
-      <div class="lp-card-head">
-        <h3>{{summary_title}}</h3>
-      </div>
-
-      <div class="lp-st-block">
-        <p class="lp-eyebrow">{{categories_title}}</p>
-        <ul class="lp-st-list">
-          {{#categories}}
-            <li>
-              <span>{{name}}</span>
-              <code class="lp-tr-idn">{{idnumber}}</code>
-            </li>
-          {{/categories}}
-        </ul>
-      </div>
-
-      <div class="lp-st-block">
-        <p class="lp-eyebrow">{{courses_title}}</p>
-        {{#has_courses}}
-          <ul class="lp-st-list">
-            {{#courses}}
-              <li>
-                <span>
-                  <b>{{fullname}}</b>
-                  <span class="lp-muted lp-sm"> · {{kind_label}}</span>
-                </span>
-                <code class="lp-tr-idn">{{idnumber}}</code>
-              </li>
-            {{/courses}}
-          </ul>
-        {{/has_courses}}
-        {{^has_courses}}
-          <p class="lp-muted lp-sm">{{cohort_help}}</p>
-        {{/has_courses}}
-      </div>
-
-      <div class="lp-st-block">
-        <p class="lp-eyebrow">{{phases_title}}</p>
-        <ol class="lp-st-phases">
-          {{#phases}}
-            <li><span class="lp-st-phase-num">{{num}}</span> {{name}}</li>
-          {{/phases}}
-        </ol>
-        <p class="lp-sm lp-muted">{{phases_note}}</p>
-      </div>
-    </section>
-  </div>
-
-  {{#has_preview}}
-    <section class="lp-card soft lp-st-log" aria-label="{{preview_title}}">
-      <div class="lp-card-head">
-        <h3>{{preview_title}}</h3>
-      </div>
-      <pre class="lp-st-log-body" tabindex="0">{{#log_lines}}{{text}}
-{{/log_lines}}</pre>
-    </section>
-  {{/has_preview}}
+  {{/has_existing}}
 
 </div>

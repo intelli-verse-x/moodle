@@ -23,6 +23,42 @@
     <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
   {{/flash_err}}
 
+  {{#show_create_track}}
+    <section class="lp-card lift lp-cb-create" data-region="builder-create-track">
+      <div class="lp-card-head">
+        <h3>{{create_title}}</h3>
+        <p class="lp-sm lp-muted">{{create_help}}</p>
+      </div>
+      <form method="post" action="{{create_action}}" class="lp-cb-create-form">
+        <input type="hidden" name="sesskey" value="{{create_sesskey}}">
+        <input type="hidden" name="action" value="create_track">
+        <div class="lp-cb-create-grid">
+          <label class="lp-field">
+            <span>{{create_name_label}}</span>
+            <input type="text" name="trackname" required maxlength="200" list="lp-cb-known-tracks" placeholder="e.g. AI &amp; Automation">
+            <datalist id="lp-cb-known-tracks">
+              {{#known_tracks}}
+                <option value="{{name}}"></option>
+              {{/known_tracks}}
+            </datalist>
+          </label>
+          <label class="lp-field">
+            <span>{{create_cohort_label}}</span>
+            <input type="text" name="cohort" required maxlength="80" value="{{create_cohort_value}}">
+          </label>
+          <label class="lp-field lp-cb-create-phases">
+            <span>{{create_phases_label}}</span>
+            <textarea name="phases" rows="5" required>{{create_phases_value}}</textarea>
+            <span class="lp-field-hint">{{create_phases_help}}</span>
+          </label>
+        </div>
+        <div class="lp-profile-form-actions">
+          <button type="submit" class="lp-btn lp-btn-solid">{{create_submit}}</button>
+        </div>
+      </form>
+    </section>
+  {{/show_create_track}}
+
   {{^has_tracks}}
     <div class="lp-cb-empty">
       {{> local_launchpad/admin_empty}}
@@ -117,6 +153,22 @@
                 {{/has_activities}}
               </section>
             {{/phases}}
+
+            {{#show_add_phase}}
+              <section class="lp-card lp-cb-add-phase">
+                <h3>{{add_phase_title}}</h3>
+                <form method="post" action="{{add_phase_action}}" class="lp-cb-add-phase-form">
+                  <input type="hidden" name="sesskey" value="{{add_phase_sesskey}}">
+                  <input type="hidden" name="action" value="add_phase">
+                  <input type="hidden" name="trackid" value="{{add_phase_trackid}}">
+                  <label class="lp-field">
+                    <span>{{add_phase_label}}</span>
+                    <input type="text" name="phasename" required maxlength="255" placeholder="e.g. Capstone clinic">
+                  </label>
+                  <button type="submit" class="lp-btn lp-btn-light">{{add_phase_submit}}</button>
+                </form>
+              </section>
+            {{/show_add_phase}}
           </div>
 
           <aside class="lp-cb-rail" aria-label="{{side_title}}">

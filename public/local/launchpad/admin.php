@@ -324,11 +324,43 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
         $flash = admin_dashboard::mark_activity_reviewed($USER, $trackid, $cmid);
+    } else if ($view === 'builder' && $action === 'create_track') {
+        $trackname = optional_param('trackname', '', PARAM_TEXT);
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $phasesraw = optional_param('phases', '', PARAM_TEXT);
+        $flash = admin_dashboard::create_track_course($USER, $trackname, $cohort, $phasesraw);
+        $SESSION->lp_admin_flash = $flash;
+        $newtrackid = (int) ($flash['trackid'] ?? 0);
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'builder',
+            'trackid' => $newtrackid > 0 ? $newtrackid : null,
+        ])));
+    } else if ($view === 'builder' && $action === 'add_phase') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $phasename = optional_param('phasename', '', PARAM_TEXT);
+        $flash = admin_dashboard::add_track_phase($USER, $trackid, $phasename);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'builder',
+            'trackid' => (int) ($flash['trackid'] ?? $trackid),
+        ]));
     } else if ($view === 'builder' && $action === 'toggle_section') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
         $show = (bool) optional_param('show', 0, PARAM_BOOL);
         $flash = admin_dashboard::set_phase_visible($USER, $trackid, $sectionnum, $show);
+    } else if ($view === 'manage' && $action === 'delete_phase') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
+        $flash = admin_dashboard::delete_track_phase($USER, $trackid, $sectionnum);
+        $SESSION->lp_admin_flash = $flash;
+        $redirtrack = (int) ($flash['trackid'] ?? $trackid);
+        $redirsection = (int) ($flash['section'] ?? max(1, $sectionnum - 1));
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'manage',
+            'trackid' => $redirtrack > 0 ? $redirtrack : null,
+            'section' => $redirsection > 0 ? $redirsection : null,
+        ])));
     } else if ($view === 'manage' && $action === 'add_activity') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $sectionnum = optional_param('sectionnum', 0, PARAM_INT);

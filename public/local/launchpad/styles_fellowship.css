@@ -11898,6 +11898,19 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   gap: 12px;
   flex-wrap: wrap;
 }
+.lp-manage-phase-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.lp-manage-phase-actions .lp-manage-edit-only {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
 .lp-manage-phase-identity {
   display: flex;
   align-items: flex-start;
@@ -12208,6 +12221,45 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
 }
 .lp-cb-empty {
   margin-top: 4px;
+}
+.lp-cb-create {
+  margin: 8px 0 16px;
+  padding: 18px 18px 14px;
+}
+.lp-cb-create .lp-card-head {
+  margin-bottom: 12px;
+}
+.lp-cb-create-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+.lp-cb-create-phases {
+  grid-column: 1 / -1;
+}
+.lp-cb-create-phases textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+}
+.lp-cb-add-phase {
+  margin-top: 12px;
+  padding: 14px 16px;
+}
+.lp-cb-add-phase-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.lp-cb-add-phase-form .lp-field {
+  flex: 1 1 220px;
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .lp-cb-create-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .lp-cb-tabs {
   display: flex;
