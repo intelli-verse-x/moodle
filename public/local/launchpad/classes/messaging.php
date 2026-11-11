@@ -531,6 +531,68 @@ final class messaging {
     }
 
     /**
+     * AJAX: load one notification for the inbox right pane (marks read like Moodle).
+     *
+     * @return array{ok:bool,selected?:array<string,mixed>,unreadcount:int,error?:string}
+     */
+    public static function notification_detail_for_inbox(
+        int $userid,
+        int $notifid,
+        string $portal = 'fellow',
+        string $ntab = 'all'
+    ): array {
+        global $DB;
+
+        if (!in_array($portal, ['fellow', 'mentor', 'admin', 'employer'], true)) {
+            $portal = 'fellow';
+        }
+        $ntab = in_array($ntab, ['all', 'unread'], true) ? $ntab : 'all';
+        $notifid = max(0, $notifid);
+        $unread = self::notification_unread_count($userid);
+
+        if ($userid <= 0 || $notifid <= 0) {
+            return ['ok' => false, 'unreadcount' => $unread, 'error' => 'invalid'];
+        }
+
+        try {
+            $record = self::find_popup_notification_record($userid, $notifid, []);
+            if ($record === null) {
+                $record = $DB->get_record('notifications', ['id' => $notifid, 'useridto' => $userid]);
+            }
+            if ($record === null) {
+                return ['ok' => false, 'unreadcount' => $unread, 'error' => 'notfound'];
+            }
+
+            $wasunread = empty($record->timeread);
+            if ($wasunread && class_exists('\core_message\api')) {
+                try {
+                    \core_message\api::mark_notification_as_read($record);
+                    $record->timeread = time();
+                    if ($unread > 0) {
+                        $unread--;
+                    }
+                } catch (\Throwable $e) {
+                    debugging('notification_detail_for_inbox mark: ' . $e->getMessage(), DEBUG_DEVELOPER);
+                }
+            }
+
+            return [
+                'ok' => true,
+                'selected' => self::format_inbox_detail($record, $portal, $ntab),
+                'unreadcount' => $unread,
+                'was_unread' => $wasunread,
+            ];
+        } catch (\Throwable $e) {
+            debugging('notification_detail_for_inbox: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            return [
+                'ok' => false,
+                'unreadcount' => self::notification_unread_count($userid),
+                'error' => 'loadfailed',
+            ];
+        }
+    }
+
+    /**
      * Full-page notifications inbox + detail (LaunchPad chrome for every portal).
      *
      * @return array<string,mixed>
@@ -613,7 +675,9 @@ final class messaging {
             'selected' => null,
             'can_mark_all' => false,
             'action_url' => $actionurl,
+            'ajax_url' => (new \moodle_url('/local/launchpad/ajax_notifications.php'))->out(false),
             'sesskey' => sesskey(),
+            'portal' => $portal,
             'ntab' => $ntab,
             'has_flash' => $flash !== null,
             'flash' => $flash,
@@ -871,6 +935,236 @@ final class messaging {
     }
 
     /**
+     * Map a Moodle course/mod URL into the current LaunchPad portal when possible.
+     * Leaves external / unknown URLs unchanged.
+     */
+    public static function portalize_moodle_url(string $url, string $portal = 'fellow'): string {
+        global $CFG;
+
+        $raw = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5);
+        if ($raw === '' || preg_match('#^(javascript|data|mailto):#i', $raw)) {
+            return $url;
+        }
+        if (!in_array($portal, ['fellow', 'mentor', 'admin', 'employer'], true)) {
+            $portal = 'fellow';
+        }
+
+        $parts = parse_url($raw);
+        if ($parts === false) {
+            return $url;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        $rootpath = rtrim((string) (parse_url($CFG->wwwroot, PHP_URL_PATH) ?: ''), '/');
+        if ($rootpath !== '' && str_starts_with($path, $rootpath)) {
+            $path = substr($path, strlen($rootpath));
+            if ($path === '' || $path[0] !== '/') {
+                $path = '/' . ltrim($path, '/');
+            }
+        }
+
+        $lookslocal = (bool) preg_match('#^/(mod/|course/|user/|local/launchpad/)#', $path);
+        $www = parse_url($CFG->wwwroot);
+        if (!empty($parts['host']) && !empty($www['host'])
+                && strcasecmp((string) $parts['host'], (string) $www['host']) !== 0
+                && !$lookslocal) {
+            // Foreign host and not a Moodle path we recognize.
+            return $url;
+        }
+
+        // Already in LaunchPad chrome.
+        if (str_contains($path, '/local/launchpad/')) {
+            return $raw;
+        }
+
+        $query = [];
+        if (!empty($parts['query'])) {
+            parse_str(html_entity_decode((string) $parts['query'], ENT_QUOTES | ENT_HTML5), $query);
+        }
+
+        if (preg_match('#^/mod/[^/]+/view\.php$#', $path) && !empty($query['id'])) {
+            return self::portal_activity_url($portal, (int) $query['id']);
+        }
+        if (preg_match('#^/mod/[^/]+/index\.php$#', $path) && !empty($query['id'])) {
+            return self::portal_course_url($portal, (int) $query['id']);
+        }
+        if (preg_match('#^/course/view\.php$#', $path) && !empty($query['id'])) {
+            return self::portal_course_url($portal, (int) $query['id']);
+        }
+        // Enrolment / welcome CTAs often point at the course user profile page.
+        if (preg_match('#^/user/(view|profile)\.php$#', $path) && !empty($query['course'])) {
+            return self::portal_course_url($portal, (int) $query['course']);
+        }
+        if (preg_match('#^/course/(recent|resources|index)\.php$#', $path) && !empty($query['id'])) {
+            return self::portal_course_url($portal, (int) $query['id']);
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Activity (cm) URL inside a portal shell.
+     * Deleted / missing CMs fall back to the course/track page (never Moodle course chrome).
+     */
+    public static function portal_activity_url(string $portal, int $cmid): string {
+        $cmid = max(0, $cmid);
+        if ($cmid <= 0) {
+            return (new \moodle_url(self::portal_path($portal)))->out(false);
+        }
+
+        $cm = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+        if (!$cm || !empty($cm->deletioninprogress)) {
+            $courseid = $cm ? (int) $cm->course : 0;
+            return $courseid > 0
+                ? self::portal_course_url($portal, $courseid)
+                : (new \moodle_url(self::portal_path($portal)))->out(false);
+        }
+
+        if ($portal === 'fellow') {
+            return (new \moodle_url(persona_home::FELLOW_PATH, [
+                'view' => 'activity',
+                'cmid' => $cmid,
+            ]))->out(false);
+        }
+        if ($portal === 'admin') {
+            return (new \moodle_url(persona_home::ADMIN_PATH, array_filter([
+                'view' => 'activity',
+                'id' => (int) $cm->course > 0 ? (int) $cm->course : null,
+                'cmid' => $cmid,
+            ])))->out(false);
+        }
+        if ($portal === 'mentor') {
+            // Mentors review submissions from the queue (need fellow id for a specific review).
+            return (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
+        }
+        // Employer: open the parent course in the employee shell.
+        return self::portal_course_url('employer', (int) $cm->course);
+    }
+
+    /**
+     * Course / track URL inside a portal shell.
+     */
+    public static function portal_course_url(string $portal, int $courseid): string {
+        $courseid = max(0, $courseid);
+        if ($courseid <= 0) {
+            return (new \moodle_url(self::portal_path($portal)))->out(false);
+        }
+        return match ($portal) {
+            'fellow' => (new \moodle_url(persona_home::FELLOW_PATH, [
+                'view' => 'track',
+                'id' => $courseid,
+            ]))->out(false),
+            'employer' => (new \moodle_url(persona_home::EMPLOYEE_PATH, [
+                'view' => 'course',
+                'id' => $courseid,
+            ]))->out(false),
+            'admin' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'manage',
+                'id' => $courseid,
+            ]))->out(false),
+            'mentor' => (new \moodle_url(persona_home::MENTOR_PATH, [
+                'view' => 'fellows',
+                'course' => $courseid,
+            ]))->out(false),
+            default => (new \moodle_url(persona_home::FELLOW_PATH, [
+                'view' => 'track',
+                'id' => $courseid,
+            ]))->out(false),
+        };
+    }
+
+    /**
+     * Rewrite Moodle hrefs inside notification HTML to LaunchPad portal URLs.
+     */
+    public static function rewrite_notification_html_links(string $html, string $portal = 'fellow'): string {
+        if ($html === '' || !str_contains($html, 'href=')) {
+            return $html;
+        }
+        return (string) preg_replace_callback(
+            '/\bhref\s*=\s*(["\'])([^"\']*)\1/i',
+            static function (array $m) use ($portal): string {
+                $rewritten = self::portalize_moodle_url($m[2], $portal);
+                return 'href=' . $m[1] . htmlspecialchars($rewritten, ENT_QUOTES | ENT_HTML5) . $m[1];
+            },
+            $html
+        );
+    }
+
+    /**
+     * Normalize URLs for equality (path + sorted query; ignore host/amp/sesskey).
+     */
+    public static function notification_urls_equivalent(string $a, string $b): bool {
+        $na = self::normalize_notification_url($a);
+        $nb = self::normalize_notification_url($b);
+        return $na !== '' && $na === $nb;
+    }
+
+    /**
+     * @return string path?query
+     */
+    private static function normalize_notification_url(string $url): string {
+        $url = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5);
+        if ($url === '') {
+            return '';
+        }
+        $parts = parse_url($url);
+        if ($parts === false) {
+            return '';
+        }
+        $path = (string) ($parts['path'] ?? '');
+        $query = [];
+        if (!empty($parts['query'])) {
+            parse_str((string) $parts['query'], $query);
+        }
+        unset($query['sesskey'], $query['notify'], $query['lang']);
+        ksort($query);
+        return strtolower($path) . ($query === [] ? '' : '?' . http_build_query($query));
+    }
+
+    /**
+     * Drop Moodle breadcrumb chrome and duplicate activity links (CTA already covers them).
+     */
+    public static function clean_notification_html(string $html, string $portal, string $contexturl = ''): string {
+        $html = trim($html);
+        if ($html === '') {
+            return $html;
+        }
+
+        // Moodle assign/quiz emails lead with: Course -> Module index -> Activity [<hr>].
+        $html = (string) preg_replace(
+            '#<p\b[^>]*>\s*(?:<a\b[^>]*>[\s\S]*?</a>\s*(?:->|-&gt;|→|»|&gt;)\s*){1,}<a\b[^>]*>[\s\S]*?</a>\s*</p>\s*(?:<hr\b[^>]*/?>\s*)?#i',
+            '',
+            $html,
+            1
+        );
+
+        $html = self::rewrite_notification_html_links($html, $portal);
+
+        if ($contexturl !== '') {
+            $html = (string) preg_replace_callback(
+                '#<a\b([^>]*)\bhref\s*=\s*(["\'])([^"\']*)\2([^>]*)>([\s\S]*?)</a>#i',
+                static function (array $m) use ($contexturl, $portal): string {
+                    $href = self::portalize_moodle_url(html_entity_decode($m[3], ENT_QUOTES | ENT_HTML5), $portal);
+                    if (self::notification_urls_equivalent($href, $contexturl)) {
+                        // Same destination as the primary CTA — keep wording, drop the link.
+                        return $m[5];
+                    }
+                    return '<a' . $m[1] . 'href=' . $m[2]
+                        . htmlspecialchars($href, ENT_QUOTES | ENT_HTML5)
+                        . $m[2] . $m[4] . '>' . $m[5] . '</a>';
+                },
+                $html
+            );
+        }
+
+        // Trailing / leading decorative hrs left by Moodle templates.
+        $html = (string) preg_replace('#^(?:\s*<hr\b[^>]*/?>\s*)+#i', '', $html);
+        $html = (string) preg_replace('#(?:\s*<hr\b[^>]*/?>\s*)+$#i', '', $html);
+
+        return trim($html);
+    }
+
+    /**
      * @return array<string,mixed>
      */
     private static function format_inbox_detail(\stdClass $n, string $portal, string $ntab): array {
@@ -882,7 +1176,7 @@ final class messaging {
         if ($subject === '') {
             $subject = get_string('fellowship_notifications', 'local_launchpad');
         }
-        $contexturl = trim((string) ($n->contexturl ?? ''));
+        $contexturl = self::portalize_moodle_url(trim((string) ($n->contexturl ?? '')), $portal);
         $contextname = trim(strip_tags((string) ($n->contexturlname ?? '')));
         if ($contextname === '') {
             $contextname = get_string('fellowship_notif_open_related', 'local_launchpad');
@@ -899,6 +1193,7 @@ final class messaging {
                 ['filter' => false]
             );
         }
+        $bodyhtml = self::clean_notification_html($bodyhtml, $portal, $contexturl);
         if (trim(strip_tags($bodyhtml)) === '') {
             $small = trim(strip_tags((string) ($n->smallmessage ?? '')));
             $bodyhtml = s($small !== '' ? $small : get_string('fellowship_notif_no_body', 'local_launchpad'));

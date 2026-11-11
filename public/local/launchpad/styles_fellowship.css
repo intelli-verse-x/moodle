@@ -7655,12 +7655,11 @@ body.lp-portal-mismatch-lock {
 .lp-notif-inbox {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 12px;
+  gap: 0;
+  padding: 14px 12px 0;
   border-right: 1px solid var(--lp-line, #E3E9F4);
   background: #FBFCFE;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   min-height: 0;
   min-width: 0;
 }
@@ -7668,11 +7667,11 @@ body.lp-portal-mismatch-lock {
   max-width: none;
   width: 100%;
   margin: 0;
-  position: sticky;
-  top: 0;
+  flex: none;
+  position: relative;
   z-index: 2;
   background: #FBFCFE;
-  padding-bottom: 4px;
+  padding-bottom: 12px;
   box-sizing: border-box;
   min-width: 0;
 }
@@ -7701,33 +7700,51 @@ body.lp-portal-mismatch-lock {
 .lp-notif-inbox .lp-notif-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.lp-notif-inbox .lp-notif-inbox-empty {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 14px;
 }
 .lp-notif-row {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 12px 12px 14px;
   border-radius: 14px;
   border: 1px solid transparent;
   text-decoration: none;
   color: inherit;
-  transition: background .15s ease, border-color .15s ease;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
 .lp-notif-row:hover {
   background: #fff;
   border-color: var(--lp-line, #E3E9F4);
 }
 .lp-notif-row.is-selected {
-  background: #fff;
-  border-color: rgba(26, 97, 242, .28);
-  box-shadow: 0 1px 0 rgba(26, 97, 242, .08);
+  background: #EEF4FF;
+  border-color: rgba(26, 97, 242, .32);
+  box-shadow: inset 3px 0 0 var(--lp-blue, #1A61F2);
+}
+.lp-notif-row.is-selected .lp-notif-name {
+  color: var(--lp-ink, #0D1429);
+}
+.lp-notif-row.is-selected .lp-notif-icon {
+  background: #D9E6FC;
+  color: var(--lp-blue, #1A61F2);
 }
 .lp-notif-row.is-unread .lp-notif-name { font-weight: 700; }
-.lp-notif-row.is-unread {
+.lp-notif-row.is-unread:not(.is-selected) {
   box-shadow: inset 3px 0 0 var(--lp-blue, #1A61F2);
 }
 .lp-notif-icon {
@@ -7900,7 +7917,10 @@ body.lp-portal-mismatch-lock {
     border-right: 0;
     border-bottom: 1px solid var(--lp-line, #E3E9F4);
     max-height: min(42vh, 360px);
-    overflow-x: hidden;
+    overflow: hidden;
+  }
+  .lp-notif-inbox .lp-notif-list {
+    max-height: none;
   }
   .lp-notif-detail { min-height: 360px; }
   .lp-notif-layout:not(.is-split) .lp-notif-detail { min-height: 220px; }

@@ -1585,6 +1585,7 @@ $string['fellowship_sequence_locked_activity'] = 'Finish the previous activity f
 $string['fellowship_sequence_locked_phase'] = 'Complete the previous phase first.';
 $string['fellowship_sequence_locked_chip'] = 'Locked';
 $string['fellowship_sequence_locked_redirect'] = 'Finish the previous activity first, then this one unlocks.';
+$string['fellowship_activity_unavailable'] = 'That activity is no longer available. Back on your track.';
 $string['fellowship_track_capstone'] = 'Capstone';
 $string['fellowship_track_capstone_help'] = 'What you build and defend on Demo day.';
 $string['fellowship_track_capstone_body'] = 'Brief, backlog, acceptance scenarios, prototype, change log and an evidence-linked decision memo. Stakeholder and data are <b>simulated</b> and labelled.';

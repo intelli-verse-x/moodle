@@ -2,8 +2,21 @@
     @template local_launchpad/portal_notifications
 
     LaunchPad notifications inbox + detail (fellow / mentor / admin / employer).
+    List selection updates the right pane via AJAX (no full page reload).
 }}
-<div class="lp-tools-page lp-reveal" data-region="portal-notifications" style="--lp-d:0">
+<div class="lp-tools-page lp-reveal"
+     data-region="portal-notifications"
+     data-ajax="{{ajax_url}}"
+     data-sesskey="{{sesskey}}"
+     data-portal="{{portal}}"
+     data-ntab="{{ntab}}"
+     data-unread="{{unread_count}}"
+     data-label-back="{{strings.notifications_back}}"
+     data-label-unread="{{strings.notifications_tab_unread}}"
+     data-label-empty-title="{{strings.notifications_detail_empty_title}}"
+     data-label-empty-body="{{strings.notifications_detail_empty_body}}"
+     data-label-open="{{strings.notifications_open_related}}"
+     style="--lp-d:0">
   {{#has_flash}}
     {{#flash}}
       <div class="lp-flash{{#ok}} is-ok{{/ok}}{{^ok}} is-err{{/ok}}" role="status">{{text}}</div>
@@ -27,7 +40,16 @@
         <p class="lp-sm lp-theme-hero-body">{{strings.notifications_inbox_lead}}</p>
         <div class="lp-notif-hero-actions">
           {{#can_mark_all}}
-            <form method="post" action="{{action_url}}" class="lp-notif-mark-all">
+            <form method="post" action="{{action_url}}" class="lp-notif-mark-all" data-lp-notif-markall-form>
+              <input type="hidden" name="sesskey" value="{{sesskey}}">
+              <input type="hidden" name="view" value="notifications">
+              <input type="hidden" name="action" value="mark_all_notifications_read">
+              <input type="hidden" name="ntab" value="{{ntab}}">
+              <button type="submit" class="lp-btn lp-btn-primary">{{strings.notifications_mark_all}}</button>
+            </form>
+          {{/can_mark_all}}
+          {{^can_mark_all}}
+            <form method="post" action="{{action_url}}" class="lp-notif-mark-all" data-lp-notif-markall-form hidden>
               <input type="hidden" name="sesskey" value="{{sesskey}}">
               <input type="hidden" name="view" value="notifications">
               <input type="hidden" name="action" value="mark_all_notifications_read">
@@ -58,18 +80,18 @@
       <dl class="lp-theme-kv lp-notif-overview-kv">
         <div class="lp-theme-kv-row">
           <dt>{{strings.notifications_total_label}}</dt>
-          <dd><b class="lp-num">{{notification_count}}</b></dd>
+          <dd><b class="lp-num" data-lp-notif-total>{{notification_count}}</b></dd>
         </div>
-        <div class="lp-theme-kv-row{{#has_unread}} is-hot{{/has_unread}}">
+        <div class="lp-theme-kv-row{{#has_unread}} is-hot{{/has_unread}}" data-lp-notif-unread-row>
           <dt>{{strings.notifications_unread_label}}</dt>
-          <dd><b class="lp-num">{{unread_count}}</b></dd>
+          <dd><b class="lp-num" data-lp-notif-unread>{{unread_count}}</b></dd>
         </div>
       </dl>
     </section>
   </div>
 
   <section class="lp-card lift lp-notif-workspace">
-    <div class="lp-notif-layout{{#has_selected}} is-split{{/has_selected}}">
+    <div class="lp-notif-layout{{#has_selected}} is-split{{/has_selected}}" data-lp-notif-layout>
       <aside class="lp-notif-inbox lp-scroll" aria-label="{{strings.notifications_inbox_heading}}">
         <div class="lp-tabs lp-tabs-block lp-notif-tabs" role="tablist" aria-label="{{strings.notifications_inbox_heading}}">
           <a class="lp-tab{{#ntab_all}} is-on{{/ntab_all}}"
@@ -77,22 +99,24 @@
              href="{{tab_all_url}}"
              aria-selected="{{#ntab_all}}true{{/ntab_all}}{{^ntab_all}}false{{/ntab_all}}">
             {{strings.notifications_tab_all}}
-            <span class="lp-tab-count">{{notification_count}}</span>
+            <span class="lp-tab-count" data-lp-notif-tab-all>{{notification_count}}</span>
           </a>
           <a class="lp-tab{{#ntab_unread}} is-on{{/ntab_unread}}"
              role="tab"
              href="{{tab_unread_url}}"
              aria-selected="{{#ntab_unread}}true{{/ntab_unread}}{{^ntab_unread}}false{{/ntab_unread}}">
             {{strings.notifications_tab_unread}}
-            <span class="lp-tab-count">{{unread_count}}</span>
+            <span class="lp-tab-count" data-lp-notif-tab-unread>{{unread_count}}</span>
           </a>
         </div>
         {{#has_items}}
-          <ul class="lp-notif-list">
+          <ul class="lp-notif-list" data-lp-notif-inbox-list>
             {{#page_items}}
-              <li>
+              <li data-lp-notif-li>
                 <a class="lp-notif-row{{#is_selected}} is-selected{{/is_selected}}{{#unread}} is-unread{{/unread}}"
-                   href="{{url}}">
+                   href="{{url}}"
+                   data-lp-notif-row
+                   data-id="{{id}}">
                   <span class="lp-notif-icon" aria-hidden="true">
                     <iconify-icon icon="hugeicons:notification-01" width="18" height="18"></iconify-icon>
                   </span>
@@ -105,7 +129,7 @@
                       <span class="lp-notif-preview">{{preview}}</span>
                     {{/has_preview}}
                     <span class="lp-notif-meta-row">
-                      {{#unread}}<span class="lp-notif-unread">{{unread_label}}</span>{{/unread}}
+                      {{#unread}}<span class="lp-notif-unread" data-lp-notif-unread-chip>{{unread_label}}</span>{{/unread}}
                     </span>
                   </span>
                 </a>
@@ -114,7 +138,7 @@
           </ul>
         {{/has_items}}
         {{^has_items}}
-          <div class="lp-notif-inbox-empty" role="status">
+          <div class="lp-notif-inbox-empty" role="status" data-lp-notif-inbox-empty>
             <div class="lp-empty-mark" aria-hidden="true">
               <iconify-icon icon="hugeicons:notification-01" width="18" height="18"></iconify-icon>
             </div>
@@ -130,17 +154,17 @@
         {{/has_items}}
       </aside>
 
-      <div class="lp-notif-detail" aria-label="{{strings.notifications_detail_heading}}">
+      <div class="lp-notif-detail" aria-label="{{strings.notifications_detail_heading}}" data-lp-notif-detail>
         {{#has_selected}}
           {{#selected}}
             <div class="lp-notif-detail-head">
-              <a class="lp-notif-back" href="{{back_url}}">{{strings.notifications_back}}</a>
+              <a class="lp-notif-back" href="{{back_url}}" data-lp-notif-back>{{strings.notifications_back}}</a>
               <div class="lp-notif-detail-meta">
                 <div class="lp-theme-hero-heading">
-                  <h3>{{name}}</h3>
-                  {{#unread}}<span class="lp-chip is-hot">{{strings.notifications_tab_unread}}</span>{{/unread}}
+                  <h3 data-lp-notif-detail-title>{{name}}</h3>
+                  {{#unread}}<span class="lp-chip is-hot" data-lp-notif-detail-unread>{{strings.notifications_tab_unread}}</span>{{/unread}}
                 </div>
-                {{#has_when}}<p class="lp-muted lp-sm">{{when}}</p>{{/has_when}}
+                {{#has_when}}<p class="lp-muted lp-sm" data-lp-notif-detail-when>{{when}}</p>{{/has_when}}
               </div>
             </div>
             <div class="lp-notif-scroll lp-scroll">
@@ -148,7 +172,7 @@
             </div>
             <div class="lp-notif-detail-actions">
               {{#has_context}}
-                <a class="lp-btn lp-btn-primary" href="{{context_url}}">{{context_label}}</a>
+                <a class="lp-btn lp-btn-primary" href="{{context_url}}" data-lp-notif-detail-context>{{context_label}}</a>
               {{/has_context}}
             </div>
           {{/selected}}

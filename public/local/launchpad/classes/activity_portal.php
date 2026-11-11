@@ -104,11 +104,20 @@ final class activity_portal {
 
         $cmrecord = get_coursemodule_from_id('', $cmid, 0, false, MUST_EXIST);
         $course = get_course((int) $cmrecord->course);
-        require_course_login($course, true, $cmrecord);
+        // Never pass a deleting/hidden CM into require_course_login — Moodle redirects
+        // to /course/view.php (native chrome). Keep the fellow/employer shell instead.
+        if (!empty($cmrecord->deletioninprogress)) {
+            throw new \moodle_exception('activityiscurrentlyhidden');
+        }
+        require_course_login($course, true, null);
 
         $modinfo = get_fast_modinfo($course, (int) $user->id);
-        $cm = $modinfo->get_cm($cmid);
-        if (!$cm->uservisible) {
+        try {
+            $cm = $modinfo->get_cm($cmid);
+        } catch (\Throwable $e) {
+            throw new \moodle_exception('activityiscurrentlyhidden');
+        }
+        if (!$cm->uservisible || !empty($cm->deletioninprogress)) {
             throw new \moodle_exception('activityiscurrentlyhidden');
         }
 
