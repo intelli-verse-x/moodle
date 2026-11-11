@@ -12722,7 +12722,7 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   color: #4a5a70;
 }
 
-/* Admin Structure (lp-st-*) — preview dry-run panel */
+/* Admin Structure (lp-st-*) — preview + confirm/apply */
 .lp-st-hero {
   margin-bottom: 8px;
 }
@@ -12734,6 +12734,23 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
 }
 .lp-st-form {
   gap: 10px;
+}
+.lp-st-apply {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--lp-ink, #1a1a1a) 12%, transparent);
+}
+.lp-st-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.lp-st-confirm input {
+  margin-top: 3px;
+  flex: 0 0 auto;
 }
 .lp-st-links {
   display: flex;

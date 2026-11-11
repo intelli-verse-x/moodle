@@ -120,6 +120,13 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
     }
+    if ($view === 'structure' && $action === 'structure_apply') {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $confirmed = (bool) optional_param('structure_confirm', 0, PARAM_BOOL);
+        $flash = admin_dashboard::run_structure_apply($USER, $cohort, $confirmed);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+    }
     if ($view === 'courseops' && $action === 'save_course_settings') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $fullname = optional_param('fullname', '', PARAM_TEXT);

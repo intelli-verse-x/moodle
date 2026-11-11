@@ -270,10 +270,10 @@ final class admin_dashboard {
     }
 
     /**
-     * Admin Structure page — blueprint summary + dry-run preview (Phase 1; no apply).
+     * Admin Structure page — blueprint summary, dry-run preview, confirm + apply.
      *
      * @param \stdClass $user
-     * @param array{ok?:string,error?:string,cohort?:string,log_lines?:list<string>} $flash
+     * @param array{ok?:string,error?:string,cohort?:string,log_lines?:list<string>,applied?:bool} $flash
      * @return array<string, mixed>
      */
     public static function structure_context(\stdClass $user, array $flash = []): array {
@@ -336,6 +336,8 @@ final class admin_dashboard {
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
         $tracksurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+        $applied = !empty($flash['applied']);
+        $trackcount = count(self::list_track_courses());
 
         return [
             'eyebrow' => get_string('admin_structure_eyebrow', 'local_launchpad'),
@@ -347,6 +349,8 @@ final class admin_dashboard {
             'cohort_help' => get_string('admin_structure_cohort_help', 'local_launchpad'),
             'cohort_value' => $cohort,
             'preview_label' => get_string('admin_structure_preview_cta', 'local_launchpad'),
+            'confirm_label' => get_string('admin_structure_confirm', 'local_launchpad', $cohort),
+            'apply_label' => get_string('admin_structure_apply_cta', 'local_launchpad'),
             'summary_title' => get_string('admin_structure_summary_title', 'local_launchpad'),
             'categories_title' => get_string('admin_structure_categories_title', 'local_launchpad'),
             'categories' => $categories,
@@ -359,6 +363,7 @@ final class admin_dashboard {
             'preview_title' => get_string('admin_structure_preview_title', 'local_launchpad'),
             'has_preview' => $loglines !== [],
             'log_lines' => $loglines,
+            'show_builder_cta' => $applied || $trackcount > 0,
             'flash_ok' => !empty($flash['ok']),
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
@@ -405,6 +410,70 @@ final class admin_dashboard {
         } catch (\Throwable $e) {
             return [
                 'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        }
+    }
+
+    /**
+     * Whether the actor may create LaunchPad categories/courses from the Structure UI.
+     * Intentionally does not use CLI apply_target — web apply is capability-gated.
+     */
+    public static function can_apply_structure(int $userid): bool {
+        if ($userid <= 0 || !self::can_access($userid)) {
+            return false;
+        }
+        $system = \context_system::instance();
+        return has_capability('moodle/category:manage', $system, $userid)
+            && has_capability('moodle/course:create', $system, $userid);
+    }
+
+    /**
+     * Apply LaunchPad structure for a cohort (real DB writes; idempotent by idnumber).
+     *
+     * @return array{ok?:string,error?:string,cohort:string,log_lines?:list<string>,applied?:bool}
+     */
+    public static function run_structure_apply(\stdClass $actor, string $cohort, bool $confirmed): array {
+        $label = trim($cohort);
+        if (!self::can_apply_structure((int) ($actor->id ?? 0))) {
+            return [
+                'error' => get_string('admin_err_capability', 'local_launchpad'),
+                'cohort' => $label,
+            ];
+        }
+        if (!$confirmed) {
+            return [
+                'error' => get_string('admin_structure_err_confirm', 'local_launchpad'),
+                'cohort' => $label,
+            ];
+        }
+
+        try {
+            $runner = new setup($label, false);
+            $runner->execute();
+            return [
+                'ok' => get_string('admin_structure_apply_ok', 'local_launchpad', $label),
+                'cohort' => $label,
+                'log_lines' => $runner->get_log(),
+                'applied' => true,
+            ];
+        } catch (cohort_exception $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        } catch (operation_failure $e) {
+            return [
+                'error' => self::flash_error_message($e)
+                    . ' '
+                    . get_string('admin_structure_err_retry', 'local_launchpad'),
+                'cohort' => $label,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'error' => self::flash_error_message($e)
+                    . ' '
+                    . get_string('admin_structure_err_retry', 'local_launchpad'),
                 'cohort' => $label,
             ];
         }

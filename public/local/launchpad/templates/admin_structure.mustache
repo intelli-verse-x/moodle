@@ -1,7 +1,7 @@
 {{!
     @template local_launchpad/admin_structure
 
-    Admin LaunchPad Structure — cohort preview (dry-run). Apply is Phase 2.
+    Admin LaunchPad Structure — cohort preview (dry-run) + confirm/apply.
     Navbar stays in admin_shell. Keep comments free of Mustache braces.
 }}
 <div class="lp-st" data-region="local-launchpad-admin-structure">
@@ -38,8 +38,22 @@
         <p class="lp-sm lp-muted">{{cohort_help}}</p>
         <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{preview_label}}</button>
       </form>
+
+      <form method="post" action="{{form_action}}" class="lp-stack lp-st-form lp-st-apply">
+        <input type="hidden" name="sesskey" value="{{sesskey}}">
+        <input type="hidden" name="action" value="structure_apply">
+        <input type="hidden" name="cohort" value="{{cohort_value}}">
+        <label class="lp-st-confirm">
+          <input type="checkbox" name="structure_confirm" value="1" required>
+          <span>{{confirm_label}}</span>
+        </label>
+        <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{apply_label}}</button>
+      </form>
+
       <div class="lp-st-links">
-        <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
+        {{#show_builder_cta}}
+          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
+        {{/show_builder_cta}}
         <a class="lp-btn lp-btn-light lp-btn-sm" href="{{tracks_url}}">{{tracks_label}}</a>
       </div>
     </section>
