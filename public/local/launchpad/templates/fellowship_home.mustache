@@ -281,13 +281,10 @@
     </div>
     {{#mycourse}}
       <article class="lp-home-course">
-        <a class="lp-home-course-media{{#has_image}} has-image{{/has_image}}" href="{{detail_url}}" aria-hidden="true" tabindex="-1"{{#has_image}} style="--lp-course-img:url('{{imageurl}}')"{{/has_image}}>
-          <span>{{media_label}}</span>
-        </a>
         <div class="lp-home-course-body">
           <h4><a href="{{detail_url}}">{{{name}}}</a></h4>
           <div class="lp-home-course-meta">
-            <span class="lp-muted">{{#hasprogress}}{{progress_display}} · {{/hasprogress}}{{status}}</span>
+            <span class="lp-muted">{{status}}</span>
           </div>
           <a class="lp-btn lp-btn-solid lp-home-course-cta" href="{{continue_url}}">{{cta_label}} <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon></a>
         </div>

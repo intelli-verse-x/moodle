@@ -1936,6 +1936,9 @@ final class fellowship_dashboard {
             $badge['status_pill'] = $isearned ? $earnedlabel : $lockedlabel;
             $badge['description'] = (string) ($badge['how'] ?? $badge['detail'] ?? '');
             $badge['has_image'] = !empty($badge['imageurl']);
+            // Always render every badge; hide non-earned when SSR tab=earned (JS toggles).
+            $badge['filter_hidden'] = ($tab === 'earned' && !$isearned);
+            $badge['earned_flag'] = $isearned ? '1' : '0';
             if (empty($badge['icon'])) {
                 $badge['icon'] = 'square-lock-02';
             }
@@ -1954,7 +1957,9 @@ final class fellowship_dashboard {
         $badgestotal = count($badges);
         $badgespct = $badgestotal > 0 ? (int) round(($badgesearned / $badgestotal) * 100) : 0;
 
-        $pageitems = $tab === 'earned' ? $earneditems : $badges;
+        // Full catalogue always in DOM so All ↔ Earned can filter client-side.
+        $pageitems = $badges;
+        $visiblecount = $tab === 'earned' ? count($earneditems) : count($badges);
         $xplog = $live['xp_log'] ?? [];
 
         $xprules = [
@@ -2100,6 +2105,7 @@ final class fellowship_dashboard {
             'badges' => $badges,
             'page_items' => $pageitems,
             'has_items' => $pageitems !== [],
+            'has_visible_badges' => $visiblecount > 0,
             'earned_items' => $earneditems,
             'has_earned_items' => $earneditems !== [],
             'recent_items' => $recent,
@@ -2112,6 +2118,7 @@ final class fellowship_dashboard {
             'badges_pct' => $badgespct,
             'tab_all' => $tab === 'all',
             'tab_earned' => $tab === 'earned',
+            'badge_filter' => $tab,
             'tab_all_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'achievements']))->out(false),
             'tab_earned_url' => (new \moodle_url(persona_home::FELLOW_PATH, [
                 'view' => 'achievements',
@@ -3697,10 +3704,12 @@ final class fellowship_dashboard {
             $taburls[$key] = (new \moodle_url(persona_home::FELLOW_PATH, $params))->out(false);
         }
 
-        $showattention = ($ftab === 'all' || $ftab === 'attention') && $attentionitems !== [];
-        $showreviewed = ($ftab === 'all' || $ftab === 'reviewed') && $reviewed !== [];
-        $showpending = ($ftab === 'all' || $ftab === 'pending') && $pending !== [];
-        $shownotsubmitted = ($ftab === 'all' || $ftab === 'not_submitted') && $notsubmitted !== [];
+        // Always expose every bucket in the DOM; SSR hidden flags match the active ftab
+        // so no-JS stays correct and JS can show/hide without a round-trip.
+        $showattention = $attentionitems !== [];
+        $showreviewed = $reviewed !== [];
+        $showpending = $pending !== [];
+        $shownotsubmitted = $notsubmitted !== [];
 
         $filterempty = false;
         if ($ftab === 'attention') {
@@ -3712,6 +3721,8 @@ final class fellowship_dashboard {
         } else if ($ftab === 'not_submitted') {
             $filterempty = $notsubmitted === [];
         }
+
+        $showemptyreleased = $assigncount > 0 && !$hasmoodlereleased;
 
         return [
             'items' => $items,
@@ -3726,6 +3737,10 @@ final class fellowship_dashboard {
             'has_reviewed_items' => $showreviewed,
             'has_pending_items' => $showpending,
             'has_not_submitted_items' => $shownotsubmitted,
+            'attention_section_hidden' => !($ftab === 'all' || $ftab === 'attention'),
+            'reviewed_section_hidden' => !($ftab === 'all' || $ftab === 'reviewed'),
+            'pending_section_hidden' => !($ftab === 'all' || $ftab === 'pending'),
+            'not_submitted_section_hidden' => !($ftab === 'all' || $ftab === 'not_submitted'),
             'has_released' => $hasmoodlereleased,
             'has_open_items' => ($pending !== [] || $notsubmitted !== []),
             'has_items' => $items !== [],
@@ -3749,8 +3764,10 @@ final class fellowship_dashboard {
             'tab_pending_url' => $taburls['pending'],
             'tab_not_submitted_url' => $taburls['not_submitted'],
             'show_tabs' => $assigncount > 0,
-            'show_filter_empty' => $assigncount > 0 && $filterempty,
-            'show_empty_released' => $assigncount > 0 && !$hasmoodlereleased && $ftab === 'all',
+            'show_filter_empty' => $assigncount > 0,
+            'filter_empty_hidden' => !($assigncount > 0 && $filterempty),
+            'show_empty_released' => $showemptyreleased,
+            'empty_released_hidden' => !($showemptyreleased && $ftab === 'all'),
             'empty_title' => self::str('fellowship_feedback_empty_title', null, 'No released feedback yet'),
             'empty_title_lead' => self::str('fellowship_feedback_empty_title_lead', null, 'No released'),
             'empty_title_accent' => self::str('fellowship_feedback_empty_title_accent', null, 'feedback'),

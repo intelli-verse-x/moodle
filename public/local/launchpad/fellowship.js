@@ -4110,4 +4110,179 @@
             search.addEventListener('input', applyNewsView);
         }
     })();
+
+    // Fellow Achievements badges: All / Earned without full reload.
+    (function initFellowBadgeFilters() {
+        var root = shell.querySelector('[data-lp-badge-filter-root]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-badge-filter]');
+        var items = root.querySelectorAll('[data-lp-badge-item]');
+        var emptyEl = root.querySelector('[data-lp-badge-empty]');
+        var panel = root.querySelector('#lp-fellow-badges-panel');
+        if (!tabs.length) {
+            return;
+        }
+
+        function pushBadgeUrl(mode) {
+            var href = '';
+            tabs.forEach(function (t) {
+                if (!href && t.getAttribute('data-lp-badge-filter') === mode) {
+                    href = t.getAttribute('href') || '';
+                }
+            });
+            if (!href || !window.history || !window.history.pushState) {
+                return;
+            }
+            try {
+                var next = new URL(href, window.location.href);
+                if (next.pathname === window.location.pathname) {
+                    window.history.pushState({ lpBadgeFilter: mode }, '', next.pathname + next.search);
+                }
+            } catch (err) {
+                // Ignore malformed hrefs — filter UI still works.
+            }
+        }
+
+        function applyBadgeFilter(mode, push) {
+            mode = mode === 'earned' ? 'earned' : 'all';
+            var shown = 0;
+            items.forEach(function (item) {
+                var earned = item.getAttribute('data-earned') === '1';
+                var show = mode === 'all' || earned;
+                item.hidden = !show;
+                if (show) {
+                    shown += 1;
+                }
+            });
+            if (emptyEl) {
+                emptyEl.hidden = shown > 0;
+            }
+            root.setAttribute('data-filter', mode);
+            tabs.forEach(function (tab) {
+                var on = tab.getAttribute('data-lp-badge-filter') === mode;
+                tab.classList.toggle('is-on', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+                if (on && panel) {
+                    panel.setAttribute('aria-labelledby', tab.id || '');
+                }
+            });
+            if (push) {
+                pushBadgeUrl(mode);
+            }
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function (e) {
+                e.preventDefault();
+                applyBadgeFilter(tab.getAttribute('data-lp-badge-filter') || 'all', true);
+            });
+        });
+
+        window.addEventListener('popstate', function () {
+            if (!shell.querySelector('[data-lp-badge-filter-root]')) {
+                return;
+            }
+            var params = new URLSearchParams(window.location.search);
+            applyBadgeFilter(params.get('tab') === 'earned' ? 'earned' : 'all', false);
+        });
+    })();
+
+    // Fellow Feedback status tabs: filter in place without reload.
+    (function initFellowFeedbackFilters() {
+        var page = shell.querySelector('[data-region="fellowship-feedback-page"]');
+        if (!page) {
+            return;
+        }
+        var root = page.querySelector('[data-lp-fb-filter-root]');
+        if (!root) {
+            return;
+        }
+        var tabs = page.querySelectorAll('[data-lp-fb-filter]');
+        var sections = page.querySelectorAll('[data-lp-fb-section]');
+        var emptyReleased = page.querySelector('[data-lp-fb-empty-released]');
+        var filterEmpty = page.querySelector('[data-lp-fb-filter-empty]');
+        var hasReleased = root.getAttribute('data-has-released') === '1';
+        if (!tabs.length) {
+            return;
+        }
+
+        function pushFeedbackUrl(mode) {
+            var href = '';
+            page.querySelectorAll('.lp-feedback-tabs [data-lp-fb-filter]').forEach(function (t) {
+                if (!href && t.getAttribute('data-lp-fb-filter') === mode) {
+                    href = t.getAttribute('href') || '';
+                }
+            });
+            if (!href || !window.history || !window.history.pushState) {
+                return;
+            }
+            try {
+                var next = new URL(href, window.location.href);
+                if (next.pathname === window.location.pathname) {
+                    window.history.pushState({ lpFbFilter: mode }, '', next.pathname + next.search);
+                }
+            } catch (err) {
+                // Ignore malformed hrefs — filter UI still works.
+            }
+        }
+
+        function applyFeedbackFilter(mode, push) {
+            var allowed = {
+                all: true,
+                attention: true,
+                reviewed: true,
+                pending: true,
+                not_submitted: true
+            };
+            mode = allowed[mode] ? mode : 'all';
+            var shown = 0;
+            sections.forEach(function (section) {
+                var bucket = section.getAttribute('data-lp-fb-section') || '';
+                var show = mode === 'all' || bucket === mode;
+                section.hidden = !show;
+                if (show) {
+                    shown += 1;
+                }
+                var title = section.querySelector('[data-lp-fb-section-title]');
+                if (title) {
+                    title.hidden = mode !== 'all';
+                }
+            });
+            if (emptyReleased) {
+                emptyReleased.hidden = !(mode === 'all' && !hasReleased);
+            }
+            if (filterEmpty) {
+                // On All, empty-released banner covers the no-feedback case; filter empty is for buckets.
+                filterEmpty.hidden = !(mode !== 'all' && shown === 0);
+            }
+            root.setAttribute('data-filter', mode);
+            page.querySelectorAll('.lp-feedback-tabs [data-lp-fb-filter]').forEach(function (tab) {
+                var on = tab.getAttribute('data-lp-fb-filter') === mode;
+                tab.classList.toggle('is-on', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            if (push) {
+                pushFeedbackUrl(mode);
+            }
+        }
+
+        page.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-fb-filter]');
+            if (!tab || !page.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyFeedbackFilter(tab.getAttribute('data-lp-fb-filter') || 'all', true);
+        });
+
+        window.addEventListener('popstate', function () {
+            if (!shell.querySelector('[data-region="fellowship-feedback-page"]')) {
+                return;
+            }
+            var params = new URLSearchParams(window.location.search);
+            applyFeedbackFilter(params.get('ftab') || 'all', false);
+        });
+    })();
 })();

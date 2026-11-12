@@ -1983,9 +1983,7 @@ body.local-launchpad-mentor {
 .lp-badge-empty .lp-xs { margin-top: 6px; font-weight: 500; }
 
 .lp-home-course {
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  gap: 14px;
+  display: block;
   margin-top: 4px;
   padding: 0;
   border: 0;
@@ -2559,6 +2557,14 @@ body.local-launchpad-mentor {
   font: inherit;
   color: inherit;
   width: 100%;
+}
+/* Author display:flex/grid beats UA [hidden] — keep filter toggles actually hidden. */
+.lp-bdg[hidden],
+.lp-feedback-block[hidden],
+.lp-feedback-empty[hidden],
+.lp-feedback-section[hidden],
+.lp-empty-inline[hidden] {
+  display: none !important;
 }
 .lp-bdg .lp-bi {
   width: 64px;
@@ -5569,7 +5575,6 @@ body.lp-cal-detail-lock { overflow: hidden; }
   .lp-stats,
   .lp-stats.lp-stats-4,
   .lp-stat-cards { grid-template-columns: 1fr; }
-  .lp-home-course { grid-template-columns: 1fr; }
   .lp-act-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }

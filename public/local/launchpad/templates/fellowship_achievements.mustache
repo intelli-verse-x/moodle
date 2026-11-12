@@ -80,7 +80,10 @@
     {{/has_next_level}}
   </section>
 
-  <section class="lp-card lift lp-stack-lg" data-region="fellowship-badges-tabs">
+  <section class="lp-card lift lp-stack-lg"
+           data-region="fellowship-badges-tabs"
+           data-lp-badge-filter-root
+           data-filter="{{badge_filter}}">
     <div class="lp-card-head lp-badges-tabs-head">
       <div class="lp-grade-progress-title">
         <span class="lp-grade-progress-icon" aria-hidden="true">
@@ -96,6 +99,7 @@
            role="tab"
            id="lp-fellow-badges-tab-all"
            href="{{tab_all_url}}"
+           data-lp-badge-filter="all"
            aria-selected="{{#tab_all}}true{{/tab_all}}{{^tab_all}}false{{/tab_all}}"
            aria-controls="lp-fellow-badges-panel">
           {{strings.badges_tab_all}}
@@ -105,6 +109,7 @@
            role="tab"
            id="lp-fellow-badges-tab-earned"
            href="{{tab_earned_url}}"
+           data-lp-badge-filter="earned"
            aria-selected="{{#tab_earned}}true{{/tab_earned}}{{^tab_earned}}false{{/tab_earned}}"
            aria-controls="lp-fellow-badges-panel">
           {{strings.badges_tab_earned}}
@@ -123,9 +128,11 @@
          id="lp-fellow-badges-panel"
          aria-labelledby="{{#tab_all}}lp-fellow-badges-tab-all{{/tab_all}}{{#tab_earned}}lp-fellow-badges-tab-earned{{/tab_earned}}">
       {{#has_items}}
-        <div class="lp-badges">
+        <div class="lp-badges" data-lp-badge-list>
           {{#page_items}}
-            <div class="lp-bdg {{css}}">
+            <div class="lp-bdg {{css}}"
+                 data-lp-badge-item
+                 data-earned="{{earned_flag}}"{{#filter_hidden}} hidden{{/filter_hidden}}>
               <span class="lp-bi" aria-hidden="true">
                 {{#has_image}}
                   <img src="{{imageurl}}" alt="" width="48" height="48">
@@ -141,15 +148,15 @@
           {{/page_items}}
         </div>
       {{/has_items}}
-      {{^has_items}}
-        <div class="lp-empty lp-empty-inline" role="status">
-          <h2>{{strings.badges_empty_title}}</h2>
-          <p>{{strings.badges_empty_body}}</p>
-          <div class="lp-empty-actions">
-            <a class="lp-btn" href="{{moodle_badges_url}}">{{strings.badges_open_moodle}}</a>
-          </div>
+      <div class="lp-empty lp-empty-inline"
+           data-lp-badge-empty
+           role="status"{{#has_visible_badges}} hidden{{/has_visible_badges}}>
+        <h2>{{strings.badges_empty_title}}</h2>
+        <p>{{strings.badges_empty_body}}</p>
+        <div class="lp-empty-actions">
+          <a class="lp-btn" href="{{moodle_badges_url}}">{{strings.badges_open_moodle}}</a>
         </div>
-      {{/has_items}}
+      </div>
     </div>
   </section>
 

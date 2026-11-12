@@ -417,11 +417,17 @@ switch ($view) {
         break;
 }
 
+// Nested views keep parent nav highlight (review→queue, fellow→fellows, prefs→notifications).
+$navcurrentkey = match ($view) {
+    'review' => 'queue',
+    'fellow' => 'fellows',
+    'notificationprefs' => 'notifications',
+    default => $view,
+};
 foreach ($nav as &$group) {
     foreach ($group['items'] as &$item) {
         $key = $item['key'] ?? '';
-        // Keep Review queue highlighted while grading.
-        $item['current'] = ($key === $view) || ($view === 'review' && $key === 'queue');
+        $item['current'] = ($key === $navcurrentkey);
     }
 }
 unset($group, $item);

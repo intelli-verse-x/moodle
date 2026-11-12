@@ -113,7 +113,7 @@ final class activity_portal {
 
         $modinfo = get_fast_modinfo($course, (int) $user->id);
         try {
-            $cm = $modinfo->get_cm($cmid);
+        $cm = $modinfo->get_cm($cmid);
         } catch (\Throwable $e) {
             throw new \moodle_exception('activityiscurrentlyhidden');
         }

@@ -212,7 +212,7 @@ if ($view === 'messages') {
         $courseid = (int) $cmforcourse->course;
     }
 } else {
-    $courseid = optional_param('id', 0, PARAM_INT);
+$courseid = optional_param('id', 0, PARAM_INT);
 }
 
 $courses = fellowship_dashboard::list_courses($userid);
@@ -467,7 +467,7 @@ if ($courseid > 0) {
         $courseexists = $DB->record_exists('course', ['id' => $courseid]);
         if ($courseexists && is_siteadmin()) {
             try {
-                $selected = get_course($courseid);
+        $selected = get_course($courseid);
             } catch (\Throwable $e) {
                 $selected = null;
                 $trackunavailable = true;
@@ -1220,7 +1220,6 @@ if ($view === 'home') {
     $mycourse = [];
     if ($selected !== null) {
         $pct = $homeoutline['percent'] ?? null;
-        $courseimage = fellowship_dashboard::course_image_url($selected);
         $mycourse = [
             'name' => fellowship_dashboard::display_label(format_string($selected->fullname)),
             'detail_url' => $trackurl,
@@ -1228,26 +1227,23 @@ if ($view === 'home') {
             'cta_label' => $next !== null
                 ? $lpstr('fellowship_cta_resume', null, 'Resume learning')
                 : $lpstr('fellowship_cta_view_track', null, 'Open track'),
+            // status alone is the progress line (e.g. "45% complete") — do not also emit progress_display.
             'status' => $pct !== null
                 ? $lpstr('fellowship_progress_pct', (int) $pct, '{$a}% complete')
                 : ($alltrackeddone
                     ? $lpstr('fellowship_gate_complete', null, 'Complete')
                     : $lpstr('fellowship_course_status_open', null, 'Ready to continue')),
             'hasprogress' => $pct !== null,
-            'progress_display' => $pct !== null ? ((int) $pct) . '%' : '',
-            'media_label' => $lpstr('fellowship_home_course_media', null, 'Track'),
-            'imageurl' => $courseimage,
-            'has_image' => $courseimage !== '',
         ];
     }
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_home', array_merge([
-        'firstname' => $firstname,
+            'firstname' => $firstname,
         // Student campus lounge hero (no mascot baked in — ring stays UI).
         'hero_image' => $pluginbase . '/assets/img/fellowship-hero-campus.jpg',
         'hero_lead' => $herolead,
         'show_hero_welcome' => false,
-        'courses' => $coursecards,
-        'has_courses' => $coursecards !== [],
+            'courses' => $coursecards,
+            'has_courses' => $coursecards !== [],
         'multi_course' => count($homecourseswitch) > 1,
         'course_switch' => $homecourseswitch,
         'calendar_url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'calendar']))->out(false),
@@ -1258,8 +1254,8 @@ if ($view === 'home') {
         'quest' => $quest,
         'mycourse' => $mycourse,
         'hasmycourse' => $mycourse !== [],
-        'next' => $next,
-        'has_next' => $next !== null,
+            'next' => $next,
+            'has_next' => $next !== null,
         'selected_course_name' => $selected
             ? fellowship_dashboard::display_label(format_string($selected->fullname))
             : '',
@@ -1311,10 +1307,10 @@ if ($view === 'feedback') {
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_feedback', array_merge($feedbackdata, [
         'has_courses' => $courses !== [],
         'empty_message' => $nocourses,
-        'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
-            'view' => 'track',
+            'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+                'view' => 'track',
             'id' => $feedbackcourseid,
-        ])))->out(false),
+            ])))->out(false),
         'empty_avatar_url' => $pluginbase . '/assets/img/prof.webp',
         'multi_course' => count($feedbackswitch) > 1,
         'course_switch' => $feedbackswitch,
@@ -1325,14 +1321,21 @@ if ($view === 'feedback') {
 }
 
 // Mark current nav + Achievements earned/total + Feedback attention.
+// Nested views must keep their parent nav key (do not exact-match $view alone).
+$navcurrentkey = match ($view) {
+    'activity' => 'track',
+    'notificationprefs' => 'notifications',
+    default => $view,
+};
 foreach ($nav as &$group) {
     foreach ($group['items'] as &$item) {
-        $item['current'] = ($item['key'] === $view);
-        if (($item['key'] ?? '') === 'achievements') {
+        $key = (string) ($item['key'] ?? '');
+        $item['current'] = ($key === $navcurrentkey);
+        if ($key === 'achievements') {
             $item['has_badge'] = true;
             $item['badge'] = $badgesearned . '/' . $badgestotal;
         }
-        if (($item['key'] ?? '') === 'feedback' && $feedbackattention > 0) {
+        if ($key === 'feedback' && $feedbackattention > 0) {
             $item['has_badge'] = true;
             $item['badge'] = (string) $feedbackattention;
         }
@@ -1399,7 +1402,7 @@ $orbittips = [
         'LaunchPad messages stay in sync with your programme inbox. Mentors and peers you can message appear here.'
     ),
 ];
-$orbittip = $orbittips[$view] ?? $orbittips['home'];
+$orbittip = $orbittips[$navcurrentkey] ?? $orbittips[$view] ?? $orbittips['home'];
 
 // Time-of-day greeting for home topbar (Employer chrome parity).
 $hour = (int) userdate(time(), '%H');
