@@ -125,11 +125,14 @@ final class portal_gate {
         if (account_persona::is_mentor($userid)) {
             return 'mentor';
         }
-        if (account_persona::is_fellowship($userid)) {
-            return 'fellowship';
-        }
         if (account_persona::is_employee($userid)) {
+            // Employee before Fellowship so employer learners with lp-* enrol
+            // (or a leftover toba_portal tag) are not labelled as fellows.
             return 'employee';
+        }
+        if (account_persona::is_fellowship($userid)
+                || registration::is_self_registered_fellow($userid)) {
+            return 'fellowship';
         }
         return 'guest';
     }

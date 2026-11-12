@@ -3732,8 +3732,15 @@ final class fellowship_dashboard {
         if ($userid <= 0) {
             return false;
         }
-        // Site admins use admin.php — do not linger on the Fellowship shell.
-        return account_persona::is_fellowship($userid);
+        // Higher-priority personas use their own shells (portal_gate mismatch).
+        // Do not let a leftover toba_portal tag open fellow.php for them.
+        if (account_persona::is_admin($userid) || account_persona::is_mentor($userid)
+                || account_persona::is_employee($userid)) {
+            return false;
+        }
+        // Enrolment OR Fellowship self-reg tag — empty home OK until admin enrols.
+        return account_persona::is_fellowship($userid)
+            || registration::is_self_registered_fellow($userid);
     }
 
     /**

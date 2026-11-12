@@ -81,7 +81,10 @@ final class persona_home {
             // Employer cohort before Fellowship: lp-* student enrolments are normal
             // for employee upskilling and must not force the Fellowship shell.
             $home = new \moodle_url(self::EMPLOYEE_PATH);
-        } else if (account_persona::is_fellowship($userid)) {
+        } else if (account_persona::is_fellowship($userid)
+                || registration::is_self_registered_fellow($userid)) {
+            // Enrolment OR Fellowship self-reg tag (toba_portal). Do not broaden
+            // account_persona::is_fellowship() — that stays enrolment-only for messaging.
             $home = new \moodle_url(self::FELLOW_PATH);
         }
 

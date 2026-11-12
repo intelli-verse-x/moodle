@@ -43,6 +43,18 @@ $string['signupclosednote'] = 'Fellowship self-registration is closed. Ask your 
 $string['signupconfirmnote'] = 'Confirm your email, then your programme assigns courses. No open marketplace.';
 $string['signuppagetitle'] = 'Create your Fellowship account';
 $string['signuppagelead'] = 'Use the same details Moodle requires for a new account. After you confirm your email, your programme admin assigns courses.';
+$string['signup_pending_eyebrow'] = 'Fellowship registration';
+$string['signup_pending_title'] = 'Check your email';
+$string['signup_pending_body'] = 'An email should have been sent to your address at {$a}. Open it and follow the confirmation link to finish creating your Fellowship account. If you cannot find it, check your spam folder.';
+$string['signup_pending_body_generic'] = 'An email should have been sent to the address you used. Open it and follow the confirmation link to finish creating your Fellowship account. If you cannot find it, check your spam folder.';
+$string['signup_pending_note'] = 'After you confirm, your programme admin assigns courses. There is no open marketplace.';
+$string['signup_pending_continue'] = 'Back to LaunchPad';
+$string['signup_pending_signin'] = 'Sign in';
+$string['signup_confirmed_eyebrow'] = 'Fellowship registration';
+$string['signup_confirmed_title'] = 'Registration confirmed';
+$string['signup_confirmed_body'] = 'Thanks, {$a}. Your registration has been confirmed. Continue to open your Fellowship dashboard.';
+$string['signup_confirmed_note'] = 'Your programme admin still assigns courses — your track appears here when they enrol you.';
+$string['signup_confirmed_continue'] = 'Continue to Fellowship';
 
 /* Become a mentor section. */
 $string['mentorheading'] = 'Become a mentor section';

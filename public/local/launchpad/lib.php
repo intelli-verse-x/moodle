@@ -99,4 +99,12 @@ function local_launchpad_post_signup_requests($user): void {
         $portal = \local_launchpad\registration::PORTAL_FELLOWSHIP;
     }
     $SESSION->{\local_launchpad\registration::SESSION_PORTAL} = $portal;
+
+    // Ensure auth_email saves fellow.php as auth_email_wantsurl (not /my/).
+    \local_launchpad\registration::ensure_fellowship_wantsurl();
+
+    // Stash email so before_http_headers can swap Moodle's stock notice page.
+    if (!empty($user->email)) {
+        \local_launchpad\registration::stash_pending_email((string) $user->email);
+    }
 }
