@@ -9,19 +9,16 @@
   <span aria-current="page">{{{fellow_name}}} · {{{assign_name}}}</span>
 </nav>
 
-<div class="lp-ach-head">
-  <div class="lp-row-sb">
-    <div>
-      <span class="lp-eyebrow">{{#str}} mentor_nav_review, local_launchpad {{/str}}</span>
-      <h2>{{#str}} mentor_review_heading, local_launchpad {{/str}} · {{{fellow_name}}}</h2>
-      <p class="lp-muted">
-        {{{assign_name}}}
-        {{#has_attempt}} · {{#str}} fellowship_feedback_attempt, local_launchpad {{/str}} {{attempt}}{{/has_attempt}}
-        {{#submitted_at}} · {{submitted_at}}{{/submitted_at}}
-      </p>
-    </div>
-    <span class="lp-chip {{status_chip_class}}">{{status_chip}}</span>
+<div class="lp-row-sb lp-review-lead">
+  <div>
+    <p class="lp-review-fellow">{{{fellow_name}}}</p>
+    <p class="lp-muted">
+      {{{assign_name}}}
+      {{#has_attempt}} · {{#str}} fellowship_feedback_attempt, local_launchpad {{/str}} {{attempt}}{{/has_attempt}}
+      {{#submitted_at}} · {{submitted_at}}{{/submitted_at}}
+    </p>
   </div>
+  <span class="lp-chip {{status_chip_class}}">{{status_chip}}</span>
 </div>
 
 {{#has_saved}}

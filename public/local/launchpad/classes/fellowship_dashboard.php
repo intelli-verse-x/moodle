@@ -32,6 +32,12 @@ final class fellowship_dashboard {
     public const DATA_REGION = 'local-launchpad-fellowship';
 
     /**
+     * TEMP local QA only — skips sequential unlock so later CMs open without prior complete.
+     * Keep false unless actively QA'ing a locked later activity.
+     */
+    public const TEMP_BYPASS_SEQUENCE_LOCK = false;
+
+    /**
      * LaunchPad courses where the user is an active student.
      *
      * @param int $userid
@@ -591,6 +597,10 @@ final class fellowship_dashboard {
         if (self::is_orientation_course($course)) {
             return $outline;
         }
+        // TEMP: remove after E10 review — see TEMP_BYPASS_SEQUENCE_LOCK.
+        if (self::TEMP_BYPASS_SEQUENCE_LOCK) {
+            return $outline;
+        }
 
         $blocked = false;
         $next = null;
@@ -634,6 +644,10 @@ final class fellowship_dashboard {
      */
     public static function is_cm_sequence_locked(\stdClass $course, int $userid, int $cmid): bool {
         if ($cmid <= 0 || $userid <= 0 || self::is_orientation_course($course)) {
+            return false;
+        }
+        // TEMP: remove after E10 review — see TEMP_BYPASS_SEQUENCE_LOCK.
+        if (self::TEMP_BYPASS_SEQUENCE_LOCK) {
             return false;
         }
         $outline = self::course_outline($course, $userid);

@@ -668,6 +668,7 @@ switch ($view) {
                 'assignsavedraft' => get_string('fellowship_assign_savedraft', 'local_launchpad'),
                 'assignsubmit' => get_string('fellowship_assign_submit', 'local_launchpad'),
                 'assignsubmitsection' => get_string('fellowship_assign_submitsection', 'local_launchpad'),
+                'assignreceipt' => get_string('fellowship_assign_receipt', 'local_launchpad'),
                 'assignpriors' => get_string('fellowship_assign_priors', 'local_launchpad'),
                 'assigncompletion' => get_string('fellowship_assign_completion', 'local_launchpad'),
                 'assignlockednote' => get_string('fellowship_assign_lockednote', 'local_launchpad'),
@@ -1035,7 +1036,19 @@ switch ($view) {
                     'a' => $lpstr(
                         'fellowship_faq_internship_a',
                         null,
-                        'No. LaunchPad is structured learning for assigned fellows. Jobs, stipends, placements, and income are never promised.'
+                        'No. LaunchPad is structured learning for assigned fellows — not a paid internship. Jobs, stipends, placements, and income are never promised.'
+                    ),
+                ],
+                [
+                    'q' => $lpstr(
+                        'fellowship_faq_offer_q',
+                        null,
+                        'What does the Fellowship learning offer look like?'
+                    ),
+                    'a' => $lpstr(
+                        'fellowship_faq_offer_a',
+                        null,
+                        'Five tracks (AI & Automation, Full Stack, Product Management, Digital Marketing, Startup Building). Each track has four phases: Foundations → Guided project → Industry simulation → Demo day and certification. You only see tracks your programme enrols you on.'
                     ),
                 ],
                 [

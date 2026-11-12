@@ -6372,6 +6372,21 @@ body.local-launchpad-mentor .lp-xp-chip { display: none; }
 }
 
 /* Mentor review room */
+.lp-review-lead {
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.lp-review-fellow {
+  margin: 0 0 4px;
+  font-family: var(--lp-head);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--lp-ink, #0f172a);
+}
+.lp-review-lead .lp-muted {
+  margin: 0;
+}
 .lp-review-banner {
   background: #E3F5E8;
   color: #1E7A3B;
@@ -12758,6 +12773,38 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   border-radius: 10px;
   background: #fff;
   border: 1px solid #e6edf5;
+}
+.lp-assign-receipt {
+  border: 1px solid color-mix(in srgb, var(--lp-ink) 12%, transparent);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: color-mix(in srgb, var(--lp-paper, #fff) 92%, var(--lp-teal, #0d9488) 8%);
+}
+.lp-assign-receipt-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 16px;
+  margin: 0 0 12px;
+}
+.lp-assign-receipt-meta dt {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lp-muted, #64748b);
+}
+.lp-assign-receipt-meta dd {
+  margin: 4px 0 0;
+}
+.lp-assign-receipt-sub {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+}
+.lp-assign-receipt-body + .lp-assign-receipt-body {
+  margin-top: 12px;
+}
+.lp-assign-receipt-honesty {
+  margin: 12px 0 0;
 }
 .lp-assign-file-list,
 .lp-assign-prior-list {
