@@ -1810,7 +1810,8 @@ body.local-launchpad-mentor {
 [data-region="fellowship-scoped"] .lp-scoped-scroll .lp-act-rows {
   max-height: min(20rem, 42vh);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Chain to page scroll when the list hits top/bottom. */
+  overscroll-behavior: auto;
   scrollbar-gutter: stable;
   margin: 0;
   padding-right: 4px;
@@ -4201,7 +4202,8 @@ body.local-launchpad-mentor {
 .lp-course-outline .lp-phase-acc[open] .lp-phase-scroll {
   max-height: min(20rem, 42vh);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Chain to page scroll when the phase list hits top/bottom. */
+  overscroll-behavior: auto;
   scrollbar-gutter: stable;
   padding-right: 10px;
   padding-bottom: 12px;
@@ -6037,7 +6039,8 @@ body.lp-orbit-is-hidden .lp-orbit { display: none; }
 .lp-xp-history-scroll .lp-xp-history-list {
   max-height: min(22rem, 46vh);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Chain to page scroll when XP history hits top/bottom. */
+  overscroll-behavior: auto;
   scrollbar-gutter: stable;
   padding-right: 4px;
   padding-bottom: 10px;
