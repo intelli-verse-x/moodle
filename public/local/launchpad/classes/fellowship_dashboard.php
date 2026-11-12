@@ -3510,6 +3510,12 @@ final class fellowship_dashboard {
 
                 $commenttext = '';
                 $nextsteptext = '';
+                $rubricparts = [
+                    'has_rubric' => false,
+                    'levels' => [],
+                    'scores' => [],
+                    'total' => null,
+                ];
                 $gradedat = 0;
                 $gradepct = null;
                 $gradestr = '';
@@ -3537,8 +3543,11 @@ final class fellowship_dashboard {
                             if ($parts['next_step'] !== '') {
                                 $nextsteptext = $parts['next_step'];
                             }
+                            if (!empty($parts['has_rubric'])) {
+                                $rubricparts = $parts;
+                            }
                             $body = $parts['comment'];
-                            if ($body === '' && $parts['next_step'] === '') {
+                            if ($body === '' && $parts['next_step'] === '' && empty($parts['has_rubric'])) {
                                 $body = (string) $gradebookgrade->feedback;
                             }
                             if ($body !== '') {
@@ -3557,7 +3566,7 @@ final class fellowship_dashboard {
                         $gradestr = format_float($gradepct, 0) . '%';
                     }
 
-                    if ($agrade && $commenttext === '' && $nextsteptext === '') {
+                    if ($agrade && $commenttext === '' && $nextsteptext === '' && empty($rubricparts['has_rubric'])) {
                         $commentsplugin = $assign->get_feedback_plugin_by_type('comments');
                         if ($commentsplugin && $commentsplugin->is_enabled()
                                 && method_exists($commentsplugin, 'get_feedback_comments')) {
@@ -3567,8 +3576,11 @@ final class fellowship_dashboard {
                                 if ($parts['next_step'] !== '') {
                                     $nextsteptext = $parts['next_step'];
                                 }
+                                if (!empty($parts['has_rubric'])) {
+                                    $rubricparts = $parts;
+                                }
                                 $body = $parts['comment'];
-                                if ($body === '' && $parts['next_step'] === '') {
+                                if ($body === '' && $parts['next_step'] === '' && empty($parts['has_rubric'])) {
                                     $body = (string) $fc->commenttext;
                                 }
                                 if ($body !== '') {
@@ -3580,8 +3592,36 @@ final class fellowship_dashboard {
                                 }
                             }
                         }
+                    } else if ($agrade && empty($rubricparts['has_rubric'])) {
+                        // Gradebook path may have comment but miss assignfeedback_comments rubric — try plugin.
+                        $commentsplugin = $assign->get_feedback_plugin_by_type('comments');
+                        if ($commentsplugin && $commentsplugin->is_enabled()
+                                && method_exists($commentsplugin, 'get_feedback_comments')) {
+                            $fc = $commentsplugin->get_feedback_comments((int) $agrade->id);
+                            if ($fc && trim((string) $fc->commenttext) !== '') {
+                                $parts = mentor_dashboard::unpack_review_comment((string) $fc->commenttext);
+                                if (!empty($parts['has_rubric'])) {
+                                    $rubricparts = $parts;
+                                }
+                                if ($nextsteptext === '' && $parts['next_step'] !== '') {
+                                    $nextsteptext = $parts['next_step'];
+                                }
+                                if ($commenttext === '') {
+                                    $body = $parts['comment'];
+                                    if ($body !== '') {
+                                        $commenttext = format_text(
+                                            $body,
+                                            (int) $fc->commentformat,
+                                            ['context' => $context, 'para' => false]
+                                        );
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+
+                $rubricrows = mentor_dashboard::rubric_breakdown_rows($rubricparts);
 
                 $attempt = $latest ? ((int) $latest->attemptnumber + 1) : 0;
                 $submittedat = 0;
@@ -3680,6 +3720,8 @@ final class fellowship_dashboard {
                     'summary' => $summary,
                     'has_grade' => $shownumeric && $gradestr !== '',
                     'grade_display' => $gradestr,
+                    'has_rubric_breakdown' => $rubricrows !== [],
+                    'rubric_rows' => $rubricrows,
                     'has_next_step' => $nextsteptext !== '',
                     'next_step' => $nextsteptext,
                     'has_comment' => $commenttext !== '',

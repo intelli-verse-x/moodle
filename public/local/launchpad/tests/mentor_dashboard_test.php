@@ -67,6 +67,54 @@ final class mentor_dashboard_test extends \basic_testcase {
         $this->assertSame(6, mentor_dashboard::HOME_QUEUE_PREVIEW);
     }
 
+    public function test_score_from_levels_math(): void {
+        // All Partial (0.6) → 18+15+15+12 = 60.
+        $partial = mentor_dashboard::score_from_levels([1, 1, 1, 1]);
+        $this->assertNotNull($partial);
+        $this->assertSame([18, 15, 15, 12], $partial['scores']);
+        $this->assertSame(60, $partial['total']);
+
+        // Solid across → 24+20+20+16 = 80 (Met).
+        $solid = mentor_dashboard::score_from_levels([2, 2, 2, 2]);
+        $this->assertNotNull($solid);
+        $this->assertSame(80, $solid['total']);
+
+        // Example total 79: Solid / Solid / Partial / Strong.
+        $mixed = mentor_dashboard::score_from_levels([2, 2, 1, 3]);
+        $this->assertNotNull($mixed);
+        $this->assertSame([24, 20, 15, 20], $mixed['scores']);
+        $this->assertSame(79, $mixed['total']);
+
+        $this->assertNull(mentor_dashboard::score_from_levels([1, 1, 1]));
+        $this->assertNull(mentor_dashboard::score_from_levels([1, 1, 1, 9]));
+    }
+
+    public function test_pack_unpack_rubric_and_next_step(): void {
+        $scored = mentor_dashboard::score_from_levels([2, 2, 1, 3]);
+        $this->assertNotNull($scored);
+        $packed = mentor_dashboard::pack_review_comment('Tighten the acceptance table.', 'Add two missing ACs', $scored);
+        $this->assertStringContainsString(mentor_dashboard::RUBRIC_MARKER, $packed);
+        $this->assertStringContainsString(mentor_dashboard::NEXT_STEP_MARKER, $packed);
+        $this->assertStringContainsString('"total":79', $packed);
+
+        $parts = mentor_dashboard::unpack_review_comment($packed);
+        $this->assertTrue($parts['has_rubric']);
+        $this->assertSame([2, 2, 1, 3], $parts['levels']);
+        $this->assertSame([24, 20, 15, 20], $parts['scores']);
+        $this->assertSame(79, $parts['total']);
+        $this->assertSame('Add two missing ACs', $parts['next_step']);
+        $this->assertSame('Tighten the acceptance table.', $parts['comment']);
+
+        $legacy = mentor_dashboard::unpack_review_comment(
+            mentor_dashboard::NEXT_STEP_MARKER . " Fix the brief\n\nPlain change note"
+        );
+        $this->assertFalse($legacy['has_rubric']);
+        $this->assertSame([], $legacy['levels']);
+        $this->assertSame('Fix the brief', $legacy['next_step']);
+        $this->assertSame('Plain change note', $legacy['comment']);
+        $this->assertSame([], mentor_dashboard::rubric_breakdown_rows($legacy));
+    }
+
     public function test_list_fellows_empty_without_courses(): void {
         $out = mentor_dashboard::list_fellows(1, []);
         $this->assertFalse($out['has_items']);

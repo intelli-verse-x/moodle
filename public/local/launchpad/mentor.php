@@ -138,12 +138,18 @@ if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
 
 // Persist review into Moodle assign before rendering.
 if ($view === 'review' && $cmid > 0 && $fellowid > 0 && data_submitted() && confirm_sesskey()) {
-    $gradepct = required_param('grade_pct', PARAM_RAW_TRIMMED);
+    $levelsraw = optional_param_array('crit_level', [], PARAM_INT);
+    $levels = [];
+    for ($i = 0; $i < 4; $i++) {
+        $levels[$i] = array_key_exists($i, $levelsraw)
+            ? (int) $levelsraw[$i]
+            : optional_param('crit_' . $i, -1, PARAM_INT);
+    }
     $comment = required_param('comment', PARAM_RAW_TRIMMED);
     $outcome = optional_param('outcome', 'met', PARAM_ALPHA);
     $nextstep = optional_param('nextstep', '', PARAM_RAW_TRIMMED);
     try {
-        $result = mentor_dashboard::save_review($userid, $cmid, $fellowid, $gradepct, $comment, $outcome, $nextstep);
+        $result = mentor_dashboard::save_review($userid, $cmid, $fellowid, $levels, $comment, $outcome, $nextstep);
         redirect(new moodle_url(persona_home::MENTOR_PATH, [
             'view' => 'review',
             'id' => $cmid,
@@ -157,7 +163,10 @@ if ($view === 'review' && $cmid > 0 && $fellowid > 0 && data_submitted() && conf
             'id' => $cmid,
             'userid' => $fellowid,
             'err' => $e->errorcode,
-            'grade_pct' => $gradepct,
+            'crit_0' => $levels[0] ?? -1,
+            'crit_1' => $levels[1] ?? -1,
+            'crit_2' => $levels[2] ?? -1,
+            'crit_3' => $levels[3] ?? -1,
             'outcome' => $outcome,
             'nextstep' => $nextstep,
         ]), $e->getMessage(), null, \core\output\notification::NOTIFY_ERROR);
@@ -372,9 +381,22 @@ switch ($view) {
         }
         $reviewdata = mentor_dashboard::get_review_context($userid, $cmid, $fellowid);
         // Preserve attempted form values after a soft validation redirect.
-        $postedgrade = optional_param('grade_pct', '', PARAM_RAW_TRIMMED);
-        if ($postedgrade !== '') {
-            $reviewdata['grade_pct'] = s($postedgrade);
+        $postedlevels = [];
+        $haspostedlevels = true;
+        for ($i = 0; $i < 4; $i++) {
+            $lv = optional_param('crit_' . $i, -1, PARAM_INT);
+            if ($lv < 0 || $lv > 3) {
+                $haspostedlevels = false;
+                break;
+            }
+            $postedlevels[] = $lv;
+        }
+        if ($haspostedlevels) {
+            $rubricui = mentor_dashboard::build_review_rubric_ui($postedlevels);
+            $reviewdata['rubric_criteria'] = $rubricui['criteria'];
+            $reviewdata['rubric_total'] = $rubricui['total'];
+            $reviewdata['grade_pct'] = (string) (int) $rubricui['total'];
+            $reviewdata['rubric_weights_json'] = json_encode($rubricui['weights']);
         }
         $postedoutcome = optional_param('outcome', '', PARAM_ALPHA);
         if ($postedoutcome === 'changes' || $postedoutcome === 'met') {
@@ -383,7 +405,7 @@ switch ($view) {
         } else if (is_number((string) ($reviewdata['grade_pct'] ?? ''))
                 && (float) $reviewdata['grade_pct'] < 70 && (float) $reviewdata['grade_pct'] >= 0
                 && (string) $reviewdata['grade_pct'] !== '') {
-            // Existing score below pass bar → default to Changes.
+            // Existing / computed score below pass bar → default to Changes.
             $reviewdata['outcome_met'] = false;
             $reviewdata['outcome_changes'] = true;
         }
