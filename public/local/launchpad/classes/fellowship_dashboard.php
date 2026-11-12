@@ -999,6 +999,120 @@ final class fellowship_dashboard {
     }
 
     /**
+     * Thin M2: phase Pass/Met label from assign stats (does not change unlock).
+     *
+     * Met only when every visible assign in the phase is graded ≥70.
+     * One high score must not mark the whole phase Met while others are pending/Changes.
+     * Unlock stays fellow-complete (submit) — see {@see apply_sequence_locks()}.
+     *
+     * @param array{
+     *     assigncount?:int,
+     *     metcount?:int,
+     *     gradedcount?:int,
+     *     below70?:bool,
+     *     pendingreview?:bool,
+     *     revising?:bool,
+     *     submitted?:bool,
+     *     sumpct?:float,
+     *     allcomplete?:bool
+     * } $stats
+     * @return array{status:string,chip:string,ico:string,score:?int,scored:bool}
+     */
+    public static function phase_gate_from_assign_stats(array $stats): array {
+        $assigncount = (int) ($stats['assigncount'] ?? 0);
+        $metcount = (int) ($stats['metcount'] ?? 0);
+        $gradedcount = (int) ($stats['gradedcount'] ?? 0);
+        $below70 = !empty($stats['below70']);
+        $pendingreview = !empty($stats['pendingreview']);
+        $revising = !empty($stats['revising']);
+        $submitted = !empty($stats['submitted']);
+        $sumpct = (float) ($stats['sumpct'] ?? 0);
+        $allcomplete = !empty($stats['allcomplete']);
+
+        $score = null;
+        $scored = false;
+        if ($gradedcount > 0) {
+            $score = (int) round($sumpct / $gradedcount);
+            $scored = true;
+        }
+
+        if ($assigncount > 0) {
+            if ($revising || $below70) {
+                return [
+                    'status' => $revising ? 'Changes requested' : 'Not yet met',
+                    'chip' => 'warn',
+                    'ico' => '',
+                    'score' => $score,
+                    'scored' => $scored,
+                ];
+            }
+            if ($metcount === $assigncount) {
+                return [
+                    'status' => 'Met',
+                    'chip' => 'ok',
+                    'ico' => '✓',
+                    'score' => $score,
+                    'scored' => $scored,
+                ];
+            }
+            if ($pendingreview) {
+                // Some assigns waiting on mentor — never Met until every assign is ≥70.
+                $partial = ($metcount > 0 || $gradedcount > 0);
+                return [
+                    'status' => $partial ? 'In progress' : 'Review pending',
+                    'chip' => $partial ? 'line' : '',
+                    'ico' => '',
+                    'score' => $score,
+                    'scored' => $scored,
+                ];
+            }
+            if ($submitted || $gradedcount > 0) {
+                return [
+                    'status' => 'In progress',
+                    'chip' => 'line',
+                    'ico' => '',
+                    'score' => $score,
+                    'scored' => $scored,
+                ];
+            }
+            return [
+                'status' => 'In progress',
+                'chip' => 'line',
+                'ico' => '',
+                'score' => null,
+                'scored' => false,
+            ];
+        }
+
+        // No assigns in this phase — page/quiz completion only (not mentor Met).
+        if ($allcomplete) {
+            return [
+                'status' => 'Complete',
+                'chip' => 'ok',
+                'ico' => '✓',
+                'score' => null,
+                'scored' => false,
+            ];
+        }
+        if ($submitted) {
+            return [
+                'status' => 'In progress',
+                'chip' => 'line',
+                'ico' => '',
+                'score' => null,
+                'scored' => false,
+            ];
+        }
+        return [
+            'status' => 'In progress',
+            'chip' => 'line',
+            'ico' => '',
+            'score' => null,
+            'scored' => false,
+        ];
+    }
+
+    /**
      * Phase progress tab: journey + per-gate weight/score/status from Moodle assigns.
      *
      * Pass at 70/100 on a released assign grade in that section (HTML rule). Empty
@@ -1072,12 +1186,16 @@ final class fellowship_dashboard {
 
             if ($visiblecount > 0 && $course !== null && $modinfo !== null) {
                 $icodim = false;
-                $bestpct = null;
-                $hasgrade = false;
                 $submitted = false;
                 $revising = false;
                 $tracked = 0;
                 $done = 0;
+                $assigncount = 0;
+                $metcount = 0;
+                $gradedcount = 0;
+                $below70 = false;
+                $pendingreview = false;
+                $sumpct = 0.0;
 
                 foreach ($activities as $activity) {
                     if (!empty($activity['tracked'])) {
@@ -1095,6 +1213,7 @@ final class fellowship_dashboard {
                     if ($cm->modname !== 'assign' || !$cm->uservisible || $cm->deletioninprogress) {
                         continue;
                     }
+                    $assigncount++;
                     $instanceid = (int) $cm->instance;
 
                     $latest = $DB->get_record('assign_submission', [
@@ -1102,7 +1221,9 @@ final class fellowship_dashboard {
                         'userid' => $userid,
                         'latest' => 1,
                     ], '*', IGNORE_MISSING);
-                    if ($latest && $latest->status === 'submitted') {
+                    $thissubmitted = ($latest && $latest->status === 'submitted');
+                    $assignrevising = false;
+                    if ($thissubmitted) {
                         $submitted = true;
                     } else if ($latest && in_array($latest->status, ['draft', 'reopened', 'new'], true)) {
                         $subcount = (int) $DB->count_records('assign_submission', [
@@ -1111,7 +1232,9 @@ final class fellowship_dashboard {
                             'status' => 'submitted',
                         ]);
                         if ($subcount > 0) {
+                            $assignrevising = true;
                             $revising = true;
+                            $submitted = true;
                         }
                     }
 
@@ -1119,44 +1242,37 @@ final class fellowship_dashboard {
                     $gg = $gradeinfo->items[0]->grades[$userid] ?? null;
                     $grademax = isset($gradeinfo->items[0]->grademax) ? (float) $gradeinfo->items[0]->grademax : 0.0;
                     if ($gg && $gg->grade !== null && $grademax > 0) {
-                        $hasgrade = true;
+                        $gradedcount++;
                         $pct = (((float) $gg->grade) / $grademax) * 100;
-                        if ($bestpct === null || $pct > $bestpct) {
-                            $bestpct = $pct;
+                        $sumpct += $pct;
+                        if ($pct >= 70) {
+                            $metcount++;
+                        } else {
+                            $below70 = true;
                         }
+                    } else if ($thissubmitted || $assignrevising) {
+                        // This assign submitted/reopened with no released grade yet.
+                        $pendingreview = true;
                     }
                 }
 
                 $allcomplete = ($tracked > 0 && $done >= $tracked);
-
-                if ($hasgrade && $bestpct !== null) {
-                    $score = (int) round($bestpct);
-                    $scored = true;
-                }
-                if ($revising || ($hasgrade && $bestpct !== null && $bestpct < 70)) {
-                    // Mentor asked for changes, or graded below the 70 Met bar.
-                    $status = $revising ? 'Changes requested' : 'Not yet met';
-                    $chip = 'warn';
-                } else if ($hasgrade && $bestpct !== null && $bestpct >= 70) {
-                    $status = 'Met';
-                    $chip = 'ok';
-                    $ico = '✓';
-                } else if (!$allcomplete && $submitted) {
-                    // Submission exists but phase activities are still open — keep "In progress".
-                    $status = 'In progress';
-                    $chip = 'line';
-                } else if ($submitted) {
-                    $status = 'Review pending';
-                    $chip = '';
-                } else if ($allcomplete) {
-                    // Foundations-style phases (page/quiz only) finish via completion, not assign grades.
-                    $status = 'Complete';
-                    $chip = 'ok';
-                    $ico = '✓';
-                } else {
-                    $status = 'In progress';
-                    $chip = 'line';
-                }
+                $gate = self::phase_gate_from_assign_stats([
+                    'assigncount' => $assigncount,
+                    'metcount' => $metcount,
+                    'gradedcount' => $gradedcount,
+                    'below70' => $below70,
+                    'pendingreview' => $pendingreview,
+                    'revising' => $revising,
+                    'submitted' => $submitted,
+                    'sumpct' => $sumpct,
+                    'allcomplete' => $allcomplete,
+                ]);
+                $status = $gate['status'];
+                $chip = $gate['chip'];
+                $ico = $gate['ico'] !== '' ? $gate['ico'] : $ico;
+                $score = $gate['score'];
+                $scored = $gate['scored'];
             }
 
             $statusmap[$num] = $status;
