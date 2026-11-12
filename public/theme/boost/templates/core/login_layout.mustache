@@ -34,6 +34,397 @@
         }
     }
 }}
+{{! Auth chrome: hide Moodle guest ? footer; forgot/set-password match login/signup. }}
+<style>
+.pagelayout-login #page-footer,
+.pagelayout-login .footer-popover,
+.pagelayout-login .btn-footer-popover,
+.pagelayout-login .btn-footer-communication,
+.pagelayout-login .footer-content-popover{display:none!important}
+
+/* Hide stock Moodle instruction box (any nesting under login region) */
+#page-login-forgot_password .login-container .generalbox,
+#page-login-forgot_password .login-container .boxwidthnormal,
+#page-login-forgot_password #region-main .generalbox.boxwidthnormal,
+#page-login-set_password .login-container .generalbox,
+#page-login-set_password .login-container .boxwidthnormal,
+#page-login-set_password #region-main .generalbox.boxwidthnormal,
+body.path-login-forgot_password .login-container .generalbox,
+body.path-login-forgot_password .login-container .boxwidthnormal,
+body.lp-set-password .login-container .generalbox,
+body.lp-set-password .login-container .boxwidthnormal{display:none!important}
+
+/* Set-password (token link) runs on forgot_password.php — use body.lp-set-password */
+body.lp-set-password .toba-forgot-back-static{display:none!important}
+body.lp-set-password .mform fieldset#id_setpassword > legend,
+body.lp-set-password .mform #id_setpasswordlegend,
+body.lp-set-password .mform legend.ftoggler{display:none!important}
+body.lp-set-password .login-container{
+  display:flex;flex-direction:column;align-items:stretch;
+  font-family:"Gantari",system-ui,-apple-system,"Segoe UI",sans-serif;color:#0d1429;
+  width:100%;max-width:420px;margin-inline:auto;box-sizing:border-box;
+}
+body.lp-set-password .toba-forgot-head{
+  display:flex;flex-direction:column;align-items:center;text-align:center;margin:0 0 1.25rem;width:100%;
+}
+body.lp-set-password .toba-forgot-head #loginlogo{width:100%;margin:0 0 .85rem;justify-content:center!important}
+body.lp-set-password .toba-forgot-head #logoimage{
+  display:block;height:56px;width:auto;max-width:min(220px,70vw);margin-inline:auto;object-fit:contain;
+}
+body.lp-set-password .toba-forgot-head .toba-login-heading{
+  font-family:"Prosto One",system-ui,sans-serif;font-weight:400;letter-spacing:-.01em;
+  text-align:center;margin:0 0 .35rem;color:#0d1429;font-size:1.75rem;line-height:1.25;
+}
+body.lp-set-password .toba-forgot-head .toba-login-sub{
+  text-align:center;color:#44506a!important;font-size:1rem;line-height:1.45;margin:0;
+}
+body.lp-set-password .mform .fitem,
+body.lp-set-password .mform .fitem.row{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  gap:.35rem;margin:0 0 .85rem!important;width:100%;--bs-gutter-x:0;
+}
+body.lp-set-password .mform .col-form-label,
+body.lp-set-password .mform label{
+  font-weight:600;color:#0d1429;padding:0!important;margin:0!important;width:100%!important;text-align:left;
+}
+body.lp-set-password .mform .felement,
+body.lp-set-password .mform .col-md-9,
+body.lp-set-password .mform .col-md-3{
+  width:100%!important;max-width:100%!important;padding:0!important;float:none!important;flex:none!important;
+}
+body.lp-set-password .mform .form-control,
+body.lp-set-password .mform input[type=password],
+body.lp-set-password .mform input[type=text],
+.lp-set-password-preview .mform .form-control{
+  display:block!important;width:100%!important;box-sizing:border-box;
+  background:#f6f8fc!important;border:1px solid #e3e9f4!important;border-radius:12px!important;
+  min-height:48px!important;padding:.55rem .85rem!important;box-shadow:none!important;
+  color:#0d1429!important;font-size:16px!important;
+}
+body.lp-set-password .mform input::placeholder,
+.lp-set-password-preview .mform input::placeholder{color:#6b778f!important;opacity:1!important}
+body.lp-set-password .mform .form-control:focus,
+body.lp-set-password .mform input[type=password]:focus{
+  background:#fff!important;border-color:#1a61f2!important;
+  box-shadow:0 0 0 .2rem rgba(26,97,242,.18)!important;outline:none!important;
+}
+body.lp-set-password .lp-set-password-user,
+.lp-set-password-preview .lp-set-password-user{
+  margin:0 0 1rem;
+  font-size:.95rem;
+  line-height:1.4;
+  color:#44506a;
+  text-align:left;
+  width:100%;
+}
+body.lp-set-password .lp-set-password-user,
+.lp-set-password-preview .lp-set-password-user{
+  color:#0d1429;
+  font-weight:500;
+}
+body.lp-set-password #id_passwordpolicyinfo,
+body.lp-set-password .mform .fstatic,
+.lp-set-password-policy{
+  font-size:.8125rem!important;color:#44506a!important;line-height:1.45;margin:0 0 1rem;
+}
+body.lp-set-password .mform .fitem_actionbuttons,
+body.lp-set-password .mform .felement[data-fieldtype=submit],
+body.lp-set-password .mform .felement[data-fieldtype=group],
+.lp-set-password-preview .fitem_actionbuttons{
+  display:flex!important;flex-direction:column!important;gap:.65rem;width:100%!important;margin-top:.35rem!important;
+}
+body.lp-set-password .mform .btn-primary,
+body.lp-set-password .mform input[type=submit],
+.lp-set-password-preview .btn-primary{
+  width:100%!important;min-height:48px!important;border-radius:999px!important;font-weight:600!important;
+  background:#1a61f2!important;border:1px solid #1a61f2!important;color:#fff!important;
+  box-shadow:0 6px 18px rgba(26,97,242,.28)!important;
+}
+body.lp-set-password .mform .btn-secondary,
+body.lp-set-password .mform #id_cancel,
+.lp-set-password-preview .btn-secondary{
+  width:100%!important;min-height:48px!important;border-radius:999px!important;font-weight:600!important;
+  background:#fff!important;border:1px solid #e3e9f4!important;color:#0d1429!important;box-shadow:none!important;
+  display:inline-flex!important;align-items:center;justify-content:center;text-decoration:none!important;
+}
+body.lp-set-password .mform .btn-secondary:hover,
+body.lp-set-password .mform #id_cancel:hover,
+.lp-set-password-preview .btn-secondary:hover{background:#ebf0fa!important}
+body.lp-set-password .mform .fdescription.required,
+body.lp-set-password .mform .icon.icon-pre{display:none!important} /* clean required asterisks clutter */
+body.lp-set-password .lp-set-password-check,
+.lp-set-password-preview .lp-set-password-check{
+  display:flex;align-items:flex-start;gap:.55rem;font-size:.9rem;color:#0d1429;font-weight:500;
+}
+.lp-set-password-preview{max-width:420px;margin:0 auto;font-family:"Gantari",system-ui,sans-serif;color:#0d1429}
+
+#page-login-forgot_password .login-container,
+#page-login-set_password .login-container{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  font-family:"Gantari",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:#0d1429;
+  width:100%;
+  max-width:420px;
+  margin-inline:auto;
+  box-sizing:border-box;
+}
+
+/* Logo + title sit ABOVE the form (moved by script) — same sizes as login */
+#page-login-forgot_password .toba-forgot-head,
+#page-login-set_password .toba-forgot-head{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  margin:0 0 1.25rem;
+  width:100%;
+}
+#page-login-forgot_password .toba-forgot-head #loginlogo,
+#page-login-set_password .toba-forgot-head #loginlogo{
+  width:100%;
+  margin:0 0 .85rem;
+  justify-content:center!important;
+}
+#page-login-forgot_password .toba-forgot-head #logoimage,
+#page-login-set_password .toba-forgot-head #logoimage{
+  display:block;
+  height:56px;
+  width:auto;
+  max-width:min(220px,70vw);
+  margin-inline:auto;
+  object-fit:contain;
+}
+#page-login-forgot_password .toba-forgot-head .toba-login-heading,
+#page-login-set_password .toba-forgot-head .toba-login-heading{
+  font-family:"Prosto One",system-ui,sans-serif;
+  font-weight:400;
+  letter-spacing:-.01em;
+  text-align:center;
+  margin:0 0 .35rem;
+  color:#0d1429;
+  font-size:1.75rem; /* matches login .h2 */
+  line-height:1.25;
+}
+#page-login-forgot_password .toba-forgot-head .toba-login-sub,
+#page-login-set_password .toba-forgot-head .toba-login-sub{
+  text-align:center;
+  color:#44506a!important;
+  font-size:1rem;
+  line-height:1.45;
+  margin:0;
+}
+
+#page-login-forgot_password .mform,
+#page-login-set_password .mform{
+  font-family:"Gantari",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:#0d1429;
+  width:100%;
+  margin:0;
+}
+#page-login-forgot_password .mform fieldset,
+#page-login-set_password .mform fieldset{
+  border:0!important;
+  margin:0 0 1rem!important;
+  padding:0!important;
+  min-width:0;
+}
+#page-login-forgot_password .mform legend,
+#page-login-forgot_password .mform .ftoggler,
+#page-login-set_password .mform legend,
+#page-login-set_password .mform .ftoggler{
+  font-family:"Gantari",system-ui,sans-serif!important;
+  font-weight:600!important;
+  font-size:.95rem!important;
+  letter-spacing:0!important;
+  color:#0d1429!important;
+  width:100%;
+  margin:0 0 .5rem!important;
+  padding:0!important;
+  border:0!important;
+  float:none!important;
+}
+#page-login-forgot_password .mform .fitem,
+#page-login-forgot_password .mform .fitem.row,
+#page-login-set_password .mform .fitem,
+#page-login-set_password .mform .fitem.row{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:.35rem;
+  margin:0 0 .85rem!important;
+  width:100%;
+  --bs-gutter-x:0;
+}
+#page-login-forgot_password .mform .col-form-label,
+#page-login-forgot_password .mform .fitemtitle,
+#page-login-forgot_password .mform label,
+#page-login-set_password .mform .col-form-label,
+#page-login-set_password .mform .fitemtitle,
+#page-login-set_password .mform label{
+  font-weight:600;
+  color:#0d1429;
+  padding:0!important;
+  margin:0!important;
+  text-align:left;
+  float:none!important;
+  width:100%!important;
+  max-width:none!important;
+}
+#page-login-forgot_password .mform .felement,
+#page-login-forgot_password .mform .col-md-9,
+#page-login-forgot_password .mform .col-md-3,
+#page-login-set_password .mform .felement,
+#page-login-set_password .mform .col-md-9,
+#page-login-set_password .mform .col-md-3{
+  width:100%!important;
+  max-width:100%!important;
+  padding:0!important;
+  float:none!important;
+  flex:none!important;
+}
+/* Exact login input look: soft fill + light line */
+#page-login-forgot_password .mform .form-control,
+#page-login-forgot_password .mform input[type=text],
+#page-login-forgot_password .mform input[type=email],
+#page-login-forgot_password .mform input[type=password],
+#page-login-set_password .mform .form-control,
+#page-login-set_password .mform input[type=text],
+#page-login-set_password .mform input[type=email],
+#page-login-set_password .mform input[type=password]{
+  display:block!important;
+  width:100%!important;
+  box-sizing:border-box;
+  background:#f6f8fc!important;
+  border:1px solid #e3e9f4!important;
+  border-radius:12px!important;
+  min-height:48px!important;
+  padding:.55rem .85rem!important;
+  box-shadow:none!important;
+  color:#0d1429!important;
+  font-size:16px!important;
+  font-family:"Gantari",system-ui,sans-serif!important;
+}
+#page-login-forgot_password .mform input::placeholder,
+#page-login-forgot_password .mform .form-control::placeholder,
+#page-login-set_password .mform input::placeholder,
+#page-login-set_password .mform .form-control::placeholder{
+  color:#6b778f!important;
+  opacity:1!important;
+}
+#page-login-forgot_password .mform .form-control:hover,
+#page-login-forgot_password .mform input[type=text]:hover,
+#page-login-forgot_password .mform input[type=email]:hover,
+#page-login-forgot_password .mform input[type=password]:hover,
+#page-login-set_password .mform .form-control:hover,
+#page-login-set_password .mform input[type=text]:hover,
+#page-login-set_password .mform input[type=email]:hover,
+#page-login-set_password .mform input[type=password]:hover{
+  background:#f6f8fc!important;
+  border-color:#e3e9f4!important;
+}
+#page-login-forgot_password .mform .form-control:focus,
+#page-login-forgot_password .mform input[type=text]:focus,
+#page-login-forgot_password .mform input[type=email]:focus,
+#page-login-forgot_password .mform input[type=password]:focus,
+#page-login-set_password .mform .form-control:focus,
+#page-login-set_password .mform input[type=text]:focus,
+#page-login-set_password .mform input[type=email]:focus,
+#page-login-set_password .mform input[type=password]:focus{
+  background:#fff!important;
+  border-color:#1a61f2!important;
+  box-shadow:0 0 0 .2rem rgba(26,97,242,.18)!important;
+  outline:none!important;
+}
+#page-login-forgot_password .mform hr,
+#page-login-set_password .mform hr{
+  border:0;
+  border-top:1px solid #e3e9f4;
+  margin:.75rem 0 1rem;
+  opacity:1;
+  width:100%;
+}
+#page-login-forgot_password .mform .fitem_actionbuttons,
+#page-login-forgot_password .mform .felement[data-fieldtype=submit],
+#page-login-set_password .mform .fitem_actionbuttons,
+#page-login-set_password .mform .felement[data-fieldtype=submit]{
+  display:flex!important;
+  flex-direction:column!important;
+  margin:0!important;
+  width:100%!important;
+}
+#page-login-forgot_password .mform .fitem:has([type=submit]),
+#page-login-set_password .mform .fitem:has([type=submit]){
+  margin:0 0 0!important;
+}
+#page-login-forgot_password .mform .btn-primary,
+#page-login-forgot_password .mform input[type=submit],
+#page-login-forgot_password .mform button[type=submit],
+#page-login-set_password .mform .btn-primary,
+#page-login-set_password .mform input[type=submit],
+#page-login-set_password .mform button[type=submit]{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  width:100%!important;
+  min-width:100%!important;
+  min-height:48px!important;
+  padding:.7rem 1.25rem!important;
+  border-radius:999px!important;
+  font-family:"Gantari",system-ui,sans-serif!important;
+  font-weight:600!important;
+  font-size:1rem!important;
+  background:#1a61f2!important;
+  border:1px solid #1a61f2!important;
+  color:#fff!important;
+  box-shadow:0 6px 18px rgba(26,97,242,.28)!important;
+}
+#page-login-forgot_password .mform .btn-primary:hover,
+#page-login-forgot_password .mform input[type=submit]:hover,
+#page-login-forgot_password .mform button[type=submit]:hover,
+#page-login-set_password .mform .btn-primary:hover,
+#page-login-set_password .mform input[type=submit]:hover,
+#page-login-set_password .mform button[type=submit]:hover{
+  background:#0f4fd6!important;
+  border-color:#0f4fd6!important;
+  color:#fff!important;
+}
+/* Static back link — only on forgot/set password (no JS required) */
+.toba-forgot-back-static{display:none!important}
+#page-login-forgot_password .toba-forgot-back-static,
+#page-login-set_password .toba-forgot-back-static,
+body.path-login-forgot_password .toba-forgot-back-static,
+body.path-login-set_password .toba-forgot-back-static{
+  display:block!important;
+  text-align:center;
+  margin:.4rem 0 0;
+  padding:0;
+  font-size:.875rem;
+  color:#44506a;
+  line-height:1.3;
+}
+#page-login-forgot_password .toba-forgot-back-static a,
+#page-login-set_password .toba-forgot-back-static a,
+body.path-login-forgot_password .toba-forgot-back-static a,
+body.path-login-set_password .toba-forgot-back-static a{
+  color:#1a61f2;
+  font-weight:600;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  min-height:36px;
+}
+#page-login-forgot_password .toba-forgot-back-static a:hover,
+#page-login-set_password .toba-forgot-back-static a:hover{text-decoration:underline}
+/* Hide duplicate JS-injected back link if both exist */
+#page-login-forgot_password .toba-forgot-back-static ~ [data-toba-forgot-back],
+#page-login-set_password .toba-forgot-back-static ~ [data-toba-forgot-back]{display:none!important}
+@media (max-width:575.98px){
+  #page-login-forgot_password .toba-forgot-head .toba-login-heading,
+  #page-login-set_password .toba-forgot-head .toba-login-heading{font-size:1.45rem}
+}
+</style>
 <div id="page-content" class="min-vh-100 row g-0">
     <aside class="login-layout-left col-lg-6 d-none d-lg-flex" aria-hidden="true">
         {{> core/login_panel }}
@@ -42,7 +433,68 @@
         <div id="region-main-box" class="login-layout-right-content">
             <div class="login-container">
                 {{{ output.main_content }}}
+                <p class="toba-forgot-back-static">
+                    <a href="{{config.wwwroot}}/login/index.php?portal=fellowship">{{#str}} forgot_back_signin, local_launchpad {{/str}}</a>
+                </p>
             </div>
         </div>
     </div>
 </div>
+<script>
+(function () {
+    var body = document.body;
+    if (!body) {
+        return;
+    }
+    var id = body.id || '';
+    var path = body.className || '';
+    var isForgot = id === 'page-login-forgot_password' || path.indexOf('path-login-forgot_password') !== -1;
+    var isSet = id === 'page-login-set_password' || path.indexOf('path-login-set_password') !== -1
+        || body.classList.contains('lp-set-password')
+        || !!document.getElementById('id_password2');
+    if (isSet) {
+        body.classList.add('lp-set-password');
+    }
+    if (!isForgot && !isSet) {
+        return;
+    }
+    var container = document.querySelector('.login-container') || document.querySelector('#region-main');
+    if (!container) {
+        return;
+    }
+    container.classList.add('toba-forgotform', 'toba-loginform');
+
+    container.querySelectorAll('.generalbox, .boxwidthnormal').forEach(function (el) {
+        if (el.closest('form')) {
+            return;
+        }
+        el.remove();
+    });
+
+    var head = container.querySelector('[data-toba-forgot-head]');
+    var form = container.querySelector('form.mform') || container.querySelector('form');
+    // Never insertBefore onto the wrong parent — that throws and aborts placeholders.
+    try {
+        if (head && form && head.parentNode !== form.parentNode) {
+            form.parentNode.insertBefore(head, form);
+        }
+    } catch (e) { /* keep head where Moodle rendered it */ }
+
+    function lpSetForgotPlaceholders() {
+        if (!isForgot) {
+            return;
+        }
+        var root = form || container;
+        var user = root.querySelector('#id_username') || root.querySelector('input[name="username"]');
+        var email = root.querySelector('#id_email') || root.querySelector('input[name="email"]');
+        if (user) {
+            user.setAttribute('placeholder', 'Enter your username');
+        }
+        if (email) {
+            email.setAttribute('placeholder', 'Enter your email');
+        }
+    }
+    lpSetForgotPlaceholders();
+    setTimeout(lpSetForgotPlaceholders, 0);
+})();
+</script>

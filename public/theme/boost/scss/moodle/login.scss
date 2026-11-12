@@ -456,19 +456,146 @@ $toba-body: "Gantari", system-ui, -apple-system, "Segoe UI", sans-serif;
     }
 }
 
+// Hide Moodle guest ? / Powered by Moodle on all auth pages (desktop + mobile).
+.pagelayout-login {
+    #page-footer,
+    .footer-popover,
+    .btn-footer-popover,
+    .btn-footer-communication,
+    .footer-content-popover {
+        display: none !important;
+    }
+
+    // Forgot / set password mform — match ToBa login inputs + CTA.
+    .login-container {
+        .generalbox {
+            max-width: 100%;
+            margin: 0 0 1.25rem;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            color: $toba-muted;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .mform {
+            font-family: $toba-body;
+            color: $toba-ink;
+
+            fieldset {
+                margin: 0 0 1.15rem;
+                padding: 0;
+                border: 0;
+            }
+
+            legend,
+            .ftoggler {
+                font-family: $toba-head;
+                font-weight: 400;
+                font-size: 1.15rem;
+                letter-spacing: -0.01em;
+                color: $toba-ink;
+                width: 100%;
+                margin: 0 0 0.65rem;
+                padding: 0;
+                border: 0;
+            }
+
+            .fitem {
+                margin-bottom: 0.85rem;
+            }
+
+            .col-form-label,
+            label {
+                font-weight: 600;
+                color: $toba-ink;
+            }
+
+            .form-control,
+            input[type="text"],
+            input[type="email"],
+            input[type="password"] {
+                width: 100%;
+                min-height: 48px;
+                box-sizing: border-box;
+                background-color: $login-input-bg;
+                border: 1px solid $toba-line;
+                border-radius: 12px;
+                box-shadow: none;
+                color: $toba-ink;
+                font-size: 16px;
+                padding: 0.65rem 0.9rem;
+
+                &:hover {
+                    background-color: $login-input-bg;
+                    border-color: $toba-line;
+                }
+
+                &:focus {
+                    background-color: #fff;
+                    border-color: $toba-blue;
+                    box-shadow: 0 0 0 0.2rem rgba(26, 97, 242, 0.18);
+                    outline: none;
+                }
+            }
+
+            hr {
+                border: 0;
+                border-top: 1px solid $toba-line;
+                margin: 1.1rem 0 1.25rem;
+                opacity: 1;
+            }
+
+            .btn-primary,
+            input[type="submit"],
+            button[type="submit"] {
+                min-height: 48px;
+                min-width: 140px;
+                padding: 0.7rem 1.35rem;
+                border-radius: 999px;
+                font-weight: 600;
+                font-size: 1rem;
+                background: $toba-blue;
+                border: 1px solid $toba-blue;
+                color: #fff;
+                box-shadow: 0 6px 18px rgba(26, 97, 242, 0.28);
+
+                &:hover {
+                    background: #0f4fd6;
+                    border-color: #0f4fd6;
+                    color: #fff;
+                }
+
+                &:focus-visible {
+                    box-shadow: 0 0 0 0.2rem rgba(26, 97, 242, 0.25);
+                    outline: none;
+                }
+            }
+
+            .fdescription.required,
+            .required {
+                color: $toba-muted;
+            }
+        }
+    }
+}
+
 @include media-breakpoint-down(lg) {
     .pagelayout-login {
         #page {
             min-height: 100dvh;
         }
-    }
 
-    // Keep the login screen clean on phones/tablets.
-    #page-footer,
-    .footer-popover,
-    .btn-footer-popover,
-    .footer-content-popover {
-        display: none !important;
+        .login-container .mform {
+            .btn-primary,
+            input[type="submit"],
+            button[type="submit"] {
+                width: 100%;
+            }
+        }
     }
 
     .login-layout-right {

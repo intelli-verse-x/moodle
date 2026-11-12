@@ -6236,6 +6236,18 @@ body.lp-orbit-is-hidden .lp-orbit { display: none; }
 }
 
 /* Mentor review queue */
+.lp-queue-intro,
+.lp-fellows-lead {
+  margin: 0 0 16px;
+}
+.lp-fellows-lead {
+  align-items: flex-start;
+  gap: 12px;
+}
+.lp-fellows-lead .lp-muted {
+  margin: 0;
+  flex: 1;
+}
 .lp-mentor-filters {
   display: flex;
   flex-wrap: wrap;
