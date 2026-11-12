@@ -68,42 +68,67 @@ final class mentor_dashboard_test extends \basic_testcase {
     }
 
     public function test_score_from_levels_math(): void {
+        // All None (0) → 0.
+        $none = mentor_dashboard::score_from_levels([0, 0, 0, 0]);
+        $this->assertNotNull($none);
+        $this->assertSame([0, 0, 0, 0], $none['scores']);
+        $this->assertSame(0, $none['total']);
+
         // All Partial (0.6) → 18+15+15+12 = 60.
-        $partial = mentor_dashboard::score_from_levels([1, 1, 1, 1]);
+        $partial = mentor_dashboard::score_from_levels([2, 2, 2, 2]);
         $this->assertNotNull($partial);
         $this->assertSame([18, 15, 15, 12], $partial['scores']);
         $this->assertSame(60, $partial['total']);
 
+        // All Missing (0.4) → 12+10+10+8 = 40 (floor without None).
+        $missing = mentor_dashboard::score_from_levels([1, 1, 1, 1]);
+        $this->assertNotNull($missing);
+        $this->assertSame(40, $missing['total']);
+
         // Solid across → 24+20+20+16 = 80 (Met).
-        $solid = mentor_dashboard::score_from_levels([2, 2, 2, 2]);
+        $solid = mentor_dashboard::score_from_levels([3, 3, 3, 3]);
         $this->assertNotNull($solid);
         $this->assertSame(80, $solid['total']);
 
         // Example total 79: Solid / Solid / Partial / Strong.
-        $mixed = mentor_dashboard::score_from_levels([2, 2, 1, 3]);
+        $mixed = mentor_dashboard::score_from_levels([3, 3, 2, 4]);
         $this->assertNotNull($mixed);
         $this->assertSame([24, 20, 15, 20], $mixed['scores']);
         $this->assertSame(79, $mixed['total']);
 
-        $this->assertNull(mentor_dashboard::score_from_levels([1, 1, 1]));
-        $this->assertNull(mentor_dashboard::score_from_levels([1, 1, 1, 9]));
+        $this->assertNull(mentor_dashboard::score_from_levels([2, 2, 2]));
+        $this->assertNull(mentor_dashboard::score_from_levels([2, 2, 2, 9]));
+        $this->assertCount(5, mentor_dashboard::rubric_level_labels());
     }
 
     public function test_pack_unpack_rubric_and_next_step(): void {
-        $scored = mentor_dashboard::score_from_levels([2, 2, 1, 3]);
+        $scored = mentor_dashboard::score_from_levels([3, 3, 2, 4]);
         $this->assertNotNull($scored);
         $packed = mentor_dashboard::pack_review_comment('Tighten the acceptance table.', 'Add two missing ACs', $scored);
         $this->assertStringContainsString(mentor_dashboard::RUBRIC_MARKER, $packed);
         $this->assertStringContainsString(mentor_dashboard::NEXT_STEP_MARKER, $packed);
         $this->assertStringContainsString('"total":79', $packed);
+        $this->assertStringContainsString('"v":' . mentor_dashboard::RUBRIC_PAYLOAD_VERSION, $packed);
 
         $parts = mentor_dashboard::unpack_review_comment($packed);
         $this->assertTrue($parts['has_rubric']);
-        $this->assertSame([2, 2, 1, 3], $parts['levels']);
+        $this->assertSame([3, 3, 2, 4], $parts['levels']);
         $this->assertSame([24, 20, 15, 20], $parts['scores']);
         $this->assertSame(79, $parts['total']);
         $this->assertSame('Add two missing ACs', $parts['next_step']);
         $this->assertSame('Tighten the acceptance table.', $parts['comment']);
+
+        // v1 payload (Missing=0…Strong=3) shifts +1 so fellow labels stay correct.
+        $v1 = mentor_dashboard::RUBRIC_MARKER
+            . '{"v":1,"levels":[2,2,1,3],"scores":[24,20,15,20],"total":79}' . "\n\n"
+            . 'Legacy packed review';
+        $v1parts = mentor_dashboard::unpack_review_comment($v1);
+        $this->assertTrue($v1parts['has_rubric']);
+        $this->assertSame([3, 3, 2, 4], $v1parts['levels']);
+        $this->assertSame(79, $v1parts['total']);
+        $rows = mentor_dashboard::rubric_breakdown_rows($v1parts);
+        $this->assertSame(get_string('mentor_review_level_solid', 'local_launchpad'), $rows[0]['level_label']);
+        $this->assertSame(get_string('mentor_review_level_partial', 'local_launchpad'), $rows[2]['level_label']);
 
         $legacy = mentor_dashboard::unpack_review_comment(
             mentor_dashboard::NEXT_STEP_MARKER . " Fix the brief\n\nPlain change note"

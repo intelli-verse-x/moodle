@@ -34,8 +34,11 @@ final class mentor_dashboard {
     /** Prefix for JSON rubric breakdown in the same assignfeedback_comments body. */
     public const RUBRIC_MARKER = '[LP-RUBRIC]';
 
-    /** Level index → weight fraction (Missing / Partial / Solid / Strong). */
-    public const RUBRIC_LEVEL_FRACTIONS = [0.4, 0.6, 0.8, 1.0];
+    /** Level index → weight fraction (None / Missing / Partial / Solid / Strong). */
+    public const RUBRIC_LEVEL_FRACTIONS = [0.0, 0.4, 0.6, 0.8, 1.0];
+
+    /** Packed [LP-RUBRIC] schema: v2 = five levels with None at index 0. */
+    public const RUBRIC_PAYLOAD_VERSION = 2;
 
     /**
      * Whether this user may open the mentor shell.
@@ -648,16 +651,11 @@ final class mentor_dashboard {
             }
         }
 
-        // Prefill: saved rubric levels, else Partial (index 1) on each criterion.
-        $rubricui = self::build_review_rubric_ui($savedlevels !== [] ? $savedlevels : [1, 1, 1, 1]);
+        // Prefill: saved rubric levels, else Partial (index 2) on each criterion.
+        $rubricui = self::build_review_rubric_ui($savedlevels !== [] ? $savedlevels : [2, 2, 2, 2]);
         $gradepct = (string) (int) $rubricui['total'];
 
         $cansubmitreview = ($substatus === 'submitted' || $substatus === 'reopened' || $hasgrade);
-        $moodlegrader = (new \moodle_url('/mod/assign/view.php', [
-            'id' => $cm->id,
-            'action' => 'grader',
-            'userid' => $fellowid,
-        ]))->out(false);
 
         $queueurl = (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
 
@@ -693,7 +691,6 @@ final class mentor_dashboard {
             'next_step' => $nextstep,
             'pass_bar' => 70,
             'queue_url' => $queueurl,
-            'moodle_grader_url' => $moodlegrader,
             'form_action' => self::review_url((int) $cm->id, $fellowid),
             'sesskey' => sesskey(),
             'is_released' => $hasgrade && $substatus !== 'reopened',
@@ -719,7 +716,7 @@ final class mentor_dashboard {
      *
      * Total is recomputed from $levels (ignore any client-only grade_pct).
      *
-     * @param list<int> $levels Four level indexes 0–3 (Missing…Strong)
+     * @param list<int> $levels Four level indexes 0–4 (None…Strong)
      * @param string $outcome met|changes
      * @return string redirect message key suffix
      */
@@ -851,12 +848,13 @@ final class mentor_dashboard {
     }
 
     /**
-     * Level labels Missing / Partial / Solid / Strong (indexes 0–3).
+     * Level labels None / Missing / Partial / Solid / Strong (indexes 0–4).
      *
      * @return list<string>
      */
     public static function rubric_level_labels(): array {
         return [
+            get_string('mentor_review_level_none', 'local_launchpad'),
             get_string('mentor_review_level_missing', 'local_launchpad'),
             get_string('mentor_review_level_partial', 'local_launchpad'),
             get_string('mentor_review_level_solid', 'local_launchpad'),
@@ -872,6 +870,7 @@ final class mentor_dashboard {
      */
     public static function score_from_levels(array $levels): ?array {
         $criteria = self::rubric_criteria();
+        $maxlvl = count(self::RUBRIC_LEVEL_FRACTIONS) - 1;
         if (count($levels) !== count($criteria)) {
             return null;
         }
@@ -883,7 +882,7 @@ final class mentor_dashboard {
                 return null;
             }
             $lvl = (int) $levels[$i];
-            if ($lvl < 0 || $lvl > 3) {
+            if ($lvl < 0 || $lvl > $maxlvl) {
                 return null;
             }
             $score = (int) round((int) $crit['weight'] * self::RUBRIC_LEVEL_FRACTIONS[$lvl]);
@@ -907,7 +906,7 @@ final class mentor_dashboard {
     public static function build_review_rubric_ui(array $levels): array {
         $scored = self::score_from_levels($levels);
         if ($scored === null) {
-            $levels = [1, 1, 1, 1];
+            $levels = [2, 2, 2, 2];
             $scored = self::score_from_levels($levels);
         }
         $labels = self::rubric_level_labels();
@@ -980,7 +979,7 @@ final class mentor_dashboard {
         $chunks = [];
         if ($rubric !== null && isset($rubric['levels'], $rubric['scores'], $rubric['total'])) {
             $payload = json_encode([
-                'v' => 1,
+                'v' => self::RUBRIC_PAYLOAD_VERSION,
                 'levels' => array_values(array_map('intval', $rubric['levels'])),
                 'scores' => array_values(array_map('intval', $rubric['scores'])),
                 'total' => (int) $rubric['total'],
@@ -1115,8 +1114,16 @@ final class mentor_dashboard {
         if (count($levels) !== 4 || count($scores) !== 4) {
             return null;
         }
+        $levels = array_map('intval', array_values($levels));
+        // v1 packed Missing=0…Strong=3; v2+ inserts None at 0 → shift labels +1.
+        $payloadver = isset($decoded['v']) && is_numeric($decoded['v']) ? (int) $decoded['v'] : 1;
+        if ($payloadver < 2) {
+            $levels = array_map(static function (int $lvl): int {
+                return min(4, $lvl + 1);
+            }, $levels);
+        }
         return [
-            'levels' => array_map('intval', array_values($levels)),
+            'levels' => $levels,
             'scores' => array_map('intval', array_values($scores)),
             'total' => (int) $total,
             'rest' => trim(substr($after, $end + 1)),

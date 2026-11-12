@@ -11,14 +11,19 @@
 
 <div class="lp-row-sb lp-review-lead">
   <div>
-    <p class="lp-review-fellow">{{{fellow_name}}}</p>
+    <div class="lp-review-lead-title">
+      <p class="lp-review-fellow">{{{fellow_name}}}</p>
+      <span class="lp-chip {{status_chip_class}}">{{status_chip}}</span>
+    </div>
     <p class="lp-muted">
       {{{assign_name}}}
       {{#has_attempt}} · {{#str}} fellowship_feedback_attempt, local_launchpad {{/str}} {{attempt}}{{/has_attempt}}
       {{#submitted_at}} · {{submitted_at}}{{/submitted_at}}
     </p>
   </div>
-  <span class="lp-chip {{status_chip_class}}">{{status_chip}}</span>
+  {{#course_name}}
+    <span class="lp-review-course-chip">{{{course_name}}}</span>
+  {{/course_name}}
 </div>
 
 {{#has_saved}}
@@ -40,15 +45,17 @@
 {{#can_submit_review}}
   <div class="lp-review-grid">
     <section class="lp-card lift lp-review-evidence">
-      <h3>{{#str}} mentor_review_evidence, local_launchpad {{/str}}</h3>
-      <p class="lp-xs lp-muted">{{{course_name}}}</p>
+      <div class="lp-review-sect-head">
+        <h3>{{#str}} mentor_review_evidence, local_launchpad {{/str}}</h3>
+        <p class="lp-xs lp-muted">{{{course_name}}}</p>
+      </div>
 
       {{#has_files}}
         <ul class="lp-review-files">
           {{#files}}
             <li class="lp-review-file">
               <span class="lp-review-ext" aria-hidden="true">{{ext}}</span>
-              <div>
+              <div class="lp-review-file-meta">
                 <b>{{filename}}</b>
                 <div class="lp-xs lp-muted">{{filesize}}</div>
               </div>
@@ -73,8 +80,16 @@
     </section>
 
     <section class="lp-card lift lp-review-form-card">
-      <h3>{{#str}} mentor_review_form_heading, local_launchpad {{/str}}</h3>
-      <p class="lp-sm lp-muted">{{#str}} mentor_review_form_lead, local_launchpad {{/str}}</p>
+      <div class="lp-review-sect-head lp-review-form-head">
+        <div>
+          <h3>{{#str}} mentor_review_form_heading, local_launchpad {{/str}}</h3>
+          <p class="lp-xs lp-muted">{{#str}} mentor_review_form_lead, local_launchpad {{/str}}</p>
+        </div>
+        <div class="lp-review-pass-meta">
+          <span class="lp-muted">{{#str}} mentor_review_pass_bar, local_launchpad {{/str}} {{pass_bar}}</span>
+          <span class="lp-chip lp-review-verdict" id="lp-rubric-verdict"></span>
+        </div>
+      </div>
 
       <form class="lp-review-form" method="post" action="{{form_action}}" id="lp-review-form"
             data-lp-rubric-weights="{{rubric_weights_json}}"
@@ -105,41 +120,59 @@
           {{/rubric_criteria}}
         </div>
 
-        <div class="lp-review-score-row lp-review-total-row">
-          <span class="lp-review-label" id="lp-total-label">{{#str}} mentor_review_total_label, local_launchpad {{/str}}</span>
-          <b class="lp-review-total" id="lp-rubric-total" aria-labelledby="lp-total-label">{{rubric_total}}</b>
-          <span class="lp-muted">/ 100 · {{#str}} mentor_review_pass_bar, local_launchpad {{/str}} {{pass_bar}}</span>
-          <span class="lp-chip lp-review-verdict" id="lp-rubric-verdict"></span>
+        <div class="lp-review-score-block">
+          <div class="lp-review-score-row lp-review-total-row">
+            <span class="lp-review-label" id="lp-total-label">{{#str}} mentor_review_total_label, local_launchpad {{/str}}</span>
+            <b class="lp-review-total" id="lp-rubric-total" aria-labelledby="lp-total-label">{{rubric_total}}</b>
+            <span class="lp-muted">/ 100</span>
+            <span class="lp-review-required lp-muted">{{#str}} mentor_review_pass_bar, local_launchpad {{/str}} {{pass_bar}}+</span>
+          </div>
+          <div class="lp-review-gauge" aria-hidden="true">
+            <div class="lp-review-gauge-fill" id="lp-rubric-gauge"></div>
+            <span class="lp-review-gauge-mark"></span>
+          </div>
         </div>
 
         <fieldset class="lp-review-outcome">
-          <legend>{{#str}} mentor_review_outcome_label, local_launchpad {{/str}}</legend>
+          <legend class="visually-hidden">{{#str}} mentor_review_outcome_label, local_launchpad {{/str}}</legend>
           <label class="lp-review-radio">
             <input type="radio" name="outcome" value="met"{{#outcome_met}} checked{{/outcome_met}}>
-            <span>{{#str}} mentor_review_outcome_met, local_launchpad {{/str}}</span>
+            <span class="lp-review-radio-copy">
+              <span class="lp-review-radio-title">{{#str}} mentor_review_outcome_met, local_launchpad {{/str}}</span>
+              <span class="lp-review-radio-hint">{{#str}} mentor_review_outcome_met_hint, local_launchpad {{/str}}</span>
+            </span>
           </label>
           <label class="lp-review-radio">
             <input type="radio" name="outcome" value="changes"{{#outcome_changes}} checked{{/outcome_changes}}>
-            <span>{{#str}} mentor_review_outcome_changes, local_launchpad {{/str}}</span>
+            <span class="lp-review-radio-copy">
+              <span class="lp-review-radio-title">{{#str}} mentor_review_outcome_changes, local_launchpad {{/str}}</span>
+              <span class="lp-review-radio-hint">{{#str}} mentor_review_outcome_changes_hint, local_launchpad {{/str}}</span>
+            </span>
           </label>
         </fieldset>
 
-        <div class="lp-review-nextstep" id="lp-nextstep-wrap"{{^outcome_changes}} hidden{{/outcome_changes}}>
-          <label class="lp-review-label" for="lp-nextstep">{{#str}} mentor_review_nextstep_label, local_launchpad {{/str}}</label>
-          <input class="lp-review-input lp-review-input-wide" id="lp-nextstep" name="nextstep" type="text"
-                 maxlength="280" value="{{next_step}}"
-                 placeholder="{{#str}} mentor_review_nextstep_placeholder, local_launchpad {{/str}}"
-                 {{#outcome_changes}}required{{/outcome_changes}}>
-          <p class="lp-xs lp-muted">{{#str}} mentor_review_nextstep_hint, local_launchpad {{/str}}</p>
+        <div class="lp-review-notes">
+          <div class="lp-review-nextstep" id="lp-nextstep-wrap"{{^outcome_changes}} hidden{{/outcome_changes}}>
+            <label class="lp-review-label" for="lp-nextstep">{{#str}} mentor_review_nextstep_label, local_launchpad {{/str}}</label>
+            <input class="lp-review-input lp-review-input-wide" id="lp-nextstep" name="nextstep" type="text"
+                   maxlength="280" value="{{next_step}}"
+                   placeholder="{{#str}} mentor_review_nextstep_placeholder, local_launchpad {{/str}}"
+                   {{#outcome_changes}}required{{/outcome_changes}}>
+            <p class="lp-xs lp-muted">{{#str}} mentor_review_nextstep_hint, local_launchpad {{/str}}</p>
+          </div>
+
+          <div class="lp-review-comment-wrap">
+            <label class="lp-review-label" for="lp-comment">{{#str}} mentor_review_comment_label, local_launchpad {{/str}}</label>
+            <textarea class="lp-review-textarea" id="lp-comment" name="comment" rows="4" required
+                      placeholder="{{#str}} mentor_review_comment_placeholder, local_launchpad {{/str}}">{{comment}}</textarea>
+          </div>
         </div>
 
-        <label class="lp-review-label" for="lp-comment">{{#str}} mentor_review_comment_label, local_launchpad {{/str}}</label>
-        <textarea class="lp-review-textarea" id="lp-comment" name="comment" rows="6" required
-                  placeholder="{{#str}} mentor_review_comment_placeholder, local_launchpad {{/str}}">{{comment}}</textarea>
-
         <div class="lp-review-actions">
-          <button type="submit" class="lp-btn lp-btn-primary">{{#str}} mentor_review_submit, local_launchpad {{/str}}</button>
-          <a class="lp-btn lp-btn-light" href="{{queue_url}}">{{#str}} mentor_review_back_queue, local_launchpad {{/str}}</a>
+          <div class="lp-review-actions-main">
+            <button type="submit" class="lp-btn lp-btn-primary">{{#str}} mentor_review_submit, local_launchpad {{/str}}</button>
+            <a class="lp-btn lp-btn-light" href="{{queue_url}}">{{#str}} mentor_review_back_queue, local_launchpad {{/str}}</a>
+          </div>
         </div>
       </form>
       <script>
@@ -150,12 +183,13 @@
         var totalEl = document.getElementById('lp-rubric-total');
         var gradeEl = document.getElementById('lp-grade-pct');
         var verdictEl = document.getElementById('lp-rubric-verdict');
+        var gaugeEl = document.getElementById('lp-rubric-gauge');
         if (!form) { return; }
 
         var weights = [];
-        var fractions = [0.4, 0.6, 0.8, 1];
+        var fractions = [0, 0.4, 0.6, 0.8, 1];
         try { weights = JSON.parse(form.getAttribute('data-lp-rubric-weights') || '[]'); } catch (e) { weights = []; }
-        try { fractions = JSON.parse(form.getAttribute('data-lp-rubric-fractions') || '[0.4,0.6,0.8,1]'); } catch (e) {}
+        try { fractions = JSON.parse(form.getAttribute('data-lp-rubric-fractions') || '[0,0.4,0.6,0.8,1]'); } catch (e) {}
 
         var metRadio = form.querySelector('input[name="outcome"][value="met"]');
         var changesRadio = form.querySelector('input[name="outcome"][value="changes"]');
@@ -207,13 +241,14 @@
 
         function calc() {
           var total = 0;
+          var maxLvl = fractions.length - 1;
           form.querySelectorAll('.lp-review-crit').forEach(function (row) {
             var idx = parseInt(row.getAttribute('data-crit-index'), 10);
             var weight = weights[idx];
             if (weight == null) { weight = parseInt(row.getAttribute('data-weight'), 10) || 0; }
             var checked = row.querySelector('input[type="radio"]:checked');
-            var lvl = checked ? parseInt(checked.value, 10) : 1;
-            if (isNaN(lvl) || lvl < 0 || lvl > 3) { lvl = 1; }
+            var lvl = checked ? parseInt(checked.value, 10) : 2;
+            if (isNaN(lvl) || lvl < 0 || lvl > maxLvl) { lvl = 2; }
             var score = Math.round(weight * (fractions[lvl] != null ? fractions[lvl] : 0.6));
             total += score;
             var out = row.querySelector('[data-crit-score]');
@@ -225,6 +260,10 @@
             var ok = total >= 70;
             verdictEl.textContent = ok ? '70+' : '<70';
             verdictEl.className = 'lp-chip lp-review-verdict ' + (ok ? 'ok' : 'warn');
+          }
+          if (gaugeEl) {
+            gaugeEl.style.width = Math.max(0, Math.min(100, total)) + '%';
+            gaugeEl.className = 'lp-review-gauge-fill' + (total >= 70 ? ' is-ok' : ' is-warn');
           }
           syncOutcomeWithTotal(total);
         }
@@ -238,11 +277,6 @@
         calc();
       })();
       </script>
-
-      <p class="lp-xs lp-muted" style="margin-top:14px">
-        {{#str}} mentor_review_moodle_note, local_launchpad {{/str}}
-        <a class="lp-link" href="{{moodle_grader_url}}">{{#str}} mentor_review_open_moodle_grader, local_launchpad {{/str}}</a>
-      </p>
     </section>
   </div>
 {{/can_submit_review}}
