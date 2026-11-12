@@ -4,9 +4,10 @@
     Shared four-gate journey path (home compact + Phase progress full).
 }}
 {{#journey.has_gates}}
-  <div class="lp-journey{{#journey.compact}} compact{{/journey.compact}}" data-lp-journey>
+  <div class="lp-journey{{#journey.compact}} compact{{/journey.compact}}" data-lp-journey
+       style="--lp-journey-min: {{journey.min_width_px}}px;">
     <div class="lp-journey-in">
-      <svg viewBox="0 0 1000 {{journey.view_h}}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="{{#str}} fellowship_journey_aria, local_launchpad {{/str}}">
+      <svg viewBox="0 0 {{journey.view_w}} {{journey.view_h}}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="{{#str}} fellowship_journey_aria, local_launchpad {{/str}}">
         <path d="{{journey.path_d}}" fill="none" stroke="var(--lp-blue-soft)" stroke-width="14" stroke-linecap="round"/>
         <path class="lp-journey-progress" d="{{journey.path_d}}" fill="none" stroke="var(--lp-blue)" stroke-width="14" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" data-to="{{journey.dash_offset}}"/>
         <path d="{{journey.path_d}}" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="2 14" stroke-linecap="round" opacity=".7"/>

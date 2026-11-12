@@ -280,6 +280,27 @@
     }
     shell.querySelectorAll('.lp-journey-progress, .lp-ring-arc').forEach(animateDash);
 
+    // Mouse wheel → horizontal pan on journey (same as fellowship.js).
+    shell.querySelectorAll('[data-lp-journey]').forEach(function (scroller) {
+        scroller.addEventListener('wheel', function (e) {
+            if (scroller.scrollWidth <= scroller.clientWidth + 1) {
+                return;
+            }
+            var mostlyVertical = Math.abs(e.deltaY) >= Math.abs(e.deltaX);
+            var delta = mostlyVertical ? e.deltaY : e.deltaX;
+            if (!delta) {
+                return;
+            }
+            var max = scroller.scrollWidth - scroller.clientWidth;
+            var next = Math.min(max, Math.max(0, scroller.scrollLeft + delta));
+            if (next === scroller.scrollLeft) {
+                return;
+            }
+            scroller.scrollLeft = next;
+            e.preventDefault();
+        }, {passive: false});
+    });
+
     if (!reduce) {
         shell.querySelectorAll('.lp-side-xpbar i, .lp-bar i').forEach(function (bar) {
             var w = bar.style.width;

@@ -2142,14 +2142,26 @@ body.local-launchpad-mentor {
   position: relative;
   width: 100%;
   overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  /* Premium: scroll without a visible scrollbar. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   margin: 4px 0 0;
+}
+.lp-journey::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 .lp-journey-in {
   position: relative;
-  width: 100%;
+  /* Wide card → 100% (path fills). Narrow card → floor width + scroll. */
+  width: max(100%, var(--lp-journey-min, 560px));
+  min-width: var(--lp-journey-min, 560px);
+  box-sizing: border-box;
 }
-.lp-journey.compact .lp-journey-in { min-width: 520px; }
 .lp-journey svg {
   width: 100%;
   height: auto;
@@ -2187,7 +2199,9 @@ body.local-launchpad-mentor {
   stroke: #fff;
   stroke-width: 3px;
 }
-.lp-journey:not(.compact) .lp-journey-in { min-width: 640px; }
+.lp-journey:not(.compact) {
+  --lp-journey-min: 640px;
+}
 .lp-jn.cur .ring {
   stroke: var(--lp-blue);
   animation: lp-pulsering 2s ease-in-out infinite;
@@ -5605,7 +5619,9 @@ body.lp-cal-detail-lock { overflow: hidden; }
   .lp-act-card-row { flex-wrap: wrap; }
   .lp-act-card .lp-chip { margin-left: 54px; }
   .lp-act-card .lp-act-chev { display: none; }
-  .lp-journey.compact .lp-journey-in { min-width: 520px; }
+  .lp-journey {
+    --lp-journey-min: 560px;
+  }
   .lp-jbot { width: 48px; }
   .lp-ladder {
     display: flex;

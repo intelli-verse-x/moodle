@@ -745,9 +745,10 @@ final class fellowship_dashboard {
             $section = $bysection[$num] ?? null;
             $hasmoodlesection = $section !== null;
             // Prefer live Moodle section titles when the course has that section.
+            // Path ring caption stays compact (spine short); full name is for cards/tooltips.
             $moodlename = trim((string) ($section['name'] ?? ''));
             $displayname = $moodlename !== '' ? $moodlename : $meta['name'];
-            $displayshort = $moodlename !== '' ? $moodlename : $meta['short'];
+            $displayshort = $meta['short'];
             if ($isdone) {
                 $status = 'done';
                 $isdoneflag = true;
@@ -803,29 +804,76 @@ final class fellowship_dashboard {
         }
 
         // Path geometry from ToBa-Learn-LaunchPad.html journey(compact).
+        // viewBox matches the path span so the track fills the card when there is
+        // room; CSS min-width only kicks in on narrow cards / many gates (scroll).
+        $gatecount = max(1, count($gates));
         $viewh = $compact ? 150 : 210;
-        $pts = [
-            [90.0, $viewh * 0.62],
-            [360.0, $viewh * 0.30],
-            [640.0, $viewh * 0.66],
-            [910.0, $viewh * 0.32],
-        ];
-        $pathd = sprintf(
-            'M%s,%s C230,%s 240,%s %s,%s S520,%s %s,%s S800,%s %s,%s',
-            $pts[0][0],
-            $pts[0][1],
-            $viewh * 0.05,
-            $viewh * 0.85,
-            $pts[1][0],
-            $pts[1][1],
-            $viewh * 0.98,
-            $pts[2][0],
-            $pts[2][1],
-            $viewh * 0.02,
-            $pts[3][0],
-            $pts[3][1]
-        );
+        if ($gatecount === 4) {
+            // Classic four-gate path — fills a 1000-wide viewBox (no empty right pad).
+            $vieww = 1000;
+            $pts = [
+                [90.0, $viewh * 0.62],
+                [360.0, $viewh * 0.30],
+                [640.0, $viewh * 0.66],
+                // Slightly inset so end caption stays inside the box.
+                [880.0, $viewh * 0.32],
+            ];
+            $pathd = sprintf(
+                'M%s,%s C230,%s 240,%s %s,%s S520,%s %s,%s S800,%s %s,%s',
+                $pts[0][0],
+                $pts[0][1],
+                $viewh * 0.05,
+                $viewh * 0.85,
+                $pts[1][0],
+                $pts[1][1],
+                $viewh * 0.98,
+                $pts[2][0],
+                $pts[2][1],
+                $viewh * 0.02,
+                $pts[3][0],
+                $pts[3][1]
+            );
+        } else {
+            // N gates: stretch across the full viewBox so extra phases still fill width.
+            $vieww = (int) max(1000, 120 + (($gatecount - 1) * 260) + 120);
+            $pts = [];
+            $span = max(1, $gatecount - 1);
+            for ($gi = 0; $gi < $gatecount; $gi++) {
+                $t = $gi / $span;
+                $x = 90.0 + $t * max(0.0, ($vieww - 180.0));
+                $ywave = ($gi % 2 === 0) ? ($viewh * 0.62) : ($viewh * 0.32);
+                if ($gi === 1) {
+                    $ywave = $viewh * 0.30;
+                } else if ($gi === 2) {
+                    $ywave = $viewh * 0.66;
+                }
+                $pts[] = [$x, $ywave];
+            }
+            $pathparts = [];
+            foreach ($pts as $pi => $pt) {
+                if ($pi === 0) {
+                    $pathparts[] = sprintf('M%s,%s', $pt[0], $pt[1]);
+                } else {
+                    $prev = $pts[$pi - 1];
+                    $c1x = $prev[0] + (($pt[0] - $prev[0]) * 0.45);
+                    $c2x = $prev[0] + (($pt[0] - $prev[0]) * 0.55);
+                    $pathparts[] = sprintf(
+                        'C%s,%s %s,%s %s,%s',
+                        $c1x,
+                        $prev[1],
+                        $c2x,
+                        $pt[1],
+                        $pt[0],
+                        $pt[1]
+                    );
+                }
+            }
+            $pathd = implode(' ', $pathparts);
+        }
         foreach ($gates as $idx => &$gate) {
+            if (!isset($pts[$idx])) {
+                continue;
+            }
             $gate['cx'] = (int) round($pts[$idx][0]);
             $gate['cy'] = (int) round($pts[$idx][1]);
         }
@@ -854,8 +902,10 @@ final class fellowship_dashboard {
 
         // Bot sits on the first gate (HTML: offset 62 compact / 78 full).
         $botlift = $compact ? 62 : 78;
-        $botleft = round(($pts[0][0] / 1000) * 100, 2) . '%';
+        $botleft = round(($pts[0][0] / max(1, $vieww)) * 100, 2) . '%';
         $bottop = round((($pts[0][1] - $botlift) / $viewh) * 100, 2) . '%';
+        // Narrow-card scroll floor only — wide cards use width:100% and fill.
+        $minwidthpx = (int) max($compact ? 560 : 640, (int) round($vieww * ($gatecount > 4 ? 0.9 : 0.55)));
 
         return [
             'has_gates' => true,
@@ -864,7 +914,9 @@ final class fellowship_dashboard {
             'gates' => $gates,
             'path_d' => $pathd,
             'dash_offset' => $dashoffset,
+            'view_w' => $vieww,
             'view_h' => $viewh,
+            'min_width_px' => $minwidthpx,
             'ring_r' => $compact ? 24 : 30,
             'core_r' => $compact ? 17 : 22,
             'mark_y' => $compact ? 6 : 7,

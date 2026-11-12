@@ -1548,6 +1548,28 @@
     }
     shell.querySelectorAll('.lp-journey-progress, .lp-ring-arc').forEach(animateDash);
 
+    // Mouse wheel is vertical-only; map it to horizontal pan on the journey strip
+    // (trackpads already send deltaX). Only trap the wheel while we can still pan.
+    shell.querySelectorAll('[data-lp-journey]').forEach(function (scroller) {
+        scroller.addEventListener('wheel', function (e) {
+            if (scroller.scrollWidth <= scroller.clientWidth + 1) {
+                return;
+            }
+            var mostlyVertical = Math.abs(e.deltaY) >= Math.abs(e.deltaX);
+            var delta = mostlyVertical ? e.deltaY : e.deltaX;
+            if (!delta) {
+                return;
+            }
+            var max = scroller.scrollWidth - scroller.clientWidth;
+            var next = Math.min(max, Math.max(0, scroller.scrollLeft + delta));
+            if (next === scroller.scrollLeft) {
+                return;
+            }
+            scroller.scrollLeft = next;
+            e.preventDefault();
+        }, {passive: false});
+    });
+
     // Sidebar XP bar + quest / weight bars (Employer home parity).
     if (!reduce) {
         shell.querySelectorAll('.lp-side-xpbar i, .lp-bar i, .lp-weight-row .lp-bar i').forEach(function (bar) {
