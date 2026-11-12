@@ -32,6 +32,12 @@ final class fellowship_dashboard {
     public const DATA_REGION = 'local-launchpad-fellowship';
 
     /**
+     * Sticky active LaunchPad course for multi-enrol fellows (user preference, course id).
+     * Cross-session; ignored when the id is no longer in list_courses().
+     */
+    public const PREF_ACTIVE_COURSE = 'local_launchpad_fellow_course';
+
+    /**
      * TEMP local QA only — skips sequential unlock so later CMs open without prior complete.
      * Keep false unless actively QA'ing a locked later activity.
      */
@@ -102,6 +108,58 @@ final class fellowship_dashboard {
             }
         }
         return $courses[0];
+    }
+
+    /**
+     * Saved active course id for the fellow (0 when unset / invalid user).
+     */
+    public static function get_active_course_preference(int $userid): int {
+        if ($userid <= 0) {
+            return 0;
+        }
+        return (int) get_user_preferences(self::PREF_ACTIVE_COURSE, 0, $userid);
+    }
+
+    /**
+     * Persist active course for cross-session sticky switch (course-scoped views / activity open).
+     */
+    public static function set_active_course_preference(int $userid, int $courseid): void {
+        if ($userid <= 0 || $courseid <= 0) {
+            return;
+        }
+        set_user_preference(self::PREF_ACTIVE_COURSE, $courseid, $userid);
+    }
+
+    /**
+     * Resolve the fellow's selected track for this request.
+     *
+     * Order: enrolled ?id= / cmid course → saved preference if still enrolled → prefer_course().
+     *
+     * @param list<\stdClass> $courses From list_courses()
+     * @param int $requestid Course id from URL or activity CM (0 = none); never a messages peer id
+     * @param int $userid
+     * @return \stdClass|null
+     */
+    public static function resolve_selected_course(array $courses, int $requestid, int $userid): ?\stdClass {
+        if ($courses === []) {
+            return null;
+        }
+
+        $byid = [];
+        foreach ($courses as $course) {
+            $byid[(int) $course->id] = $course;
+        }
+
+        if ($requestid > 0 && isset($byid[$requestid])) {
+            return $byid[$requestid];
+        }
+
+        $sticky = self::get_active_course_preference($userid);
+        if ($sticky > 0 && isset($byid[$sticky])) {
+            return $byid[$sticky];
+        }
+
+        return self::prefer_course($courses);
     }
 
     /**

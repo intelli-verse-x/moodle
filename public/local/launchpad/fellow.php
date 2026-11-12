@@ -195,6 +195,11 @@ if (data_submitted() && confirm_sesskey()) {
     }
 }
 
+// Course-scoped views may take ?id= as track. Messages: id = peer user — never course.
+$coursescopedviews = ['home', 'track', 'progress', 'feedback', 'portfolio', 'activity'];
+$iscoursescoped = in_array($view, $coursescopedviews, true);
+$requestcourseid = 0;
+
 if ($view === 'messages') {
     $messageuserid = optional_param('id', 0, PARAM_INT);
     $messageconvid = optional_param('convid', 0, PARAM_INT);
@@ -209,14 +214,48 @@ if ($view === 'messages') {
     // Resolve course from the CM so track nav / access checks stay coherent.
     $cmforcourse = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
     if ($cmforcourse) {
-        $courseid = (int) $cmforcourse->course;
+        $requestcourseid = (int) $cmforcourse->course;
+        $courseid = $requestcourseid;
     }
-} else {
-$courseid = optional_param('id', 0, PARAM_INT);
+} else if ($iscoursescoped) {
+    $requestcourseid = optional_param('id', 0, PARAM_INT);
+    $courseid = $requestcourseid;
 }
 
 $courses = fellowship_dashboard::list_courses($userid);
 $courseids = array_map(static fn($c) => (int) $c->id, $courses);
+
+// Sticky active course: request (if enrolled) → preference → prefer_course().
+$selected = null;
+$trackunavailable = false;
+if ($requestcourseid > 0) {
+    $resolved = fellowship_dashboard::resolve_selected_course($courses, $requestcourseid, $userid);
+    if ($resolved !== null && (int) $resolved->id === $requestcourseid) {
+        $selected = $resolved;
+        $courseid = $requestcourseid;
+        fellowship_dashboard::set_active_course_preference($userid, $requestcourseid);
+    } else {
+        // Explicit request but not enrolled / hidden: LaunchPad-friendly empty (siteadmin may peek).
+        $courseexists = $DB->record_exists('course', ['id' => $requestcourseid]);
+        if ($courseexists && is_siteadmin()) {
+            try {
+                $selected = get_course($requestcourseid);
+                $courseid = $requestcourseid;
+            } catch (\Throwable $e) {
+                $selected = null;
+                $trackunavailable = true;
+                $courseid = 0;
+            }
+        } else {
+            $trackunavailable = true;
+            $courseid = 0;
+            $selected = null;
+        }
+    }
+} else {
+    $selected = fellowship_dashboard::resolve_selected_course($courses, 0, $userid);
+    $courseid = $selected ? (int) $selected->id : 0;
+}
 
 $ntab = optional_param('ntab', 'all', PARAM_ALPHA);
 if (!in_array($ntab, ['all', 'unread'], true)) {
@@ -292,7 +331,7 @@ $PAGE->set_url(new moodle_url(persona_home::FELLOW_PATH, array_filter([
     'view' => $view !== 'home' ? $view : null,
     'id' => $view === 'messages'
         ? ($messageuserid > 0 ? $messageuserid : null)
-        : (($view !== 'activity' && $courseid > 0) ? $courseid : null),
+        : (($iscoursescoped && $view !== 'activity' && $courseid > 0) ? $courseid : null),
     'cmid' => ($view === 'activity' && $cmid > 0) ? $cmid : null,
     'convid' => ($view === 'messages' && $messageuserid <= 0 && $messageconvid > 0) ? $messageconvid : null,
     'mtab' => ($view === 'messages' && $messagetab !== 'all') ? $messagetab : null,
@@ -317,8 +356,10 @@ $preferencesurl = (new moodle_url(persona_home::FELLOW_PATH, [
     'view' => 'profile',
     'ptab' => 'preferences',
 ]))->out(false);
-$homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
-$progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false);
+// Thread active course id into course-scoped nav only (not messages / news / calendar / XP).
+$scopedid = ($courseid > 0) ? ['id' => $courseid] : [];
+$homeurl = (new moodle_url(persona_home::FELLOW_PATH, $scopedid))->out(false);
+$progressurl = (new moodle_url(persona_home::FELLOW_PATH, array_merge(['view' => 'progress'], $scopedid)))->out(false);
 $notificationsurl = messaging::notifications_page_url('fellow');
 $messagesurl = messaging::messages_url(null, 'fellow');
 $msgunread = messaging::conversation_unread_count($userid);
@@ -352,7 +393,7 @@ $nav = [
             ],
             [
                 'label' => $lpstr('fellowship_nav_track', null, 'My track'),
-                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, array_merge(['view' => 'track'], $scopedid)))->out(false),
                 'current' => ($view === 'track' || $view === 'activity'),
                 'key' => 'track',
                 'icon_svg' => $icon('layers-01'),
@@ -371,7 +412,7 @@ $nav = [
         'items' => [
             [
                 'label' => $lpstr('fellowship_nav_feedback', null, 'Feedback'),
-                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'feedback']))->out(false),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, array_merge(['view' => 'feedback'], $scopedid)))->out(false),
                 'current' => $view === 'feedback',
                 'key' => 'feedback',
                 'icon_svg' => $icon('message-01'),
@@ -406,7 +447,7 @@ $nav = [
             ],
             [
                 'label' => $lpstr('fellowship_nav_portfolio', null, 'Portfolio'),
-                'url' => (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'portfolio']))->out(false),
+                'url' => (new moodle_url(persona_home::FELLOW_PATH, array_merge(['view' => 'portfolio'], $scopedid)))->out(false),
                 'current' => $view === 'portfolio',
                 'key' => 'portfolio',
                 'icon_svg' => $icon('briefcase-01'),
@@ -452,37 +493,6 @@ $crumbhome = [
     'label' => $lpstr('fellowship_nav_home', null, 'Home'),
     'url' => $homeurl,
 ];
-
-$selected = null;
-$trackunavailable = false;
-if ($courseid > 0) {
-    foreach ($courses as $c) {
-        if ((int) $c->id === $courseid) {
-            $selected = $c;
-            break;
-        }
-    }
-    if ($selected === null) {
-        // Hidden, deleted, or not enrolled: LaunchPad-friendly empty — never raw Moodle error.
-        $courseexists = $DB->record_exists('course', ['id' => $courseid]);
-        if ($courseexists && is_siteadmin()) {
-            try {
-        $selected = get_course($courseid);
-            } catch (\Throwable $e) {
-                $selected = null;
-                $trackunavailable = true;
-                $courseid = 0;
-            }
-        } else {
-            $trackunavailable = true;
-            $courseid = 0;
-        }
-    }
-} else if ($courses !== []) {
-    // Prefer a track course over Shared orientation when no ?id= is given.
-    $selected = fellowship_dashboard::prefer_course($courses);
-    $courseid = $selected ? (int) $selected->id : 0;
-}
 
 $outline = null;
 $coursecards = [];
@@ -1230,24 +1240,46 @@ if ($view === 'home') {
         ];
     }
 
+    // Current course: one card when single enrol; all enrolments when multi (click = switch).
     $mycourse = [];
-    if ($selected !== null) {
-        $pct = $homeoutline['percent'] ?? null;
-        $mycourse = [
-            'name' => fellowship_dashboard::display_label(format_string($selected->fullname)),
-            'detail_url' => $trackurl,
-            'continue_url' => $next['url'] ?? $trackurl,
-            'cta_label' => $next !== null
-                ? $lpstr('fellowship_cta_resume', null, 'Resume learning')
-                : $lpstr('fellowship_cta_view_track', null, 'Open track'),
-            // status alone is the progress line (e.g. "45% complete") — do not also emit progress_display.
-            'status' => $pct !== null
-                ? $lpstr('fellowship_progress_pct', (int) $pct, '{$a}% complete')
-                : ($alltrackeddone
-                    ? $lpstr('fellowship_gate_complete', null, 'Complete')
-                    : $lpstr('fellowship_course_status_open', null, 'Ready to continue')),
-            'hasprogress' => $pct !== null,
-        ];
+    $pct = $homeoutline['percent'] ?? null;
+    $selectedstatus = $pct !== null
+        ? $lpstr('fellowship_progress_pct', (int) $pct, '{$a}% complete')
+        : ($alltrackeddone
+            ? $lpstr('fellowship_gate_complete', null, 'Complete')
+            : $lpstr('fellowship_course_status_open', null, 'Ready to continue'));
+    foreach ($coursecards as $card) {
+        $cid = (int) $card['id'];
+        $isselected = $selectedid > 0 && $cid === $selectedid;
+        $switchhome = (new moodle_url(persona_home::FELLOW_PATH, [
+            'view' => 'home',
+            'id' => $cid,
+        ]))->out(false);
+        if ($isselected) {
+            $mycourse[] = [
+                'name' => $card['fullname'],
+                'detail_url' => $trackurl,
+                'continue_url' => $next['url'] ?? $trackurl,
+                'cta_label' => $next !== null
+                    ? $lpstr('fellowship_cta_resume', null, 'Resume learning')
+                    : $lpstr('fellowship_cta_view_track', null, 'Open track'),
+                'status' => $selectedstatus,
+                'hasprogress' => $pct !== null,
+                'selected' => true,
+                'switch_url' => $switchhome,
+            ];
+        } else {
+            $mycourse[] = [
+                'name' => $card['fullname'],
+                'detail_url' => $switchhome,
+                'continue_url' => $switchhome,
+                'cta_label' => $lpstr('fellowship_cta_switch_course', null, 'Switch to this track'),
+                'status' => $lpstr('fellowship_course_status_other', null, 'Enrolled · tap to make active'),
+                'hasprogress' => false,
+                'selected' => false,
+                'switch_url' => $switchhome,
+            ];
+        }
     }
     $content = $OUTPUT->render_from_template('local_launchpad/fellowship_home', array_merge([
             'firstname' => $firstname,
@@ -1439,6 +1471,11 @@ $profilemenu = employer_dashboard::profile_menu_context(
     $preferencesurl,
     $logouturl
 );
+$activecourselabel = '';
+if (count($courses) > 1 && $selected !== null) {
+    $activecourselabel = fellowship_dashboard::display_label(format_string($selected->fullname));
+}
+
 $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array_merge([
     'data_region' => fellowship_dashboard::DATA_REGION,
     'assets' => $pluginbase . '/assets/img',
@@ -1446,6 +1483,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     'firstname' => $firstname,
     'greeting' => $greeting,
     'portallabel' => $lpstr('fellowship_portal_label', null, 'Fellowship portal'),
+    'active_course_label' => $activecourselabel,
     'role_label' => $fellowrole,
     'is_home' => $view === 'home',
     'has_courses' => $courses !== [],

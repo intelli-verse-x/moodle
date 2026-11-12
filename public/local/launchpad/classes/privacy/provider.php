@@ -26,12 +26,13 @@ namespace local_launchpad\privacy;
 
 use core_privacy\local\metadata\collection;
 use core_privacy\local\request\writer;
+use local_launchpad\fellowship_dashboard;
 use local_launchpad\registration;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Stores a Fellowship portal preference for self-registered users.
+ * Stores Fellowship preferences (portal + sticky active course).
  *
  * @copyright  2026 IntelliVerse-X
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -51,6 +52,10 @@ class provider implements
             registration::PREF_PORTAL,
             'privacy:metadata:preference:toba_portal'
         );
+        $collection->add_user_preference(
+            fellowship_dashboard::PREF_ACTIVE_COURSE,
+            'privacy:metadata:preference:local_launchpad_fellow_course'
+        );
         return $collection;
     }
 
@@ -67,6 +72,15 @@ class provider implements
                 registration::PREF_PORTAL,
                 $portal,
                 get_string('privacy:metadata:preference:toba_portal', 'local_launchpad')
+            );
+        }
+        $active = get_user_preferences(fellowship_dashboard::PREF_ACTIVE_COURSE, null, $userid);
+        if ($active !== null && $active !== '' && (int) $active > 0) {
+            writer::export_user_preference(
+                'local_launchpad',
+                fellowship_dashboard::PREF_ACTIVE_COURSE,
+                (string) $active,
+                get_string('privacy:metadata:preference:local_launchpad_fellow_course', 'local_launchpad')
             );
         }
     }

@@ -279,17 +279,27 @@
       </div>
       <a class="lp-link" href="{{track_url}}">{{#str}} fellowship_nav_track, local_launchpad {{/str}} <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon></a>
     </div>
-    {{#mycourse}}
-      <article class="lp-home-course">
-        <div class="lp-home-course-body">
-          <h4><a href="{{detail_url}}">{{{name}}}</a></h4>
-          <div class="lp-home-course-meta">
-            <span class="lp-muted">{{status}}</span>
+    <div class="lp-home-course-list{{#multi_course}} is-multi{{/multi_course}}">
+      {{#mycourse}}
+        <article class="lp-home-course{{#selected}} is-selected{{/selected}}">
+          <div class="lp-home-course-body">
+            <h4>
+              {{#selected}}
+                <a href="{{detail_url}}">{{{name}}}</a>
+                <span class="lp-home-course-active">{{#str}} fellowship_course_active_badge, local_launchpad {{/str}}</span>
+              {{/selected}}
+              {{^selected}}
+                <a href="{{switch_url}}">{{{name}}}</a>
+              {{/selected}}
+            </h4>
+            <div class="lp-home-course-meta">
+              <span class="lp-muted">{{status}}</span>
+            </div>
+            <a class="lp-btn {{#selected}}lp-btn-solid{{/selected}}{{^selected}}lp-btn-ghost{{/selected}} lp-home-course-cta" href="{{continue_url}}">{{cta_label}} <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon></a>
           </div>
-          <a class="lp-btn lp-btn-solid lp-home-course-cta" href="{{continue_url}}">{{cta_label}} <iconify-icon icon="hugeicons:arrow-right-02" width="16" height="16" aria-hidden="true"></iconify-icon></a>
-        </div>
-      </article>
-    {{/mycourse}}
+        </article>
+      {{/mycourse}}
+    </div>
   </section>
   {{/hasmycourse}}
 </div>

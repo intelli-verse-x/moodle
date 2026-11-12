@@ -25,8 +25,9 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['pluginname'] = 'ToBa Learn LaunchPad';
-$string['privacy:metadata'] = 'The LaunchPad plugin stores a portal preference for users who self-register for Fellowship.';
+$string['privacy:metadata'] = 'The LaunchPad plugin stores portal and fellowship preferences for users.';
 $string['privacy:metadata:preference:toba_portal'] = 'Records that the account was created via Fellowship self-registration.';
+$string['privacy:metadata:preference:local_launchpad_fellow_course'] = 'Stores the fellow\'s last selected LaunchPad course so multi-course navigation stays sticky across visits.';
 $string['pagetitle'] = 'ToBa Learn · LaunchPad Fellowship';
 $string['mentorformurl'] = 'Become a mentor · Google Form URL';
 $string['mentorformurl_desc'] = 'Public Google Form link for mentor applications. Applicants are redirected here from the landing page. After they submit, your team contacts them for the next steps.';
@@ -1421,9 +1422,12 @@ $string['fellowship_recent_badges_help'] = 'Badges from work on your record. Ope
 $string['fellowship_recent_badges_empty'] = 'No badges earned yet.';
 $string['fellowship_recent_badges_empty_hint'] = 'Finish lessons, quizzes, or assignments and your newest badges will show here first.';
 $string['fellowship_home_course_title'] = 'Current course';
-$string['fellowship_your_courses_help'] = 'Your enrolled LaunchPad course. Resume learning, or open My track for the full outline.';
+$string['fellowship_your_courses_help'] = 'Your enrolled LaunchPad track(s). When you have more than one, tap a course to make it active — Home, My track, Progress, Feedback and Portfolio follow that pick.';
 $string['fellowship_home_course_media'] = 'Track';
 $string['fellowship_course_status_open'] = 'Ready to continue';
+$string['fellowship_course_status_other'] = 'Enrolled · tap to make active';
+$string['fellowship_course_active_badge'] = 'Active';
+$string['fellowship_cta_switch_course'] = 'Switch to this track';
 $string['fellowship_cta_resume'] = 'Resume learning';
 $string['fellowship_cta_start'] = 'Start learning';
 $string['fellowship_cta_view_track'] = 'Open track';

@@ -17,7 +17,7 @@
         </button>
         <div class="lp-greet">
           <h1 class="lp-page-title">{{#is_home}}{{greeting}}{{/is_home}}{{^is_home}}{{pagetitle}}{{/is_home}}</h1>
-          <p class="lp-greet-sub">{{portallabel}}</p>
+          <p class="lp-greet-sub">{{portallabel}}{{#active_course_label}} · <span class="lp-greet-track">{{{active_course_label}}}</span>{{/active_course_label}}</p>
         </div>
       </div>
       <div class="lp-topbar-actions">
