@@ -3206,10 +3206,215 @@ final class fellowship_dashboard {
     }
 
     /**
+     * Plain-text snippet from HTML/text for portfolio case cards (never invents content).
+     */
+    private static function portfolio_plain_snippet(string $raw, int $maxlen = 180): string {
+        $plain = trim(html_to_text($raw, 0, false));
+        $plain = preg_replace('/\s+/u', ' ', $plain) ?? $plain;
+        $plain = trim($plain);
+        if ($plain === '') {
+            return '';
+        }
+        return shorten_text($plain, $maxlen, true, '…');
+    }
+
+    /**
+     * Problem / What I did / Result lines from Moodle assign data already on a feedback row.
+     *
+     * @param array<string,mixed> $row From list_assignment_feedback()
+     * @return array{
+     *   problem_text: string,
+     *   has_problem_text: bool,
+     *   did_text: string,
+     *   has_did_text: bool,
+     *   result_text: string,
+     *   has_result_text: bool,
+     *   result_feedback: string,
+     *   has_result_feedback: bool
+     * }
+     */
+    private static function portfolio_case_fields(array $row): array {
+        // Title already shows assign name; Problem body = brief/criteria/intro only.
+        $brief = trim((string) ($row['brief_snippet'] ?? ''));
+        $problem = $brief !== ''
+            ? $brief
+            : self::str(
+                'fellowship_portfolio_problem_fallback',
+                null,
+                'No brief or criteria published for this assignment yet.'
+            );
+
+        // What I did = submission facts only (not Met/Changes — those belong in Result).
+        $didparts = [];
+        $status = (string) ($row['status'] ?? 'not_submitted');
+        $submitted = trim((string) ($row['submitted_at'] ?? ''));
+        if ($submitted !== '') {
+            $didparts[] = self::str('fellowship_portfolio_when_submitted', $submitted, 'Submitted {$a}');
+        } else if ($status === 'pending' || $status === 'reviewed' || $status === 'changes') {
+            $didparts[] = self::str(
+                'fellowship_portfolio_did_submitted',
+                null,
+                'Submitted'
+            );
+        }
+        $attempt = (int) ($row['attempt'] ?? 0);
+        if (!empty($row['has_attempt']) && $attempt > 0) {
+            $didparts[] = self::str('fellowship_portfolio_attempt', (string) $attempt, 'Attempt {$a}');
+        }
+        $artifact = trim((string) ($row['artifact_summary'] ?? ''));
+        if ($artifact !== '') {
+            $didparts[] = $artifact;
+        } else if ($didparts !== []) {
+            $didparts[] = self::str(
+                'fellowship_portfolio_artifact_none',
+                null,
+                'No file or online text to summarise'
+            );
+        }
+        $did = implode(' · ', array_filter($didparts, static fn($p) => $p !== ''));
+
+        $statuslabel = trim((string) ($row['status_label'] ?? ''));
+        $resultparts = [];
+        $feedbacksnip = trim((string) ($row['feedback_snippet'] ?? ''));
+        if ($status === 'pending') {
+            $resultparts[] = self::str(
+                'fellowship_portfolio_result_awaiting',
+                null,
+                'Awaiting review'
+            );
+        } else if ($status === 'not_submitted') {
+            $resultparts[] = self::str(
+                'fellowship_portfolio_result_open',
+                null,
+                'Open — not submitted yet'
+            );
+        } else {
+            // Met / Changes / Done / Below pass bar from released mentor review.
+            if ($statuslabel !== '') {
+                $resultparts[] = $statuslabel;
+            }
+            if (!empty($row['has_grade']) && trim((string) ($row['grade_display'] ?? '')) !== '') {
+                $resultparts[] = (string) $row['grade_display'];
+            }
+            $graded = trim((string) ($row['graded_at'] ?? ''));
+            if ($graded !== '') {
+                $resultparts[] = self::str('fellowship_portfolio_when_graded', $graded, 'Graded {$a}');
+            }
+        }
+        $result = implode(' · ', array_filter($resultparts, static fn($p) => $p !== ''));
+
+        return [
+            'problem_text' => $problem,
+            'has_problem_text' => $problem !== '',
+            'did_text' => $did,
+            'has_did_text' => $did !== '',
+            'result_text' => $result,
+            'has_result_text' => $result !== '',
+            'result_feedback' => $feedbacksnip,
+            'has_result_feedback' => $feedbacksnip !== '',
+        ];
+    }
+
+    /**
+     * Brief/criteria + submission artifact + feedback snippets from a live assign.
+     * Real Moodle data only — empty strings when nothing is published or submitted.
+     *
+     * @param \stdClass|null $user Fellow user row (for file submission plugin); null skips files
+     * @return array{brief_snippet: string, artifact_summary: string, feedback_snippet: string}
+     */
+    private static function portfolio_assign_snippets(
+        \assign $assign,
+        \stdClass $instance,
+        int $userid,
+        $submission,
+        string $commenthtml,
+        ?\stdClass $user = null
+    ): array {
+        $brief = '';
+        $rawintro = trim((string) ($instance->intro ?? ''));
+        if ($rawintro !== '') {
+            $parts = activity_portal::parse_assign_intro_sections($rawintro);
+            if ($parts['brief_html'] !== '') {
+                $brief = self::portfolio_plain_snippet($parts['brief_html']);
+            }
+            if ($brief === '' && $parts['criteria_html'] !== '') {
+                $brief = self::portfolio_plain_snippet($parts['criteria_html']);
+            }
+            if ($brief === '') {
+                // Honest activity intro when no [LP-BRIEF]/[LP-CRITERIA] markers.
+                $brief = self::portfolio_plain_snippet($rawintro);
+            }
+        }
+
+        $artifactbits = [];
+        if ($submission) {
+            $fileplugin = $assign->get_submission_plugin_by_type('file');
+            if ($fileplugin && $fileplugin->is_enabled() && $user) {
+                $filenames = [];
+                foreach ($fileplugin->get_files($submission, $user) as $storedfile) {
+                    /** @var \stored_file $storedfile */
+                    if ($storedfile->is_directory()) {
+                        continue;
+                    }
+                    $filenames[] = $storedfile->get_filename();
+                }
+                $n = count($filenames);
+                if ($n === 1) {
+                    $artifactbits[] = self::str(
+                        'fellowship_portfolio_artifact_file',
+                        $filenames[0],
+                        'File: {$a}'
+                    );
+                } else if ($n > 1) {
+                    $artifactbits[] = self::str(
+                        'fellowship_portfolio_artifact_files',
+                        (string) $n,
+                        '{$a} files'
+                    );
+                }
+            }
+            $textplugin = $assign->get_submission_plugin_by_type('onlinetext');
+            if ($textplugin && $textplugin->is_enabled()
+                    && method_exists($textplugin, 'get_editor_text')) {
+                $raw = $textplugin->get_editor_text('onlinetext', (int) $submission->id);
+                if (is_string($raw) && trim(strip_tags($raw)) !== '') {
+                    $plain = self::portfolio_plain_snippet($raw, 100);
+                    if ($plain !== '') {
+                        $artifactbits[] = self::str(
+                            'fellowship_portfolio_artifact_text',
+                            $plain,
+                            'Online text: {$a}'
+                        );
+                    } else {
+                        $artifactbits[] = self::str(
+                            'fellowship_portfolio_artifact_text_only',
+                            null,
+                            'Online text submitted'
+                        );
+                    }
+                }
+            }
+        }
+        $artifact = implode(' · ', $artifactbits);
+
+        $feedback = '';
+        if (trim(strip_tags($commenthtml)) !== '') {
+            $feedback = self::portfolio_plain_snippet($commenthtml, 160);
+        }
+
+        return [
+            'brief_snippet' => $brief,
+            'artifact_summary' => $artifact,
+            'feedback_snippet' => $feedback,
+        ];
+    }
+
+    /**
      * Portfolio = Moodle assign evidence for the selected track (submissions + released reviews).
      *
      * Reuses list_assignment_feedback() visibility rules. Not-submitted assigns are counted
-     * in stats only — they are not portfolio evidence yet.
+     * in stats only — they are not portfolio evidence yet. Each evidence row is a case card
+     * (Problem → What I did → Result) from real assign / submission / feedback data only.
      *
      * @param list<\stdClass> $courses Courses to scan (pass the selected track for page scope)
      * @param int|null $courseid Selected course id (preserved for callers / switch URLs)
@@ -3263,6 +3468,7 @@ final class fellowship_dashboard {
                 'reviewed' => 'checkmark-circle-02',
                 default => 'file-02',
             };
+            $case = self::portfolio_case_fields($row);
             $item = [
                 'cmid' => (int) ($row['cmid'] ?? 0),
                 'course_id' => (int) ($row['course_id'] ?? 0),
@@ -3292,6 +3498,17 @@ final class fellowship_dashboard {
                 'is_reviewed' => $status === 'reviewed',
                 'is_changes' => $status === 'changes',
                 'is_open' => false,
+                'problem_label' => self::str('fellowship_portfolio_case_problem', null, 'Problem'),
+                'did_label' => self::str('fellowship_portfolio_case_did', null, 'What I did'),
+                'result_label' => self::str('fellowship_portfolio_case_result', null, 'Result'),
+                'problem_text' => $case['problem_text'],
+                'has_problem_text' => $case['has_problem_text'],
+                'did_text' => $case['did_text'],
+                'has_did_text' => $case['has_did_text'],
+                'result_text' => $case['result_text'],
+                'has_result_text' => $case['has_result_text'],
+                'result_feedback' => $case['result_feedback'],
+                'has_result_feedback' => $case['has_result_feedback'],
             ];
 
             if (!empty($item['needs_attention'])) {
@@ -3399,7 +3616,7 @@ final class fellowship_dashboard {
             'evidence_status' => $evidencestatus,
             'hero_summary' => $herosummary,
             'selected_course_name' => $coursename,
-            'list_heading' => self::str('fellowship_portfolio_list_heading', null, 'Evidence'),
+            'list_heading' => self::str('fellowship_portfolio_list_heading', null, 'Case studies'),
         ];
     }
 
@@ -3524,6 +3741,7 @@ final class fellowship_dashboard {
         $items = [];
         $attention = 0;
         $assigncount = 0;
+        $fellowuser = \core_user::get_user($userid) ?: null;
 
         foreach ($courses as $course) {
             $modinfo = get_fast_modinfo($course, $userid);
@@ -3823,6 +4041,16 @@ final class fellowship_dashboard {
                     || $submittedcount > 0
                 );
 
+                // Portfolio case cards reuse these Moodle-only snippets (no invented copy).
+                $casesnips = self::portfolio_assign_snippets(
+                    $assign,
+                    $instance,
+                    $userid,
+                    $latest,
+                    $commenttext,
+                    $fellowuser
+                );
+
                 $items[] = [
                     'cmid' => (int) $cm->id,
                     'course_id' => (int) $course->id,
@@ -3853,6 +4081,9 @@ final class fellowship_dashboard {
                         ? userdate($gradedat, get_string('strftimedatetimeshort', 'langconfig'))
                         : '',
                     'needs_attention' => $needsattention,
+                    'brief_snippet' => $casesnips['brief_snippet'],
+                    'artifact_summary' => $casesnips['artifact_summary'],
+                    'feedback_snippet' => $casesnips['feedback_snippet'],
                     '_sort' => max(
                         $gradedat,
                         $submittedat,

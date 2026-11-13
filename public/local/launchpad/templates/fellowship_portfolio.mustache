@@ -1,7 +1,7 @@
 {{!
     @template local_launchpad/fellowship_portfolio
 
-    Fellowship portfolio — selected-track Moodle evidence + accurate At a glance.
+    Fellowship portfolio — selected-track case cards (Problem → What I did → Result).
 }}
 <div class="lp-tools-page lp-reveal" data-region="fellowship-portfolio" style="--lp-d:0">
   {{#multi_course}}
@@ -99,24 +99,44 @@
       </div>
       <ul class="lp-port-list">
         {{#items}}
-          <li class="lp-port-item{{#needs_attention}} is-attention{{/needs_attention}}">
-            <div class="lp-port-item-main">
-              <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
-                <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
-              </span>
-              <div class="lp-port-item-copy">
-                <h3><a href="{{url}}">{{{name}}}</a></h3>
-                {{#summary}}<p class="lp-sm lp-muted">{{summary}}</p>{{/summary}}
-                <div class="lp-port-item-meta">
-                  {{#has_when}}<span>{{when_label}}</span>{{/has_when}}
-                  {{#has_attempt}}<span>{{attempt_label}}</span>{{/has_attempt}}
-                  {{#has_grade}}<span class="lp-port-grade">{{grade_display}}</span>{{/has_grade}}
-                  {{#has_comment}}<span>{{#str}} fellowship_portfolio_has_feedback, local_launchpad {{/str}}</span>{{/has_comment}}
+          <li class="lp-port-item lp-port-case{{#needs_attention}} is-attention{{/needs_attention}}{{#is_pending}} is-pending{{/is_pending}}">
+            <div class="lp-port-case-top">
+              <div class="lp-port-item-main">
+                <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+                  <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
+                </span>
+                <div class="lp-port-item-copy">
+                  <h3><a href="{{url}}">{{{name}}}</a></h3>
                 </div>
               </div>
+              <div class="lp-port-item-aside">
+                <span class="lp-chip {{chip}}">{{status}}</span>
+              </div>
             </div>
-            <div class="lp-port-item-aside">
-              <span class="lp-chip {{chip}}">{{status}}</span>
+            <div class="lp-port-case-body">
+              {{#has_problem_text}}
+                <div class="lp-port-case-block">
+                  <p class="lp-port-case-label">{{problem_label}}</p>
+                  <p class="lp-port-case-text">{{problem_text}}</p>
+                </div>
+              {{/has_problem_text}}
+              {{#has_did_text}}
+                <div class="lp-port-case-block">
+                  <p class="lp-port-case-label">{{did_label}}</p>
+                  <p class="lp-port-case-text">{{did_text}}</p>
+                </div>
+              {{/has_did_text}}
+              {{#has_result_text}}
+                <div class="lp-port-case-block lp-port-case-result">
+                  <p class="lp-port-case-label">{{result_label}}</p>
+                  <p class="lp-port-case-text">{{result_text}}</p>
+                  {{#has_result_feedback}}
+                    <p class="lp-port-case-feedback">{{result_feedback}}</p>
+                  {{/has_result_feedback}}
+                </div>
+              {{/has_result_text}}
+            </div>
+            <div class="lp-port-case-foot">
               <a class="lp-btn lp-btn-light" href="{{url}}">{{cta_label}}</a>
             </div>
           </li>

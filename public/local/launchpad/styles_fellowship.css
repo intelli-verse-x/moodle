@@ -7414,7 +7414,7 @@ body.lp-portal-mismatch-lock {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
 }
 .lp-port-item {
   display: grid;
@@ -7492,6 +7492,92 @@ body.lp-portal-mismatch-lock {
 .lp-port-item-aside .lp-btn {
   white-space: nowrap;
 }
+
+/* M3 thin — case-study cards (Problem → What I did → Result) */
+.lp-port-case {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 16px 14px;
+  border: 1px solid var(--lp-line, #E3E9F4);
+  background: linear-gradient(180deg, #FBFCFE 0%, #F5F8FC 100%);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--lp-blue, #1A61F2) 6%, transparent);
+}
+.lp-port-case:hover {
+  border-color: color-mix(in srgb, var(--lp-blue, #1A61F2) 28%, var(--lp-line, #E3E9F4));
+  background: #fff;
+}
+.lp-port-case.is-attention {
+  border-color: color-mix(in srgb, #C98500 32%, transparent);
+  background: linear-gradient(180deg, #FFFBF3 0%, #FFF8EB 100%);
+}
+.lp-port-case.is-pending {
+  border-color: color-mix(in srgb, var(--lp-blue, #1A61F2) 16%, var(--lp-line, #E3E9F4));
+}
+.lp-port-case-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+.lp-port-case-top .lp-port-item-aside {
+  flex-direction: row;
+  align-items: center;
+}
+.lp-port-case-body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  padding: 2px 2px 0;
+}
+.lp-port-case-block {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #fff 88%, var(--lp-blue-soft, #E5EDFA));
+  border: 1px solid color-mix(in srgb, var(--lp-line, #E3E9F4) 80%, transparent);
+}
+.lp-port-case-result {
+  background: color-mix(in srgb, var(--lp-blue-softer, #EBF0FA) 55%, #fff);
+  border-color: color-mix(in srgb, var(--lp-blue, #1A61F2) 14%, var(--lp-line, #E3E9F4));
+}
+.lp-port-case.is-attention .lp-port-case-result {
+  background: color-mix(in srgb, #FFF3D6 70%, #fff);
+  border-color: color-mix(in srgb, #C98500 22%, transparent);
+}
+.lp-port-case-label {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--lp-blue, #1A61F2);
+}
+.lp-port-case-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--lp-ink, #0D1429);
+  word-break: break-word;
+}
+.lp-port-case-feedback {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed color-mix(in srgb, var(--lp-blue, #1A61F2) 18%, var(--lp-line, #E3E9F4));
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lp-muted, #5C667A);
+  font-style: italic;
+}
+.lp-port-case-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+.lp-port-case-foot .lp-btn {
+  white-space: nowrap;
+}
 @media (max-width: 900px) {
   .lp-port-system { grid-template-columns: 1fr; }
   .lp-port-item {
@@ -7502,6 +7588,12 @@ body.lp-portal-mismatch-lock {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+  }
+  .lp-port-case-body {
+    grid-template-columns: 1fr;
+  }
+  .lp-port-case-top {
+    flex-wrap: wrap;
   }
 }
 
