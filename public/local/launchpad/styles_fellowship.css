@@ -7597,6 +7597,123 @@ body.lp-portal-mismatch-lock {
   }
 }
 
+/* M3 — fellow-written case study (private, per track) */
+.lp-port-case-study {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+.lp-port-case-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 16px 18px;
+}
+.lp-port-case-form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+.lp-port-case-form-head .lp-card-copy h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.lp-port-case-form-head .lp-card-copy p {
+  margin: 2px 0 0;
+}
+.lp-port-case-form .lp-field textarea {
+  font: inherit;
+  font-weight: 400;
+  color: var(--lp-ink);
+  padding: 10px 12px;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: #fff;
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  line-height: 1.45;
+}
+.lp-port-case-form .lp-field textarea:focus {
+  outline: 2px solid var(--lp-blue);
+  outline-offset: 1px;
+}
+.lp-port-case-form .lp-help {
+  margin-top: 2px;
+  font-weight: 500;
+}
+.lp-port-case-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.lp-port-case-tip {
+  padding: 14px 14px 12px;
+}
+.lp-port-case-tip p {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--lp-ink, #12161f);
+}
+.lp-port-case-checklist {
+  padding: 14px 14px 12px;
+}
+.lp-port-case-checklist h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.lp-port-case-checklist > .lp-sm {
+  margin: 4px 0 10px;
+}
+.lp-port-case-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp-port-case-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--lp-muted, #5C667A);
+  line-height: 1.35;
+}
+.lp-port-case-check-mark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--lp-line, #E3E9F4);
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: transparent;
+}
+.lp-port-case-check.is-done {
+  color: var(--lp-ink, #12161f);
+}
+.lp-port-case-check.is-done .lp-port-case-check-mark {
+  border-color: color-mix(in srgb, #1E7A3B 35%, var(--lp-line, #E3E9F4));
+  background: #E3F5E8;
+  color: #1E7A3B;
+}
+@media (max-width: 900px) {
+  .lp-port-case-study {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Messages — Capstone overview + systematic workspace */
 .lp-tools-page[data-region="fellowship-messages"],
 .lp-tools-page[data-region="employer-messages"] {

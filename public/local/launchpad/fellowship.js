@@ -4285,4 +4285,29 @@
             applyFeedbackFilter(params.get('ftab') || 'all', false);
         });
     })();
+
+    // Portfolio case study: live word-count help (soft hint only).
+    (function portfolioCaseWordHelp() {
+        var form = shell.querySelector('[data-region="portfolio-case-form"]');
+        if (!form) {
+            return;
+        }
+        var body = form.querySelector('[data-lp-case-body]');
+        var help = form.querySelector('[data-lp-case-word-help]');
+        if (!body || !help) {
+            return;
+        }
+        function countWords(text) {
+            var trimmed = String(text || '').trim();
+            if (!trimmed) {
+                return 0;
+            }
+            return trimmed.split(/\s+/).filter(Boolean).length;
+        }
+        function refresh() {
+            help.textContent = countWords(body.value) + ' words · aim for 250–400';
+        }
+        body.addEventListener('input', refresh);
+        refresh();
+    })();
 })();

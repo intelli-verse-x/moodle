@@ -1,7 +1,8 @@
 {{!
     @template local_launchpad/fellowship_portfolio
 
-    Fellowship portfolio — selected-track case cards (Problem → What I did → Result).
+    Fellowship portfolio — selected-track case cards (Problem → What I did → Result)
+    plus fellow-written case study form (private, per active track).
 }}
 <div class="lp-tools-page lp-reveal" data-region="fellowship-portfolio" style="--lp-d:0">
   {{#multi_course}}
@@ -83,6 +84,72 @@
       </dl>
     </section>
   </div>
+
+  {{#case_can_save}}
+    <div class="lp-port-case-study">
+      <form class="lp-card lift lp-port-case-form" method="post" action="{{case_form_action}}" data-region="portfolio-case-form">
+        <input type="hidden" name="sesskey" value="{{case_sesskey}}">
+        <input type="hidden" name="action" value="save_case_study">
+        <input type="hidden" name="id" value="{{case_course_id}}">
+        <div class="lp-port-case-form-head">
+          <div class="lp-theme-hero-title-row">
+            <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
+              <iconify-icon icon="hugeicons:quill-write-01" width="18" height="18"></iconify-icon>
+            </span>
+            <div class="lp-card-copy">
+              <h3>{{#str}} fellowship_portfolio_case_heading, local_launchpad {{/str}}</h3>
+              <p class="lp-sm lp-muted">{{#str}} fellowship_portfolio_case_lead, local_launchpad {{/str}}</p>
+            </div>
+          </div>
+          {{#case_has_saved}}
+            <span class="lp-chip ok" role="status">{{case_saved_label}}</span>
+          {{/case_has_saved}}
+        </div>
+
+        <label class="lp-field">
+          <span>{{#str}} fellowship_portfolio_case_title_label, local_launchpad {{/str}}</span>
+          <input type="text" name="case_title" value="{{case_title}}" maxlength="200"
+                 autocomplete="off"
+                 placeholder="{{#str}} fellowship_portfolio_case_title_placeholder, local_launchpad {{/str}}">
+        </label>
+
+        <label class="lp-field">
+          <span>{{#str}} fellowship_portfolio_case_body_label, local_launchpad {{/str}}</span>
+          <textarea name="case_body" rows="8" maxlength="20000"
+                    placeholder="{{#str}} fellowship_portfolio_case_body_placeholder, local_launchpad {{/str}}"
+                    data-lp-case-body>{{case_body}}</textarea>
+          <span class="lp-help lp-sm lp-muted" data-lp-case-word-help>{{case_word_help}}</span>
+        </label>
+
+        <label class="lp-check-row">
+          <input type="checkbox" name="case_simulated" value="1"{{#case_simulated}} checked{{/case_simulated}}>
+          <span>{{#str}} fellowship_portfolio_case_simulated_label, local_launchpad {{/str}}</span>
+        </label>
+
+        <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">
+          {{#str}} fellowship_portfolio_case_save, local_launchpad {{/str}}
+        </button>
+      </form>
+
+      <aside class="lp-port-case-aside">
+        <div class="lp-card soft lp-port-case-tip">
+          <p class="lp-sm">{{case_tip}}</p>
+        </div>
+        <section class="lp-card lift lp-port-case-checklist" aria-label="{{#str}} fellowship_portfolio_case_checklist_heading, local_launchpad {{/str}}">
+          <h3>{{#str}} fellowship_portfolio_case_checklist_heading, local_launchpad {{/str}}</h3>
+          <p class="lp-sm lp-muted">{{#str}} fellowship_portfolio_case_checklist_lead, local_launchpad {{/str}}</p>
+          <ul class="lp-port-case-checks">
+            {{#case_checklist}}
+              <li class="lp-port-case-check {{done_class}}">
+                <span class="lp-port-case-check-mark" aria-hidden="true">{{#done}}✓{{/done}}</span>
+                <span>{{label}}</span>
+              </li>
+            {{/case_checklist}}
+          </ul>
+        </section>
+      </aside>
+    </div>
+  {{/case_can_save}}
 
   {{#has_items}}
     <section class="lp-card lift lp-port-workspace" aria-label="{{list_heading}}">

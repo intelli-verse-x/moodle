@@ -38,6 +38,18 @@ final class fellowship_dashboard {
     public const PREF_ACTIVE_COURSE = 'local_launchpad_fellow_course';
 
     /**
+     * Prefix for per-course portfolio case study JSON prefs: {prefix}{courseid}.
+     * Payload: {title, body, simulated, timemodified}. Private to the fellow.
+     */
+    public const PREF_PORTFOLIO_CASE_PREFIX = 'local_launchpad_portfolio_case_';
+
+    /** Max stored case study title length (chars). */
+    public const PORTFOLIO_CASE_TITLE_MAX = 200;
+
+    /** Max stored case study body length (chars). */
+    public const PORTFOLIO_CASE_BODY_MAX = 20000;
+
+    /**
      * TEMP local QA only — skips sequential unlock so later CMs open without prior complete.
      * Keep false unless actively QA'ing a locked later activity.
      */
@@ -128,6 +140,190 @@ final class fellowship_dashboard {
             return;
         }
         set_user_preference(self::PREF_ACTIVE_COURSE, $courseid, $userid);
+    }
+
+    /**
+     * Preference name for a fellow's portfolio case study on one course.
+     */
+    public static function portfolio_case_preference_name(int $courseid): string {
+        return self::PREF_PORTFOLIO_CASE_PREFIX . max(0, $courseid);
+    }
+
+    /**
+     * Load the fellow-written portfolio case study for a course (empty defaults when unset).
+     *
+     * @return array{title: string, body: string, simulated: bool, timemodified: int}
+     */
+    public static function get_portfolio_case_study(int $userid, int $courseid): array {
+        $empty = [
+            'title' => '',
+            'body' => '',
+            'simulated' => false,
+            'timemodified' => 0,
+        ];
+        if ($userid <= 0 || $courseid <= 0) {
+            return $empty;
+        }
+        $raw = get_user_preferences(self::portfolio_case_preference_name($courseid), null, $userid);
+        if ($raw === null || $raw === '') {
+            return $empty;
+        }
+        $decoded = json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            return $empty;
+        }
+        return [
+            'title' => trim((string) ($decoded['title'] ?? '')),
+            'body' => trim((string) ($decoded['body'] ?? '')),
+            'simulated' => !empty($decoded['simulated']),
+            'timemodified' => max(0, (int) ($decoded['timemodified'] ?? 0)),
+        ];
+    }
+
+    /**
+     * Save a fellow-written portfolio case study (trim + length-cap; no invented content).
+     *
+     * @return array{title: string, body: string, simulated: bool, timemodified: int}
+     */
+    public static function set_portfolio_case_study(
+        int $userid,
+        int $courseid,
+        string $title,
+        string $body,
+        bool $simulated
+    ): array {
+        if ($userid <= 0 || $courseid <= 0) {
+            return self::get_portfolio_case_study($userid, $courseid);
+        }
+        $title = trim($title);
+        $body = trim($body);
+        if (\core_text::strlen($title) > self::PORTFOLIO_CASE_TITLE_MAX) {
+            $title = \core_text::substr($title, 0, self::PORTFOLIO_CASE_TITLE_MAX);
+        }
+        if (\core_text::strlen($body) > self::PORTFOLIO_CASE_BODY_MAX) {
+            $body = \core_text::substr($body, 0, self::PORTFOLIO_CASE_BODY_MAX);
+        }
+        $now = time();
+        $payload = [
+            'title' => $title,
+            'body' => $body,
+            'simulated' => $simulated,
+            'timemodified' => $now,
+        ];
+        set_user_preference(
+            self::portfolio_case_preference_name($courseid),
+            json_encode($payload, JSON_UNESCAPED_UNICODE),
+            $userid
+        );
+        return $payload;
+    }
+
+    /**
+     * Soft read-only checklist hints from saved case text / simulated flag (no grade impact).
+     *
+     * @param array{title?: string, body?: string, simulated?: bool} $case
+     * @return list<array{label: string, done: bool}>
+     */
+    public static function portfolio_case_checklist(array $case): array {
+        $body = (string) ($case['body'] ?? '');
+        $simulated = !empty($case['simulated']);
+        return [
+            [
+                'label' => self::str(
+                    'fellowship_portfolio_case_check_problem',
+                    null,
+                    'Problem in one sentence'
+                ),
+                'done' => (bool) preg_match('/problem/i', $body),
+            ],
+            [
+                'label' => self::str(
+                    'fellowship_portfolio_case_check_assumptions',
+                    null,
+                    'Evidence and assumptions separated'
+                ),
+                'done' => (bool) preg_match('/assum/i', $body),
+            ],
+            [
+                'label' => self::str(
+                    'fellowship_portfolio_case_check_decision',
+                    null,
+                    'A decision with a reason'
+                ),
+                'done' => (bool) preg_match('/decid|chose/i', $body),
+            ],
+            [
+                'label' => self::str(
+                    'fellowship_portfolio_case_check_simulated',
+                    null,
+                    'Labelled simulated'
+                ),
+                'done' => $simulated,
+            ],
+        ];
+    }
+
+    /**
+     * Mustache context for the fellow-written case study block (form + soft checklist).
+     *
+     * @return array<string, mixed>
+     */
+    public static function portfolio_case_study_context(
+        int $userid,
+        int $courseid,
+        string $formaction,
+        string $sesskey,
+        bool $justsaved = false
+    ): array {
+        $case = self::get_portfolio_case_study($userid, $courseid);
+        $hascourse = $courseid > 0;
+        $words = 0;
+        $trimmed = trim($case['body']);
+        if ($trimmed !== '') {
+            $parts = preg_split('/\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY);
+            $words = is_array($parts) ? count($parts) : 0;
+        }
+        $savedat = (int) $case['timemodified'];
+        $hassaved = $savedat > 0;
+        $savedlabel = '';
+        if ($hassaved) {
+            $when = userdate($savedat, get_string('strftimedatetimeshort', 'langconfig'));
+            $savedlabel = self::str(
+                'fellowship_portfolio_case_saved',
+                $when,
+                'Saved {$a}'
+            );
+        }
+        $checklist = self::portfolio_case_checklist($case);
+        foreach ($checklist as &$row) {
+            $row['done_class'] = !empty($row['done']) ? 'is-done' : '';
+        }
+        unset($row);
+
+        return [
+            'case_can_save' => $hascourse,
+            'case_form_action' => $formaction,
+            'case_sesskey' => $sesskey,
+            'case_course_id' => $courseid,
+            'case_title' => $case['title'],
+            'case_body' => $case['body'],
+            'case_simulated' => !empty($case['simulated']),
+            'case_word_count' => $words,
+            'case_word_help' => self::str(
+                'fellowship_portfolio_case_word_help',
+                $words,
+                '{$a} words · aim for 250–400'
+            ),
+            'case_has_saved' => $hassaved,
+            'case_saved_label' => $savedlabel,
+            'case_just_saved' => $justsaved && $hassaved,
+            'case_checklist' => $checklist,
+            'case_tip' => self::str(
+                'fellowship_portfolio_case_tip',
+                null,
+                'A strong case study shows a decision and its limits. Say what you would test next.'
+            ),
+        ];
     }
 
     /**

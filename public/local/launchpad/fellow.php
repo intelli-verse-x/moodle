@@ -193,6 +193,41 @@ if (data_submitted() && confirm_sesskey()) {
             'page' => $processed['page'],
         ]));
     }
+    if ($postaction === 'save_case_study') {
+        $savecourseid = optional_param('id', 0, PARAM_INT);
+        $enrolledids = [];
+        foreach (fellowship_dashboard::list_courses($userid) as $course) {
+            $enrolledids[(int) $course->id] = true;
+        }
+        if ($savecourseid <= 0 || empty($enrolledids[$savecourseid])) {
+            redirect(
+                new moodle_url(persona_home::FELLOW_PATH, ['view' => 'portfolio']),
+                $lpstr(
+                    'fellowship_portfolio_case_err_course',
+                    null,
+                    'Choose an enrolled track before saving a case study.'
+                ),
+                null,
+                \core\output\notification::NOTIFY_ERROR
+            );
+        }
+        $casetitle = optional_param('case_title', '', PARAM_TEXT);
+        $casebody = optional_param('case_body', '', PARAM_TEXT);
+        $casesimulated = (bool) optional_param('case_simulated', 0, PARAM_BOOL);
+        fellowship_dashboard::set_portfolio_case_study(
+            $userid,
+            $savecourseid,
+            $casetitle,
+            $casebody,
+            $casesimulated
+        );
+        // Skip XP award this slice — provisional XP stays activity-derived.
+        redirect(new moodle_url(persona_home::FELLOW_PATH, [
+            'view' => 'portfolio',
+            'id' => $savecourseid,
+            'casesaved' => 1,
+        ]));
+    }
 }
 
 // Course-scoped views may take ?id= as track. Messages: id = peer user — never course.
@@ -860,7 +895,18 @@ switch ($view) {
         if (empty($portdata['selected_course_name']) && $selected) {
             $portdata['selected_course_name'] = fellowship_dashboard::display_label(format_string($selected->fullname));
         }
-        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_portfolio', array_merge($portdata, [
+        $casecourseid = $portfoliocourseid !== null ? (int) $portfoliocourseid : 0;
+        $casectx = fellowship_dashboard::portfolio_case_study_context(
+            $userid,
+            $casecourseid,
+            (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+                'view' => 'portfolio',
+                'id' => $casecourseid > 0 ? $casecourseid : null,
+            ])))->out(false),
+            sesskey(),
+            (bool) optional_param('casesaved', 0, PARAM_INT)
+        );
+        $content = $OUTPUT->render_from_template('local_launchpad/fellowship_portfolio', array_merge($portdata, $casectx, [
             'multi_course' => count($portfolioswitch) > 1,
             'course_switch' => $portfolioswitch,
             'track_url' => (new moodle_url(persona_home::FELLOW_PATH, array_filter([
