@@ -1,0 +1,82 @@
+{{!
+    @template local_launchpad/notification_dropdown
+
+    Custom LaunchPad notification dropdown (Moodle popup APIs).
+}}
+<div class="lp-notif-dd"
+     data-region="lp-notif-dropdown"
+     data-userid="{{notif_userid}}"
+     data-portal="{{notif_portal}}"
+     data-ajax="{{notif_ajax_url}}"
+     data-sesskey="{{notif_sesskey}}"
+     data-limit="{{notif_limit}}"
+     data-unread="{{unread_notifications}}">
+  <button type="button"
+          class="lp-iconbtn lp-notif-toggle"
+          data-lp-notif-toggle
+          aria-expanded="false"
+          aria-controls="lp-notif-panel"
+          aria-haspopup="dialog"
+          aria-label="{{notifications_label}}"
+          title="{{#str}} fellowship_notif_dd_title, local_launchpad {{/str}}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <path d="M6 9a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/>
+      <path d="M10 20a2 2 0 004 0"/>
+    </svg>
+    <span class="lp-notif-dot{{^has_unread_notifications}} is-hidden{{/has_unread_notifications}}"
+          data-lp-notif-count
+          aria-hidden="true">{{unread_notifications}}</span>
+  </button>
+  <div class="lp-notif-panel"
+       id="lp-notif-panel"
+       role="dialog"
+       aria-modal="true"
+       aria-label="{{#str}} fellowship_notifications, local_launchpad {{/str}}"
+       hidden>
+    <div class="lp-notif-panel-head">
+      <h2>{{#str}} fellowship_notifications, local_launchpad {{/str}}</h2>
+      <div class="lp-notif-panel-actions">
+        <button type="button"
+                class="lp-notif-action"
+                data-lp-notif-markall
+                title="{{#str}} fellowship_notif_mark_all, local_launchpad {{/str}}"
+                aria-label="{{#str}} fellowship_notif_mark_all, local_launchpad {{/str}}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 12l5 5L20 6"/>
+          </svg>
+        </button>
+        <a class="lp-notif-action"
+           href="{{notif_prefs_url}}"
+           title="{{#str}} fellowship_notif_preferences, local_launchpad {{/str}}"
+           aria-label="{{#str}} fellowship_notif_preferences, local_launchpad {{/str}}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9c.2.6.7 1 1.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>
+          </svg>
+        </a>
+        <button type="button"
+                class="lp-notif-action"
+                data-lp-notif-close
+                title="{{#str}} fellowship_notif_close, local_launchpad {{/str}}"
+                aria-label="{{#str}} fellowship_notif_close, local_launchpad {{/str}}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="lp-notif-panel-body" data-lp-notif-scroll>
+      <div class="lp-notif-list" data-lp-notif-list role="list" aria-busy="false"></div>
+      <div class="lp-notif-empty" data-lp-notif-empty hidden role="status">
+        {{#str}} fellowship_notif_empty, local_launchpad {{/str}}
+      </div>
+      <div class="lp-notif-loading" data-lp-notif-loading hidden role="status">
+        {{#str}} fellowship_notif_loading, local_launchpad {{/str}}
+      </div>
+    </div>
+    <div class="lp-notif-panel-foot">
+      <a class="lp-notif-seeall" href="{{notif_see_all_url}}">{{#str}} fellowship_notif_see_all, local_launchpad {{/str}}</a>
+    </div>
+    <span class="visually-hidden" data-lp-notif-live aria-live="polite"></span>
+  </div>
+</div>

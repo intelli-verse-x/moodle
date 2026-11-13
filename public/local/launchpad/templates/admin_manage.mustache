@@ -107,6 +107,15 @@
             <div class="lp-manage-phase-actions">
               <div class="lp-manage-edit-only" hidden>
                 <button type="button" class="lp-btn lp-btn-solid lp-btn-sm" data-lp-manage-add-open>{{add_label}}</button>
+                {{#can_delete_phase}}
+                  <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{delete_phase_confirm}}">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="delete_phase">
+                    <input type="hidden" name="trackid" value="{{trackid}}">
+                    <input type="hidden" name="sectionnum" value="{{sectionnum}}">
+                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm lp-btn-danger">{{delete_phase_label}}</button>
+                  </form>
+                {{/can_delete_phase}}
               </div>
             </div>
           </div>

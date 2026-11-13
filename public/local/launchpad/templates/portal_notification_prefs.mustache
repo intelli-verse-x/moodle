@@ -1,0 +1,99 @@
+{{!
+    @template local_launchpad/portal_notification_prefs
+
+    LaunchPad notification preferences — Web/Email matrix (Moodle storage).
+    No Advanced Moodle escape hatch.
+}}
+<div class="lp-tools-page lp-reveal" data-region="portal-notification-prefs" style="--lp-d:0">
+  <div class="lp-profile-pref-back">
+    <a class="lp-btn lp-btn-light" href="{{back_url}}">
+      <iconify-icon icon="hugeicons:arrow-left-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+      {{back_label}}
+    </a>
+  </div>
+
+  {{#has_flash}}
+    {{#flash}}
+      <div class="lp-flash{{#ok}} is-ok{{/ok}}{{^ok}} is-err{{/ok}}" role="status">{{text}}</div>
+    {{/flash}}
+  {{/has_flash}}
+
+  <form class="lp-card lift lp-profile-form lp-profile-pref-form lp-notif-pref-form" method="post" action="{{action_url}}">
+    <input type="hidden" name="sesskey" value="{{sesskey}}">
+    <input type="hidden" name="view" value="notificationprefs">
+    <input type="hidden" name="action" value="save_notification_preferences">
+    <div class="lp-card-head">
+      <div class="lp-grade-progress-title">
+        <span class="lp-grade-progress-icon" aria-hidden="true">
+          <iconify-icon icon="hugeicons:notification-01" width="22" height="22"></iconify-icon>
+        </span>
+        <div class="lp-card-copy">
+          <h3>{{title}}</h3>
+          <p>{{help}}</p>
+        </div>
+      </div>
+    </div>
+
+    <label class="lp-field lp-field-check lp-notif-pref-disable-all">
+      <span class="lp-field-check-row">
+        <input id="lp-disable-all" type="checkbox" name="disable_all" value="1" {{#disable_all_checked}}checked{{/disable_all_checked}}>
+        <span>{{disable_all_label}}</span>
+      </span>
+      <span class="lp-sm lp-muted">{{disable_all_help}}</span>
+    </label>
+
+    {{#has_groups}}
+      <div class="lp-notif-pref-matrix" role="region" aria-label="{{title}}">
+        <table class="lp-notif-pref-table">
+          <thead>
+            <tr>
+              <th scope="col">{{provider_col_label}}</th>
+              {{#column_headers}}
+                <th scope="col" class="lp-notif-pref-channel">{{label}}</th>
+              {{/column_headers}}
+            </tr>
+          </thead>
+          {{#groups}}
+            <tbody>
+              <tr class="lp-notif-pref-group">
+                <th scope="colgroup" colspan="{{column_count}}">{{displayname}}</th>
+              </tr>
+              {{#providers}}
+                <tr class="lp-notif-pref-row">
+                  <th scope="row">
+                    {{displayname}}
+                    <input type="hidden" name="providers[]" value="{{prefbase}}">
+                  </th>
+                  {{#channels}}
+                    <td class="lp-notif-pref-channel">
+                      {{#locked}}
+                        <span class="lp-notif-pref-locked{{#locked_on}} is-on{{/locked_on}}{{#locked_off}} is-off{{/locked_off}}"
+                              title="{{locked_label}}">{{locked_label}}</span>
+                      {{/locked}}
+                      {{^locked}}
+                        <label class="lp-notif-pref-toggle">
+                          <input type="checkbox"
+                                 name="matrix[{{prefbase}}][{{name}}]"
+                                 value="1"
+                                 {{#checked}}checked{{/checked}}
+                                 aria-label="{{name}}">
+                        </label>
+                      {{/locked}}
+                    </td>
+                  {{/channels}}
+                </tr>
+              {{/providers}}
+            </tbody>
+          {{/groups}}
+        </table>
+      </div>
+    {{/has_groups}}
+    {{^has_groups}}
+      <p class="lp-sm lp-muted">{{empty_label}}</p>
+    {{/has_groups}}
+
+    <div class="lp-profile-form-actions">
+      <button type="submit" class="lp-btn lp-btn-primary">{{save_label}}</button>
+    </div>
+  </form>
+</div>

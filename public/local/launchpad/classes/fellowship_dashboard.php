@@ -377,7 +377,7 @@ final class fellowship_dashboard {
             $percent = (int) round(($completed / $trackable) * 100);
         }
 
-        return [
+        $outline = [
             'sections' => $sections,
             'completion_enabled' => $completionenabled,
             'completed' => $completed,
@@ -385,6 +385,8 @@ final class fellowship_dashboard {
             'percent' => $percent,
             'next' => $next,
         ];
+        // Sequential access: next CM unlocks on fellow-complete (assign submit ≠ Met).
+        return self::apply_sequence_locks($outline, $course);
     }
 
     /**
@@ -480,6 +482,8 @@ final class fellowship_dashboard {
                     'status_chip' => 'ok',
                     'tracked' => true,
                     'complete' => true,
+                    // Access unlocks on submit/Met; score Met is separate.
+                    'access_complete' => true,
                 ];
             }
             if ($gradepct !== null && in_array($substatus, ['reopened', 'draft', 'new'], true)) {
@@ -489,6 +493,7 @@ final class fellowship_dashboard {
                     'status_chip' => 'warn',
                     'tracked' => true,
                     'complete' => false,
+                    'access_complete' => true,
                 ];
             }
             if ($gradepct !== null) {
@@ -499,6 +504,7 @@ final class fellowship_dashboard {
                     'status_chip' => 'warn',
                     'tracked' => true,
                     'complete' => false,
+                    'access_complete' => true,
                 ];
             }
             if ($substatus === 'submitted' || $submittedcount > 0) {
@@ -508,6 +514,7 @@ final class fellowship_dashboard {
                     'status_chip' => '',
                     'tracked' => true,
                     'complete' => false,
+                    'access_complete' => true,
                 ];
             }
             return [
@@ -516,6 +523,7 @@ final class fellowship_dashboard {
                 'status_chip' => 'line',
                 'tracked' => true,
                 'complete' => false,
+                'access_complete' => false,
             ];
         }
 
@@ -528,17 +536,115 @@ final class fellowship_dashboard {
                 'status_chip' => $completioncomplete ? 'ok' : 'line',
                 'tracked' => true,
                 'complete' => $completioncomplete,
+                'access_complete' => $completioncomplete,
             ];
         }
 
         // Content without completion: no misleading "Not tracked" chip.
+        // Untracked rows do not block sequential access.
         return [
             'show_status' => false,
             'status_label' => '',
             'status_chip' => '',
             'tracked' => false,
             'complete' => false,
+            'access_complete' => true,
         ];
+    }
+
+    /**
+     * True when this outline activity participates in sequential unlock order.
+     * Forums/labels never gate later activities.
+     */
+    public static function activity_counts_for_sequence(array $activity): bool {
+        $mod = (string) ($activity['modname'] ?? '');
+        if ($mod === 'forum' || $mod === 'label') {
+            return false;
+        }
+        // Test fixtures may omit modname; still count tracked rows.
+        if ($mod === '') {
+            return array_key_exists('tracked', $activity) || array_key_exists('complete', $activity);
+        }
+        return true;
+    }
+
+    /**
+     * Fellow-complete for access unlock (not Met/score).
+     * Prefer explicit access_complete; fall back to complete for older fixtures.
+     */
+    public static function activity_access_complete(array $activity): bool {
+        if (array_key_exists('access_complete', $activity)) {
+            return !empty($activity['access_complete']);
+        }
+        return !empty($activity['complete']);
+    }
+
+    /**
+     * Apply sequential locks on a course_outline() result.
+     * Current incomplete activity stays open; later ones lock until it is fellow-complete.
+     * Orientation courses: no locks (leave outline unchanged).
+     *
+     * @param array $outline From {@see course_outline()}
+     * @return array Same shape with locked / unlock_reason on activities; next recalculated
+     */
+    public static function apply_sequence_locks(array $outline, \stdClass $course): array {
+        if (self::is_orientation_course($course)) {
+            return $outline;
+        }
+
+        $blocked = false;
+        $next = null;
+        $sections = [];
+        foreach ($outline['sections'] ?? [] as $section) {
+            $activities = [];
+            foreach ($section['activities'] ?? [] as $activity) {
+                $counts = self::activity_counts_for_sequence($activity);
+                $locked = $blocked && $counts;
+                if ($locked) {
+                    $activity['locked'] = true;
+                    $activity['is_locked'] = true;
+                    $activity['url'] = '';
+                    $activity['unlock_reason'] = get_string(
+                        'fellowship_sequence_locked_activity',
+                        'local_launchpad'
+                    );
+                } else {
+                    $activity['locked'] = false;
+                    $activity['is_locked'] = false;
+                    $activity['unlock_reason'] = '';
+                    if ($counts && $next === null && !self::activity_access_complete($activity)) {
+                        $next = $activity;
+                    }
+                }
+                $activities[] = $activity;
+                if ($counts && !$blocked && !self::activity_access_complete($activity)) {
+                    $blocked = true;
+                }
+            }
+            $section['activities'] = $activities;
+            $sections[] = $section;
+        }
+        $outline['sections'] = $sections;
+        $outline['next'] = $next;
+        return $outline;
+    }
+
+    /**
+     * Whether a course module is locked by sequential access for this fellow.
+     */
+    public static function is_cm_sequence_locked(\stdClass $course, int $userid, int $cmid): bool {
+        if ($cmid <= 0 || $userid <= 0 || self::is_orientation_course($course)) {
+            return false;
+        }
+        $outline = self::course_outline($course, $userid);
+        foreach ($outline['sections'] ?? [] as $section) {
+            foreach ($section['activities'] ?? [] as $activity) {
+                if ((int) ($activity['cmid'] ?? 0) === $cmid) {
+                    return !empty($activity['locked']);
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -607,23 +713,25 @@ final class fellowship_dashboard {
         $phasedone = [];
         foreach ($spine as $num => $meta) {
             $section = $bysection[$num] ?? null;
-            $tracked = 0;
+            $sequenced = 0;
             $done = 0;
             if ($section !== null) {
                 foreach ($section['activities'] ?? [] as $activity) {
-                    if (!empty($activity['tracked'])) {
-                        $tracked++;
-                        if (!empty($activity['complete'])) {
-                            $done++;
-                        }
+                    // Access unlock uses fellow-complete (submit), not Met score.
+                    if (!self::activity_counts_for_sequence($activity)) {
+                        continue;
+                    }
+                    $sequenced++;
+                    if (self::activity_access_complete($activity)) {
+                        $done++;
                     }
                 }
             }
-            $phasedone[$num] = ($tracked > 0 && $done >= $tracked);
+            $phasedone[$num] = ($sequenced > 0 && $done >= $sequenced);
         }
 
-        // HTML home journey: gate 0 is done|cur; later gates stay lock until earlier work is met.
-        // We advance "current" when prior phases are complete (still show all four).
+        // HTML home journey: gate 0 is done|cur; later gates stay lock until earlier phases are fellow-complete.
+        // We advance "current" when prior phases are access-complete (still show all four).
         $gates = [];
         $foundcurrent = false;
         $i = 0;
@@ -661,7 +769,12 @@ final class fellowship_dashboard {
             } else if (!$hasmoodlesection) {
                 $statustext = get_string('fellowship_journey_section_missing', 'local_launchpad');
             } else {
-                $statustext = 'Not released';
+                // Has a section but this gate is not current/done — locked behind prior work,
+                // or waiting on published activities (empty section still "has" a Moodle section).
+                $actcount = count($section['activities'] ?? []);
+                $statustext = $actcount > 0
+                    ? get_string('fellowship_sequence_locked_chip', 'local_launchpad')
+                    : get_string('fellowship_track_coming_soon_chip', 'local_launchpad');
             }
             $weight = (int) ($weights[$num] ?? 0);
             $gates[] = [
@@ -1041,6 +1154,8 @@ final class fellowship_dashboard {
         $trackphases = [];
         $firstopen = true;
         $currentset = false;
+        // Prior phases fellow-complete (access) — used for "you're ready / coming soon" copy.
+        $prioraccessready = true;
 
         // Shared orientation: show section-0 activities as one honest phase (not four locked gates).
         $sourcephases = $progress['phases'] ?? [];
@@ -1097,36 +1212,99 @@ final class fellowship_dashboard {
                     array_values($section['activities'] ?? [])
                 );
             }
-            $released = $activities !== [];
-            $isopen = $released && $firstopen;
-            if ($released) {
+            $hascontent = $activities !== [];
+            $contentpending = !$hascontent;
+            // Sequence lock: phase opens only after prior phases are fellow-complete.
+            $sequencelocked = false;
+            if ($hascontent && !$isorient) {
+                foreach ($activities as $act) {
+                    if (!self::activity_counts_for_sequence($act)) {
+                        continue;
+                    }
+                    if (!empty($act['locked'])) {
+                        $sequencelocked = true;
+                    }
+                    break;
+                }
+            }
+            $phaseavailable = $hascontent && !$sequencelocked;
+            $isopen = $phaseavailable && $firstopen;
+            if ($phaseavailable) {
                 $firstopen = false;
             }
             $phasedone = !empty($phase['is_met']) || !empty($phase['is_phase_done']);
+            // Access "done" for advancing current: all sequence activities fellow-complete.
+            $accessdone = false;
+            if ($hascontent && !$isorient) {
+                $seq = 0;
+                $seqdone = 0;
+                foreach ($activities as $act) {
+                    if (!self::activity_counts_for_sequence($act)) {
+                        continue;
+                    }
+                    $seq++;
+                    if (self::activity_access_complete($act)) {
+                        $seqdone++;
+                    }
+                }
+                $accessdone = ($seq > 0 && $seqdone >= $seq);
+            } else if ($isorient) {
+                $accessdone = $phasedone;
+            }
             $iscurrent = false;
-            if ($released && !$currentset && !$phasedone) {
+            if ($phaseavailable && !$currentset && !$accessdone) {
                 $iscurrent = true;
                 $currentset = true;
             }
+            $fellowreadyforphase = $prioraccessready && !$isorient;
             $iconmeta = $phaseicons[$num] ?? ['icon' => 'book-open-01', 'tone' => 'blue'];
-            if (!$released) {
+            if ($contentpending) {
+                $iconmeta = ['icon' => 'hourglass', 'tone' => 'slate'];
+            } else if ($sequencelocked) {
                 $iconmeta = ['icon' => 'square-lock-02', 'tone' => 'slate'];
             }
             unset($phase['_orient_activities']);
+            $weight = $phase['weight'] ?? 0;
+            if ($contentpending) {
+                $lockednote = $fellowreadyforphase
+                    ? get_string('fellowship_track_coming_soon_ready_note', 'local_launchpad', $weight)
+                    : get_string('fellowship_track_coming_soon_note', 'local_launchpad', $weight);
+                $unavailablechip = get_string('fellowship_track_coming_soon_chip', 'local_launchpad');
+                $unavailableicon = 'hourglass';
+            } else if ($sequencelocked) {
+                $lockednote = get_string('fellowship_sequence_locked_phase', 'local_launchpad');
+                $unavailablechip = get_string('fellowship_sequence_locked_chip', 'local_launchpad');
+                $unavailableicon = 'square-lock-02';
+            } else {
+                $lockednote = get_string('fellowship_track_phase_locked', 'local_launchpad', $weight);
+                $unavailablechip = get_string('fellowship_track_coming_soon_chip', 'local_launchpad');
+                $unavailableicon = 'hourglass';
+            }
             $trackphases[] = array_merge($phase, [
                 'index' => $num > 0 ? $num : 1,
                 'anchor' => 'phase-' . ($num > 0 ? $num : 'orient'),
                 'blurb' => $blurbs[$num] ?? ($blurbs[1] ?? ''),
-                'released' => $released,
+                // Template "released" means openable content (not sequence-locked).
+                'released' => $phaseavailable,
+                'has_content' => $hascontent,
+                'content_pending' => $contentpending,
+                'sequence_locked' => $sequencelocked,
+                'fellow_ready' => $fellowreadyforphase,
+                'unavailable_chip' => $unavailablechip,
+                'unavailable_icon' => $unavailableicon,
                 'is_open' => $isopen,
                 'is_current' => $iscurrent,
                 'activities' => $activities,
                 'has_activities' => $activities !== [],
-                'locked_note' => get_string('fellowship_track_phase_locked', 'local_launchpad', $phase['weight']),
+                'locked_note' => $lockednote,
                 'icon' => $iconmeta['icon'],
                 'icon_tone' => $iconmeta['tone'],
-                'show_lock' => !$released,
+                'show_lock' => !$phaseavailable,
             ]);
+            // Next phase readiness: empty phases are skipped (they neither unlock nor block).
+            if (!$isorient && !$contentpending) {
+                $prioraccessready = $accessdone;
+            }
         }
 
         $weights = [];
@@ -2568,6 +2746,18 @@ final class fellowship_dashboard {
         $activity['status_label'] = $status;
         $activity['statustone'] = $statustone;
         $activity['meta'] = $meta !== '' ? \core_text::strtoupper($meta) : $meta;
+        $locked = !empty($activity['locked']) || !empty($activity['is_locked']);
+        $activity['locked'] = $locked;
+        $activity['is_locked'] = $locked;
+        if ($locked) {
+            $activity['url'] = '';
+            if (($activity['unlock_reason'] ?? '') === '') {
+                $activity['unlock_reason'] = get_string(
+                    'fellowship_sequence_locked_activity',
+                    'local_launchpad'
+                );
+            }
+        }
         return $activity;
     }
 
@@ -2595,10 +2785,20 @@ final class fellowship_dashboard {
      *   items: list<array>,
      *   has_items: bool,
      *   has_posts: bool,
+     *   has_pinned: bool,
      *   count_posts: int,
+     *   count_pinned: int,
      *   count_courses: int,
      *   moodle_news_url: string,
-     *   has_moodle_news: bool
+     *   has_moodle_news: bool,
+     *   filter_label: string,
+     *   filter_all: string,
+     *   filter_pinned: string,
+     *   search_placeholder: string,
+     *   sort_label: string,
+     *   stats_foot: string,
+     *   list_footer: string,
+     *   list_footer_empty: string
      * }
      */
     public static function list_announcements(int $userid, array $courses): array {
@@ -2641,25 +2841,41 @@ final class fellowship_dashboard {
                     }
                     $author = $DB->get_record('user', ['id' => (int) $post->userid], 'id,firstname,lastname');
                     $authorname = $author ? fullname($author) : '';
+                    $authorinitials = $author ? self::initials($author) : '';
                     $tagrows = announcement_service::tag_chips_for_post((int) $post->id);
                     $ispinned = (int) ($discussion->pinned ?? 0) === 1;
                     $modcontext = \context_module::instance((int) $cm->id);
                     $attachments = announcement_service::attachment_rows_for_post($modcontext, (int) $post->id);
                     $attachcount = count($attachments);
+                    $subject = format_string($discussion->name);
+                    $coursename = format_string($course->fullname);
+                    $excerpt = shorten_text(format_text(
+                        $post->message,
+                        (int) $post->messageformat,
+                        ['context' => $modcontext, 'para' => false]
+                    ), 180);
+                    $tagnames = [];
+                    foreach ($tagrows as $tagrow) {
+                        $tagnames[] = (string) ($tagrow['name'] ?? '');
+                    }
+                    $searchbits = array_filter([
+                        html_to_text($subject, 0, false),
+                        html_to_text($excerpt, 0, false),
+                        html_to_text($coursename, 0, false),
+                        $authorname,
+                        implode(' ', $tagnames),
+                    ]);
                     $items[] = [
                         'id' => (int) $discussion->id,
-                        'subject' => format_string($discussion->name),
-                        'excerpt' => shorten_text(format_text(
-                            $post->message,
-                            (int) $post->messageformat,
-                            ['context' => $modcontext, 'para' => false]
-                        ), 180),
+                        'subject' => $subject,
+                        'excerpt' => $excerpt,
                         'author' => $authorname,
+                        'author_initials' => $authorinitials,
                         'has_author' => $authorname !== '',
                         'when' => userdate((int) $discussion->timemodified, get_string('strftimedatetimeshort', 'langconfig')),
                         'timemodified' => (int) $discussion->timemodified,
                         'url' => (new \moodle_url('/mod/forum/discuss.php', ['d' => $discussion->id]))->out(false),
-                        'course_name' => format_string($course->fullname),
+                        'course_name' => $coursename,
                         'cta_label' => $ctalabel,
                         'icon' => 'news',
                         'tags' => $tagrows,
@@ -2673,6 +2889,7 @@ final class fellowship_dashboard {
                         'attach_badge' => $attachcount > 0
                             ? get_string('admin_announcements_attach_badge', 'local_launchpad', $attachcount)
                             : '',
+                        'search_text' => \core_text::strtolower(implode(' ', $searchbits)),
                     ];
                 }
             }
@@ -2682,24 +2899,52 @@ final class fellowship_dashboard {
         $items = array_slice($items, 0, 15);
 
         $coursenames = [];
+        $pinnedcount = 0;
         foreach ($items as $item) {
             $name = (string) ($item['course_name'] ?? '');
             if ($name !== '') {
                 $coursenames[$name] = true;
             }
+            if (!empty($item['is_pinned'])) {
+                $pinnedcount++;
+            }
         }
 
         $hasitems = $items !== [];
         $hasmoodlenews = $firstforumurl !== '';
+        $postcount = count($items);
+        $listfooter = $hasitems
+            ? get_string('fellowship_news_list_footer', 'local_launchpad', (object) [
+                'shown' => $postcount,
+                'total' => $postcount,
+            ])
+            : '';
+        // JS-safe pattern: Moodle already interpolates {$a->…} in list_footer.
+        $listfooterpattern = get_string('fellowship_news_list_footer', 'local_launchpad', (object) [
+            'shown' => '{shown}',
+            'total' => '{total}',
+        ]);
 
         return [
             'items' => $items,
             'has_items' => $hasitems,
             'has_posts' => $hasitems,
-            'count_posts' => count($items),
+            'has_pinned' => $pinnedcount > 0,
+            'count_posts' => $postcount,
+            'count_pinned' => $pinnedcount,
             'count_courses' => count($coursenames),
             'moodle_news_url' => $firstforumurl,
             'has_moodle_news' => $hasmoodlenews,
+            'filter_label' => get_string('fellowship_news_filter_label', 'local_launchpad'),
+            'filter_all' => get_string('fellowship_news_filter_all', 'local_launchpad'),
+            'filter_pinned' => get_string('fellowship_news_filter_pinned', 'local_launchpad'),
+            'search_placeholder' => get_string('fellowship_news_search_ph', 'local_launchpad'),
+            'sort_label' => get_string('fellowship_news_sort_newest', 'local_launchpad'),
+            'stats_foot' => get_string('fellowship_news_stats_foot', 'local_launchpad'),
+            'list_footer' => $listfooter,
+            'list_footer_pattern' => $listfooterpattern,
+            'list_footer_empty' => get_string('fellowship_news_list_footer_empty', 'local_launchpad'),
+            'list_filtered_empty' => get_string('fellowship_news_list_filtered_empty', 'local_launchpad'),
         ];
     }
 
@@ -3259,16 +3504,21 @@ final class fellowship_dashboard {
                     $attention++;
                 }
 
+                // Pill text mirrors color: Done (green ≥70) vs Below pass bar (orange <70).
                 $statuslabel = match ($status) {
                     'pending' => get_string('fellowship_feedback_status_pending', 'local_launchpad'),
-                    'reviewed' => get_string('fellowship_feedback_status_reviewed', 'local_launchpad'),
+                    'reviewed' => $passedgate
+                        ? get_string('fellowship_feedback_status_done', 'local_launchpad')
+                        : get_string('fellowship_feedback_status_below', 'local_launchpad'),
                     'changes' => get_string('fellowship_feedback_status_changes', 'local_launchpad'),
                     default => get_string('fellowship_feedback_status_none', 'local_launchpad'),
                 };
 
                 $summary = match ($status) {
                     'pending' => get_string('fellowship_feedback_summary_pending', 'local_launchpad'),
-                    'reviewed' => get_string('fellowship_feedback_summary_reviewed', 'local_launchpad'),
+                    'reviewed' => $passedgate
+                        ? get_string('fellowship_feedback_summary_reviewed_done', 'local_launchpad')
+                        : get_string('fellowship_feedback_summary_reviewed_below', 'local_launchpad'),
                     'changes' => get_string('fellowship_feedback_summary_changes', 'local_launchpad'),
                     default => get_string('fellowship_feedback_summary_none', 'local_launchpad'),
                 };

@@ -27,10 +27,7 @@
             <b>{{sidecard.chip_value}}</b> <span>{{sidecard.chip_label}}</span>
           </a>
         {{/hascourses}}
-        <a class="lp-iconbtn" href="{{urls.notifications}}" aria-label="{{notifications_label}}">
-          <iconify-icon icon="hugeicons:notification-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-          {{#hasunread}}<span class="lp-notif-dot">{{unread}}</span>{{/hasunread}}
-        </a>
+        {{> local_launchpad/notification_dropdown }}
         {{> local_launchpad/profile_menu }}
       </div>
     </header>
@@ -67,8 +64,11 @@
           {{> local_launchpad/employer_messages }}
         {{/is_messages}}
         {{#is_notifications}}
-          {{> local_launchpad/employer_notifications }}
+          {{> local_launchpad/portal_notifications }}
         {{/is_notifications}}
+        {{#is_notificationprefs}}
+          {{> local_launchpad/portal_notification_prefs }}
+        {{/is_notificationprefs}}
         {{#is_profile}}
           {{> local_launchpad/employer_profile }}
         {{/is_profile}}

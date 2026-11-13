@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks, Builder, Calendar, Announcements, Cohorts, People, Mentors, Reviews.
+ * Admin portal — Overview, Tracks, Structure, Builder, Calendar, Announcements, Cohorts, People, Mentors, Reviews.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -46,11 +46,47 @@ portal_gate::assert_or_redirect_home(
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
 $allowedviews = [
-    'home', 'tracks', 'courseops', 'builder', 'manage', 'activity', 'calendar',
+    'home', 'tracks', 'structure', 'courseops', 'builder', 'manage', 'activity', 'calendar',
     'announcements', 'cohorts', 'people', 'mentors', 'reviews',
+    'notifications', 'notificationprefs',
 ];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+
+$ntab = optional_param('ntab', 'all', PARAM_ALPHA);
+if (!in_array($ntab, ['all', 'unread'], true)) {
+    $ntab = 'all';
+}
+$notifid = optional_param('notifid', 0, PARAM_INT);
+$notifdone = optional_param('notifdone', 0, PARAM_INT);
+$notiferr = optional_param('notiferr', '', PARAM_ALPHAEXT);
+$notifprefsaved = optional_param('notifprefsaved', 0, PARAM_INT);
+$notifpreferr = optional_param('notifpreferr', '', PARAM_ALPHAEXT);
+
+if (($view === 'notifications' || $view === 'notificationprefs')
+        && data_submitted() && confirm_sesskey()) {
+    $naction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'notifications' && $naction === 'mark_all_notifications_read') {
+        $result = messaging::mark_all_popup_notifications_read($userid);
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'notifications',
+            'ntab' => $ntab !== 'all' ? $ntab : null,
+            'notifdone' => !empty($result['ok']) ? 1 : null,
+            'notiferr' => empty($result['ok']) ? 'failed' : null,
+        ])));
+    }
+    if ($view === 'notificationprefs' && $naction === 'save_notification_preferences') {
+        $errsave = messaging::save_notification_preferences(
+            $userid,
+            messaging::notification_preferences_request_payload()
+        );
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'notificationprefs',
+            'notifprefsaved' => $errsave === '' ? 1 : null,
+            'notifpreferr' => $errsave !== '' ? $errsave : null,
+        ])));
+    }
 }
 
 $courseopssection = optional_param('section', 'hub', PARAM_ALPHANUMEXT);
@@ -75,9 +111,42 @@ if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
 
 if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage'
             || $view === 'activity' || $view === 'announcements' || $view === 'reviews'
-            || $view === 'courseops')
+            || $view === 'courseops' || $view === 'structure')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'structure' && $action === 'structure_preview') {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $flash = admin_dashboard::run_structure_preview($USER, $cohort);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+    }
+    if ($view === 'structure' && $action === 'structure_apply') {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $confirmed = (bool) optional_param('structure_confirm', 0, PARAM_BOOL);
+        $flash = admin_dashboard::run_structure_apply($USER, $cohort, $confirmed);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+    }
+    if ($view === 'structure' && ($action === 'structure_hide' || $action === 'structure_unhide')) {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $courseid = optional_param('courseid', 0, PARAM_INT);
+        $flash = admin_dashboard::run_structure_set_visible(
+            $USER,
+            $courseid,
+            $action === 'structure_unhide',
+            $cohort
+        );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+    }
+    if ($view === 'structure' && $action === 'structure_delete') {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $courseid = optional_param('courseid', 0, PARAM_INT);
+        $confirmtext = optional_param('confirmtext', '', PARAM_TEXT);
+        $flash = admin_dashboard::run_structure_delete($USER, $courseid, $confirmtext, $cohort);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+    }
     if ($view === 'courseops' && $action === 'save_course_settings') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $fullname = optional_param('fullname', '', PARAM_TEXT);
@@ -255,11 +324,43 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
         $flash = admin_dashboard::mark_activity_reviewed($USER, $trackid, $cmid);
+    } else if ($view === 'builder' && $action === 'create_track') {
+        $trackname = optional_param('trackname', '', PARAM_TEXT);
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $phasesraw = optional_param('phases', '', PARAM_TEXT);
+        $flash = admin_dashboard::create_track_course($USER, $trackname, $cohort, $phasesraw);
+        $SESSION->lp_admin_flash = $flash;
+        $newtrackid = (int) ($flash['trackid'] ?? 0);
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'builder',
+            'trackid' => $newtrackid > 0 ? $newtrackid : null,
+        ])));
+    } else if ($view === 'builder' && $action === 'add_phase') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $phasename = optional_param('phasename', '', PARAM_TEXT);
+        $flash = admin_dashboard::add_track_phase($USER, $trackid, $phasename);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'builder',
+            'trackid' => (int) ($flash['trackid'] ?? $trackid),
+        ]));
     } else if ($view === 'builder' && $action === 'toggle_section') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
         $show = (bool) optional_param('show', 0, PARAM_BOOL);
         $flash = admin_dashboard::set_phase_visible($USER, $trackid, $sectionnum, $show);
+    } else if ($view === 'manage' && $action === 'delete_phase') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
+        $flash = admin_dashboard::delete_track_phase($USER, $trackid, $sectionnum);
+        $SESSION->lp_admin_flash = $flash;
+        $redirtrack = (int) ($flash['trackid'] ?? $trackid);
+        $redirsection = (int) ($flash['section'] ?? max(1, $sectionnum - 1));
+        redirect(new moodle_url(persona_home::ADMIN_PATH, array_filter([
+            'view' => 'manage',
+            'trackid' => $redirtrack > 0 ? $redirtrack : null,
+            'section' => $redirsection > 0 ? $redirsection : null,
+        ])));
     } else if ($view === 'manage' && $action === 'add_activity') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $sectionnum = optional_param('sectionnum', 0, PARAM_INT);
@@ -395,6 +496,7 @@ $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->ou
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::ADMIN_PATH))->out(false);
 $tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+$structureurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
 $builderurl = (new moodle_url(persona_home::ADMIN_PATH, array_filter([
     'view' => 'builder',
     'trackid' => $trackid > 0 ? $trackid : null,
@@ -405,7 +507,7 @@ $mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))-
 $reviewsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
 $calendarurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'calendar']))->out(false);
 $announcementsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']))->out(false);
-$notificationsurl = messaging::moodle_notifications_url();
+$notificationsurl = messaging::notifications_page_url('admin');
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -435,6 +537,15 @@ $nav = [
                 'key' => 'tracks',
                 'icon_svg' => $icon(
                     '<path d="M4 6h16M4 12h10M4 18h14"/>'
+                ),
+            ],
+            [
+                'label' => get_string('admin_nav_structure', 'local_launchpad'),
+                'url' => $structureurl,
+                'current' => $view === 'structure',
+                'key' => 'structure',
+                'icon_svg' => $icon(
+                    '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>'
                 ),
             ],
             [
@@ -525,6 +636,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_tracks',
         admin_dashboard::tracks_context($USER)
+    );
+} else if ($view === 'structure') {
+    $pagetitle = get_string('admin_nav_structure', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_structure',
+        admin_dashboard::structure_context($USER, $flash)
     );
 } else if ($view === 'courseops') {
     $pagetitle = get_string('admin_courseops_heading', 'local_launchpad');
@@ -641,6 +758,18 @@ if ($view === 'tracks') {
         'local_launchpad/admin_reviews',
         admin_dashboard::reviews_context($USER, $flash)
     );
+} else if ($view === 'notifications') {
+    $pagetitle = get_string('fellowship_nav_notifications', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/portal_notifications',
+        messaging::notifications_inbox_page($userid, 'admin', $ntab, $notifid, $notifdone > 0, $notiferr)
+    );
+} else if ($view === 'notificationprefs') {
+    $pagetitle = get_string('fellowship_notif_preferences', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/portal_notification_prefs',
+        messaging::notification_preferences_page($userid, 'admin', $notifprefsaved > 0, $notifpreferr)
+    );
 } else {
     $view = 'home';
     $pagetitle = get_string('admin_nav_overview', 'local_launchpad');
@@ -682,7 +811,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'str_signout' => get_string('fellowship_nav_signout', 'local_launchpad'),
     'str_menu' => get_string('fellowship_menu', 'local_launchpad'),
     'str_account' => get_string('fellowship_nav_account', 'local_launchpad'),
-], $mismatch));
+], messaging::notification_dropdown_context($userid, 'admin'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";

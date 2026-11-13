@@ -34,12 +34,7 @@
         <h1 class="lp-page-title">{{pagetitle}}</h1>
       </div>
       <div class="lp-topbar-actions">
-        <a class="lp-iconbtn" href="{{notifications_url}}" aria-label="{{notifications_label}}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/><path d="M10 20a2 2 0 004 0"/></svg>
-          {{#has_unread_notifications}}
-            <span class="lp-notif-dot">{{unread_notifications}}</span>
-          {{/has_unread_notifications}}
-        </a>
+        {{> local_launchpad/notification_dropdown }}
         {{> local_launchpad/profile_menu }}
       </div>
     </header>

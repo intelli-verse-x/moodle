@@ -104,11 +104,20 @@ final class activity_portal {
 
         $cmrecord = get_coursemodule_from_id('', $cmid, 0, false, MUST_EXIST);
         $course = get_course((int) $cmrecord->course);
-        require_course_login($course, true, $cmrecord);
+        // Never pass a deleting/hidden CM into require_course_login — Moodle redirects
+        // to /course/view.php (native chrome). Keep the fellow/employer shell instead.
+        if (!empty($cmrecord->deletioninprogress)) {
+            throw new \moodle_exception('activityiscurrentlyhidden');
+        }
+        require_course_login($course, true, null);
 
         $modinfo = get_fast_modinfo($course, (int) $user->id);
-        $cm = $modinfo->get_cm($cmid);
-        if (!$cm->uservisible) {
+        try {
+            $cm = $modinfo->get_cm($cmid);
+        } catch (\Throwable $e) {
+            throw new \moodle_exception('activityiscurrentlyhidden');
+        }
+        if (!$cm->uservisible || !empty($cm->deletioninprogress)) {
             throw new \moodle_exception('activityiscurrentlyhidden');
         }
 
@@ -268,17 +277,25 @@ final class activity_portal {
             }
             $hasfiles = $files !== [];
         } else if ($modname === 'assign') {
-            // E9: LaunchPad brief chrome; draft/submit stay in Moodle.
+            // Assignment brief + submit/status/feedback run inside LaunchPad.
             require_capability('mod/assign:view', $context);
-            $needsengine = true;
+            $needsengine = false;
             $isinportal = false;
             $assignbrief = self::build_assign_brief($cm, $course, $context, (int) $user->id);
+            $assignbrief = array_merge(
+                $assignbrief,
+                assign_submit_ui::export((int) $cm->id, (int) $user->id)
+            );
         } else if ($modname === 'quiz') {
-            // E8: LaunchPad quiz intro chrome; attempt UI stays in Moodle.
+            // Quiz intro + attempt run inside LaunchPad (Moodle engine underneath).
             require_capability('mod/quiz:view', $context);
-            $needsengine = true;
+            $needsengine = false;
             $isinportal = false;
             $quizbrief = self::build_quiz_brief($cm, $course, $context, (int) $user->id);
+            $quizbrief = array_merge(
+                $quizbrief,
+                quiz_attempt_ui::brief_actions((int) $cm->id, (int) $cm->instance, (int) $user->id)
+            );
         } else {
             // Interactive Moodle engines — keep completion for the native mod view.
             $needsengine = true;
@@ -445,7 +462,7 @@ final class activity_portal {
     }
 
     /**
-     * Fellow-facing quiz intro for LaunchPad chrome (attempt stays in Moodle).
+     * Fellow-facing quiz intro for LaunchPad chrome.
      *
      * @return array<string,mixed>
      */
@@ -612,7 +629,7 @@ final class activity_portal {
     }
 
     /**
-     * Fellow-facing assignment brief for LaunchPad chrome (submit stays in Moodle).
+     * Fellow-facing assignment brief for LaunchPad chrome.
      *
      * @return array<string,mixed>
      */

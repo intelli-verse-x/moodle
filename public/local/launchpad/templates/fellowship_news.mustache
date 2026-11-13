@@ -1,9 +1,15 @@
 {{!
     @template local_launchpad/fellowship_news
 
-    Fellowship announcements — Capstone hero + stats + Moodle news-forum list.
+    Fellowship announcements — overview + stats + filterable news-forum feed
+    (Stitch fellow announcements layout as IA/visual reference; real data only).
 }}
-<div class="lp-tools-page lp-reveal" data-region="fellowship-news" style="--lp-d:0">
+<div class="lp-tools-page lp-reveal" data-region="fellowship-news" style="--lp-d:0"
+  data-lp-news-page
+  data-total="{{count_posts}}"
+  data-str-footer-pattern="{{list_footer_pattern}}"
+  data-str-footer-empty="{{list_footer_empty}}"
+  data-str-filtered-empty="{{list_filtered_empty}}">
   <div class="lp-news-system">
     <section class="lp-card lift lp-theme-hero lp-news-overview">
       <div class="lp-theme-hero-main">
@@ -21,7 +27,10 @@
         <p class="lp-sm lp-theme-hero-body">{{#str}} fellowship_news_lead, local_launchpad {{/str}}</p>
         {{#has_moodle_news}}
           <div class="lp-news-hero-actions">
-            <a class="lp-btn lp-btn-light" href="{{moodle_news_url}}">{{#str}} fellowship_news_open_moodle, local_launchpad {{/str}}</a>
+            <a class="lp-btn lp-btn-light" href="{{moodle_news_url}}">
+              <span>{{#str}} fellowship_news_open_moodle, local_launchpad {{/str}}</span>
+              <iconify-icon icon="hugeicons:link-square-02" width="14" height="14" aria-hidden="true"></iconify-icon>
+            </a>
           </div>
         {{/has_moodle_news}}
       </div>
@@ -52,22 +61,52 @@
           <dd><b class="lp-num">{{count_courses}}</b></dd>
         </div>
       </dl>
+      <p class="lp-news-stats-foot">{{stats_foot}}</p>
     </section>
   </div>
 
   {{#has_items}}
     <section class="lp-card lift lp-news-workspace" aria-label="{{#str}} fellowship_nav_news, local_launchpad {{/str}}">
-      <ul class="lp-news-list">
+      <div class="lp-news-toolbar">
+        <div class="lp-news-filters" role="tablist" aria-label="{{filter_label}}">
+          <button type="button" class="lp-news-filter is-active" data-lp-news-filter="all" aria-pressed="true">
+            <span>{{filter_all}}</span>
+            <span class="lp-news-filter-count">{{count_posts}}</span>
+          </button>
+          {{#has_pinned}}
+            <button type="button" class="lp-news-filter" data-lp-news-filter="pinned" aria-pressed="false">
+              <iconify-icon icon="hugeicons:pin" width="14" height="14" aria-hidden="true"></iconify-icon>
+              <span>{{filter_pinned}}</span>
+              <span class="lp-news-filter-count is-muted">{{count_pinned}}</span>
+            </button>
+          {{/has_pinned}}
+        </div>
+        <div class="lp-news-toolbar-tools">
+          <label class="lp-news-search">
+            <span class="lp-sr-only">{{search_placeholder}}</span>
+            <iconify-icon icon="hugeicons:search-01" width="14" height="14" aria-hidden="true"></iconify-icon>
+            <input type="search" data-lp-news-search placeholder="{{search_placeholder}}" autocomplete="off">
+          </label>
+          <span class="lp-news-sort" title="{{sort_label}}">
+            <iconify-icon icon="hugeicons:sorting-05" width="14" height="14" aria-hidden="true"></iconify-icon>
+            <span>{{sort_label}}</span>
+          </span>
+        </div>
+      </div>
+
+      <ul class="lp-news-list" data-lp-news-list>
         {{#items}}
-          <li class="lp-news-item{{#is_pinned}} is-pinned{{/is_pinned}}">
+          <li class="lp-news-item{{#is_pinned}} is-pinned{{/is_pinned}}"
+            data-lp-news-item
+            data-pinned="{{#is_pinned}}1{{/is_pinned}}{{^is_pinned}}0{{/is_pinned}}"
+            data-search="{{search_text}}">
             <div class="lp-news-item-main">
-              <span class="lp-grade-progress-icon is-sm" aria-hidden="true">
-                <iconify-icon icon="hugeicons:{{icon}}" width="18" height="18"></iconify-icon>
-              </span>
               <div class="lp-news-item-copy">
-                {{#course_name}}<span class="lp-eyebrow">{{{course_name}}}</span>{{/course_name}}
-                {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
-                {{#has_attachments}}<span class="lp-ann-attach-badge">{{attach_badge}}</span>{{/has_attachments}}
+                <div class="lp-news-item-badges">
+                  {{#course_name}}<span class="lp-news-course-chip">{{{course_name}}}</span>{{/course_name}}
+                  {{#is_pinned}}<span class="lp-ann-pin-badge">{{pinned_badge}}</span>{{/is_pinned}}
+                  {{#has_attachments}}<span class="lp-ann-attach-badge">{{attach_badge}}</span>{{/has_attachments}}
+                </div>
                 <h3><a href="{{url}}">{{{subject}}}</a></h3>
                 {{#excerpt}}<p class="lp-sm lp-muted">{{{excerpt}}}</p>{{/excerpt}}
                 {{#has_tags}}
@@ -95,17 +134,34 @@
                   </ul>
                 {{/has_attachments}}
                 <div class="lp-news-item-meta">
-                  {{#has_author}}<span>{{author}}</span>{{/has_author}}
-                  {{#when}}<span>{{when}}</span>{{/when}}
+                  {{#has_author}}
+                    <span class="lp-news-author">
+                      {{#author_initials}}
+                        <span class="lp-news-avatar" aria-hidden="true">{{author_initials}}</span>
+                      {{/author_initials}}
+                      <span class="lp-news-author-name">{{author}}</span>
+                    </span>
+                    {{#when}}<span class="lp-news-meta-sep" aria-hidden="true">·</span>{{/when}}
+                  {{/has_author}}
+                  {{#when}}<span class="lp-news-when">{{when}}</span>{{/when}}
                 </div>
               </div>
             </div>
             <div class="lp-news-item-aside">
-              <a class="lp-btn lp-btn-light" href="{{url}}">{{cta_label}}</a>
+              <a class="lp-btn lp-btn-light lp-news-open" href="{{url}}">
+                <span>{{cta_label}}</span>
+                <iconify-icon icon="hugeicons:arrow-right-01" width="14" height="14" aria-hidden="true"></iconify-icon>
+              </a>
             </div>
           </li>
         {{/items}}
       </ul>
+
+      <p class="lp-news-filtered-empty" data-lp-news-filtered-empty hidden role="status">{{list_filtered_empty}}</p>
+
+      <div class="lp-news-feed-foot">
+        <span data-lp-news-foot>{{list_footer}}</span>
+      </div>
     </section>
   {{/has_items}}
   {{^has_items}}

@@ -38,6 +38,8 @@ use local_launchpad\login_portal;
 use local_launchpad\messaging;
 use local_launchpad\persona_home;
 use local_launchpad\portal_gate;
+use local_launchpad\assign_submit_ui;
+use local_launchpad\quiz_attempt_ui;
 
 /**
  * Resolve a Moodle lang key for Fellowship UI (never show [[missing]] markers).
@@ -65,6 +67,11 @@ $messageconvid = 0;
 $messagetab = 'all';
 $courseid = 0;
 $cmid = optional_param('cmid', 0, PARAM_INT);
+$qstart = optional_param('qstart', 0, PARAM_INT);
+$qattempt = optional_param('qattempt', 0, PARAM_INT);
+$qsummary = optional_param('qsummary', 0, PARAM_INT);
+$qreview = optional_param('qreview', 0, PARAM_INT);
+$qpage = optional_param('page', 0, PARAM_INT);
 $ptab = optional_param('ptab', 'overview', PARAM_ALPHA);
 if (!in_array($ptab, ['overview', 'edit', 'preferences'], true)) {
     $ptab = 'overview';
@@ -129,6 +136,63 @@ if (data_submitted() && confirm_sesskey()) {
             'prefsaved' => 1,
         ]));
     }
+    if ($postaction === 'assign_process' && $cmid > 0) {
+        $cmrecordpost = get_coursemodule_from_id('assign', $cmid, 0, false, MUST_EXIST);
+        $cmcoursepost = get_course((int) $cmrecordpost->course);
+        if (fellowship_dashboard::is_cm_sequence_locked($cmcoursepost, $userid, $cmid)) {
+            redirect(
+                new moodle_url(persona_home::FELLOW_PATH, [
+                    'view' => 'track',
+                    'id' => (int) $cmrecordpost->course,
+                ]),
+                get_string('fellowship_sequence_locked_redirect', 'local_launchpad'),
+                null,
+                \core\output\notification::NOTIFY_INFO
+            );
+        }
+        try {
+            $flash = assign_submit_ui::process_post($cmid, $userid);
+        } catch (\Throwable $e) {
+            $flash = 'error';
+        }
+        redirect(assign_submit_ui::activity_url($cmid, ['assignmsg' => $flash]));
+    }
+    if ($postaction === 'quiz_process' && $cmid > 0) {
+        // Sequential unlock still applies before processing answers.
+        $cmrecordpost = get_coursemodule_from_id('quiz', $cmid, 0, false, MUST_EXIST);
+        $cmcoursepost = get_course((int) $cmrecordpost->course);
+        if (fellowship_dashboard::is_cm_sequence_locked($cmcoursepost, $userid, $cmid)) {
+            redirect(
+                new moodle_url(persona_home::FELLOW_PATH, [
+                    'view' => 'track',
+                    'id' => (int) $cmrecordpost->course,
+                ]),
+                get_string('fellowship_sequence_locked_redirect', 'local_launchpad'),
+                null,
+                \core\output\notification::NOTIFY_INFO
+            );
+        }
+        try {
+            $processed = quiz_attempt_ui::process_post($cmid, $userid);
+        } catch (\moodle_exception $e) {
+            redirect(
+                quiz_attempt_ui::activity_url($cmid),
+                $e->getMessage(),
+                null,
+                \core\output\notification::NOTIFY_ERROR
+            );
+        }
+        if (!empty($processed['finished'])) {
+            redirect(quiz_attempt_ui::activity_url($cmid, ['qreview' => $processed['attemptid']]));
+        }
+        if (!empty($processed['summary'])) {
+            redirect(quiz_attempt_ui::activity_url($cmid, ['qsummary' => $processed['attemptid']]));
+        }
+        redirect(quiz_attempt_ui::activity_url($cmid, [
+            'qattempt' => $processed['attemptid'],
+            'page' => $processed['page'],
+        ]));
+    }
 }
 
 if ($view === 'messages') {
@@ -153,6 +217,42 @@ if ($view === 'messages') {
 
 $courses = fellowship_dashboard::list_courses($userid);
 $courseids = array_map(static fn($c) => (int) $c->id, $courses);
+
+$ntab = optional_param('ntab', 'all', PARAM_ALPHA);
+if (!in_array($ntab, ['all', 'unread'], true)) {
+    $ntab = 'all';
+}
+$notifid = optional_param('notifid', 0, PARAM_INT);
+$notifdone = optional_param('notifdone', 0, PARAM_INT);
+$notiferr = optional_param('notiferr', '', PARAM_ALPHAEXT);
+$notifprefsaved = optional_param('notifprefsaved', 0, PARAM_INT);
+$notifpreferr = optional_param('notifpreferr', '', PARAM_ALPHAEXT);
+
+// Notifications inbox / preferences posts.
+if (($view === 'notifications' || $view === 'notificationprefs')
+        && data_submitted() && confirm_sesskey()) {
+    $naction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'notifications' && $naction === 'mark_all_notifications_read') {
+        $result = messaging::mark_all_popup_notifications_read($userid);
+        redirect(new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'notifications',
+            'ntab' => $ntab !== 'all' ? $ntab : null,
+            'notifdone' => !empty($result['ok']) ? 1 : null,
+            'notiferr' => empty($result['ok']) ? 'failed' : null,
+        ])));
+    }
+    if ($view === 'notificationprefs' && $naction === 'save_notification_preferences') {
+        $err = messaging::save_notification_preferences(
+            $userid,
+            messaging::notification_preferences_request_payload()
+        );
+        redirect(new moodle_url(persona_home::FELLOW_PATH, array_filter([
+            'view' => 'notificationprefs',
+            'notifprefsaved' => $err === '' ? 1 : null,
+            'notifpreferr' => $err !== '' ? $err : null,
+        ])));
+    }
+}
 
 // Send / delete LaunchPad messages (Moodle-backed) before rendering.
 if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
@@ -219,9 +319,10 @@ $preferencesurl = (new moodle_url(persona_home::FELLOW_PATH, [
 ]))->out(false);
 $homeurl = (new moodle_url(persona_home::FELLOW_PATH))->out(false);
 $progressurl = (new moodle_url(persona_home::FELLOW_PATH, ['view' => 'progress']))->out(false);
-$notificationsurl = messaging::moodle_notifications_url();
+$notificationsurl = messaging::notifications_page_url('fellow');
 $messagesurl = messaging::messages_url(null, 'fellow');
 $msgunread = messaging::conversation_unread_count($userid);
+$unread = messaging::notification_unread_count($userid);
 // Opening Announcements clears the news badge (Messages use Moodle read state; Feedback stays until revise).
 if ($view === 'news') {
     announcement_service::mark_seen($userid);
@@ -320,6 +421,15 @@ $nav = [
                 'badge' => $msgunread > 0 ? (string) $msgunread : '',
             ],
             [
+                'label' => $lpstr('fellowship_nav_notifications', null, 'Notifications'),
+                'url' => messaging::notifications_page_url('fellow'),
+                'current' => ($view === 'notifications' || $view === 'notificationprefs'),
+                'key' => 'notifications',
+                'icon_svg' => $icon('notification-01'),
+                'has_badge' => $unread > 0,
+                'badge' => $unread > 0 ? (string) $unread : '',
+            ],
+            [
                 'label' => $lpstr('fellowship_nav_profile', null, 'Profile'),
                 'url' => $profileurl,
                 'current' => $view === 'profile',
@@ -344,18 +454,29 @@ $crumbhome = [
 ];
 
 $selected = null;
+$trackunavailable = false;
 if ($courseid > 0) {
-    if (!in_array($courseid, $courseids, true) && !is_siteadmin()) {
-        throw new \moodle_exception('fellowship_course_denied', 'local_launchpad');
-    }
     foreach ($courses as $c) {
         if ((int) $c->id === $courseid) {
             $selected = $c;
             break;
         }
     }
-    if ($selected === null && is_siteadmin()) {
-        $selected = get_course($courseid);
+    if ($selected === null) {
+        // Hidden, deleted, or not enrolled: LaunchPad-friendly empty — never raw Moodle error.
+        $courseexists = $DB->record_exists('course', ['id' => $courseid]);
+        if ($courseexists && is_siteadmin()) {
+            try {
+                $selected = get_course($courseid);
+            } catch (\Throwable $e) {
+                $selected = null;
+                $trackunavailable = true;
+                $courseid = 0;
+            }
+        } else {
+            $trackunavailable = true;
+            $courseid = 0;
+        }
     }
 } else if ($courses !== []) {
     // Prefer a track course over Shared orientation when no ?id= is given.
@@ -397,6 +518,12 @@ $nocourses = $lpstr(
     null,
     'You do not have a LaunchPad course yet. When your place is confirmed, your programme admin will enrol you and your track will appear here.'
 );
+$trackgone = $lpstr(
+    'fellowship_track_unavailable',
+    null,
+    'This track is no longer available. It may have been hidden or removed by your programme admin.'
+);
+$emptycoursesmessage = $trackunavailable ? $trackgone : $nocourses;
 
 switch ($view) {
     case 'activity':
@@ -412,22 +539,92 @@ switch ($view) {
         if (!$onfellowcourse) {
             redirect($trackback);
         }
-        $trackurl = (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+        $trackback = new moodle_url(persona_home::FELLOW_PATH, [
             'view' => 'track',
-            'id' => $courseid > 0 ? $courseid : null,
-        ])))->out(false);
+            'id' => (int) $cmrecord->course,
+        ]);
+        // Soft-deleted / disappearing CMs must stay in LaunchPad (never Moodle course view).
+        if (!empty($cmrecord->deletioninprogress)) {
+            redirect(
+                $trackback,
+                get_string('fellowship_activity_unavailable', 'local_launchpad'),
+                null,
+                \core\output\notification::NOTIFY_INFO
+            );
+        }
+        $trackurl = $trackback->out(false);
+        // Sequential unlock: do not open a later CM until earlier ones are fellow-complete.
+        $cmcourse = get_course((int) $cmrecord->course);
+        if (fellowship_dashboard::is_cm_sequence_locked($cmcourse, $userid, $cmid)) {
+            redirect(
+                $trackback,
+                get_string('fellowship_sequence_locked_redirect', 'local_launchpad'),
+                null,
+                \core\output\notification::NOTIFY_INFO
+            );
+        }
+        // Start quiz attempt inside LaunchPad (no Moodle handoff).
+        if ($qstart && $cmrecord->modname === 'quiz') {
+            try {
+                $newattemptid = quiz_attempt_ui::start_or_resume($cmid, $userid);
+            } catch (\moodle_exception $e) {
+                redirect(
+                    quiz_attempt_ui::activity_url($cmid),
+                    $e->getMessage(),
+                    null,
+                    \core\output\notification::NOTIFY_ERROR
+                );
+            }
+            redirect(quiz_attempt_ui::activity_url($cmid, [
+                'qattempt' => $newattemptid,
+                'page' => 0,
+            ]));
+        }
+
         try {
             $activityctx = activity_portal::export($USER, $cmid, ['courseurl' => $trackurl]);
         } catch (\moodle_exception $e) {
-            redirect($trackback);
+            redirect(
+                $trackback,
+                get_string('fellowship_activity_unavailable', 'local_launchpad'),
+                null,
+                \core\output\notification::NOTIFY_INFO
+            );
         }
         $act = $activityctx['activity'] ?? [];
         $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
         $modtype = (string) ($act['modtype'] ?? '');
         $showjudging = in_array($modtype, ['assign', 'quiz'], true);
+
+        $quizui = [];
+        if ($modtype === 'quiz') {
+            try {
+                if ($qreview > 0) {
+                    $quizui = quiz_attempt_ui::export_review($cmid, $qreview, $userid);
+                    $pagetitle = get_string('fellowship_quiz_review_title', 'local_launchpad');
+                } else if ($qsummary > 0) {
+                    $quizui = quiz_attempt_ui::export_summary($cmid, $qsummary, $userid);
+                    $pagetitle = get_string('fellowship_quiz_summary_title', 'local_launchpad');
+                } else if ($qattempt > 0) {
+                    $quizui = quiz_attempt_ui::export_attempt($cmid, $qattempt, $qpage, $userid);
+                    $pagetitle = get_string('fellowship_quiz_attempt_title', 'local_launchpad');
+                }
+            } catch (\moodle_exception $e) {
+                redirect(
+                    quiz_attempt_ui::activity_url($cmid),
+                    $e->getMessage(),
+                    null,
+                    \core\output\notification::NOTIFY_ERROR
+                );
+            }
+        }
+
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_activity', [
-            'activity' => array_merge($act, [
-                'show_judging' => $showjudging,
+            'activity' => array_merge($act, $quizui, [
+                'show_judging' => $showjudging
+                    && empty($quizui['quiz_attempting'])
+                    && empty($quizui['quiz_summarising'])
+                    && empty($quizui['quiz_reviewing']),
                 'judging_title' => get_string('fellowship_judging_title', 'local_launchpad'),
                 'judging_body' => $modtype === 'assign'
                     ? get_string('fellowship_judging_body', 'local_launchpad')
@@ -462,6 +659,18 @@ switch ($view) {
                 'assignstatus' => get_string('fellowship_assign_status', 'local_launchpad'),
                 'assigncontinue' => get_string('fellowship_assign_continue', 'local_launchpad'),
                 'assignenginehelp' => get_string('fellowship_assign_engine_help', 'local_launchpad'),
+                'assignattempt' => get_string('fellowship_assign_attempt', 'local_launchpad'),
+                'assignfeedback' => get_string('fellowship_assign_feedback', 'local_launchpad'),
+                'assignfiles' => get_string('fellowship_assign_files', 'local_launchpad'),
+                'assignonlinetext' => get_string('fellowship_assign_onlinetext', 'local_launchpad'),
+                'assignfileupload' => get_string('fellowship_assign_fileupload', 'local_launchpad'),
+                'assignfilehint' => get_string('fellowship_assign_filehint', 'local_launchpad'),
+                'assignsavedraft' => get_string('fellowship_assign_savedraft', 'local_launchpad'),
+                'assignsubmit' => get_string('fellowship_assign_submit', 'local_launchpad'),
+                'assignsubmitsection' => get_string('fellowship_assign_submitsection', 'local_launchpad'),
+                'assignpriors' => get_string('fellowship_assign_priors', 'local_launchpad'),
+                'assigncompletion' => get_string('fellowship_assign_completion', 'local_launchpad'),
+                'assignlockednote' => get_string('fellowship_assign_lockednote', 'local_launchpad'),
                 'quizbrief' => get_string('fellowship_quiz_brief', 'local_launchpad'),
                 'quizbriefmissing' => get_string('fellowship_quiz_brief_missing', 'local_launchpad'),
                 'quizpractice' => get_string('fellowship_quiz_practice', 'local_launchpad'),
@@ -475,15 +684,34 @@ switch ($view) {
                 'quizstatus' => get_string('fellowship_quiz_status', 'local_launchpad'),
                 'quizcontinue' => get_string('fellowship_quiz_continue', 'local_launchpad'),
                 'quizenginehelp' => get_string('fellowship_quiz_engine_help', 'local_launchpad'),
+                'quizstart' => get_string('fellowship_quiz_start', 'local_launchpad'),
+                'quizresume' => get_string('fellowship_quiz_resume', 'local_launchpad'),
+                'quizreview' => get_string('fellowship_quiz_review', 'local_launchpad'),
+                'quizsubmit' => get_string('fellowship_quiz_submit', 'local_launchpad'),
+                'quiznext' => get_string('fellowship_quiz_next', 'local_launchpad'),
+                'quizprev' => get_string('fellowship_quiz_prev', 'local_launchpad'),
+                'quizopensummary' => get_string('fellowship_quiz_open_summary', 'local_launchpad'),
+                'quizsummarylead' => get_string('fellowship_quiz_summary_lead', 'local_launchpad'),
+                'quizsummaryjump' => get_string('fellowship_quiz_summary_jump', 'local_launchpad'),
+                'quizbackattempt' => get_string('fellowship_quiz_back_attempt', 'local_launchpad'),
+                'quizbackbrief' => get_string('fellowship_quiz_back_brief', 'local_launchpad'),
+                'quiznoquestions' => get_string('fellowship_quiz_no_questions_cta', 'local_launchpad'),
+                'quizexhausted' => get_string('fellowship_quiz_exhausted_cta', 'local_launchpad'),
+                'quizconfirmfinish' => get_string('fellowship_quiz_confirm_finish', 'local_launchpad'),
             ],
         ]);
         break;
 
     case 'track':
-        $pagetitle = $lpstr('fellowship_nav_track', null, 'My track');
+        $pagetitle = $trackunavailable
+            ? $lpstr('fellowship_track_unavailable_heading', null, 'Track unavailable')
+            : $lpstr('fellowship_nav_track', null, 'My track');
         if ($selected === null) {
             $content = $OUTPUT->render_from_template('local_launchpad/fellowship_empty_courses', [
-                'message' => $nocourses,
+                'heading' => $trackunavailable
+                    ? $lpstr('fellowship_track_unavailable_heading', null, 'Track unavailable')
+                    : '',
+                'message' => $emptycoursesmessage,
             ]);
         } else {
             $trackdata = fellowship_dashboard::track_for_user($userid, $selected);
@@ -541,6 +769,34 @@ switch ($view) {
             $pagetitle = (string) $msgdata['other_name'];
         }
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', $msgdata);
+        break;
+
+    case 'notifications':
+        $pagetitle = $lpstr('fellowship_nav_notifications', null, 'Notifications');
+        $content = $OUTPUT->render_from_template(
+            'local_launchpad/portal_notifications',
+            messaging::notifications_inbox_page(
+                $userid,
+                'fellow',
+                $ntab,
+                $notifid,
+                $notifdone > 0,
+                $notiferr
+            )
+        );
+        break;
+
+    case 'notificationprefs':
+        $pagetitle = $lpstr('fellowship_notif_preferences', null, 'Notification preferences');
+        $content = $OUTPUT->render_from_template(
+            'local_launchpad/portal_notification_prefs',
+            messaging::notification_preferences_page(
+                $userid,
+                'fellow',
+                $notifprefsaved > 0,
+                $notifpreferr
+            )
+        );
         break;
 
     case 'calendar':
@@ -1084,7 +1340,6 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = messaging::notification_unread_count($userid);
 $notificationslabel = messaging::notifications_label($unread);
 
 $orbittips = [
@@ -1214,7 +1469,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     ],
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,
-], $mismatch));
+], messaging::notification_dropdown_context($userid, 'fellow'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";

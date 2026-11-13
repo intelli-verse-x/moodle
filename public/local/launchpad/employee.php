@@ -30,6 +30,7 @@ require_once(__DIR__ . '/classes/portal_gate.php');
 use local_launchpad\account_persona;
 use local_launchpad\employer_dashboard;
 use local_launchpad\login_portal;
+use local_launchpad\messaging;
 use local_launchpad\portal_gate;
 
 require_login();
@@ -53,7 +54,10 @@ $profileerr = optional_param('profileerr', '', PARAM_ALPHAEXT);
 $prefsaved = optional_param('prefsaved', 0, PARAM_INT);
 $preferr = optional_param('preferr', '', PARAM_ALPHAEXT);
 $pref = optional_param('pref', '', PARAM_ALPHAEXT);
-$allowedviews = ['home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages', 'notifications', 'profile'];
+$allowedviews = [
+    'home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages',
+    'notifications', 'notificationprefs', 'profile',
+];
 $allowedprefs = [
     'password', 'language', 'editor', 'forum', 'calendar', 'messages', 'notifications',
     'edit', 'public', 'files', 'contentbank', 'tokens',
@@ -88,6 +92,7 @@ if ($notifid < 0) {
 // Course id: home focus, course detail, or grades detail. Cleared on other tools.
 if ($view === 'courses' || $view === 'badges'
         || $view === 'calendar' || $view === 'messages' || $view === 'notifications'
+        || $view === 'notificationprefs'
         || $view === 'profile'
         || $courseid < 0) {
     $courseid = 0;
@@ -97,6 +102,31 @@ if ($view !== 'messages') {
 }
 if ($view !== 'notifications') {
     $notifid = 0;
+}
+
+if (($view === 'notifications' || $view === 'notificationprefs')
+        && data_submitted() && confirm_sesskey()) {
+    $naction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'notifications' && $naction === 'mark_all_notifications_read') {
+        $result = messaging::mark_all_popup_notifications_read((int) $USER->id);
+        redirect(new moodle_url('/local/launchpad/employee.php', array_filter([
+            'view' => 'notifications',
+            'ntab' => $ntab !== 'all' ? $ntab : null,
+            'notifdone' => !empty($result['ok']) ? 1 : null,
+            'notiferr' => empty($result['ok']) ? 'failed' : null,
+        ])));
+    }
+    if ($view === 'notificationprefs' && $naction === 'save_notification_preferences') {
+        $errsave = messaging::save_notification_preferences(
+            (int) $USER->id,
+            messaging::notification_preferences_request_payload()
+        );
+        redirect(new moodle_url('/local/launchpad/employee.php', array_filter([
+            'view' => 'notificationprefs',
+            'prefsaved' => $errsave === '' ? 1 : null,
+            'preferr' => $errsave !== '' ? $errsave : null,
+        ])));
+    }
 }
 if ($view !== 'profile') {
     $ptab = 'overview';

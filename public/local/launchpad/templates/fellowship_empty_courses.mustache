@@ -3,6 +3,11 @@
 }}
 <div class="lp-empty" role="status">
   <div class="lp-empty-mark" aria-hidden="true">LP</div>
-  <h2>{{#str}} fellowship_no_courses_heading, local_launchpad {{/str}}</h2>
+  {{#heading}}
+    <h2>{{heading}}</h2>
+  {{/heading}}
+  {{^heading}}
+    <h2>{{#str}} fellowship_no_courses_heading, local_launchpad {{/str}}</h2>
+  {{/heading}}
   <p>{{message}}</p>
 </div>

@@ -69,6 +69,41 @@ if ($view === 'messages') {
 
 $courses = persona_home::list_mentor_courses($userid);
 
+$ntab = optional_param('ntab', 'all', PARAM_ALPHA);
+if (!in_array($ntab, ['all', 'unread'], true)) {
+    $ntab = 'all';
+}
+$notifid = optional_param('notifid', 0, PARAM_INT);
+$notifdone = optional_param('notifdone', 0, PARAM_INT);
+$notiferr = optional_param('notiferr', '', PARAM_ALPHAEXT);
+$notifprefsaved = optional_param('notifprefsaved', 0, PARAM_INT);
+$notifpreferr = optional_param('notifpreferr', '', PARAM_ALPHAEXT);
+
+if (($view === 'notifications' || $view === 'notificationprefs')
+        && data_submitted() && confirm_sesskey()) {
+    $naction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($view === 'notifications' && $naction === 'mark_all_notifications_read') {
+        $result = messaging::mark_all_popup_notifications_read($userid);
+        redirect(new moodle_url(persona_home::MENTOR_PATH, array_filter([
+            'view' => 'notifications',
+            'ntab' => $ntab !== 'all' ? $ntab : null,
+            'notifdone' => !empty($result['ok']) ? 1 : null,
+            'notiferr' => empty($result['ok']) ? 'failed' : null,
+        ])));
+    }
+    if ($view === 'notificationprefs' && $naction === 'save_notification_preferences') {
+        $errsave = messaging::save_notification_preferences(
+            $userid,
+            messaging::notification_preferences_request_payload()
+        );
+        redirect(new moodle_url(persona_home::MENTOR_PATH, array_filter([
+            'view' => 'notificationprefs',
+            'notifprefsaved' => $errsave === '' ? 1 : null,
+            'notifpreferr' => $errsave !== '' ? $errsave : null,
+        ])));
+    }
+}
+
 // Send / delete LaunchPad messages (Moodle-backed) before rendering.
 if ($view === 'messages' && data_submitted() && confirm_sesskey()) {
     $toid = optional_param('id', 0, PARAM_INT);
@@ -152,9 +187,10 @@ $homeurl = (new moodle_url(persona_home::MENTOR_PATH))->out(false);
 $queueurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
 $fellowsurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false);
 $calendarurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'calendar']))->out(false);
-$notificationsurl = messaging::moodle_notifications_url();
+$notificationsurl = messaging::notifications_page_url('mentor');
 $messagesurl = messaging::messages_url(null, 'mentor');
 $msgunread = messaging::conversation_unread_count($userid);
+$unread = messaging::notification_unread_count($userid);
 
 $firstname = format_string($USER->firstname);
 $displayname = fullname($USER);
@@ -218,6 +254,15 @@ $nav = [
                 'has_badge' => $msgunread > 0,
                 'badge' => $msgunread > 0 ? (string) $msgunread : '',
             ],
+            [
+                'label' => get_string('fellowship_nav_notifications', 'local_launchpad'),
+                'url' => messaging::notifications_page_url('mentor'),
+                'current' => ($view === 'notifications' || $view === 'notificationprefs'),
+                'key' => 'notifications',
+                'icon_svg' => $icon('<path d="M6 9a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/><path d="M10 20a2 2 0 004 0"/>'),
+                'has_badge' => $unread > 0,
+                'badge' => $unread > 0 ? (string) $unread : '',
+            ],
         ],
     ],
 ];
@@ -278,6 +323,22 @@ switch ($view) {
             $pagetitle = (string) $msgdata['other_name'];
         }
         $content = $OUTPUT->render_from_template('local_launchpad/fellowship_messages', $msgdata);
+        break;
+
+    case 'notifications':
+        $pagetitle = get_string('fellowship_nav_notifications', 'local_launchpad');
+        $content = $OUTPUT->render_from_template(
+            'local_launchpad/portal_notifications',
+            messaging::notifications_inbox_page($userid, 'mentor', $ntab, $notifid, $notifdone > 0, $notiferr)
+        );
+        break;
+
+    case 'notificationprefs':
+        $pagetitle = get_string('fellowship_notif_preferences', 'local_launchpad');
+        $content = $OUTPUT->render_from_template(
+            'local_launchpad/portal_notification_prefs',
+            messaging::notification_preferences_page($userid, 'mentor', $notifprefsaved > 0, $notifpreferr)
+        );
         break;
 
     case 'calendar':
@@ -365,7 +426,6 @@ foreach ($nav as &$group) {
 }
 unset($group, $item);
 
-$unread = messaging::notification_unread_count($userid);
 $notificationslabel = messaging::notifications_label($unread);
 
 $mismatch = portal_gate::consume_modal_context();
@@ -408,7 +468,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_mer
             get_string('mentor_role_label', 'local_launchpad')
         ),
     ],
-], $mismatch));
+], messaging::notification_dropdown_context($userid, 'mentor'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";

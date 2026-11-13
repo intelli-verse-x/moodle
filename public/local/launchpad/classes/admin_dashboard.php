@@ -57,6 +57,15 @@ final class admin_dashboard {
     }
 
     /**
+     * Whether an idnumber is a LaunchPad structure course (track or orientation).
+     */
+    public static function is_structure_idnumber(string $idnumber): bool {
+        $idnumber = strtolower(trim($idnumber));
+        return $idnumber !== ''
+            && str_starts_with($idnumber, account_persona::COURSE_IDNUMBER_PREFIX);
+    }
+
+    /**
      * Overview page context from live Moodle data.
      *
      * @param \stdClass $user
@@ -254,7 +263,7 @@ final class admin_dashboard {
             'filter_ready_label' => get_string('admin_tracks_filter_ready', 'local_launchpad', $readycount),
             'filter_outline_label' => get_string('admin_tracks_filter_outline', 'local_launchpad', $outlinecount),
             'filter_empty' => get_string('admin_tracks_filter_empty', 'local_launchpad'),
-            // Builder CTA tile (real Course builder link — not a fake create-track flow).
+            // Builder CTA tile (authors inside existing tracks — Structure owns create/sync).
             'builder_tile_title' => get_string('admin_tracks_builder_tile_title', 'local_launchpad'),
             'builder_tile_body' => get_string('admin_tracks_builder_tile_body', 'local_launchpad'),
             'builder_tile_cta' => get_string('admin_tracks_builder_tile_cta', 'local_launchpad'),
@@ -264,8 +273,838 @@ final class admin_dashboard {
             'admin_tracks_empty',
             'admin_empty_title_no_tracks',
             $builderurl,
-            'admin_empty_cta_builder'
+            'admin_empty_cta_create_track'
         ));
+    }
+
+    /**
+     * Admin Structure page — manage existing tracks (hide/delete). Create is Course builder.
+     *
+     * @param \stdClass $user
+     * @param array{ok?:string,error?:string,cohort?:string,log_lines?:list<string>,applied?:bool} $flash
+     * @return array<string, mixed>
+     */
+    public static function structure_context(\stdClass $user, array $flash = []): array {
+        unset($user);
+
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
+        $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $tracksurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+        $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
+        $existing = self::structure_all_rows();
+        $hasexisting = $existing !== [];
+
+        return [
+            'eyebrow' => get_string('admin_structure_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_structure_heading', 'local_launchpad'),
+            'lead' => get_string('admin_structure_lead', 'local_launchpad'),
+            'form_action' => $formaction,
+            'sesskey' => sesskey(),
+            'cohort_value' => '',
+            'has_existing' => $hasexisting,
+            'existing_title' => get_string('admin_structure_existing_title_all', 'local_launchpad'),
+            'existing_lead' => get_string('admin_structure_existing_lead', 'local_launchpad'),
+            'existing_col_name' => get_string('admin_structure_existing_col_name', 'local_launchpad'),
+            'existing_col_idnumber' => get_string('admin_structure_existing_col_idnumber', 'local_launchpad'),
+            'existing_col_kind' => get_string('admin_structure_existing_col_kind', 'local_launchpad'),
+            'existing_col_visibility' => get_string('admin_structure_existing_col_visibility', 'local_launchpad'),
+            'existing_rows' => $existing,
+            'danger_title' => get_string('admin_structure_danger_title', 'local_launchpad'),
+            'danger_lead' => get_string('admin_structure_danger_lead', 'local_launchpad'),
+            'danger_hide_label' => get_string('admin_structure_danger_hide', 'local_launchpad'),
+            'danger_unhide_label' => get_string('admin_structure_danger_unhide', 'local_launchpad'),
+            'danger_delete_label' => get_string('admin_structure_danger_delete', 'local_launchpad'),
+            'danger_delete_warn' => get_string('admin_structure_danger_delete_warn', 'local_launchpad'),
+            'danger_delete_need_hide' => get_string('admin_structure_danger_need_hide', 'local_launchpad'),
+            'danger_confirm_label' => get_string('admin_structure_danger_confirm_label', 'local_launchpad'),
+            'danger_confirm_help' => get_string('admin_structure_danger_confirm_help', 'local_launchpad'),
+            'show_builder_cta' => true,
+            'show_cohorts_cta' => $hasexisting,
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
+            'builder_url' => $builderurl,
+            'builder_label' => get_string('admin_structure_open_builder', 'local_launchpad'),
+            'create_in_builder_label' => get_string('admin_structure_create_in_builder', 'local_launchpad'),
+            'cohorts_url' => $cohortsurl,
+            'cohorts_label' => get_string('admin_nav_cohorts', 'local_launchpad'),
+            'tracks_url' => $tracksurl,
+            'tracks_label' => get_string('admin_nav_tracks', 'local_launchpad'),
+            'empty_manage_title' => get_string('admin_structure_empty_title', 'local_launchpad'),
+            'empty_manage_body' => get_string('admin_structure_empty_body', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * All orientation + track courses for Structure manage / danger zone.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function structure_all_rows(): array {
+        $rows = [];
+        foreach (self::list_orientation_courses() as $course) {
+            $rows[] = self::structure_danger_row($course, true);
+        }
+        foreach (self::list_track_courses() as $course) {
+            $rows[] = self::structure_danger_row($course, false);
+        }
+        return $rows;
+    }
+
+    /**
+     * Existing orientation + track courses for a cohort label (by idnumber slug).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function structure_existing_rows(string $cohort): array {
+        try {
+            $slug = blueprint::cohort_slug($cohort);
+        } catch (cohort_exception $e) {
+            return [];
+        }
+
+        $rows = [];
+        $orient = self::orientation_course_for_slug($slug);
+        if ($orient) {
+            $rows[] = self::structure_danger_row($orient, true);
+        }
+
+        foreach (self::list_track_courses() as $course) {
+            $courseslug = self::cohort_slug_from_track_idnumber((string) ($course->idnumber ?? ''));
+            if ($courseslug !== $slug) {
+                continue;
+            }
+            $rows[] = self::structure_danger_row($course, false);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * One Structure status / danger-zone row for a LaunchPad course.
+     *
+     * @return array<string, mixed>
+     */
+    private static function structure_danger_row(\stdClass $course, bool $isorientation): array {
+        $visible = (int) ($course->visible ?? 0) === 1;
+        $courseid = (int) ($course->id ?? 0);
+        $enrolcount = self::fellow_count($courseid);
+        $idn = (string) ($course->idnumber ?? '');
+        $cohortslug = self::cohort_slug_from_track_idnumber($idn) ?? '';
+        return [
+            'courseid' => $courseid,
+            'fullname' => format_string($course->fullname),
+            'shortname' => (string) ($course->shortname ?? ''),
+            'idnumber' => $idn,
+            'cohort_value' => $cohortslug,
+            'kind_label' => $isorientation
+                ? get_string('admin_structure_kind_orientation', 'local_launchpad')
+                : get_string('admin_structure_kind_track', 'local_launchpad'),
+            'visibility_label' => $visible
+                ? get_string('admin_visibility_badge_live', 'local_launchpad')
+                : get_string('admin_visibility_badge_hidden', 'local_launchpad'),
+            'is_visible' => $visible,
+            'is_hidden' => !$visible,
+            'is_orientation' => $isorientation,
+            'enrol_count' => $enrolcount,
+            'enrol_count_label' => get_string('admin_structure_danger_enrols', 'local_launchpad', $enrolcount),
+            'can_delete' => !$visible,
+        ];
+    }
+
+    /**
+     * Dry-run LaunchPad structure for a cohort (web-safe via setup::line gating).
+     *
+     * @return array{ok?:string,error?:string,cohort:string,log_lines?:list<string>}
+     */
+    public static function run_structure_preview(\stdClass $actor, string $cohort): array {
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return [
+                'error' => get_string('admin_err_capability', 'local_launchpad'),
+                'cohort' => trim($cohort),
+            ];
+        }
+
+        $label = trim($cohort);
+        try {
+            $runner = new setup($label, true);
+            $runner->execute();
+            return [
+                'ok' => get_string('admin_structure_preview_ok', 'local_launchpad'),
+                'cohort' => $label,
+                'log_lines' => $runner->get_log(),
+            ];
+        } catch (cohort_exception $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        } catch (operation_failure $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        }
+    }
+
+    /**
+     * Whether the actor may create LaunchPad categories/courses from the Structure UI.
+     * Intentionally does not use CLI apply_target — web apply is capability-gated.
+     */
+    public static function can_apply_structure(int $userid): bool {
+        if ($userid <= 0 || !self::can_access($userid)) {
+            return false;
+        }
+        $system = \context_system::instance();
+        return has_capability('moodle/category:manage', $system, $userid)
+            && has_capability('moodle/course:create', $system, $userid);
+    }
+
+    /**
+     * Create one LaunchPad track course with phase sections (not the full CLI dump).
+     *
+     * @param string $phasesraw Optional newline/comma-separated phase titles; default blueprint phases.
+     * @return array{ok?:string,error?:string,trackid?:int}
+     */
+    public static function create_track_course(
+        \stdClass $actor,
+        string $trackname,
+        string $cohort,
+        string $phasesraw = ''
+    ): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $trackname = trim($trackname);
+        $cohort = trim($cohort);
+        if ($cohort === '') {
+            $cohort = 'Pilot';
+        }
+        if ($trackname === '') {
+            return ['error' => get_string('admin_builder_create_err_name', 'local_launchpad')];
+        }
+        if (!self::can_apply_structure((int) ($actor->id ?? 0))) {
+            return ['error' => get_string('admin_err_capability', 'local_launchpad')];
+        }
+
+        try {
+            $cohortslug = blueprint::cohort_slug($cohort);
+        } catch (cohort_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $codeslug = self::track_code_slug($trackname);
+        if ($codeslug === '') {
+            return ['error' => get_string('admin_builder_create_err_name', 'local_launchpad')];
+        }
+
+        $idnumber = account_persona::COURSE_IDNUMBER_PREFIX . $codeslug . '-' . $cohortslug;
+        if ($DB->record_exists('course', ['idnumber' => $idnumber])) {
+            return ['error' => get_string('admin_builder_create_err_exists', 'local_launchpad', $idnumber)];
+        }
+
+        $phases = self::parse_phase_titles($phasesraw);
+        if ($phases === []) {
+            return ['error' => get_string('admin_builder_create_err_phases', 'local_launchpad')];
+        }
+
+        try {
+            $root = self::ensure_fellowship_root_category();
+            $catidnumber = 'launchpad-' . $codeslug;
+            $category = $DB->get_record('course_categories', ['idnumber' => $catidnumber]);
+            if (!$category) {
+                // Reuse blueprint category when the track matches a known name.
+                foreach (blueprint::track_categories() as $knownid => $knownname) {
+                    if (strcasecmp($knownname, $trackname) === 0
+                            || str_replace('launchpad-', '', $knownid) === $codeslug) {
+                        $catidnumber = $knownid;
+                        $category = $DB->get_record('course_categories', ['idnumber' => $knownid]);
+                        break;
+                    }
+                }
+            }
+            if (!$category) {
+                $createdcat = \core_course_category::create((object) [
+                    'name' => $trackname,
+                    'idnumber' => $catidnumber,
+                    'parent' => (int) $root->id,
+                    'visible' => 0,
+                    'description' => 'LaunchPad track category — created from Course builder.',
+                    'descriptionformat' => FORMAT_PLAIN,
+                ]);
+                $category = $DB->get_record('course_categories', ['id' => $createdcat->id], '*', MUST_EXIST);
+            }
+
+            $shortname = 'LP-' . strtoupper($codeslug) . '-' . strtoupper($cohortslug);
+            if ($DB->record_exists('course', ['shortname' => $shortname])) {
+                $shortname .= '-' . substr((string) time(), -4);
+            }
+
+            $numsections = count($phases);
+            $course = create_course((object) [
+                'category' => (int) $category->id,
+                'fullname' => 'LaunchPad · ' . $trackname . ' · Cohort ' . $cohort,
+                'shortname' => $shortname,
+                'idnumber' => $idnumber,
+                'summary' => 'LaunchPad track course (hidden until release). Created from Course builder.',
+                'summaryformat' => FORMAT_PLAIN,
+                'format' => 'topics',
+                'numsections' => $numsections,
+                'startdate' => time(),
+                'visible' => 0,
+                'newsitems' => 0,
+                'showgrades' => 1,
+                'enablecompletion' => 1,
+            ]);
+
+            course_create_sections_if_missing($course->id, range(0, $numsections));
+            $modinfo = get_fast_modinfo($course->id);
+            $n = 1;
+            foreach ($phases as $phasename) {
+                $section = $modinfo->get_section_info($n);
+                course_update_section($course, $section, ['name' => $phasename]);
+                $n++;
+            }
+
+            // Manual enrol instance (same as setup).
+            $instances = enrol_get_instances($course->id, true);
+            $hasmanual = false;
+            foreach ($instances as $instance) {
+                if ($instance->enrol === 'manual') {
+                    $hasmanual = true;
+                    break;
+                }
+            }
+            if (!$hasmanual) {
+                $plugin = enrol_get_plugin('manual');
+                if ($plugin) {
+                    $plugin->add_instance($course);
+                }
+            }
+
+            return [
+                'ok' => get_string('admin_builder_create_ok', 'local_launchpad', format_string($course->fullname)),
+                'trackid' => (int) $course->id,
+            ];
+        } catch (\Throwable $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+    }
+
+    /**
+     * Append one named phase section to an existing LaunchPad track course.
+     *
+     * @return array{ok?:string,error?:string,trackid?:int}
+     */
+    public static function add_track_phase(\stdClass $actor, int $trackid, string $phasename): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        $phasename = trim($phasename);
+        if ($phasename === '') {
+            return ['error' => get_string('admin_builder_phase_err_name', 'local_launchpad'), 'trackid' => $trackid];
+        }
+        if (!self::can_apply_structure((int) ($actor->id ?? 0))) {
+            return ['error' => get_string('admin_err_capability', 'local_launchpad'), 'trackid' => $trackid];
+        }
+
+        $course = $DB->get_record('course', ['id' => $trackid], '*', IGNORE_MISSING);
+        if (!$course || !self::is_track_idnumber((string) ($course->idnumber ?? ''))) {
+            return ['error' => get_string('admin_err_unknown_track', 'local_launchpad'), 'trackid' => $trackid];
+        }
+
+        try {
+            $maxsection = (int) $DB->get_field_sql(
+                "SELECT MAX(section) FROM {course_sections} WHERE course = ?",
+                [$trackid]
+            );
+            $next = max(1, $maxsection + 1);
+            course_create_sections_if_missing($trackid, range(0, $next));
+            // Topics no longer stores numsections on {course}; sync format option only if present.
+            self::sync_track_numsections($trackid, $next);
+            rebuild_course_cache($trackid, true);
+            $modinfo = get_fast_modinfo($trackid);
+            $section = $modinfo->get_section_info($next);
+            course_update_section($course, $section, ['name' => $phasename]);
+            rebuild_course_cache($trackid, true);
+
+            return [
+                'ok' => get_string('admin_builder_phase_ok', 'local_launchpad', $phasename),
+                'trackid' => $trackid,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'trackid' => $trackid,
+            ];
+        }
+    }
+
+    /**
+     * Named phase sections for a track (section > 0), including extras beyond blueprint 1–4.
+     *
+     * @return array<int, string> sectionnum => title
+     */
+    public static function track_phase_titles(int $courseid): array {
+        global $DB;
+
+        $defaults = blueprint::phase_sections();
+        if ($courseid <= 0) {
+            return $defaults;
+        }
+
+        $sections = $DB->get_records_select(
+            'course_sections',
+            'course = ? AND section > 0',
+            [$courseid],
+            'section ASC'
+        );
+        if ($sections === []) {
+            return $defaults;
+        }
+
+        $out = [];
+        foreach ($sections as $section) {
+            $sectionnum = (int) ($section->section ?? 0);
+            if ($sectionnum <= 0) {
+                continue;
+            }
+            $dbname = trim((string) ($section->name ?? ''));
+            $out[$sectionnum] = $dbname !== ''
+                ? format_string($dbname)
+                : (string) ($defaults[$sectionnum]
+                    ?? get_string('admin_builder_phase_fallback', 'local_launchpad', $sectionnum));
+        }
+
+        return $out !== [] ? $out : $defaults;
+    }
+
+    /**
+     * Permanently delete one phase section from a LaunchPad track course.
+     *
+     * Uses Moodle course_delete_section (force). Keeps at least one phase.
+     *
+     * @return array{ok?:string,error?:string,trackid?:int,section?:int}
+     */
+    public static function delete_track_phase(\stdClass $actor, int $trackid, int $sectionnum): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        if (!self::can_apply_structure((int) ($actor->id ?? 0))) {
+            return ['error' => get_string('admin_err_capability', 'local_launchpad'), 'trackid' => $trackid];
+        }
+        if ($trackid <= 0 || $sectionnum < 1) {
+            return ['error' => get_string('admin_builder_err_params', 'local_launchpad'), 'trackid' => $trackid];
+        }
+
+        $course = $DB->get_record('course', ['id' => $trackid], '*', IGNORE_MISSING);
+        if (!$course || !self::is_track_idnumber((string) ($course->idnumber ?? ''))) {
+            return ['error' => get_string('admin_err_unknown_track', 'local_launchpad'), 'trackid' => $trackid];
+        }
+
+        $phases = self::track_phase_titles($trackid);
+        if (!isset($phases[$sectionnum])) {
+            return [
+                'error' => get_string('admin_builder_err_section', 'local_launchpad'),
+                'trackid' => $trackid,
+            ];
+        }
+        if (count($phases) <= 1) {
+            return [
+                'error' => get_string('admin_manage_delete_phase_err_last', 'local_launchpad'),
+                'trackid' => $trackid,
+                'section' => $sectionnum,
+            ];
+        }
+
+        $section = $DB->get_record('course_sections', [
+            'course' => $trackid,
+            'section' => $sectionnum,
+        ]);
+        if (!$section) {
+            return [
+                'error' => get_string('admin_builder_err_section', 'local_launchpad'),
+                'trackid' => $trackid,
+            ];
+        }
+
+        $phasename = $phases[$sectionnum];
+        $redirectsection = max(1, $sectionnum - 1);
+
+        try {
+            // Force = true: also remove activities in the phase (confirm warned in UI).
+            $deleted = course_delete_section($course, $section, true, false);
+            if (!$deleted) {
+                return [
+                    'error' => get_string('admin_manage_delete_phase_err', 'local_launchpad', $phasename),
+                    'trackid' => $trackid,
+                    'section' => $sectionnum,
+                ];
+            }
+
+            // course_delete_section already adjusts format numsections when the format still
+            // uses that option. Do NOT write {course}.numsections — column removed in modern
+            // Moodle; that second write caused a false "Error writing to database" after a
+            // successful delete.
+            $maxsection = (int) $DB->get_field_sql(
+                "SELECT COALESCE(MAX(section), 0) FROM {course_sections} WHERE course = ?",
+                [$trackid]
+            );
+            if ($maxsection < 1) {
+                $maxsection = 1;
+            }
+            self::sync_track_numsections($trackid, $maxsection);
+            rebuild_course_cache($trackid, true);
+
+            $remaining = self::track_phase_titles($trackid);
+            if (!isset($remaining[$redirectsection])) {
+                $redirectsection = (int) (array_key_first($remaining) ?: 1);
+            }
+
+            return [
+                'ok' => get_string('admin_manage_delete_phase_ok', 'local_launchpad', $phasename),
+                'trackid' => $trackid,
+                'section' => $redirectsection,
+            ];
+        } catch (\Throwable $e) {
+            // Section may already be gone; never report a post-delete housekeeping failure as
+            // a hard delete failure if the phase is no longer present.
+            $remaining = self::track_phase_titles($trackid);
+            if (!isset($remaining[$sectionnum])) {
+                if (!isset($remaining[$redirectsection])) {
+                    $redirectsection = (int) (array_key_first($remaining) ?: 1);
+                }
+                return [
+                    'ok' => get_string('admin_manage_delete_phase_ok', 'local_launchpad', $phasename),
+                    'trackid' => $trackid,
+                    'section' => $redirectsection,
+                ];
+            }
+            return [
+                'error' => self::flash_error_message($e),
+                'trackid' => $trackid,
+                'section' => $sectionnum,
+            ];
+        }
+    }
+
+    /**
+     * Sync topics/legacy numsections via course format options only (never {course}.numsections).
+     */
+    private static function sync_track_numsections(int $trackid, int $maxsection): void {
+        if ($trackid <= 0 || $maxsection < 0) {
+            return;
+        }
+        $format = course_get_format($trackid);
+        $options = $format->get_format_options();
+        if (!array_key_exists('numsections', $options)) {
+            return;
+        }
+        $current = (int) ($options['numsections'] ?? 0);
+        if ($current === $maxsection) {
+            return;
+        }
+        $format->update_course_format_options(['numsections' => $maxsection]);
+    }
+
+    /**
+     * Ensure fellowship root category exists (create hidden if missing).
+     */
+    public static function ensure_fellowship_root_category(): \stdClass {
+        global $DB;
+
+        $root = self::fellowship_root_category();
+        if ($root) {
+            return $root;
+        }
+        $created = \core_course_category::create((object) [
+            'name' => blueprint::ROOT_CATEGORY,
+            'idnumber' => blueprint::ROOT_IDNUMBER,
+            'parent' => 0,
+            'visible' => 0,
+            'description' => 'LaunchPad root — created from Course builder.',
+            'descriptionformat' => FORMAT_PLAIN,
+        ]);
+        return $DB->get_record('course_categories', ['id' => $created->id], '*', MUST_EXIST);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function parse_phase_titles(string $raw): array {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return array_values(blueprint::phase_sections());
+        }
+        $parts = preg_split('/[\r\n,]+/', $raw) ?: [];
+        $out = [];
+        foreach ($parts as $part) {
+            $title = trim($part);
+            if ($title !== '') {
+                $out[] = \core_text::substr($title, 0, 255);
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Short code for idnumbers from a track title.
+     */
+    public static function track_code_slug(string $trackname): string {
+        $map = [
+            'ai' => 'ai',
+            'ai automation' => 'ai',
+            'automation' => 'ai',
+            'full stack' => 'fullstack',
+            'fullstack' => 'fullstack',
+            'full stack development' => 'fullstack',
+            'product' => 'pm',
+            'product management' => 'pm',
+            'pm' => 'pm',
+            'marketing' => 'marketing',
+            'digital marketing' => 'marketing',
+            'startup' => 'startup',
+            'startup building' => 'startup',
+        ];
+        $key = strtolower(trim(preg_replace('/[^a-z0-9]+/i', ' ', $trackname) ?? ''));
+        $key = trim(preg_replace('/\s+/', ' ', $key) ?? '');
+        if (isset($map[$key])) {
+            return $map[$key];
+        }
+        $slug = strtolower(trim($trackname));
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+        $slug = trim($slug, '-');
+        if (\core_text::strlen($slug) > 24) {
+            $slug = \core_text::substr($slug, 0, 24);
+            $slug = rtrim($slug, '-');
+        }
+        return $slug;
+    }
+
+    /**
+     * Apply LaunchPad structure for a cohort (real DB writes; idempotent by idnumber).
+     *
+     * @return array{ok?:string,error?:string,cohort:string,log_lines?:list<string>,applied?:bool}
+     */
+    public static function run_structure_apply(\stdClass $actor, string $cohort, bool $confirmed): array {
+        $label = trim($cohort);
+        if (!self::can_apply_structure((int) ($actor->id ?? 0))) {
+            return [
+                'error' => get_string('admin_err_capability', 'local_launchpad'),
+                'cohort' => $label,
+            ];
+        }
+        if (!$confirmed) {
+            return [
+                'error' => get_string('admin_structure_err_confirm', 'local_launchpad'),
+                'cohort' => $label,
+            ];
+        }
+
+        try {
+            $runner = new setup($label, false);
+            $runner->execute();
+            return [
+                'ok' => get_string('admin_structure_apply_ok', 'local_launchpad', $label),
+                'cohort' => $label,
+                'log_lines' => $runner->get_log(),
+                'applied' => true,
+            ];
+        } catch (cohort_exception $e) {
+            return [
+                'error' => self::flash_error_message($e),
+                'cohort' => $label,
+            ];
+        } catch (operation_failure $e) {
+            return [
+                'error' => self::flash_error_message($e)
+                    . ' '
+                    . get_string('admin_structure_err_retry', 'local_launchpad'),
+                'cohort' => $label,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'error' => self::flash_error_message($e)
+                    . ' '
+                    . get_string('admin_structure_err_retry', 'local_launchpad'),
+                'cohort' => $label,
+            ];
+        }
+    }
+
+    /**
+     * Resolve a LaunchPad track or orientation course by id for Structure danger zone.
+     */
+    public static function resolve_structure_course(int $courseid): ?\stdClass {
+        global $DB;
+
+        if ($courseid <= 0) {
+            return null;
+        }
+        $course = $DB->get_record('course', ['id' => $courseid], '*', IGNORE_MISSING);
+        if (!$course || !self::is_structure_idnumber((string) ($course->idnumber ?? ''))) {
+            return null;
+        }
+        return $course;
+    }
+
+    /**
+     * Hide or unhide a LaunchPad structure course (track or orientation).
+     *
+     * @return array{ok?:string,error?:string,cohort:string}
+     */
+    public static function run_structure_set_visible(
+        \stdClass $actor,
+        int $courseid,
+        bool $visible,
+        string $cohort
+    ): array {
+        global $CFG;
+
+        $label = trim($cohort);
+        $out = static function (?string $ok, ?string $error) use ($label): array {
+            $flash = ['cohort' => $label];
+            if ($ok !== null) {
+                $flash['ok'] = $ok;
+            }
+            if ($error !== null) {
+                $flash['error'] = $error;
+            }
+            return $flash;
+        };
+
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return $out(null, get_string('admin_err_capability', 'local_launchpad'));
+        }
+
+        require_once($CFG->dirroot . '/course/lib.php');
+
+        $course = self::resolve_structure_course($courseid);
+        if ($course === null) {
+            return $out(null, get_string('admin_structure_danger_err_course', 'local_launchpad'));
+        }
+
+        $ctx = \context_course::instance($courseid);
+        if (!has_capability('moodle/course:visibility', $ctx, $actor)
+                && !has_capability('moodle/course:update', $ctx, $actor)) {
+            return $out(null, get_string('admin_courseops_err_cap_visibility', 'local_launchpad'));
+        }
+
+        $want = $visible ? 1 : 0;
+        if ((int) ($course->visible ?? 0) === $want) {
+            return $out(
+                $visible
+                    ? get_string('admin_structure_danger_unhide_ok', 'local_launchpad', format_string($course->fullname))
+                    : get_string('admin_structure_danger_hide_ok', 'local_launchpad', format_string($course->fullname)),
+                null
+            );
+        }
+
+        try {
+            update_course((object) [
+                'id' => $courseid,
+                'visible' => $want,
+            ]);
+        } catch (\Throwable $e) {
+            return $out(null, self::flash_error_message($e));
+        }
+
+        return $out(
+            $visible
+                ? get_string('admin_structure_danger_unhide_ok', 'local_launchpad', format_string($course->fullname))
+                : get_string('admin_structure_danger_hide_ok', 'local_launchpad', format_string($course->fullname)),
+            null
+        );
+    }
+
+    /**
+     * Permanently delete a LaunchPad structure course after type-confirm.
+     * Requires the course to be hidden first. Confirm must match shortname or idnumber.
+     *
+     * @return array{ok?:string,error?:string,cohort:string}
+     */
+    public static function run_structure_delete(
+        \stdClass $actor,
+        int $courseid,
+        string $confirmtext,
+        string $cohort
+    ): array {
+        global $CFG;
+
+        $label = trim($cohort);
+        $out = static function (?string $ok, ?string $error) use ($label): array {
+            $flash = ['cohort' => $label];
+            if ($ok !== null) {
+                $flash['ok'] = $ok;
+            }
+            if ($error !== null) {
+                $flash['error'] = $error;
+            }
+            return $flash;
+        };
+
+        if (!self::can_access((int) ($actor->id ?? 0))) {
+            return $out(null, get_string('admin_err_capability', 'local_launchpad'));
+        }
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/moodlelib.php');
+
+        $course = self::resolve_structure_course($courseid);
+        if ($course === null) {
+            return $out(null, get_string('admin_structure_danger_err_course', 'local_launchpad'));
+        }
+
+        $ctx = \context_course::instance($courseid);
+        if (!has_capability('moodle/course:delete', $ctx, $actor)) {
+            return $out(null, get_string('admin_structure_danger_err_cap_delete', 'local_launchpad'));
+        }
+
+        if ((int) ($course->visible ?? 0) === 1) {
+            return $out(null, get_string('admin_structure_danger_err_not_hidden', 'local_launchpad'));
+        }
+
+        $confirm = trim($confirmtext);
+        $shortname = trim((string) ($course->shortname ?? ''));
+        $idnumber = trim((string) ($course->idnumber ?? ''));
+        $matched = $confirm !== '' && (
+            \core_text::strtolower($confirm) === \core_text::strtolower($shortname)
+            || \core_text::strtolower($confirm) === \core_text::strtolower($idnumber)
+        );
+        if (!$matched) {
+            // Wrong confirm is a no-op with a clear error — course stays.
+            return $out(null, get_string('admin_structure_danger_err_confirm', 'local_launchpad'));
+        }
+
+        $displayname = format_string($course->fullname);
+        $idnumberlabel = $idnumber;
+
+        try {
+            $ok = delete_course($course, false);
+        } catch (\Throwable $e) {
+            return $out(null, self::flash_error_message($e));
+        }
+        if (!$ok) {
+            return $out(null, get_string('admin_structure_danger_err_delete', 'local_launchpad'));
+        }
+
+        return $out(
+            get_string('admin_structure_danger_delete_ok', 'local_launchpad', (object) [
+                'name' => $displayname,
+                'idnumber' => $idnumberlabel,
+            ]),
+            null
+        );
     }
 
     /**
@@ -313,7 +1152,7 @@ final class admin_dashboard {
 
         $tracks = self::list_track_courses();
         if ($tracks === []) {
-            $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
             return array_merge([
                 'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
                 'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
@@ -334,8 +1173,8 @@ final class admin_dashboard {
             ], self::empty_state(
                 'admin_tracks_empty',
                 'admin_empty_title_no_tracks',
-                $builderurl,
-                'admin_empty_cta_builder'
+                $structureurl,
+                'admin_empty_cta_structure'
             ));
         }
 
@@ -1883,8 +2722,29 @@ final class admin_dashboard {
      * @return array<string, mixed>
      */
     public static function builder_context(\stdClass $user, int $trackid = 0, array $flash = []): array {
+        $cancreate = self::can_apply_structure((int) ($user->id ?? 0));
         unset($user);
         $tracks = self::list_track_courses();
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $defaultphases = implode("\n", array_values(blueprint::phase_sections()));
+        $createform = [
+            'show_create_track' => $cancreate,
+            'create_action' => $formaction,
+            'create_sesskey' => sesskey(),
+            'create_title' => get_string('admin_builder_create_title', 'local_launchpad'),
+            'create_help' => get_string('admin_builder_create_help', 'local_launchpad'),
+            'create_name_label' => get_string('admin_builder_create_name', 'local_launchpad'),
+            'create_cohort_label' => get_string('admin_builder_create_cohort', 'local_launchpad'),
+            'create_phases_label' => get_string('admin_builder_create_phases', 'local_launchpad'),
+            'create_phases_help' => get_string('admin_builder_create_phases_help', 'local_launchpad'),
+            'create_phases_value' => $defaultphases,
+            'create_submit' => get_string('admin_builder_create_submit', 'local_launchpad'),
+            'create_cohort_value' => 'Pilot',
+            'known_tracks' => array_values(array_map(static function (string $name): array {
+                return ['name' => $name];
+            }, array_values(blueprint::track_categories()))),
+        ];
+
         if ($tracks === []) {
             return array_merge([
                 'eyebrow' => get_string('admin_builder_eyebrow', 'local_launchpad'),
@@ -1895,9 +2755,11 @@ final class admin_dashboard {
                 'flash_ok_body' => (string) ($flash['ok'] ?? ''),
                 'flash_err' => !empty($flash['error']),
                 'flash_err_body' => (string) ($flash['error'] ?? ''),
-            ], self::empty_state(
+            ], $createform, self::empty_state(
                 'admin_builder_empty',
-                'admin_empty_title_no_tracks'
+                'admin_empty_title_no_tracks',
+                '',
+                ''
             ));
         }
 
@@ -2003,10 +2865,17 @@ final class admin_dashboard {
                 'tip_body' => $tipbody,
                 'course_url' => (new \moodle_url('/course/view.php', ['id' => $cid]))->out(false),
                 'open_course_label' => $opencourse,
+                'show_add_phase' => $cancreate,
+                'add_phase_action' => $formaction,
+                'add_phase_sesskey' => $sesskey,
+                'add_phase_trackid' => $cid,
+                'add_phase_title' => get_string('admin_builder_phase_title', 'local_launchpad'),
+                'add_phase_label' => get_string('admin_builder_phase_name', 'local_launchpad'),
+                'add_phase_submit' => get_string('admin_builder_phase_submit', 'local_launchpad'),
             ];
         }
 
-        return [
+        return array_merge([
             'eyebrow' => get_string('admin_builder_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_builder_heading', 'local_launchpad'),
             'lead' => get_string('admin_builder_lead', 'local_launchpad'),
@@ -2018,7 +2887,7 @@ final class admin_dashboard {
             'flash_ok_body' => (string) ($flash['ok'] ?? ''),
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
-        ];
+        ], $createform);
     }
 
     /**
@@ -2026,11 +2895,21 @@ final class admin_dashboard {
      */
     public static function builder_track_tab_label(\stdClass $course): string {
         $idnumber = strtolower(trim((string) ($course->idnumber ?? '')));
+        $cohort = self::cohort_slug_from_track_idnumber($idnumber);
+        $trackbit = '';
         if (preg_match('/^lp-([a-z0-9]+)-/', $idnumber, $m)) {
             $code = $m[1];
+            $trackbit = match ($code) {
+                'ai' => 'AI',
+                'fullstack' => 'Full Stack',
+                'pm' => 'Product',
+                'marketing' => 'Marketing',
+                'startup' => 'Startup',
+                default => $code,
+            };
             foreach (blueprint::track_categories() as $catid => $name) {
                 if (str_replace('launchpad-', '', $catid) === $code) {
-                    return match ($code) {
+                    $trackbit = match ($code) {
                         'ai' => 'AI',
                         'fullstack' => 'Full Stack',
                         'pm' => 'Product',
@@ -2038,16 +2917,24 @@ final class admin_dashboard {
                         'startup' => 'Startup',
                         default => $name,
                     };
+                    break;
                 }
             }
         }
 
-        $fullname = format_string($course->fullname ?? '');
-        // "LaunchPad — AI & Automation — Cohort Pilot" → middle segment.
-        if (preg_match('/LaunchPad\s*[—–-]\s*(.+?)\s*[—–-]/u', $fullname, $m)) {
-            return trim($m[1]);
+        if ($trackbit === '') {
+            $fullname = format_string($course->fullname ?? '');
+            if (preg_match('/LaunchPad\s*[·—–-]\s*(.+?)\s*[·—–-]/u', $fullname, $m)) {
+                $trackbit = trim($m[1]);
+            } else {
+                $trackbit = $fullname !== '' ? $fullname : get_string('admin_builder_untitled', 'local_launchpad');
+            }
         }
-        return $fullname !== '' ? $fullname : get_string('admin_builder_untitled', 'local_launchpad');
+
+        if ($cohort !== null && $cohort !== '') {
+            return $trackbit . ' · ' . $cohort;
+        }
+        return $trackbit;
     }
 
     /**
@@ -2062,17 +2949,40 @@ final class admin_dashboard {
         require_once($CFG->dirroot . '/course/lib.php');
 
         $courseid = (int) $course->id;
-        $names = blueprint::phase_sections();
-        $out = [];
+        $defaults = blueprint::phase_sections();
+        $sections = $DB->get_records_select(
+            'course_sections',
+            'course = ? AND section > 0',
+            [$courseid],
+            'section ASC'
+        );
+        // Fallback for brand-new courses before sections exist in DB.
+        if ($sections === []) {
+            foreach ($defaults as $sectionnum => $title) {
+                $sections[$sectionnum] = (object) [
+                    'id' => 0,
+                    'course' => $courseid,
+                    'section' => $sectionnum,
+                    'name' => $title,
+                    'visible' => 0,
+                ];
+            }
+        }
 
-        foreach ($names as $sectionnum => $title) {
-            $section = $DB->get_record('course_sections', [
-                'course' => $courseid,
-                'section' => $sectionnum,
-            ]);
-            $sectionvisible = $section && (int) $section->visible === 1;
-            $sectionid = $section ? (int) $section->id : 0;
-            $activities = self::builder_activities_for_section($courseid, $section, $sectionvisible);
+        $out = [];
+        foreach ($sections as $section) {
+            $sectionnum = (int) ($section->section ?? 0);
+            if ($sectionnum <= 0) {
+                continue;
+            }
+            $dbname = trim((string) ($section->name ?? ''));
+            $title = $dbname !== ''
+                ? format_string($dbname)
+                : (string) ($defaults[$sectionnum] ?? get_string('admin_builder_phase_fallback', 'local_launchpad', $sectionnum));
+            $sectionvisible = (int) ($section->visible ?? 0) === 1;
+            $sectionid = (int) ($section->id ?? 0);
+            $sectionrec = $sectionid > 0 ? $section : null;
+            $activities = self::builder_activities_for_section($courseid, $sectionrec, $sectionvisible);
 
             $hasready = false;
             foreach ($activities as $act) {
@@ -2134,7 +3044,6 @@ final class admin_dashboard {
         int $sectionnum,
         array $flash = []
     ): array {
-        unset($user);
         $tracks = self::list_track_courses();
         $course = null;
         foreach ($tracks as $c) {
@@ -2148,6 +3057,7 @@ final class admin_dashboard {
             $trackid = (int) $course->id;
         }
         if ($course === null) {
+            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
             $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
             return array_merge([
                 'has_course' => false,
@@ -2160,18 +3070,17 @@ final class admin_dashboard {
             ], self::empty_state(
                 'admin_builder_empty',
                 'admin_empty_title_no_tracks',
-                $builderurl,
-                'admin_empty_cta_builder'
+                $structureurl,
+                'admin_empty_cta_structure'
             ));
         }
 
-        $phases = blueprint::phase_sections();
-        if ($sectionnum < 1 || $sectionnum > 4 || !isset($phases[$sectionnum])) {
-            $sectionnum = 1;
-        }
-        $phasetitle = $phases[$sectionnum];
-        $section = null;
         global $DB;
+        $phases = self::track_phase_titles($trackid);
+        if ($sectionnum < 1 || !isset($phases[$sectionnum])) {
+            $sectionnum = (int) (array_key_first($phases) ?: 1);
+        }
+        $phasetitle = $phases[$sectionnum] ?? get_string('admin_builder_phase_fallback', 'local_launchpad', $sectionnum);
         $section = $DB->get_record('course_sections', [
             'course' => $trackid,
             'section' => $sectionnum,
@@ -2277,6 +3186,14 @@ final class admin_dashboard {
 
         $tracklabel = self::builder_track_tab_label($course);
         $hasdraftqueue = $draftcount > 0;
+        $phasecount = count($phases);
+        $candeletephase = self::can_apply_structure((int) ($user->id ?? 0)) && $phasecount > 1;
+        $deletephaseconfirm = $activitycount > 0
+            ? get_string('admin_manage_delete_phase_confirm_busy', 'local_launchpad', (object) [
+                'name' => $phasetitle,
+                'count' => $activitycount,
+            ])
+            : get_string('admin_manage_delete_phase_confirm', 'local_launchpad', $phasetitle);
 
         return [
             'has_course' => true,
@@ -2340,6 +3257,9 @@ final class admin_dashboard {
             'form_action' => $formaction,
             'sesskey' => $sesskey,
             'trackid' => $trackid,
+            'can_delete_phase' => $candeletephase,
+            'delete_phase_label' => get_string('admin_manage_delete_phase', 'local_launchpad'),
+            'delete_phase_confirm' => $deletephaseconfirm,
             'reorder_hint' => get_string('admin_manage_reorder_hint', 'local_launchpad'),
             'save_order_label' => get_string('admin_manage_save_order', 'local_launchpad'),
             'cancel_order_label' => get_string('admin_manage_cancel_order', 'local_launchpad'),
@@ -2378,7 +3298,7 @@ final class admin_dashboard {
         if (!in_array($modname, $allowed, true)) {
             return ['error' => get_string('admin_manage_err_mod', 'local_launchpad')];
         }
-        if ($trackcourseid <= 0 || $sectionnum < 1 || $sectionnum > 4) {
+        if ($trackcourseid <= 0 || $sectionnum < 1) {
             return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
         }
 
@@ -2389,6 +3309,9 @@ final class admin_dashboard {
         }
         if (!self::is_track_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_mentors_err_not_track', 'local_launchpad')];
+        }
+        if (!isset(self::track_phase_titles($trackcourseid)[$sectionnum])) {
+            return ['error' => get_string('admin_builder_err_section', 'local_launchpad')];
         }
 
         $context = \context_course::instance($trackcourseid);
@@ -2599,7 +3522,7 @@ final class admin_dashboard {
         unset($actor);
         require_once($CFG->dirroot . '/course/lib.php');
 
-        if ($trackcourseid <= 0 || $sectionnum < 1 || $sectionnum > 4) {
+        if ($trackcourseid <= 0 || $sectionnum < 1) {
             return ['error' => get_string('admin_manage_err_reorder_params', 'local_launchpad')];
         }
 
@@ -3794,7 +4717,7 @@ final class admin_dashboard {
         unset($actor);
         require_once($CFG->dirroot . '/course/lib.php');
 
-        if ($trackcourseid <= 0 || $sectionnum < 1 || $sectionnum > 4) {
+        if ($trackcourseid <= 0 || $sectionnum < 1) {
             return ['error' => get_string('admin_builder_err_params', 'local_launchpad')];
         }
         try {
@@ -3847,7 +4770,10 @@ final class admin_dashboard {
         }
         \core_courseformat\formatactions::section($trackcourseid)->set_visibility($sectioninfo, $show);
 
-        $phasename = blueprint::phase_sections()[$sectionnum] ?? (string) $sectionnum;
+        $phasename = self::track_phase_titles($trackcourseid)[$sectionnum]
+            ?? (trim((string) ($section->name ?? '')) !== ''
+                ? format_string((string) $section->name)
+                : (string) $sectionnum);
         return [
             'ok' => $show
                 ? get_string('admin_builder_ok_shown', 'local_launchpad', $phasename)
@@ -5129,6 +6055,7 @@ final class admin_dashboard {
         $maxfellows = account_provision::pilot_max_fellows_per_track();
         $seats = $trackcount * $maxmentors;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
         return array_merge([
             'eyebrow' => get_string('admin_mentors_eyebrow', 'local_launchpad'),
@@ -5183,8 +6110,8 @@ final class admin_dashboard {
         ], self::empty_state(
             'admin_mentors_empty',
             'admin_empty_title_no_tracks',
-            $builderurl,
-            'admin_empty_cta_builder'
+            $structureurl,
+            'admin_empty_cta_structure'
         ));
     }
 
@@ -6080,8 +7007,12 @@ final class admin_dashboard {
      */
     public static function cohort_slug_from_track_idnumber(string $idnumber): ?string {
         $idnumber = strtolower(trim($idnumber));
-        if (preg_match('/^lp-(?:ai|fullstack|pm|marketing|startup)-(.+)$/', $idnumber, $m)) {
+        if (preg_match('/^lp-orient-(.+)$/', $idnumber, $m)) {
             return $m[1] !== '' ? $m[1] : null;
+        }
+        // lp-{trackcode}-{cohortslug} (known or custom track codes).
+        if (preg_match('/^lp-([a-z0-9]+)-(.+)$/', $idnumber, $m)) {
+            return $m[2] !== '' ? $m[2] : null;
         }
         return null;
     }
