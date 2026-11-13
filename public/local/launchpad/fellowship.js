@@ -2387,6 +2387,48 @@
             return;
         }
 
+        function emptyCopy(key) {
+            if (!emptyEl) {
+                return null;
+            }
+            return {
+                title: emptyEl.getAttribute('data-empty-' + key + '-title') || '',
+                body: emptyEl.getAttribute('data-empty-' + key + '-body') || '',
+                ctaUrl: emptyEl.getAttribute('data-empty-' + key + '-cta-url') || '',
+                ctaLabel: emptyEl.getAttribute('data-empty-' + key + '-cta-label') || '',
+                hasCta: emptyEl.getAttribute('data-empty-' + key + '-has-cta') === '1'
+            };
+        }
+
+        function applyEmptyCopy(key) {
+            if (!emptyEl) {
+                return;
+            }
+            var copy = emptyCopy(key) || emptyCopy('all');
+            if (!copy) {
+                return;
+            }
+            var titleEl = emptyEl.querySelector('[data-lp-people-empty-title]');
+            var bodyEl = emptyEl.querySelector('[data-lp-people-empty-body]');
+            var ctaWrap = emptyEl.querySelector('[data-lp-people-empty-cta-wrap]');
+            var ctaEl = emptyEl.querySelector('[data-lp-people-empty-cta]');
+            if (titleEl) {
+                titleEl.textContent = copy.title;
+            }
+            if (bodyEl) {
+                bodyEl.textContent = copy.body;
+            }
+            if (ctaWrap && ctaEl) {
+                if (copy.hasCta && copy.ctaUrl) {
+                    ctaWrap.style.display = '';
+                    ctaEl.setAttribute('href', copy.ctaUrl);
+                    ctaEl.textContent = copy.ctaLabel;
+                } else {
+                    ctaWrap.style.display = 'none';
+                }
+            }
+        }
+
         function applyTab(tab, pushUrl) {
             var key = tab || 'all';
             if (key !== 'all' && key !== 'fellow' && key !== 'mentor' && key !== 'admin') {
@@ -2408,6 +2450,8 @@
                 el.classList.toggle('is-on', on);
                 el.setAttribute('aria-selected', on ? 'true' : 'false');
             });
+
+            applyEmptyCopy(key);
 
             if (emptyEl) {
                 emptyEl.style.display = visible === 0 ? '' : 'none';

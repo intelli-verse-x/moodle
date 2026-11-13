@@ -5021,6 +5021,17 @@ final class admin_dashboard {
         $cohortcount = self::distinct_cohort_count($tracks);
 
         $recent = self::recent_track_enrolments(12);
+        $hastracks = $tracks !== [];
+        $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+
+        // Before-view honesty: no tracks ≠ “Foundations not ready”.
+        if (!$hastracks) {
+            $enrolemptytitle = get_string('admin_cohorts_enrol_empty_no_tracks_title', 'local_launchpad');
+            $enrolemptybody = get_string('admin_cohorts_enrol_empty_no_tracks_body', 'local_launchpad');
+        } else {
+            $enrolemptytitle = get_string('admin_cohorts_enrol_empty_not_ready_title', 'local_launchpad');
+            $enrolemptybody = get_string('admin_cohorts_no_ready', 'local_launchpad');
+        }
 
         $icon = static function (string $paths): string {
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">'
@@ -5034,6 +5045,10 @@ final class admin_dashboard {
                 self::cohort_display_label($slug, $orient)
             )
             : get_string('admin_cohorts_tile_cohort_sub_none', 'local_launchpad');
+
+        $startsub = $startdate > 0
+            ? get_string('admin_cohorts_tile_start_sub', 'local_launchpad')
+            : get_string('admin_cohorts_tile_start_sub_tbc', 'local_launchpad');
 
         $tiles = [
             [
@@ -5051,7 +5066,7 @@ final class admin_dashboard {
                 'value' => $startdate > 0
                     ? userdate($startdate, get_string('strftimedatefullshort', 'langconfig'))
                     : get_string('admin_cohorts_tile_start_tbc', 'local_launchpad'),
-                'sub' => get_string('admin_cohorts_tile_start_sub', 'local_launchpad'),
+                'sub' => $startsub,
                 'icon_svg' => $icon(
                     '<rect x="3" y="5" width="18" height="16" rx="2"/>'
                     . '<path d="M3 10h18M8 3v4M16 3v4"/>'
@@ -5079,8 +5094,13 @@ final class admin_dashboard {
             'eyebrow' => get_string('admin_cohorts_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_cohorts_heading', 'local_launchpad'),
             'lead' => get_string('admin_cohorts_lead', 'local_launchpad'),
+            // Builder CTA only on the enrol empty card (not hero — same pattern as Overview/Tracks).
+            'show_builder_cta' => !$hasready,
+            'builder_url' => $builderurl,
+            'builder_cta_label' => get_string('admin_cohorts_builder_cta', 'local_launchpad'),
             'tiles' => $tiles,
             'form_title' => get_string('admin_cohorts_form_title', 'local_launchpad'),
+            'form_lead' => get_string('admin_cohorts_form_lead', 'local_launchpad'),
             'email_label' => get_string('admin_cohorts_email_label', 'local_launchpad'),
             'email_placeholder' => get_string('admin_cohorts_email_placeholder', 'local_launchpad'),
             'track_label' => get_string('admin_cohorts_track_label', 'local_launchpad'),
@@ -5092,15 +5112,19 @@ final class admin_dashboard {
             'submit_label' => get_string('admin_cohorts_submit', 'local_launchpad'),
             'has_track_options' => $options !== [],
             'has_ready_track' => $hasready,
-            'no_ready_body' => get_string('admin_cohorts_no_ready', 'local_launchpad'),
+            'enrol_empty_title' => $enrolemptytitle,
+            'enrol_empty_body' => $enrolemptybody,
+            'no_ready_body' => $enrolemptybody,
             'track_options' => $options,
             'bytrack_title' => get_string('admin_cohorts_bytrack_title', 'local_launchpad'),
+            'bytrack_lead' => get_string('admin_cohorts_bytrack_lead', 'local_launchpad'),
             'bytrack' => $bytrack,
             'has_bytrack' => $bytrack !== [],
             'tip_body' => get_string('admin_cohorts_tip', 'local_launchpad'),
             'tip_prof_url' => (new \moodle_url('/local/launchpad/assets/img/prof.webp'))->out(false),
             'recent_title' => get_string('admin_cohorts_recent_title', 'local_launchpad'),
             'recent_empty' => get_string('admin_cohorts_recent_empty', 'local_launchpad'),
+            'bytrack_empty_title' => get_string('admin_cohorts_bytrack_empty_title', 'local_launchpad'),
             'bytrack_empty' => get_string('admin_cohorts_bytrack_empty', 'local_launchpad'),
             'col_fellow' => get_string('admin_cohorts_col_fellow', 'local_launchpad'),
             'col_track' => get_string('admin_cohorts_col_track', 'local_launchpad'),
@@ -5245,7 +5269,54 @@ final class admin_dashboard {
         }
 
         $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
-        return array_merge([
+        $mentorsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
+
+        // Resolve lang with English fallback — never ship Moodle's [[missing]] markers to the UI.
+        $pstr = static function (string $key, string $fallback): string {
+            if (!get_string_manager()->string_exists($key, 'local_launchpad')) {
+                return $fallback;
+            }
+            $out = get_string($key, 'local_launchpad');
+            if (!is_string($out) || $out === '' || str_contains($out, '[[')) {
+                return $fallback;
+            }
+            return $out;
+        };
+
+        // Per-tab empty copy/CTA — client filter swaps these without a reload.
+        $emptybytab = [
+            'all' => [
+                'title' => $pstr('admin_people_empty_title', 'No people here'),
+                'body' => $pstr('admin_people_empty', 'No people match this filter yet.'),
+                'cta_url' => $cohortsurl,
+                'cta_label' => $pstr('admin_empty_cta_cohorts', 'Enrol a fellow'),
+                'has_cta' => true,
+            ],
+            'fellow' => [
+                'title' => $pstr('admin_people_empty_title_fellow', 'No fellows here'),
+                'body' => $pstr('admin_people_empty_fellow', 'No fellows enrolled on LaunchPad tracks yet.'),
+                'cta_url' => $cohortsurl,
+                'cta_label' => $pstr('admin_empty_cta_cohorts', 'Enrol a fellow'),
+                'has_cta' => true,
+            ],
+            'mentor' => [
+                'title' => $pstr('admin_people_empty_title_mentor', 'No mentors here'),
+                'body' => $pstr('admin_people_empty_mentor', 'No mentors assigned to LaunchPad tracks yet.'),
+                'cta_url' => $mentorsurl,
+                'cta_label' => $pstr('admin_empty_cta_mentors', 'Assign a mentor'),
+                'has_cta' => true,
+            ],
+            'admin' => [
+                'title' => $pstr('admin_people_empty_title_admin', 'No admins here'),
+                'body' => $pstr('admin_people_empty_admin', 'No LaunchPad admins listed yet.'),
+                'cta_url' => '',
+                'cta_label' => '',
+                'has_cta' => false,
+            ],
+        ];
+        $initialempty = $emptybytab[$tab] ?? $emptybytab['all'];
+
+        return [
             'eyebrow' => get_string('admin_people_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_people_heading', 'local_launchpad'),
             'lead' => get_string('admin_people_lead', 'local_launchpad'),
@@ -5258,12 +5329,33 @@ final class admin_dashboard {
             'people' => $all,
             'has_people' => $all !== [],
             'footnote' => get_string('admin_people_footnote', 'local_launchpad'),
-        ], self::empty_state(
-            'admin_people_empty',
-            'admin_people_empty_title',
-            $cohortsurl,
-            'admin_empty_cta_cohorts'
-        ));
+            'empty_mark' => 'AD',
+            'empty_title' => $initialempty['title'],
+            'empty_body' => $initialempty['body'],
+            'has_empty_cta' => $initialempty['has_cta'],
+            'empty_cta_url' => $initialempty['cta_url'],
+            'empty_cta_label' => $initialempty['cta_label'],
+            'empty_tab_all_title' => $emptybytab['all']['title'],
+            'empty_tab_all_body' => $emptybytab['all']['body'],
+            'empty_tab_all_cta_url' => $emptybytab['all']['cta_url'],
+            'empty_tab_all_cta_label' => $emptybytab['all']['cta_label'],
+            'empty_tab_all_has_cta' => $emptybytab['all']['has_cta'] ? '1' : '0',
+            'empty_tab_fellow_title' => $emptybytab['fellow']['title'],
+            'empty_tab_fellow_body' => $emptybytab['fellow']['body'],
+            'empty_tab_fellow_cta_url' => $emptybytab['fellow']['cta_url'],
+            'empty_tab_fellow_cta_label' => $emptybytab['fellow']['cta_label'],
+            'empty_tab_fellow_has_cta' => $emptybytab['fellow']['has_cta'] ? '1' : '0',
+            'empty_tab_mentor_title' => $emptybytab['mentor']['title'],
+            'empty_tab_mentor_body' => $emptybytab['mentor']['body'],
+            'empty_tab_mentor_cta_url' => $emptybytab['mentor']['cta_url'],
+            'empty_tab_mentor_cta_label' => $emptybytab['mentor']['cta_label'],
+            'empty_tab_mentor_has_cta' => $emptybytab['mentor']['has_cta'] ? '1' : '0',
+            'empty_tab_admin_title' => $emptybytab['admin']['title'],
+            'empty_tab_admin_body' => $emptybytab['admin']['body'],
+            'empty_tab_admin_cta_url' => $emptybytab['admin']['cta_url'],
+            'empty_tab_admin_cta_label' => $emptybytab['admin']['cta_label'],
+            'empty_tab_admin_has_cta' => $emptybytab['admin']['has_cta'] ? '1' : '0',
+        ];
     }
 
     /**
@@ -5499,12 +5591,16 @@ final class admin_dashboard {
             [
                 'label' => get_string('admin_reviews_tile_overdue', 'local_launchpad'),
                 'value' => (string) $overduetotal,
-                'sub' => get_string('admin_reviews_tile_overdue_sub', 'local_launchpad', $sladays),
-                'foot' => get_string(
-                    'admin_reviews_tile_overdue_foot',
-                    'local_launchpad',
-                    (object) ['days' => $sladays, 'count' => $overduetotal]
-                ),
+                'sub' => $overduetotal > 0
+                    ? get_string('admin_reviews_tile_overdue_sub', 'local_launchpad', $sladays)
+                    : get_string('admin_reviews_tile_overdue_sub_none', 'local_launchpad'),
+                'foot' => $overduetotal > 0
+                    ? get_string(
+                        'admin_reviews_tile_overdue_foot',
+                        'local_launchpad',
+                        (object) ['days' => $sladays, 'count' => $overduetotal]
+                    )
+                    : get_string('admin_reviews_tile_overdue_foot_none', 'local_launchpad', $sladays),
                 'badge' => $overduetotal > 0
                     ? get_string('admin_reviews_tile_badge_overdue', 'local_launchpad')
                     : get_string('admin_reviews_tile_badge_within', 'local_launchpad'),
@@ -5518,9 +5614,16 @@ final class admin_dashboard {
             [
                 'label' => get_string('admin_reviews_tile_released', 'local_launchpad'),
                 'value' => (string) $released,
-                'sub' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
-                'foot' => get_string('admin_reviews_tile_released_foot', 'local_launchpad'),
-                'badge' => get_string('admin_reviews_tile_released_sub', 'local_launchpad'),
+                // Empty: one wrapping line only — a short sub + long foot made "E…" via ellipsis.
+                'sub' => $released > 0
+                    ? get_string('admin_reviews_tile_released_sub', 'local_launchpad')
+                    : get_string('admin_reviews_tile_released_foot_none', 'local_launchpad'),
+                'foot' => $released > 0
+                    ? get_string('admin_reviews_tile_released_foot', 'local_launchpad')
+                    : '',
+                'badge' => $released > 0
+                    ? get_string('admin_reviews_tile_released_sub', 'local_launchpad')
+                    : get_string('admin_reviews_tile_badge_none', 'local_launchpad'),
                 'badge_tone' => 'info',
                 'tone' => '',
                 'icon_svg' => $icon('<path d="M4 12l5 5L20 6"/>'),

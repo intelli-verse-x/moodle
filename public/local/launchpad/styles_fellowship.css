@@ -2907,11 +2907,22 @@ body.local-launchpad-mentor {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Empty Released (no meta): allow the single help line to wrap instead of "E…". */
+.lp-ro-kpi-foot:not(:has(.lp-ro-kpi-meta)) .lp-ro-kpi-sub {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
 .lp-ro-kpi-meta {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lp-ro-pill {
   display: inline-flex;
