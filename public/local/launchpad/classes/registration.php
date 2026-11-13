@@ -205,8 +205,10 @@ class registration {
             // send, immediately before header()+notice. Skip on SMTP exceptions.
             if (!empty($SESSION->{self::SESSION_PENDING_EMAIL})) {
                 global $PAGE;
+                // moodle_page::set_title() appends " | {shortname}" — exact === never matches.
                 $title = (string) ($PAGE->title ?? '');
-                if ($title !== '' && $title === get_string('emailconfirm')) {
+                $emailconfirm = get_string('emailconfirm');
+                if ($title !== '' && str_starts_with($title, $emailconfirm)) {
                     redirect(new \moodle_url('/local/launchpad/signup_pending.php'));
                 }
             }
