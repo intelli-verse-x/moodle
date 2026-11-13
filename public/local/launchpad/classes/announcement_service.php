@@ -171,6 +171,8 @@ final class announcement_service {
         $tracktotal = count($trackoptions);
         $trackslive = count($trackswithposts);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']))->out(false);
+        $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $hastracks = $trackoptions !== [];
 
         return array_merge([
             'eyebrow' => get_string('admin_announcements_eyebrow', 'local_launchpad'),
@@ -186,6 +188,12 @@ final class announcement_service {
             'stat_tracks_label' => get_string('admin_announcements_stat_tracks', 'local_launchpad'),
             'form_title' => get_string('admin_announcements_compose_title', 'local_launchpad'),
             'compose_lead' => get_string('admin_announcements_compose_lead', 'local_launchpad'),
+            // Compose empty ≠ feed empty: posts need a track news forum first.
+            'compose_empty_title' => get_string('admin_announcements_compose_empty_title', 'local_launchpad'),
+            'compose_empty_body' => get_string('admin_announcements_compose_empty_body', 'local_launchpad'),
+            'has_compose_empty_cta' => !$hastracks,
+            'compose_empty_cta_url' => $builderurl,
+            'compose_empty_cta_label' => get_string('admin_structure_create_in_builder', 'local_launchpad'),
             'list_title' => get_string('admin_announcements_list_title', 'local_launchpad'),
             'live_badge' => get_string('admin_announcements_live_badge', 'local_launchpad', count($items)),
             'refresh_label' => get_string('admin_announcements_refresh', 'local_launchpad'),
@@ -231,7 +239,7 @@ final class announcement_service {
             'col_when' => get_string('admin_announcements_col_when', 'local_launchpad'),
             'form_action' => $formaction,
             'sesskey' => sesskey(),
-            'has_tracks' => $trackoptions !== [],
+            'has_tracks' => $hastracks,
             'track_options' => $trackoptions,
             'tag_options' => $tagoptions,
             'items' => $items,

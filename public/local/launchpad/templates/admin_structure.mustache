@@ -15,12 +15,10 @@
         <div class="lp-st-links" style="margin-top:12px">
           {{#show_builder_cta}}
             <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{builder_url}}">{{create_in_builder_label}}</a>
-            <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
           {{/show_builder_cta}}
           {{#show_cohorts_cta}}
             <a class="lp-btn lp-btn-light lp-btn-sm" href="{{cohorts_url}}">{{cohorts_label}}</a>
           {{/show_cohorts_cta}}
-          <a class="lp-btn lp-btn-light lp-btn-sm" href="{{tracks_url}}">{{tracks_label}}</a>
         </div>
       </div>
     </div>
@@ -128,9 +126,6 @@
     <section class="lp-card soft lp-st-empty" role="status">
       <h3>{{empty_manage_title}}</h3>
       <p class="lp-muted">{{empty_manage_body}}</p>
-      <p class="lp-empty-actions" style="margin-top:12px">
-        <a class="lp-btn lp-btn-solid" href="{{builder_url}}">{{create_in_builder_label}}</a>
-      </p>
     </section>
   {{/has_existing}}
 

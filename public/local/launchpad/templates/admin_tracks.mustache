@@ -13,12 +13,7 @@
         <h2>{{heading}}</h2>
         <p class="lp-hero-lead">{{lead}}</p>
         <p class="lp-sm lp-tr-cat">
-          {{#category_chip_ok}}
-            <span class="lp-chip ok">{{category_chip}}</span>
-          {{/category_chip_ok}}
-          {{^category_chip_ok}}
-            <span class="lp-chip line">{{category_chip}}</span>
-          {{/category_chip_ok}}
+          <span class="lp-chip {{category_chip_class}}">{{category_chip}}</span>
         </p>
       </div>
       <aside class="lp-tr-hero-stats" aria-label="{{heading}}">

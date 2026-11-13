@@ -244,8 +244,21 @@ final class admin_dashboard {
         }
 
         $trackcount = count($cards);
+        // Live Moodle course_categories.visible on launchpad-root — not a static badge.
         $root = self::fellowship_root_category();
-        $catvisible = $root && (int) $root->visible === 1;
+        if (!$root) {
+            $catchip = get_string('admin_tracks_category_missing', 'local_launchpad');
+            $catchipclass = 'warn';
+            $catvisible = false;
+        } else if ((int) $root->visible === 1) {
+            $catchip = get_string('admin_tracks_category_visible', 'local_launchpad');
+            $catchipclass = 'ok';
+            $catvisible = true;
+        } else {
+            $catchip = get_string('admin_tracks_category_hidden', 'local_launchpad');
+            $catchipclass = 'line';
+            $catvisible = false;
+        }
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
 
@@ -254,9 +267,8 @@ final class admin_dashboard {
             'eyebrow' => get_string('admin_tracks_eyebrow', 'local_launchpad'),
             'heading' => get_string('admin_tracks_heading', 'local_launchpad'),
             'lead' => get_string('admin_tracks_lead', 'local_launchpad'),
-            'category_chip' => $catvisible
-                ? get_string('admin_tracks_category_visible', 'local_launchpad')
-                : get_string('admin_tracks_category_hidden', 'local_launchpad'),
+            'category_chip' => $catchip,
+            'category_chip_class' => $catchipclass,
             'category_chip_ok' => $catvisible,
             'has_tracks' => $cards !== [],
             'tracks' => $cards,
@@ -359,7 +371,6 @@ final class admin_dashboard {
 
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
-        $tracksurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
         $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
         $existing = self::structure_all_rows();
         $hasexisting = $existing !== [];
@@ -388,6 +399,7 @@ final class admin_dashboard {
             'danger_delete_need_hide' => get_string('admin_structure_danger_need_hide', 'local_launchpad'),
             'danger_confirm_label' => get_string('admin_structure_danger_confirm_label', 'local_launchpad'),
             'danger_confirm_help' => get_string('admin_structure_danger_confirm_help', 'local_launchpad'),
+            // One Create-in-builder CTA in the hero for empty + after (not duplicated in empty card).
             'show_builder_cta' => true,
             'show_cohorts_cta' => $hasexisting,
             'flash_ok' => !empty($flash['ok']),
@@ -395,12 +407,9 @@ final class admin_dashboard {
             'flash_err' => !empty($flash['error']),
             'flash_err_body' => (string) ($flash['error'] ?? ''),
             'builder_url' => $builderurl,
-            'builder_label' => get_string('admin_structure_open_builder', 'local_launchpad'),
             'create_in_builder_label' => get_string('admin_structure_create_in_builder', 'local_launchpad'),
             'cohorts_url' => $cohortsurl,
             'cohorts_label' => get_string('admin_nav_cohorts', 'local_launchpad'),
-            'tracks_url' => $tracksurl,
-            'tracks_label' => get_string('admin_nav_tracks', 'local_launchpad'),
             'empty_manage_title' => get_string('admin_structure_empty_title', 'local_launchpad'),
             'empty_manage_body' => get_string('admin_structure_empty_body', 'local_launchpad'),
         ];
@@ -6783,6 +6792,9 @@ final class admin_dashboard {
             'shown_list_label' => get_string('admin_visibility_shown_list', 'local_launchpad'),
             'visibility_empty' => $tracks === [],
             'visibility_empty_body' => get_string('admin_visibility_empty', 'local_launchpad'),
+            // Empty card CTA → Course builder (create first track / structure).
+            'visibility_create_url' => (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false),
+            'visibility_create_label' => get_string('admin_visibility_create_cta', 'local_launchpad'),
             'visibility_footer_tip' => get_string('admin_visibility_footer_tip', 'local_launchpad'),
         ];
     }
