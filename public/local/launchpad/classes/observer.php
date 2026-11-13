@@ -76,6 +76,11 @@ class observer {
         if ($userid <= 0) {
             return;
         }
+        // Persist Fellowship/Mentor tab so empty shells survive wiping lp-* courses.
+        $rawportal = optional_param('portal', '', PARAM_ALPHANUMEXT);
+        if ($rawportal !== '') {
+            registration::remember_login_portal($userid, $rawportal);
+        }
         // Login form portal field (employer/fellowship/mentor) must win over /my/ defaults.
         // Do not rewrite a pinned gate URL — wrong persona must hit employee/fellow/mentor.php
         // so portal_gate can stash the mismatch modal on the real home.

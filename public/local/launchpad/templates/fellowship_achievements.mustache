@@ -237,7 +237,9 @@
         {{/has_next_badges}}
         {{^has_next_badges}}
           <p class="lp-sm">{{strings.badges_next_done}}</p>
-          <a class="lp-btn lp-btn-light" href="{{moodle_badges_url}}">{{strings.badges_open_moodle}}</a>
+          {{#show_moodle_badges_link}}
+            <a class="lp-btn lp-btn-light" href="{{moodle_badges_url}}">{{strings.badges_open_moodle}}</a>
+          {{/show_moodle_badges_link}}
         {{/has_next_badges}}
       </section>
     </div>

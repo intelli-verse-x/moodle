@@ -48,7 +48,12 @@ final class mentor_dashboard {
             return false;
         }
         // Site admins use admin.php — do not linger on the Mentor shell.
-        return account_persona::is_mentor($userid);
+        if (account_persona::is_admin($userid)) {
+            return false;
+        }
+        // Teacher on lp-* OR mentor portal tag (empty queue OK until courses exist).
+        return account_persona::is_mentor($userid)
+            || registration::is_portal_mentor($userid);
     }
 
     /**

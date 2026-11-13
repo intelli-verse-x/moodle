@@ -2222,6 +2222,7 @@ final class fellowship_dashboard {
      */
     public static function achievements_for_user(int $userid, array $courses): array {
         $live = self::live_achievements($userid, $courses);
+        $live['has_courses'] = $courses !== [];
         return self::achievements_context_from_live($live);
     }
 
@@ -2335,7 +2336,25 @@ final class fellowship_dashboard {
         });
         $lockeditems = array_values(array_filter($badges, static fn(array $b): bool => empty($b['earned'])));
         $recent = array_slice($earneditems, 0, 4);
-        $nextbadges = array_slice($lockeditems, 0, 3);
+        // No enrolment → do not invent track lesson targets in "Next up".
+        $hascourses = !empty($live['has_courses']);
+        $nextbadges = $hascourses ? array_slice($lockeditems, 0, 3) : [];
+        $nextactivity = trim((string) ($live['next_activity_name'] ?? ''));
+        if ($hascourses && $nextactivity !== '') {
+            array_unshift($nextbadges, [
+                'name' => self::str('fellowship_badges_next_work', null, 'Next on your track'),
+                'description' => self::str(
+                    'fellowship_badges_next_work_how',
+                    $nextactivity,
+                    'Open: {$a}'
+                ),
+                'icon' => 'course',
+                'has_image' => false,
+                'imageurl' => '',
+                'earned' => false,
+            ]);
+            $nextbadges = array_slice($nextbadges, 0, 3);
+        }
 
         $badgesearned = (int) ($live['badges_earned'] ?? count($earneditems));
         $badgestotal = count($badges);
@@ -2440,11 +2459,17 @@ final class fellowship_dashboard {
                 'No badges earned yet — your first unlock will show here.'
             ),
             'badges_next_heading' => self::str('fellowship_badges_next_heading', null, 'Next up'),
-            'badges_next_done' => self::str(
-                'fellowship_badges_next_done',
-                null,
-                'You’ve unlocked every LaunchPad badge in this set.'
-            ),
+            'badges_next_done' => $hascourses
+                ? self::str(
+                    'fellowship_badges_next_done',
+                    null,
+                    'You’ve unlocked every LaunchPad badge in this set.'
+                )
+                : self::str(
+                    'fellowship_badges_next_need_enrol',
+                    null,
+                    'No track assigned yet. When your programme enrols you, the next badge steps for your course will show here.'
+                ),
             'xp_history' => self::str('fellowship_xp_history', null, 'XP history'),
             'xp_history_empty' => self::str(
                 'fellowship_xp_history_empty',
@@ -2496,6 +2521,7 @@ final class fellowship_dashboard {
             'has_recent' => $recent !== [],
             'next_items' => $nextbadges,
             'has_next_badges' => $nextbadges !== [],
+            'show_moodle_badges_link' => $hascourses && $nextbadges === [],
             'has_side_panels' => true,
             'badges_earned' => $badgesearned,
             'badges_total' => $badgestotal,
@@ -2546,6 +2572,12 @@ final class fellowship_dashboard {
         $foundationscomplete = false;
         $foundationsgateat = 0;
         $foundationsgradeok = false;
+        /** @var list<string> Foundations (section 1) lesson titles in course order. */
+        $foundationlessons = [];
+        /** @var list<string> Foundations quiz titles in course order. */
+        $foundationquizzes = [];
+        /** @var string First incomplete visible activity name (any phase) for Next up honesty. */
+        $nextactivityname = '';
 
         foreach ($courses as $course) {
             $modinfo = get_fast_modinfo($course, $userid);
@@ -2580,6 +2612,7 @@ final class fellowship_dashboard {
 
                 if ($cm->modname === 'page' || $cm->modname === 'resource' || $cm->modname === 'url') {
                     if ($sectionnum === 1) {
+                        $foundationlessons[] = $name;
                         $pagestotals1++;
                         if ($iscomplete) {
                             $pagesdones1++;
@@ -2595,6 +2628,15 @@ final class fellowship_dashboard {
                             'page-' . $cm->id
                         );
                     }
+                }
+
+                if ($cm->modname === 'quiz' && $sectionnum === 1) {
+                    $foundationquizzes[] = $name;
+                }
+
+                if ($nextactivityname === '' && !$iscomplete
+                        && in_array($cm->modname, ['page', 'resource', 'url', 'quiz', 'assign'], true)) {
+                    $nextactivityname = $name;
                 }
 
                 if ($sectionnum === 1 && $completionenabled && $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE) {
@@ -2762,68 +2804,81 @@ final class fellowship_dashboard {
             }
         }
 
+        $lesson1 = $foundationlessons[0] ?? '';
+        $lesson2 = $foundationlessons[1] ?? '';
+        $quiz1 = $foundationquizzes[0] ?? '';
+        $firsthow = $lesson1 !== ''
+            ? get_string('fellowship_badge_how_finish_named', 'local_launchpad', $lesson1)
+            : get_string('fellowship_badge_how_first_lesson', 'local_launchpad');
+        $evidencehow = $lesson2 !== ''
+            ? get_string('fellowship_badge_how_finish_named', 'local_launchpad', $lesson2)
+            : get_string('fellowship_badge_how_early_lesson', 'local_launchpad');
+        $acehow = $quiz1 !== ''
+            ? get_string('fellowship_badge_how_quiz_full', 'local_launchpad', $quiz1)
+            : get_string('fellowship_badge_how_quiz_foundations', 'local_launchpad');
+
         // Hugeicons slugs (iconify: hugeicons:<slug>) — no emoji.
         $badgedefs = [
             'first' => [
                 'name' => 'First step',
                 'icon' => 'plant-01',
-                'how' => 'Finish your first lesson',
+                'how' => $firsthow,
                 'earned' => $pagesdone >= 1,
                 'at' => $pagesdone >= 1 ? self::first_log_ts($xplog, 'page-') : 0,
             ],
             'evidence' => [
                 'name' => 'Evidence hunter',
                 'icon' => 'search-01',
-                'how' => 'Finish Lesson 2: Evidence versus assumptions',
+                'how' => $evidencehow,
                 'earned' => $evidence,
                 'at' => $evidence ? self::first_log_ts($xplog, 'page-') : 0,
             ],
             'allLessons' => [
                 'name' => 'Foundations reader',
                 'icon' => 'books-01',
-                'how' => 'Finish all Foundations lessons in your track',
+                'how' => get_string('fellowship_badge_how_all_foundations', 'local_launchpad'),
                 'earned' => $alllessons,
                 'at' => $alllessons ? self::first_log_ts($xplog, 'page-') : 0,
             ],
             'ace' => [
                 'name' => 'Quiz ace',
                 'icon' => 'target-01',
-                'how' => 'Score full marks on the Foundations check',
+                'how' => $acehow,
                 'earned' => $quizperfect,
                 'at' => $quizperfectat,
             ],
             'handin' => [
                 'name' => 'Hand-in hero',
                 'icon' => 'mail-send-01',
-                'how' => 'Submit your first assignment',
+                'how' => get_string('fellowship_badge_how_first_assign', 'local_launchpad'),
                 'earned' => $assignsubmitted,
                 'at' => $assignsubmittedat,
             ],
             'loop' => [
                 'name' => 'Feedback loop',
                 'icon' => 'refresh',
-                'how' => 'Resubmit after your mentor requests changes',
+                'how' => get_string('fellowship_badge_how_resubmit', 'local_launchpad'),
                 'earned' => $assignresubmit,
                 'at' => $assignresubmitat,
             ],
             'gate' => [
                 'name' => 'Gate one cleared',
                 'icon' => 'flag-02',
-                'how' => 'Pass Foundations (completion or grade ≥ 70)',
+                'how' => get_string('fellowship_badge_how_gate', 'local_launchpad'),
                 'earned' => $gatecleared,
                 'at' => $foundationsgateat,
             ],
             'portfolio' => [
                 'name' => 'Portfolio starter',
                 'icon' => 'folder-01',
-                'how' => 'Save your first portfolio case study',
+                'how' => get_string('fellowship_badge_how_portfolio', 'local_launchpad'),
                 'earned' => false,
                 'at' => 0,
             ],
             'profile' => [
                 'name' => 'Introduced',
                 'icon' => 'waving-hand-01',
-                'how' => 'Add a city or description on your Moodle profile',
+                'how' => get_string('fellowship_badge_how_profile', 'local_launchpad'),
                 'earned' => $profiledone,
                 'at' => $profileat,
             ],
@@ -2863,6 +2918,8 @@ final class fellowship_dashboard {
             }, $xplog),
             'badges' => $badges,
             'badges_earned' => $earnedcount,
+            'next_activity_name' => $nextactivityname,
+            'has_courses' => $courses !== [],
         ];
     }
 
@@ -3368,16 +3425,25 @@ final class fellowship_dashboard {
             'total' => '{total}',
         ]);
 
+        $hasenrolled = $courses !== [];
+        $emptybody = $hasenrolled
+            ? get_string('fellowship_news_empty_body', 'local_launchpad')
+            : get_string('fellowship_news_empty_need_enrol', 'local_launchpad');
+
         return [
             'items' => $items,
             'has_items' => $hasitems,
             'has_posts' => $hasitems,
             'has_pinned' => $pinnedcount > 0,
+            'has_enrolled_courses' => $hasenrolled,
             'count_posts' => $postcount,
             'count_pinned' => $pinnedcount,
-            'count_courses' => count($coursenames),
+            // Enrolled tracks (not only courses that already have a post).
+            'count_courses' => count($courses),
             'moodle_news_url' => $firstforumurl,
             'has_moodle_news' => $hasmoodlenews,
+            'empty_title' => get_string('fellowship_news_empty_title', 'local_launchpad'),
+            'empty_body' => $emptybody,
             'filter_label' => get_string('fellowship_news_filter_label', 'local_launchpad'),
             'filter_all' => get_string('fellowship_news_filter_all', 'local_launchpad'),
             'filter_pinned' => get_string('fellowship_news_filter_pinned', 'local_launchpad'),
@@ -3848,16 +3914,17 @@ final class fellowship_dashboard {
             'badges_earned' => 0,
         ];
         // Reuse definitions with nothing earned via a zero-user path is heavy; inline locked catalogue.
+        // Generic locked catalogue (no invented lesson titles — those need a live track).
         foreach ([
             ['first', 'First step', 'plant-01', 'Finish your first lesson'],
-            ['evidence', 'Evidence hunter', 'search-01', 'Finish Lesson 2: Evidence versus assumptions'],
+            ['evidence', 'Evidence hunter', 'search-01', 'Finish an early Foundations lesson on your track'],
             ['allLessons', 'Foundations reader', 'books-01', 'Finish all Foundations lessons in your track'],
-            ['ace', 'Quiz ace', 'target-01', 'Score full marks on the Foundations check'],
+            ['ace', 'Quiz ace', 'target-01', 'Score full marks on a Foundations quiz'],
             ['handin', 'Hand-in hero', 'mail-send-01', 'Submit your first assignment'],
             ['loop', 'Feedback loop', 'refresh', 'Resubmit after your mentor requests changes'],
             ['gate', 'Gate one cleared', 'flag-02', 'Pass Foundations (completion or grade ≥ 70)'],
             ['portfolio', 'Portfolio starter', 'folder-01', 'Save your first portfolio case study'],
-            ['profile', 'Introduced', 'waving-hand-01', 'Add a city or description on your Moodle profile'],
+            ['profile', 'Introduced', 'waving-hand-01', 'Add a city or description on your profile'],
         ] as $row) {
             $live['badges'][] = [
                 'id' => $row[0],
@@ -4461,6 +4528,7 @@ final class fellowship_dashboard {
         // Higher-priority personas use their own shells (portal_gate mismatch).
         // Do not let a leftover toba_portal tag open fellow.php for them.
         if (account_persona::is_admin($userid) || account_persona::is_mentor($userid)
+                || registration::is_portal_mentor($userid)
                 || account_persona::is_employee($userid)) {
             return false;
         }

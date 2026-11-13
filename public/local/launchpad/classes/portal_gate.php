@@ -122,7 +122,7 @@ final class portal_gate {
         if (account_persona::is_admin($userid)) {
             return 'admin';
         }
-        if (account_persona::is_mentor($userid)) {
+        if (account_persona::is_mentor($userid) || registration::is_portal_mentor($userid)) {
             return 'mentor';
         }
         if (account_persona::is_employee($userid)) {

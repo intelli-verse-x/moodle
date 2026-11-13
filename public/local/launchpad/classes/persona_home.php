@@ -75,7 +75,9 @@ final class persona_home {
         // is_admin() already covers is_siteadmin() — avoid a second native check.
         if (account_persona::is_admin($userid)) {
             $home = new \moodle_url(self::ADMIN_PATH);
-        } else if (account_persona::is_mentor($userid)) {
+        } else if (account_persona::is_mentor($userid)
+                || registration::is_portal_mentor($userid)) {
+            // Teacher on lp-* OR mentor portal tag (empty shell after course wipe).
             $home = new \moodle_url(self::MENTOR_PATH);
         } else if (account_persona::is_employee($userid)) {
             // Employer cohort before Fellowship: lp-* student enrolments are normal

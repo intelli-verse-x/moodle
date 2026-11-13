@@ -1178,6 +1178,7 @@ switch ($view) {
 
 // Live XP + badges once per request (sidebar, topbar, Achievements, Home).
 $live = fellowship_dashboard::live_achievements($userid, $courses);
+$live['has_courses'] = $courses !== [];
 $ach = fellowship_dashboard::achievements_context_from_live($live, $view === 'achievements' ? $tab : 'all');
 $xptotal = (int) $ach['xp_total'];
 $badgesearned = (int) $ach['badges_earned'];

@@ -45,6 +45,9 @@ class registration {
     /** Only Fellowship may self-register. */
     public const PORTAL_FELLOWSHIP = 'fellowship';
 
+    /** Mentor portal tag (login tab / empty mentor shell when no lp-* teacher role yet). */
+    public const PORTAL_MENTOR = 'mentor';
+
     /**
      * Enable auth_email and set Self registration to Email-based.
      *
@@ -128,6 +131,37 @@ class registration {
         }
         $portal = get_user_preferences(self::PREF_PORTAL, '', $userid);
         return self::normalise_portal((string) $portal) === self::PORTAL_FELLOWSHIP;
+    }
+
+    /**
+     * Mentor shell tag via toba_portal (survives wiping lp-* teacher roles).
+     *
+     * Does not grant grading caps — mentor.php still shows empty queue until
+     * the user is a teacher on an lp-* course. Used only for shell home/access.
+     */
+    public static function is_portal_mentor(int $userid): bool {
+        if ($userid <= 0) {
+            return false;
+        }
+        $portal = strtolower(trim((string) get_user_preferences(self::PREF_PORTAL, '', $userid)));
+        return $portal === self::PORTAL_MENTOR || $portal === 'mentors';
+    }
+
+    /**
+     * Persist Fellowship/Mentor portal choice after a successful login tab pin.
+     *
+     * So empty-state shells still open after courses are removed (scratch wipe).
+     */
+    public static function remember_login_portal(int $userid, string $portal): void {
+        if ($userid <= 0) {
+            return;
+        }
+        $portal = login_portal::normalise($portal);
+        if ($portal !== login_portal::FELLOWSHIP && $portal !== login_portal::MENTOR) {
+            return;
+        }
+        set_user_preference(self::PREF_PORTAL, $portal, $userid);
+        persona_home::reset_home_cache();
     }
 
     /**
