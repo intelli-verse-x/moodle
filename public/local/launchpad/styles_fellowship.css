@@ -12043,6 +12043,19 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
   border-radius: 50%;
   background: currentColor;
 }
+.lp-tr-status-orient {
+  color: #5b4a2a;
+  background: #f7efd9;
+}
+.lp-tr-status-orient::before {
+  background: #b45309;
+}
+.lp-tr-orient-wrap {
+  margin-top: 8px;
+}
+.lp-tr-orient-card .lp-tr-card-foot .lp-inline-form {
+  display: inline-flex;
+}
 .lp-tr-status-ready {
   color: #166534;
   background: #dcfce7;

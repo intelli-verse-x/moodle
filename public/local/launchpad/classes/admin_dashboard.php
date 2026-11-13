@@ -57,6 +57,13 @@ final class admin_dashboard {
     }
 
     /**
+     * Whether an idnumber is Shared orientation (`lp-orient-*`).
+     */
+    public static function is_orientation_idnumber(string $idnumber): bool {
+        return str_starts_with(strtolower(trim($idnumber)), self::ORIENT_IDNUMBER_PREFIX);
+    }
+
+    /**
      * Whether an idnumber is a LaunchPad structure course (track or orientation).
      */
     public static function is_structure_idnumber(string $idnumber): bool {
@@ -207,10 +214,13 @@ final class admin_dashboard {
     /**
      * Tracks & courses page (HTML a-tracks) — card grid from live Moodle.
      *
+     * Orientation (`lp-orient-*`) is listed separately for Show/Hide — not counted in track KPIs.
+     *
      * @param \stdClass $user
+     * @param array{ok?:string,error?:string} $flash
      * @return array<string, mixed>
      */
-    public static function tracks_context(\stdClass $user): array {
+    public static function tracks_context(\stdClass $user, array $flash = []): array {
         $firstname = format_string($user->firstname ?? '');
         $tracks = self::list_track_courses();
         $cards = [];
@@ -228,10 +238,16 @@ final class admin_dashboard {
             $fellowstotal += (int) ($card['fellows_count'] ?? 0);
         }
 
+        $orientcards = [];
+        foreach (self::list_orientation_courses() as $orient) {
+            $orientcards[] = self::orientation_card_context($orient);
+        }
+
         $trackcount = count($cards);
         $root = self::fellowship_root_category();
         $catvisible = $root && (int) $root->visible === 1;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
 
         return array_merge([
             'firstname' => $firstname,
@@ -244,6 +260,18 @@ final class admin_dashboard {
             'category_chip_ok' => $catvisible,
             'has_tracks' => $cards !== [],
             'tracks' => $cards,
+            // Orientation — separate from track KPIs / filters.
+            'has_orientation' => $orientcards !== [],
+            'orientation_title' => get_string('admin_tracks_orient_title', 'local_launchpad'),
+            'orientation_lead' => get_string('admin_tracks_orient_lead', 'local_launchpad'),
+            'orientation_help' => get_string('admin_tracks_orient_help', 'local_launchpad'),
+            'orientation_courses' => $orientcards,
+            'form_action' => $formaction,
+            'sesskey' => sesskey(),
+            'flash_ok' => !empty($flash['ok']),
+            'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+            'flash_err' => !empty($flash['error']),
+            'flash_err_body' => (string) ($flash['error'] ?? ''),
             // Hero summary (computed from live track cards — no fake export/sync CTAs).
             'stat_tracks_label' => get_string('admin_tracks_stat_tracks', 'local_launchpad'),
             'stat_tracks_value' => (string) $trackcount,
@@ -275,6 +303,48 @@ final class admin_dashboard {
             $builderurl,
             'admin_empty_cta_create_track'
         ));
+    }
+
+    /**
+     * Orientation card for Tracks page (Show/Hide + Course ops — not a fellowship track KPI).
+     *
+     * @param \stdClass $course id, fullname, shortname, idnumber, visible
+     * @return array<string, mixed>
+     */
+    public static function orientation_card_context(\stdClass $course): array {
+        $courseid = (int) $course->id;
+        $isvisible = (int) ($course->visible ?? 0) === 1;
+        $idnumber = trim((string) ($course->idnumber ?? ''));
+        $shortname = trim((string) ($course->shortname ?? ''));
+        $showshortname = $shortname !== '' && strcasecmp($shortname, $idnumber) !== 0;
+        $fellows = self::fellow_count($courseid);
+        $slug = self::cohort_slug_from_track_idnumber($idnumber) ?? '';
+
+        return [
+            'id' => $courseid,
+            'name' => format_string($course->fullname),
+            'idnumber' => $idnumber !== '' ? s($idnumber) : '',
+            'shortname' => $showshortname ? s($shortname) : '',
+            'badge' => get_string('admin_tracks_orient_badge', 'local_launchpad'),
+            'is_visible' => $isvisible,
+            'is_hidden' => !$isvisible,
+            'visibility_label' => $isvisible
+                ? get_string('admin_tracks_course_visible', 'local_launchpad')
+                : get_string('admin_tracks_course_hidden', 'local_launchpad'),
+            'enrolled_section_label' => get_string('admin_tracks_enrolled_section', 'local_launchpad'),
+            'fellows_count' => $fellows,
+            'fellows_label' => get_string('admin_tracks_fellows', 'local_launchpad', $fellows),
+            'hide_label' => get_string('admin_structure_danger_hide', 'local_launchpad'),
+            'show_label' => get_string('admin_structure_danger_unhide', 'local_launchpad'),
+            'cohort_value' => $slug,
+            'course_url' => (new \moodle_url('/course/view.php', ['id' => $courseid]))->out(false),
+            'open_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
+            'courseops_url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                'view' => 'courseops',
+                'trackid' => $courseid,
+            ]))->out(false),
+            'courseops_label' => get_string('admin_tracks_course_ops', 'local_launchpad'),
+        ];
     }
 
     /**
@@ -1109,6 +1179,7 @@ final class admin_dashboard {
 
     /**
      * Resolve a LaunchPad track course by id (0 / invalid → first track or null).
+     * Orientation is excluded — use {@see resolve_courseops_course()} for Course ops.
      */
     public static function resolve_track_course(int $trackid): ?\stdClass {
         $tracks = self::list_track_courses();
@@ -1126,7 +1197,36 @@ final class admin_dashboard {
     }
 
     /**
+     * Resolve a Course ops course: track or shared orientation (`lp-orient-*`).
+     * 0 / invalid → first track, else first orientation, else null.
+     */
+    public static function resolve_courseops_course(int $courseid): ?\stdClass {
+        $tracks = self::list_track_courses();
+        $orients = self::list_orientation_courses();
+        if ($courseid > 0) {
+            foreach ($orients as $course) {
+                if ((int) $course->id === $courseid) {
+                    return $course;
+                }
+            }
+            foreach ($tracks as $course) {
+                if ((int) $course->id === $courseid) {
+                    return $course;
+                }
+            }
+        }
+        if ($tracks !== []) {
+            return $tracks[0];
+        }
+        if ($orients !== []) {
+            return $orients[0];
+        }
+        return null;
+    }
+
+    /**
      * M5 Course ops hub — track-scoped in-shell home (not a Moodle link farm).
+     * Orientation courses appear in the picker (labeled) for Show/Hide + settings.
      *
      * @param \stdClass $user
      * @param int $trackid
@@ -1151,7 +1251,8 @@ final class admin_dashboard {
         }
 
         $tracks = self::list_track_courses();
-        if ($tracks === []) {
+        $orients = self::list_orientation_courses();
+        if ($tracks === [] && $orients === []) {
             $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
             return array_merge([
                 'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
@@ -1178,8 +1279,35 @@ final class admin_dashboard {
             ));
         }
 
-        $selected = self::resolve_track_course($trackid);
+        $selected = self::resolve_courseops_course($trackid);
+        if ($selected === null) {
+            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
+            return array_merge([
+                'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
+                'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
+                'lead' => get_string('admin_courseops_lead', 'local_launchpad'),
+                'has_tracks' => false,
+                'is_hub' => true,
+                'is_settings' => false,
+                'is_participants' => false,
+                'is_grades' => false,
+                'is_completion' => false,
+                'is_reports' => false,
+                'is_qbank' => false,
+                'is_soon' => false,
+                'flash_ok' => !empty($flash['ok']),
+                'flash_ok_body' => (string) ($flash['ok'] ?? ''),
+                'flash_err' => !empty($flash['error']),
+                'flash_err_body' => (string) ($flash['error'] ?? ''),
+            ], self::empty_state(
+                'admin_tracks_empty',
+                'admin_empty_title_no_tracks',
+                $structureurl,
+                'admin_empty_cta_structure'
+            ));
+        }
         $trackid = (int) $selected->id;
+        $isorientation = self::is_orientation_idnumber((string) ($selected->idnumber ?? ''));
         // Full row for settings (list query is slim).
         $fullcourse = $DB->get_record('course', ['id' => $trackid], '*', MUST_EXIST);
         $visible = (int) ($fullcourse->visible ?? 0) === 1;
@@ -1257,6 +1385,25 @@ final class admin_dashboard {
         ];
 
         $tracktabs = [];
+        foreach ($orients as $course) {
+            $cid = (int) $course->id;
+            $slug = self::cohort_slug_from_track_idnumber((string) ($course->idnumber ?? '')) ?? '';
+            $tablabel = $slug !== ''
+                ? get_string('admin_courseops_orient_tab', 'local_launchpad', $slug)
+                : get_string('admin_tracks_orient_badge', 'local_launchpad');
+            $tracktabs[] = [
+                'id' => $cid,
+                'label' => $tablabel,
+                'title' => format_string($course->fullname),
+                'url' => (new \moodle_url(persona_home::ADMIN_PATH, [
+                    'view' => 'courseops',
+                    'trackid' => $cid,
+                    'section' => $section === 'hub' ? 'hub' : $section,
+                ]))->out(false),
+                'current' => $cid === $trackid,
+                'is_orientation' => true,
+            ];
+        }
         foreach ($tracks as $course) {
             $cid = (int) $course->id;
             $tracktabs[] = [
@@ -1269,6 +1416,7 @@ final class admin_dashboard {
                     'section' => $section === 'hub' ? 'hub' : $section,
                 ]))->out(false),
                 'current' => $cid === $trackid,
+                'is_orientation' => false,
             ];
         }
 
@@ -1296,14 +1444,17 @@ final class admin_dashboard {
             'track_idnumber' => s($fullcourse->idnumber ?? ''),
             'trackid' => $trackid,
             'track_tabs' => $tracktabs,
+            'is_orientation' => $isorientation,
             'is_visible' => $visible,
             'visibility_chip' => $visible
                 ? get_string('admin_courseops_visible', 'local_launchpad')
                 : get_string('admin_courseops_hidden', 'local_launchpad'),
+            'show_ready_chip' => !$isorientation,
             'ready_chip' => $foundationsready
                 ? get_string('admin_tracks_foundations_ready', 'local_launchpad')
                 : get_string('admin_tracks_outline_only', 'local_launchpad'),
             'ready_ok' => $foundationsready,
+            'orient_chip' => get_string('admin_tracks_orient_badge', 'local_launchpad'),
             'teacher_kv_label' => get_string('admin_builder_kv_teacher', 'local_launchpad'),
             'teacher_summary' => $teachers !== []
                 ? implode(', ', $teachers)
@@ -1316,7 +1467,9 @@ final class admin_dashboard {
             'back_tracks_label' => get_string('admin_courseops_back_tracks', 'local_launchpad'),
             'preview_url' => (new \moodle_url('/course/view.php', ['id' => $trackid]))->out(false),
             'preview_label' => get_string('admin_tracks_open_course', 'local_launchpad'),
-            'status_title' => get_string('admin_courseops_status_title', 'local_launchpad'),
+            'status_title' => $isorientation
+                ? get_string('admin_courseops_status_title_orient', 'local_launchpad')
+                : get_string('admin_courseops_status_title', 'local_launchpad'),
             'ops_title' => get_string('admin_courseops_ops_title', 'local_launchpad'),
             'ops_lead' => get_string('admin_courseops_ops_lead', 'local_launchpad'),
             'primary_nav' => $primary,
@@ -1567,7 +1720,7 @@ final class admin_dashboard {
             return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
         }
         $course = $DB->get_record('course', ['id' => $trackid], 'id,idnumber', IGNORE_MISSING);
-        if (!$course || !self::is_track_idnumber((string) ($course->idnumber ?? ''))) {
+        if (!$course || !self::is_structure_idnumber((string) ($course->idnumber ?? ''))) {
             return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
         }
         return messaging::set_track_chat_enabled($trackid, $on);
@@ -2035,12 +2188,12 @@ final class admin_dashboard {
         require_once($CFG->dirroot . '/course/lib.php');
         require_once($CFG->libdir . '/completionlib.php');
 
-        $course = self::resolve_track_course($trackid);
+        $course = self::resolve_courseops_course($trackid);
         if ($course === null || (int) $course->id !== $trackid) {
             return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
         }
         $full = $DB->get_record('course', ['id' => $trackid], '*', IGNORE_MISSING);
-        if (!$full || !self::is_track_idnumber((string) ($full->idnumber ?? ''))) {
+        if (!$full || !self::is_structure_idnumber((string) ($full->idnumber ?? ''))) {
             return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
         }
         $modcontext = \context_course::instance($trackid);
@@ -2476,7 +2629,7 @@ final class admin_dashboard {
         } catch (account_provision_exception $e) {
             return ['error' => self::flash_error_message($e)];
         }
-        if (!self::is_track_idnumber((string) $course->idnumber)) {
+        if (!self::is_structure_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
         }
 
@@ -2518,7 +2671,7 @@ final class admin_dashboard {
         } catch (account_provision_exception $e) {
             return ['error' => self::flash_error_message($e)];
         }
-        if (!self::is_track_idnumber((string) $course->idnumber)) {
+        if (!self::is_structure_idnumber((string) $course->idnumber)) {
             return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
         }
 
@@ -2588,12 +2741,12 @@ final class admin_dashboard {
             return $fail(get_string('admin_courseops_err_shortname', 'local_launchpad'));
         }
 
-        $course = self::resolve_track_course($trackid);
+        $course = self::resolve_courseops_course($trackid);
         if ($course === null || (int) $course->id !== $trackid) {
             return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
         }
         $full = $DB->get_record('course', ['id' => $trackid], '*', IGNORE_MISSING);
-        if (!$full || !self::is_track_idnumber((string) ($full->idnumber ?? ''))) {
+        if (!$full || !self::is_structure_idnumber((string) ($full->idnumber ?? ''))) {
             return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
         }
 

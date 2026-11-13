@@ -111,7 +111,7 @@ if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
 
 if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage'
             || $view === 'activity' || $view === 'announcements' || $view === 'reviews'
-            || $view === 'courseops' || $view === 'structure')
+            || $view === 'courseops' || $view === 'structure' || $view === 'tracks')
         && data_submitted() && confirm_sesskey()) {
     $action = optional_param('action', '', PARAM_ALPHAEXT);
     if ($view === 'structure' && $action === 'structure_preview') {
@@ -127,7 +127,8 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
     }
-    if ($view === 'structure' && ($action === 'structure_hide' || $action === 'structure_unhide')) {
+    if (($view === 'structure' || $view === 'tracks')
+            && ($action === 'structure_hide' || $action === 'structure_unhide')) {
         $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
         $courseid = optional_param('courseid', 0, PARAM_INT);
         $flash = admin_dashboard::run_structure_set_visible(
@@ -137,7 +138,7 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $cohort
         );
         $SESSION->lp_admin_flash = $flash;
-        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => $view]));
     }
     if ($view === 'structure' && $action === 'structure_delete') {
         $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
@@ -635,7 +636,7 @@ if ($view === 'tracks') {
     $pagetitle = get_string('admin_nav_tracks', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_tracks',
-        admin_dashboard::tracks_context($USER)
+        admin_dashboard::tracks_context($USER, $flash)
     );
 } else if ($view === 'structure') {
     $pagetitle = get_string('admin_nav_structure', 'local_launchpad');
