@@ -953,7 +953,8 @@ switch ($view) {
             persona_home::FELLOW_PATH,
             $pref,
             $prefsaved > 0,
-            $preferr
+            $preferr,
+            true // hide Moodle Advanced / escape-hatch preferences
         );
         // Fellowship: LaunchPad profile is enough — no Moodle escape buttons.
         $profilestrings = employer_tools::profile_strings();
@@ -990,18 +991,10 @@ switch ($view) {
         $profilestrings['native_tools_note'] = $lpstr(
             'fellowship_profile_prefs_note',
             null,
-            'Some advanced preference tools open outside LaunchPad when your programme requires them.'
+            'Changes save to your LaunchPad account.'
         );
-        $profilestrings['pref_open_moodle'] = $lpstr(
-            'fellowship_pref_open_advanced',
-            null,
-            'Open advanced settings'
-        );
-        $profilestrings['pref_advanced_moodle'] = $lpstr(
-            'fellowship_pref_advanced',
-            null,
-            'Advanced settings'
-        );
+        $profilestrings['pref_open_moodle'] = '';
+        $profilestrings['pref_advanced_moodle'] = '';
         $profilestrings['profile_course_details_title'] = $lpstr(
             'fellowship_profile_course_details_title',
             null,

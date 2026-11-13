@@ -2360,6 +2360,17 @@
         });
 
         applyTab(root.getAttribute('data-lp-profile-active') || 'overview', false);
+
+        // Pref detail used to render under a still-visible hub (display:flex beat [hidden]).
+        // After CSS fix, still scroll the form into view so the change is obvious.
+        var prefDetail = root.querySelector('[data-lp-profile-pref-detail]');
+        if (prefDetail && !prefDetail.hidden) {
+            try {
+                prefDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (err) {
+                prefDetail.scrollIntoView(true);
+            }
+        }
     })();
 
     // Admin People tabs: filter in-place (no full-page reload).

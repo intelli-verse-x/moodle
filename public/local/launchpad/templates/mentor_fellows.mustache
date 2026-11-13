@@ -4,7 +4,8 @@
 {{^has_courses}}
   <div class="lp-empty" role="status">
     <div class="lp-empty-mark" aria-hidden="true">MN</div>
-    <p>{{empty_courses_message}}</p>
+    <h2>{{#str}} mentor_fellows_no_courses_title, local_launchpad {{/str}}</h2>
+    <p>{{#str}} mentor_fellows_no_courses_body, local_launchpad {{/str}}</p>
   </div>
 {{/has_courses}}
 {{#has_courses}}

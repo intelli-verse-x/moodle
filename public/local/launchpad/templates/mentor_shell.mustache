@@ -7,7 +7,9 @@
 <div class="lp-shell" data-region="{{data_region}}" id="lp-shell">
   <div class="lp-scrim" data-lp-nav-close hidden></div>
   <nav class="lp-side" id="lp-side" aria-label="{{#str}} mentor_nav_aria, local_launchpad {{/str}}">
-    <a class="lp-logo" href="{{home_url}}"><span class="lp-logo-mark" aria-hidden="true"></span>ToBa Learn</a>
+    <a class="lp-logo" href="{{home_url}}">
+      <img class="lp-logo-img" src="{{assets}}/logo-on-dark.png" alt="ToBa Learn" width="106" height="40">
+    </a>
     <div class="lp-role">{{role_label}}</div>
     {{#nav_groups}}
       <div class="lp-nl">{{group}}</div>

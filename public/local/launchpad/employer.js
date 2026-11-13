@@ -710,6 +710,15 @@
         });
 
         applyTab(root.getAttribute('data-lp-profile-active') || 'overview', false);
+
+        var prefDetail = root.querySelector('[data-lp-profile-pref-detail]');
+        if (prefDetail && !prefDetail.hidden) {
+            try {
+                prefDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (err) {
+                prefDetail.scrollIntoView(true);
+            }
+        }
     })();
 
 })();

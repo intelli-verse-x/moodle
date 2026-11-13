@@ -9375,6 +9375,11 @@ body.lp-portal-mismatch-lock {
   flex-direction: column;
   gap: 16px;
 }
+/* Author display:flex beats UA [hidden] — hub must actually hide when a pref detail opens. */
+.lp-profile-prefs[hidden],
+[data-lp-profile-pref-detail][hidden] {
+  display: none !important;
+}
 .lp-profile-prefs-lead { margin: 0; max-width: 62ch; }
 .lp-profile-pref-list {
   list-style: none;

@@ -285,7 +285,6 @@ switch ($view) {
         $queuedata = mentor_dashboard::list_review_queue($userid, $courses, $filter);
         $content = $OUTPUT->render_from_template('local_launchpad/mentor_queue', array_merge($queuedata, [
             'has_courses' => $courses !== [],
-            'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
         ]));
         break;
 
@@ -294,7 +293,6 @@ switch ($view) {
         $fellowsdata = mentor_dashboard::list_fellows($userid, $courses);
         $content = $OUTPUT->render_from_template('local_launchpad/mentor_fellows', array_merge($fellowsdata, [
             'has_courses' => $courses !== [],
-            'empty_courses_message' => get_string('mentor_area_no_courses', 'local_launchpad'),
             'queue_url' => $queueurl,
         ]));
         break;
@@ -469,6 +467,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_mer
     'content' => $content,
     'pagetitle' => $pagetitle,
     'home_url' => $homeurl,
+    'assets' => $pluginbase . '/assets/img',
     'logout_url' => $logouturl,
     'profile_url' => $profileurl,
     'notifications_url' => $notificationsurl,

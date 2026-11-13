@@ -60,6 +60,8 @@ Modes:
   --mode=structure   Hide + delete every course with idnumber lp-* (default).
                      Keeps LaunchPad categories. Admin recreates tracks in UI
                      (or re-run setup_structure.php --apply for empty shelves).
+                     Also clears Moodle notifications + private/group messages
+                     for tagged fellow/mentor users (Personal space kept).
   --mode=progress    Keep courses; clear completions, quiz attempts, assign
                      submissions/grades on lp-* for non-siteadmin users; unenrol
                      students from lp-* courses; clear LaunchPad user prefs.
@@ -200,6 +202,80 @@ function lp_clean_clear_notifications(array $userids, bool $apply): int {
     $DB->delete_records_select('message_popup_notifications', "notificationid $idinsql", $idparams);
     $DB->delete_records_select('notifications', "id $idinsql", $idparams);
     return $n;
+}
+
+/**
+ * Soft-delete messages + drop non-self conversation memberships for users.
+ * Leaves Personal (self) space; clears leftover private/group threads after course wipe.
+ *
+ * @param list<int> $userids
+ * @return int Conversation memberships removed (approx)
+ */
+function lp_clean_clear_messages(array $userids, bool $apply): int {
+    global $DB;
+
+    require_once(__DIR__ . '/../../../message/lib.php');
+
+    $userids = array_values(array_unique(array_filter(array_map('intval', $userids))));
+    if ($userids === []) {
+        return 0;
+    }
+
+    $removed = 0;
+    foreach ($userids as $userid) {
+        if ($userid <= 0 || is_siteadmin($userid)) {
+            continue;
+        }
+        $memberships = $DB->get_records('message_conversation_members', ['userid' => $userid], '', 'id, conversationid');
+        foreach ($memberships as $member) {
+            $convid = (int) $member->conversationid;
+            if ($convid <= 0) {
+                continue;
+            }
+            $conv = $DB->get_record('message_conversations', ['id' => $convid], 'id, type');
+            if (!$conv) {
+                continue;
+            }
+            $type = (int) $conv->type;
+            $isself = $type === \core_message\api::MESSAGE_CONVERSATION_TYPE_SELF;
+            if (!$apply) {
+                // Count non-self only — self stays as Personal space.
+                if (!$isself) {
+                    $removed++;
+                }
+                continue;
+            }
+            try {
+                \core_message\api::delete_conversation_by_id($userid, $convid);
+            } catch (Throwable $e) {
+                cli_writeln('  ! soft-delete msgs failed u=' . $userid . ' c=' . $convid . ': ' . $e->getMessage());
+            }
+            if ($isself) {
+                continue;
+            }
+            try {
+                \core_message\api::unset_favourite_conversation($convid, $userid);
+            } catch (Throwable $e) {
+                // Not favourited — fine.
+            }
+            if ($type === \core_message\api::MESSAGE_CONVERSATION_TYPE_GROUP) {
+                try {
+                    \core_message\api::remove_members_from_conversation([$userid], $convid);
+                    $removed++;
+                } catch (Throwable $e) {
+                    cli_writeln('  ! group leave failed u=' . $userid . ' c=' . $convid . ': ' . $e->getMessage());
+                }
+            } else {
+                // Individual: API refuses remove_members — drop membership for wipe only.
+                $DB->delete_records('message_conversation_members', [
+                    'userid' => $userid,
+                    'conversationid' => $convid,
+                ]);
+                $removed++;
+            }
+        }
+    }
+    return $removed;
 }
 
 $stampeduserids = [];
@@ -467,6 +543,10 @@ if ($mode === 'structure' || $mode === 'all') {
     cli_writeln('=== Clear Moodle notifications for affected users ===');
     $nnotif = lp_clean_clear_notifications($stampeduserids, $apply);
     cli_writeln(($apply ? 'deleted' : 'would delete') . " notification rows: $nnotif");
+    cli_writeln('');
+    cli_writeln('=== Clear Moodle messages (private/group; keep Personal space) ===');
+    $nmsg = lp_clean_clear_messages($stampeduserids, $apply);
+    cli_writeln(($apply ? 'removed' : 'would remove') . " non-self conversation memberships: $nmsg");
 }
 
 if ($deletedemousers && ($mode === 'structure' || $mode === 'all')) {
