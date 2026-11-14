@@ -423,7 +423,6 @@
             var desc = dialog.querySelector('[data-lp-badge-desc]');
             var status = dialog.querySelector('[data-lp-badge-status]');
             var scope = dialog.querySelector('[data-lp-badge-scope]');
-            var moodle = dialog.querySelector('[data-lp-badge-moodle]');
             if (img) {
                 img.onerror = function () {
                     img.onerror = null;
@@ -454,10 +453,6 @@
             if (scope) {
                 scope.textContent = badge.scope_label || '';
                 scope.hidden = !badge.scope_label;
-            }
-            if (moodle) {
-                moodle.href = badge.moodle_url || '#';
-                moodle.hidden = !badge.moodle_url;
             }
         }
 

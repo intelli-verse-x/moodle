@@ -54,6 +54,11 @@ $profileerr = optional_param('profileerr', '', PARAM_ALPHAEXT);
 $prefsaved = optional_param('prefsaved', 0, PARAM_INT);
 $preferr = optional_param('preferr', '', PARAM_ALPHAEXT);
 $pref = optional_param('pref', '', PARAM_ALPHAEXT);
+$calmode = optional_param('cal', 'month', PARAM_ALPHA);
+$calfilter = optional_param('filter', 'all', PARAM_ALPHA);
+$caltime = optional_param('time', 0, PARAM_INT);
+$calyear = optional_param('year', 0, PARAM_INT);
+$calmonth = optional_param('month', 0, PARAM_INT);
 $allowedviews = [
     'home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages',
     'notifications', 'notificationprefs', 'profile',
@@ -82,6 +87,19 @@ if (!in_array($ntab, ['all', 'unread'], true)) {
 }
 if (!in_array($ptab, ['overview', 'edit', 'preferences'], true)) {
     $ptab = 'overview';
+}
+if (!in_array($calmode, ['month', 'upcoming', 'day', 'week'], true)) {
+    $calmode = 'month';
+}
+if (!in_array($calfilter, ['all', 'course', 'personal'], true)) {
+    $calfilter = 'all';
+}
+if ($view !== 'calendar') {
+    $calmode = 'month';
+    $calfilter = 'all';
+    $caltime = 0;
+    $calyear = 0;
+    $calmonth = 0;
 }
 if ($convid < 0) {
     $convid = 0;
@@ -148,6 +166,11 @@ $PAGE->set_url(new moodle_url('/local/launchpad/employee.php', array_filter([
     'notifid' => ($view === 'notifications' && $notifid > 0) ? $notifid : null,
     'ptab' => ($view === 'profile' && $ptab !== 'overview') ? $ptab : null,
     'pref' => ($view === 'profile' && $ptab === 'preferences' && $pref !== '') ? $pref : null,
+    'cal' => ($view === 'calendar' && $calmode !== 'month') ? $calmode : null,
+    'filter' => ($view === 'calendar' && $calfilter !== 'all') ? $calfilter : null,
+    'time' => ($view === 'calendar' && $caltime > 0) ? $caltime : null,
+    'year' => ($view === 'calendar' && $calyear > 0) ? $calyear : null,
+    'month' => ($view === 'calendar' && $calmonth > 0) ? $calmonth : null,
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('employer_area_title', 'local_launchpad'));
@@ -178,7 +201,12 @@ $templatecontext = array_merge(
         $profileerr,
         $pref,
         $prefsaved > 0,
-        $preferr
+        $preferr,
+        $calmode,
+        $calfilter,
+        $caltime,
+        $calyear,
+        $calmonth
     ),
     $mismatch
 );
@@ -190,6 +218,9 @@ $assetv = (string) ($plugin->version ?? time());
 // Same visual system as Fellowship shell (styles_fellowship → styles_employer).
 $cssurl = $pluginbase . '/styles_employer.css?v=' . rawurlencode($assetv);
 $jsurl = $pluginbase . '/employer.js?v=' . rawurlencode($assetv);
+// Full month calendar shares Fellowship calendar CSS/JS (month grid + personal CRUD).
+$calcssurl = $pluginbase . '/styles_fellowship.css?v=' . rawurlencode($assetv);
+$caljsurl = $pluginbase . '/fellowship.js?v=' . rawurlencode($assetv);
 $title = s(get_string('employer_area_title', 'local_launchpad'));
 $body = $OUTPUT->render_from_template('local_launchpad/employer_dashboard', $templatecontext);
 
@@ -205,6 +236,9 @@ echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
+if ($view === 'calendar') {
+    echo '<link rel="stylesheet" href="' . s($calcssurl) . '">' . "\n";
+}
 echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '</head>' . "\n";
 $bodyclass = 'local-launchpad-employer';
@@ -214,5 +248,8 @@ if (!empty($mismatch['show_portal_mismatch'])) {
 echo '<body class="' . $bodyclass . '">' . "\n";
 echo $body;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
+if ($view === 'calendar') {
+    echo '<script src="' . s($caljsurl) . '" defer></script>' . "\n";
+}
 echo '</body>' . "\n";
 echo '</html>';

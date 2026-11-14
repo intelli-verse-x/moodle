@@ -479,6 +479,34 @@ final class calendar_service {
     }
 
     /**
+     * Employer (employee shell) calendar — same month UI as fellow/mentor.
+     *
+     * @param list<\stdClass> $courses
+     * @param string $mode month|upcoming|day|week
+     */
+    public static function employer_context(
+        int $userid,
+        array $courses,
+        int $year,
+        int $month,
+        string $mode = 'month',
+        string $filter = 'all',
+        ?int $daytime = null
+    ): array {
+        return self::page_context(
+            $userid,
+            $courses,
+            $year,
+            $month,
+            $mode,
+            persona_home::EMPLOYEE_PATH,
+            'employer',
+            $filter,
+            $daytime
+        );
+    }
+
+    /**
      * Admin calendar page context (LaunchPad tracks; course + personal events).
      *
      * @param list<\stdClass> $courses
@@ -521,7 +549,7 @@ final class calendar_service {
      * @param list<\stdClass> $courses
      * @param string $mode month|upcoming|day
      * @param string $basepath Persona home path for calendar URLs
-     * @param string $portal fellow|mentor|admin
+     * @param string $portal fellow|mentor|admin|employer
      * @param string $filter all|course|personal
      * @param array{
      *     trackid?:int,
@@ -529,7 +557,7 @@ final class calendar_service {
      *     preferred_courseid?:int,
      *     show_track_filter?:bool,
      *     all_tracks?:list<array{id:int,name:string}>
-     * } $adminui Admin-only sticky filter UI (ignored for fellow/mentor)
+     * } $adminui Admin-only sticky filter UI (ignored for fellow/mentor/employer)
      */
     public static function page_context(
         int $userid,
@@ -552,7 +580,7 @@ final class calendar_service {
         if ($basepath === '') {
             $basepath = persona_home::FELLOW_PATH;
         }
-        if (!in_array($portal, ['fellow', 'mentor', 'admin'], true)) {
+        if (!in_array($portal, ['fellow', 'mentor', 'admin', 'employer'], true)) {
             $portal = 'fellow';
         }
         [$tstart, $tend] = self::month_range($year, $month);
@@ -643,9 +671,9 @@ final class calendar_service {
         $canaddcourse = $manageable !== [];
         // Site (programme-wide) create is admin-only and caps-gated at system context.
         $canaddsite = ($portal === 'admin') && self::user_can_add_site($userid);
-        // Fellowship calendar is personal-first (study reminders, meetings). Mentors
-        // and admins can also add course events when they have manageentries.
-        if ($portal === 'fellow') {
+        // Fellowship + Employer calendars are personal-first (study reminders, meetings).
+        // Mentors and admins can also add course events when they have manageentries.
+        if ($portal === 'fellow' || $portal === 'employer') {
             $canaddcourse = false;
             $manageable = [];
             $canaddsite = false;

@@ -30,6 +30,7 @@ require_once(__DIR__ . '/classes/calendar_service.php');
 require_once(__DIR__ . '/classes/mentor_dashboard.php');
 require_once(__DIR__ . '/classes/admin_dashboard.php');
 
+use local_launchpad\account_persona;
 use local_launchpad\admin_dashboard;
 use local_launchpad\calendar_service;
 use local_launchpad\fellowship_dashboard;
@@ -46,6 +47,8 @@ if ($portal === 'admin') {
     $allowed = admin_dashboard::can_access($userid) || is_siteadmin();
 } else if ($portal === 'mentor') {
     $allowed = mentor_dashboard::can_access($userid) || is_siteadmin();
+} else if ($portal === 'employer') {
+    $allowed = account_persona::is_employee($userid) || is_siteadmin();
 } else {
     $allowed = fellowship_dashboard::can_access($userid) || is_siteadmin();
 }

@@ -233,12 +233,12 @@ final class employer_tools {
                 ? self::str(
                     'employer_grades_detail_intro',
                     null,
-                    'Full Moodle user grade report for this course — weights, ranges, feedback, and contribution.'
+                    'Full user grade report for this course — weights, ranges, feedback, and contribution.'
                 )
                 : self::str(
                     'employer_grades_intro',
                     null,
-                    'Moodle grade overview across your courses. Open a course for the full user report.'
+                    'Grade overview across your courses. Open a course for the full user report.'
                 ),
         ];
     }
@@ -370,7 +370,7 @@ final class employer_tools {
                     $description = self::str(
                         'employer_badge_how_default',
                         null,
-                        'Complete the Moodle criteria for this badge.'
+                        'Complete the criteria for this badge.'
                     );
                 }
 
@@ -961,12 +961,12 @@ final class employer_tools {
             'denied' => self::str(
                 'employer_messages_send_denied',
                 null,
-                'You cannot reply to this conversation. Check Moodle messaging permissions.'
+                'You cannot reply to this conversation. Check messaging permissions.'
             ),
             'failed' => self::str(
                 'employer_messages_send_failed',
                 null,
-                'Moodle could not deliver the message. Try again or open Messages in Moodle.'
+                'Could not deliver the message. Try again.'
             ),
         ];
         return [
@@ -3872,7 +3872,7 @@ final class employer_tools {
                 'denied_message' => self::str(
                     'employer_grades_load_failed',
                     null,
-                    'Could not load the Moodle grade report for this course.'
+                    'Could not load the grade report for this course.'
                 ),
             ]);
         }
