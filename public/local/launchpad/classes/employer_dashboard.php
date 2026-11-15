@@ -229,7 +229,8 @@ final class employer_dashboard {
                 '/local/launchpad/employee_action.php',
                 $pref,
                 $prefsaved,
-                $preferr
+                $preferr,
+                true // LaunchPad-only: no Open public profile / Full editor Moodle buttons
             );
         }
 
@@ -943,14 +944,14 @@ final class employer_dashboard {
             'profile_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Your Moodle account details, editable profile fields, and preference links.'
+                'Name, contact details, and preferences for your LaunchPad account.'
             ),
             'profile_tabs_aria' => self::str('employer_profile_tabs_aria', null, 'Profile sections'),
             'profile_tab_overview' => self::str('employer_profile_tab_overview', null, 'Overview'),
             'profile_tab_edit' => self::str('employer_profile_tab_edit', null, 'Edit'),
             'profile_tab_preferences' => self::str('employer_profile_tab_preferences', null, 'Preferences'),
             'profile_edit_cta' => self::str('employer_profile_edit_cta', null, 'Edit profile'),
-            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor in Moodle'),
+            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor'),
             'profile_edit_external' => self::str('employer_profile_edit_external', null, 'Edit in identity provider'),
             'profile_open_moodle' => self::str('employer_profile_open_moodle', null, 'Open public profile'),
             'profile_empty_title' => self::str('employer_profile_empty_title', null, 'No profile details yet'),
@@ -963,12 +964,12 @@ final class employer_dashboard {
             'profile_edit_help' => self::str(
                 'employer_profile_edit_help',
                 null,
-                'Changes save to your Moodle user account. Locked fields are controlled by your login method.'
+                'Changes save to your account. Locked fields are controlled by your login method.'
             ),
             'profile_edit_note' => self::str(
                 'employer_profile_edit_note',
                 null,
-                'Picture upload and advanced custom fields open in Moodle’s full profile editor.'
+                'Use Edit for name, contact, and bio. Preferences covers messages, notifications, and language.'
             ),
             'profile_custom_heading' => self::str('employer_profile_custom_heading', null, 'Additional fields'),
             'profile_save' => self::str('employer_profile_save', null, 'Save profile'),
@@ -976,17 +977,17 @@ final class employer_dashboard {
             'profile_edit_unavailable_title' => self::str(
                 'employer_profile_edit_unavailable_title',
                 null,
-                'Edit this profile in Moodle'
+                'Profile edit is managed by your login method'
             ),
             'profile_edit_unavailable_body' => self::str(
                 'employer_profile_edit_unavailable_body',
                 null,
-                'Your account settings require Moodle’s profile editor (or an external identity provider).'
+                'Your organisation controls this account. Use Preferences for what LaunchPad allows, or ask your programme admin.'
             ),
             'profile_prefs_lead' => self::str(
                 'employer_profile_prefs_lead',
                 null,
-                'Account, communication, and system preferences — edited here when possible, or opened in Moodle for heavy tools.'
+                'Account, communication, and system preferences — edit here when available.'
             ),
             'native_tools_note' => self::str(
                 'employer_native_tools_note',

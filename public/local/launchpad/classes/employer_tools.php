@@ -1413,14 +1413,14 @@ final class employer_tools {
             'profile_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Name, contact details, and preferences from your Moodle account.'
+                'Name, contact details, and preferences for your LaunchPad account.'
             ),
             'profile_tabs_aria' => self::str('employer_profile_tabs_aria', null, 'Profile sections'),
             'profile_tab_overview' => self::str('employer_profile_tab_overview', null, 'Overview'),
             'profile_tab_edit' => self::str('employer_profile_tab_edit', null, 'Edit'),
             'profile_tab_preferences' => self::str('employer_profile_tab_preferences', null, 'Preferences'),
             'profile_edit_cta' => self::str('employer_profile_edit_cta', null, 'Edit profile'),
-            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor in Moodle'),
+            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor'),
             'profile_edit_external' => self::str('employer_profile_edit_external', null, 'Edit in identity provider'),
             'profile_open_moodle' => self::str('employer_profile_open_moodle', null, 'Open public profile'),
             'profile_empty_title' => self::str('employer_profile_empty_title', null, 'No profile details yet'),
@@ -1433,12 +1433,12 @@ final class employer_tools {
             'profile_edit_help' => self::str(
                 'employer_profile_edit_help',
                 null,
-                'Changes save to your Moodle user account. Locked fields are controlled by your login method.'
+                'Changes save to your account. Locked fields are controlled by your login method.'
             ),
             'profile_edit_note' => self::str(
                 'employer_profile_edit_note',
                 null,
-                'Picture upload and advanced custom fields open in Moodle’s full profile editor.'
+                'Use Edit for name, contact, and bio. Preferences covers messages, notifications, and language.'
             ),
             'profile_custom_heading' => self::str('employer_profile_custom_heading', null, 'Additional fields'),
             'profile_save' => self::str('employer_profile_save', null, 'Save profile'),
@@ -1446,12 +1446,12 @@ final class employer_tools {
             'profile_edit_unavailable_title' => self::str(
                 'employer_profile_edit_unavailable_title',
                 null,
-                'Edit this profile in Moodle'
+                'Profile edit is managed by your login method'
             ),
             'profile_edit_unavailable_body' => self::str(
                 'employer_profile_edit_unavailable_body',
                 null,
-                'Your account settings require Moodle’s profile editor (or an external identity provider).'
+                'Your organisation controls this account. Use Preferences for what LaunchPad allows, or ask your programme admin.'
             ),
             'profile_prefs_lead' => self::str(
                 'employer_profile_prefs_lead',
@@ -1461,12 +1461,12 @@ final class employer_tools {
             'native_tools_note' => self::str(
                 'employer_profile_prefs_note',
                 null,
-                'Most preferences save here. A few tools (files, tokens) open in Moodle when needed.'
+                'Changes save to your LaunchPad account.'
             ),
             'pref_back' => self::str('employer_pref_back', null, 'Back to preferences'),
             'pref_save' => self::str('employer_pref_save', null, 'Save preferences'),
             'pref_cancel' => self::str('employer_pref_cancel', null, 'Cancel'),
-            'pref_open_moodle' => self::str('employer_pref_open_moodle', null, 'Open in Moodle'),
+            'pref_open_moodle' => self::str('employer_pref_open_moodle', null, 'Open'),
             'pref_open_portal_edit' => self::str('employer_pref_open_portal_edit', null, 'Edit in LaunchPad'),
             'pref_advanced_moodle' => '',
         ];
@@ -1632,8 +1632,9 @@ final class employer_tools {
             'page_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Name, contact details, and preferences from your Moodle account.'
+                'Name, contact details, and preferences for your LaunchPad account.'
             ),
+            'hide_moodle_escapes' => $hidemoodleescapes,
             'moodle_url' => $moodleprofile,
             'moodle_edit_url' => $moodleedit,
             'moodle_prefs_url' => $moodleprefs,

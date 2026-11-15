@@ -649,7 +649,12 @@ final class admin_dashboard {
             $n = 1;
             foreach ($phases as $phasename) {
                 $section = $modinfo->get_section_info($n);
-                course_update_section($course, $section, ['name' => $phasename]);
+                // Match course default: phases start hidden (activity → section → course).
+                // Moodle creates sections visible=1; leave general (0) alone.
+                course_update_section($course, $section, [
+                    'name' => $phasename,
+                    'visible' => 0,
+                ]);
                 $n++;
             }
 
@@ -713,7 +718,11 @@ final class admin_dashboard {
             rebuild_course_cache($trackid, true);
             $modinfo = get_fast_modinfo($trackid);
             $section = $modinfo->get_section_info($next);
-            course_update_section($course, $section, ['name' => $phasename]);
+            // New phases start hidden — same rule as create_track_course.
+            course_update_section($course, $section, [
+                'name' => $phasename,
+                'visible' => 0,
+            ]);
             rebuild_course_cache($trackid, true);
 
             return [
