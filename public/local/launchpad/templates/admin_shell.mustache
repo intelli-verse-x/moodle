@@ -60,4 +60,15 @@
     </main>
   </div>
 </div>
+<dialog class="lp-confirm-dialog" id="lp-confirm-dialog" data-region="lp-confirm-dialog"
+        aria-labelledby="lp-confirm-title">
+  <form method="dialog" class="lp-confirm-dialog-panel">
+    <h2 id="lp-confirm-title" data-lp-confirm-title>{{str_confirm_title}}</h2>
+    <p class="lp-sm" data-lp-confirm-msg></p>
+    <div class="lp-confirm-dialog-actions">
+      <button type="submit" class="lp-btn lp-btn-light" value="cancel" data-lp-confirm-cancel>{{str_confirm_cancel}}</button>
+      <button type="button" class="lp-btn lp-btn-solid lp-btn-danger-solid" data-lp-confirm-yes>{{str_confirm_delete}}</button>
+    </div>
+  </form>
+</dialog>
 {{> local_launchpad/portal_mismatch_modal}}

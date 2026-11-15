@@ -306,7 +306,12 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'announcements']));
     }
-    if ($view === 'cohorts' && $action === 'enrol_fellow') {
+    if ($view === 'cohorts' && $action === 'create_orientation') {
+        $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
+        $flash = admin_dashboard::ensure_shared_orientation($USER, $cohort);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']));
+    } else if ($view === 'cohorts' && $action === 'enrol_fellow') {
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $alsoorient = (bool) optional_param('also_orient', 0, PARAM_BOOL);
@@ -812,6 +817,18 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'str_signout' => get_string('fellowship_nav_signout', 'local_launchpad'),
     'str_menu' => get_string('fellowship_menu', 'local_launchpad'),
     'str_account' => get_string('fellowship_nav_account', 'local_launchpad'),
+    'str_confirm_title' => admin_dashboard::lang_string_or(
+        'admin_confirm_title',
+        'Please confirm'
+    ),
+    'str_confirm_cancel' => admin_dashboard::lang_string_or(
+        'admin_confirm_cancel',
+        'Cancel'
+    ),
+    'str_confirm_delete' => admin_dashboard::lang_string_or(
+        'admin_confirm_delete',
+        'Delete'
+    ),
 ], messaging::notification_dropdown_context($userid, 'admin'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
