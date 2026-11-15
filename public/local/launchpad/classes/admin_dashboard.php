@@ -674,9 +674,105 @@ final class admin_dashboard {
                 }
             }
 
+            // One Shared orientation per cohort — create if missing (shared by all tracks).
+            $orient = self::ensure_shared_orientation($actor, $cohort);
+            $ok = get_string('admin_builder_create_ok', 'local_launchpad', format_string($course->fullname));
+            if (!empty($orient['created'])) {
+                $ok .= ' ' . get_string('admin_orient_auto_created', 'local_launchpad');
+            } else if (!empty($orient['error'])) {
+                // Track succeeded; surface orientation issue without failing the create.
+                $ok .= ' ' . get_string('admin_orient_auto_failed', 'local_launchpad', $orient['error']);
+            }
+
             return [
-                'ok' => get_string('admin_builder_create_ok', 'local_launchpad', format_string($course->fullname)),
+                'ok' => $ok,
                 'trackid' => (int) $course->id,
+            ];
+        } catch (\Throwable $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+    }
+
+    /**
+     * Create Shared orientation for a cohort if missing (`lp-orient-{slug}`).
+     * Hidden course under fellowship root — not a track (no phase sections).
+     *
+     * @return array{ok?:string,error?:string,courseid?:int,created?:bool,already?:bool}
+     */
+    public static function ensure_shared_orientation(\stdClass $actor, string $cohort): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $cohort = trim($cohort);
+        if ($cohort === '') {
+            $cohort = 'Pilot';
+        }
+        if (!self::can_apply_structure((int) ($actor->id ?? 0))) {
+            return ['error' => get_string('admin_err_capability', 'local_launchpad')];
+        }
+
+        try {
+            $slug = blueprint::cohort_slug($cohort);
+        } catch (cohort_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $idnumber = self::ORIENT_IDNUMBER_PREFIX . $slug;
+        $existing = $DB->get_record('course', ['idnumber' => $idnumber]);
+        if ($existing) {
+            return [
+                'ok' => get_string('admin_orient_already', 'local_launchpad', format_string($existing->fullname)),
+                'courseid' => (int) $existing->id,
+                'created' => false,
+                'already' => true,
+            ];
+        }
+
+        try {
+            $root = self::ensure_fellowship_root_category();
+            $shortname = 'LP-ORIENT-' . strtoupper($slug);
+            if ($DB->record_exists('course', ['shortname' => $shortname])) {
+                $shortname .= '-' . substr((string) time(), -4);
+            }
+
+            $course = create_course((object) [
+                'category' => (int) $root->id,
+                'fullname' => 'LaunchPad Orientation · Cohort ' . $cohort,
+                'shortname' => $shortname,
+                'idnumber' => $idnumber,
+                'summary' => 'Shared LaunchPad orientation for this cohort. Hidden until released.',
+                'summaryformat' => FORMAT_PLAIN,
+                'format' => 'topics',
+                'numsections' => 0,
+                'startdate' => time(),
+                'visible' => 0,
+                'newsitems' => 0,
+                'showgrades' => 1,
+                'enablecompletion' => 1,
+            ]);
+
+            $instances = enrol_get_instances($course->id, true);
+            $hasmanual = false;
+            foreach ($instances as $instance) {
+                if ($instance->enrol === 'manual') {
+                    $hasmanual = true;
+                    break;
+                }
+            }
+            if (!$hasmanual) {
+                $plugin = enrol_get_plugin('manual');
+                if ($plugin) {
+                    $plugin->add_instance($course);
+                }
+            }
+
+            return [
+                'ok' => get_string('admin_orient_create_ok', 'local_launchpad', format_string($course->fullname)),
+                'courseid' => (int) $course->id,
+                'created' => true,
+                'already' => false,
             ];
         } catch (\Throwable $e) {
             return ['error' => self::flash_error_message($e)];
@@ -3949,9 +4045,8 @@ final class admin_dashboard {
         }
         $content = '';
         if ($modname === 'page') {
-            $content = (string) ($instance->content ?? '');
-            // Keep simple HTML for textarea editing.
-            $content = trim($content);
+            // Plain multiline for the slim textarea (no raw <p> tags).
+            $content = self::page_content_for_editor((string) ($instance->content ?? ''));
         }
 
         $grade = '';
@@ -3992,6 +4087,10 @@ final class admin_dashboard {
             'name_label' => get_string('admin_activity_name', 'local_launchpad'),
             'intro_label' => get_string('admin_activity_intro', 'local_launchpad'),
             'content_label' => get_string('admin_activity_content', 'local_launchpad'),
+            'content_hint' => self::lang_string_or(
+                'admin_activity_content_hint',
+                'Keep each [LP-…] line — it structures the fellow lesson. Replace the sentence under each marker with real content.'
+            ),
             'grade_label' => get_string('admin_activity_grade', 'local_launchpad'),
             'track_completion_label' => get_string('admin_activity_track_completion', 'local_launchpad'),
             'track_completion_hint' => get_string('admin_activity_track_completion_hint', 'local_launchpad'),
@@ -4128,7 +4227,7 @@ final class admin_dashboard {
             $update->introformat = FORMAT_HTML;
         }
         if ($modname === 'page') {
-            $update->content = purify_html($content);
+            $update->content = self::page_content_from_editor($content);
             $update->contentformat = FORMAT_HTML;
         }
         if (($modname === 'quiz' || $modname === 'assign') && $grade !== null
@@ -4177,6 +4276,57 @@ final class admin_dashboard {
         }
 
         return ['ok' => $ok];
+    }
+
+    /**
+     * Resolve a local_launchpad string; never return Moodle [[missing]] markers.
+     */
+    public static function lang_string_or(string $key, string $fallback): string {
+        if (!get_string_manager()->string_exists($key, 'local_launchpad')) {
+            return $fallback;
+        }
+        $out = get_string($key, 'local_launchpad');
+        if (!is_string($out) || $out === '' || str_contains($out, '[[')) {
+            return $fallback;
+        }
+        return $out;
+    }
+
+    /**
+     * Page HTML → plain multiline for the slim activity textarea.
+     */
+    public static function page_content_for_editor(string $html): string {
+        $plain = trim(html_to_text($html, 0, false));
+        if ($plain === '') {
+            return '';
+        }
+        $plain = preg_replace("/\n{3,}/", "\n\n", $plain) ?? $plain;
+        return trim($plain);
+    }
+
+    /**
+     * Plain textarea (or pasted HTML) → stored page HTML with paragraph tags.
+     * Preserves [LP-OBJECTIVE] / EXPLAIN / EXAMPLE / EXERCISE markers as their own lines.
+     */
+    public static function page_content_from_editor(string $raw): string {
+        $raw = str_replace(["\r\n", "\r"], "\n", $raw);
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '';
+        }
+        // Pasted HTML (Advanced editor / copy) — purify as-is.
+        if (preg_match('/<[a-z][\s\S]*>/i', $raw)) {
+            return purify_html($raw);
+        }
+        $html = '';
+        foreach (preg_split("/\n/", $raw) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $html .= '<p>' . s($line) . '</p>';
+        }
+        return purify_html($html);
     }
 
     /**
@@ -4960,6 +5110,7 @@ final class admin_dashboard {
      * @return array<string, mixed>
      */
     public static function cohorts_context(\stdClass $user, array $flash = [], int $preselecttrackid = 0): array {
+        $cancreateorient = self::can_apply_structure((int) ($user->id ?? 0));
         unset($user);
         $tracks = self::list_track_courses();
         $slug = self::primary_cohort_slug($tracks);
@@ -5118,6 +5269,12 @@ final class admin_dashboard {
             'orient_checked' => $orient !== null,
             'orient_missing' => $orient === null && $slug !== null,
             'orient_missing_body' => get_string('admin_cohorts_orient_missing', 'local_launchpad'),
+            'orient_missing_help' => get_string('admin_orient_missing_help', 'local_launchpad'),
+            'show_create_orient' => $cancreateorient && $orient === null && $slug !== null,
+            'create_orient_submit' => get_string('admin_orient_create_submit', 'local_launchpad'),
+            'create_orient_cohort' => $slug !== null
+                ? self::cohort_display_label($slug, $orient)
+                : 'Pilot',
             'submit_label' => get_string('admin_cohorts_submit', 'local_launchpad'),
             'has_track_options' => $options !== [],
             'has_ready_track' => $hasready,

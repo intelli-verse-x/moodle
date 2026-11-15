@@ -2803,15 +2803,79 @@
         setEdit(false);
     })();
 
-    // Confirm before deleting a whole activity (Manage + activity settings).
-    document.querySelectorAll('form[data-lp-delete-confirm]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-            var msg = form.getAttribute('data-lp-delete-confirm') || '';
+    // Confirm before deleting (Manage activity/phase, activity settings, course ops remove).
+    // Uses LaunchPad dialog — never window.confirm / alert.
+    (function initLpDeleteConfirm() {
+        var dialog = document.getElementById('lp-confirm-dialog');
+        var pendingForm = null;
+
+        function fallbackConfirm(form, msg) {
             if (msg && !window.confirm(msg)) {
-                e.preventDefault();
+                return false;
+            }
+            return true;
+        }
+
+        function openDialog(form) {
+            var msg = form.getAttribute('data-lp-delete-confirm') || '';
+            if (!dialog || typeof dialog.showModal !== 'function') {
+                return fallbackConfirm(form, msg);
+            }
+            pendingForm = form;
+            var msgEl = dialog.querySelector('[data-lp-confirm-msg]');
+            if (msgEl) {
+                msgEl.textContent = msg;
+            }
+            if (!dialog.open) {
+                dialog.showModal();
+            }
+            return false;
+        }
+
+        document.addEventListener('submit', function (e) {
+            var form = e.target && e.target.closest
+                ? e.target.closest('form[data-lp-delete-confirm]')
+                : null;
+            if (!form) {
+                return;
+            }
+            if (form.getAttribute('data-lp-confirm-ok') === '1') {
+                form.removeAttribute('data-lp-confirm-ok');
+                return;
+            }
+            e.preventDefault();
+            if (openDialog(form) === true) {
+                form.setAttribute('data-lp-confirm-ok', '1');
+                form.submit();
             }
         });
-    });
+
+        if (!dialog) {
+            return;
+        }
+        var yesBtn = dialog.querySelector('[data-lp-confirm-yes]');
+        if (yesBtn) {
+            yesBtn.addEventListener('click', function () {
+                if (!pendingForm) {
+                    dialog.close();
+                    return;
+                }
+                var form = pendingForm;
+                pendingForm = null;
+                form.setAttribute('data-lp-confirm-ok', '1');
+                dialog.close();
+                form.submit();
+            });
+        }
+        dialog.addEventListener('close', function () {
+            pendingForm = null;
+        });
+        dialog.addEventListener('click', function (e) {
+            if (e.target === dialog) {
+                dialog.close();
+            }
+        });
+    })();
 
     // Admin File settings: pending picks with ×, mark attached files for removal on Save.
     document.querySelectorAll('[data-lp-file-picker]').forEach(function (root) {
