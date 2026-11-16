@@ -3772,6 +3772,23 @@
         });
     })();
 
+    /* Assign submit: confirm before submit-for-review (Save draft skips confirm) */
+    (function () {
+        var form = document.querySelector('[data-region="assign-submit"]');
+        if (!form) {
+            return;
+        }
+        form.addEventListener('submit', function (ev) {
+            var submitter = ev.submitter || document.activeElement;
+            if (submitter && submitter.getAttribute('name') === 'assign_submit') {
+                var msg = form.getAttribute('data-confirm-submit') || 'Submit for review?';
+                if (!window.confirm(msg)) {
+                    ev.preventDefault();
+                }
+            }
+        });
+    })();
+
     /* Quiz attempt / summary: confirm finish + optional countdown */
     (function () {
         var root = document.querySelector('[data-region="quiz-attempt"], [data-region="quiz-summary"]');
