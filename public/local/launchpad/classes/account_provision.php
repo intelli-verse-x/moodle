@@ -142,6 +142,81 @@ final class account_provision {
     }
 
     /**
+     * One Moodle account = one LaunchPad persona (Fellow / Mentor / Employee).
+     * Blocks dual-tagging via LaunchPad provision (admin UI + CLI).
+     *
+     * @param string $targetpersona fellowship|mentor|employee
+     * @throws account_provision_exception
+     */
+    public static function assert_persona_exclusive(int $userid, string $targetpersona): void {
+        $target = strtolower(trim($targetpersona));
+        self::assert_grant_allowed($target);
+        self::require_user($userid);
+
+        if (account_persona::is_admin($userid)) {
+            throw new account_provision_exception(
+                'persona_conflict_admin',
+                get_string('account_provision_err_persona_admin', 'local_launchpad')
+            );
+        }
+
+        $isemployee = account_persona::is_employee($userid);
+        $isfellow = account_persona::is_fellowship($userid);
+        $ismentor = account_persona::is_mentor($userid);
+
+        if ($target === account_persona::EMPLOYEE) {
+            // Already Employer: course enrolments (student on lp-*) are normal for Phase 2
+            // and must not block re-grant / revoke flows.
+            if ($isemployee) {
+                return;
+            }
+            if ($isfellow) {
+                throw new account_provision_exception(
+                    'persona_conflict_fellow',
+                    get_string('account_provision_err_persona_fellow', 'local_launchpad')
+                );
+            }
+            if ($ismentor) {
+                throw new account_provision_exception(
+                    'persona_conflict_mentor',
+                    get_string('account_provision_err_persona_mentor', 'local_launchpad')
+                );
+            }
+            return;
+        }
+
+        if ($target === account_persona::FELLOWSHIP) {
+            if ($isemployee) {
+                throw new account_provision_exception(
+                    'persona_conflict_employee',
+                    get_string('account_provision_err_persona_employee', 'local_launchpad')
+                );
+            }
+            if ($ismentor) {
+                throw new account_provision_exception(
+                    'persona_conflict_mentor',
+                    get_string('account_provision_err_persona_mentor', 'local_launchpad')
+                );
+            }
+            return;
+        }
+
+        // Mentor.
+        if ($isemployee) {
+            throw new account_provision_exception(
+                'persona_conflict_employee',
+                get_string('account_provision_err_persona_employee', 'local_launchpad')
+            );
+        }
+        if ($isfellow) {
+            throw new account_provision_exception(
+                'persona_conflict_fellow',
+                get_string('account_provision_err_persona_fellow', 'local_launchpad')
+            );
+        }
+    }
+
+    /**
      * Pure policy: LaunchPad course idnumber shape (lp-*).
      */
     public static function is_launchpad_idnumber(string $idnumber): bool {
@@ -341,6 +416,25 @@ final class account_provision {
             return ['status' => 'exists', 'userid' => (int) $existing->id];
         }
 
+        $emailowner = $DB->get_record_select(
+            'user',
+            'deleted = 0 AND mnethostid = :mnet AND ' . $DB->sql_equal('email', ':email', false, false),
+            [
+                'mnet' => $CFG->mnet_localhost_id,
+                'email' => $email,
+            ]
+        );
+        if ($emailowner) {
+            throw new account_provision_exception(
+                'email_taken',
+                get_string('account_provision_err_email_taken', 'local_launchpad', s($email))
+            );
+        }
+
+        $plain = !empty($data['password'])
+            ? (string) $data['password']
+            : generate_password(12);
+
         $user = (object) [
             'auth' => 'manual',
             'username' => $username,
@@ -349,16 +443,15 @@ final class account_provision {
             'lastname' => $lastname,
             'confirmed' => 1,
             'mnethostid' => $CFG->mnet_localhost_id,
+            'password' => $plain,
         ];
-        if (!empty($data['password'])) {
-            $user->password = (string) $data['password'];
-        } else {
-            // Temporary password; staff should force reset via Moodle tools as needed.
-            $user->password = generate_password(12);
-        }
 
         $userid = user_create_user($user, true, false);
-        return ['status' => 'created', 'userid' => (int) $userid];
+        return [
+            'status' => 'created',
+            'userid' => (int) $userid,
+            'password' => $plain,
+        ];
     }
 
     /**
@@ -374,6 +467,7 @@ final class account_provision {
         self::assert_grant_allowed(account_persona::FELLOWSHIP);
         self::require_can_enrol($actor, $courseid);
         self::require_user($userid);
+        self::assert_persona_exclusive($userid, account_persona::FELLOWSHIP);
         $course = self::require_launchpad_course($courseid);
 
         // Seat caps apply to assigned tracks only — not Shared orientation.
@@ -405,6 +499,7 @@ final class account_provision {
         self::assert_grant_allowed(account_persona::MENTOR);
         self::require_can_enrol($actor, $courseid);
         self::require_user($userid);
+        self::assert_persona_exclusive($userid, account_persona::MENTOR);
         self::require_launchpad_course($courseid);
 
         $roleshortname = strtolower(trim($roleshortname));
@@ -527,6 +622,7 @@ final class account_provision {
             throw new account_provision_exception('forbidden', 'Not authorized to provision employees');
         }
         self::require_user($userid);
+        self::assert_persona_exclusive($userid, account_persona::EMPLOYEE);
 
         require_once($CFG->dirroot . '/cohort/lib.php');
 
@@ -536,6 +632,83 @@ final class account_provision {
         }
         cohort_add_member($cohortid, $userid);
         return ['status' => 'added', 'userid' => $userid, 'cohortid' => $cohortid];
+    }
+
+    /**
+     * Enrol an Employer staff member on a LaunchPad course (manual student seat).
+     * Not the fellow seat-cap / enrol_fellow path — persona stays Employee.
+     *
+     * @return array{status:string,userid:int,courseid:int} status enrolled|already_enrolled
+     * @throws account_provision_exception
+     */
+    public static function enrol_employee_to_course(\stdClass $actor, int $userid, int $courseid): array {
+        self::require_can_enrol($actor, $courseid);
+        self::require_user($userid);
+        if (!account_persona::is_employee($userid)) {
+            throw new account_provision_exception(
+                'not_employee',
+                get_string('account_provision_err_not_employee', 'local_launchpad')
+            );
+        }
+        if (account_persona::is_mentor($userid) || account_persona::is_admin($userid)) {
+            throw new account_provision_exception(
+                'persona_conflict_mentor',
+                get_string('account_provision_err_persona_mentor', 'local_launchpad')
+            );
+        }
+        $course = self::require_launchpad_course($courseid);
+        // Prefer assigned tracks; orientation enrol is allowed but uncommon for Employer staff.
+        unset($course);
+
+        $result = self::enrol_with_role($userid, $courseid, 'student');
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
+    }
+
+    /**
+     * Unenrol Employer staff from a LaunchPad course seat (portal access unchanged).
+     *
+     * @return array{status:string,userid:int,courseid:int} status unenrolled|not_enrolled
+     * @throws account_provision_exception
+     */
+    public static function unenrol_employee_from_course(\stdClass $actor, int $userid, int $courseid): array {
+        self::require_can_unenrol($actor, $courseid);
+        self::require_user($userid);
+        if (!account_persona::is_employee($userid)) {
+            throw new account_provision_exception(
+                'not_employee',
+                get_string('account_provision_err_not_employee', 'local_launchpad')
+            );
+        }
+        self::require_launchpad_course($courseid);
+
+        $result = self::unenrol_with_archetype($userid, $courseid, 'student');
+        messaging::maybe_sync_track_chat_members($courseid);
+        return $result;
+    }
+
+    /**
+     * Revoke Employer portal access (remove lp-employee cohort). User row stays in Moodle.
+     *
+     * @return array{status:string,userid:int,cohortid:int} status removed|not_member
+     * @throws account_provision_exception
+     */
+    public static function revoke_employee(\stdClass $actor, int $userid): array {
+        global $CFG;
+
+        if (!self::actor_may_manage_employees($actor)) {
+            throw new account_provision_exception('forbidden', 'Not authorized to provision employees');
+        }
+        self::require_user($userid);
+
+        require_once($CFG->dirroot . '/cohort/lib.php');
+
+        $cohortid = self::ensure_employee_cohort();
+        if (!cohort_is_member($cohortid, $userid)) {
+            return ['status' => 'not_member', 'userid' => $userid, 'cohortid' => $cohortid];
+        }
+        cohort_remove_member($cohortid, $userid);
+        return ['status' => 'removed', 'userid' => $userid, 'cohortid' => $cohortid];
     }
 
     /**
