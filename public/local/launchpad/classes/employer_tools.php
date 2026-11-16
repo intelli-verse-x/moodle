@@ -233,12 +233,12 @@ final class employer_tools {
                 ? self::str(
                     'employer_grades_detail_intro',
                     null,
-                    'Full Moodle user grade report for this course — weights, ranges, feedback, and contribution.'
+                    'Full user grade report for this course — weights, ranges, feedback, and contribution.'
                 )
                 : self::str(
                     'employer_grades_intro',
                     null,
-                    'Moodle grade overview across your courses. Open a course for the full user report.'
+                    'Grade overview across your courses. Open a course for the full user report.'
                 ),
         ];
     }
@@ -370,7 +370,7 @@ final class employer_tools {
                     $description = self::str(
                         'employer_badge_how_default',
                         null,
-                        'Complete the Moodle criteria for this badge.'
+                        'Complete the criteria for this badge.'
                     );
                 }
 
@@ -961,12 +961,12 @@ final class employer_tools {
             'denied' => self::str(
                 'employer_messages_send_denied',
                 null,
-                'You cannot reply to this conversation. Check Moodle messaging permissions.'
+                'You cannot reply to this conversation. Check messaging permissions.'
             ),
             'failed' => self::str(
                 'employer_messages_send_failed',
                 null,
-                'Moodle could not deliver the message. Try again or open Messages in Moodle.'
+                'Could not deliver the message. Try again.'
             ),
         ];
         return [
@@ -1413,14 +1413,14 @@ final class employer_tools {
             'profile_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Name, contact details, and preferences from your Moodle account.'
+                'Name, contact details, and preferences for your LaunchPad account.'
             ),
             'profile_tabs_aria' => self::str('employer_profile_tabs_aria', null, 'Profile sections'),
             'profile_tab_overview' => self::str('employer_profile_tab_overview', null, 'Overview'),
             'profile_tab_edit' => self::str('employer_profile_tab_edit', null, 'Edit'),
             'profile_tab_preferences' => self::str('employer_profile_tab_preferences', null, 'Preferences'),
             'profile_edit_cta' => self::str('employer_profile_edit_cta', null, 'Edit profile'),
-            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor in Moodle'),
+            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor'),
             'profile_edit_external' => self::str('employer_profile_edit_external', null, 'Edit in identity provider'),
             'profile_open_moodle' => self::str('employer_profile_open_moodle', null, 'Open public profile'),
             'profile_empty_title' => self::str('employer_profile_empty_title', null, 'No profile details yet'),
@@ -1433,12 +1433,12 @@ final class employer_tools {
             'profile_edit_help' => self::str(
                 'employer_profile_edit_help',
                 null,
-                'Changes save to your Moodle user account. Locked fields are controlled by your login method.'
+                'Changes save to your account. Locked fields are controlled by your login method.'
             ),
             'profile_edit_note' => self::str(
                 'employer_profile_edit_note',
                 null,
-                'Picture upload and advanced custom fields open in Moodle’s full profile editor.'
+                'Use Edit for name, contact, and bio. Preferences covers messages, notifications, and language.'
             ),
             'profile_custom_heading' => self::str('employer_profile_custom_heading', null, 'Additional fields'),
             'profile_save' => self::str('employer_profile_save', null, 'Save profile'),
@@ -1446,12 +1446,12 @@ final class employer_tools {
             'profile_edit_unavailable_title' => self::str(
                 'employer_profile_edit_unavailable_title',
                 null,
-                'Edit this profile in Moodle'
+                'Profile edit is managed by your login method'
             ),
             'profile_edit_unavailable_body' => self::str(
                 'employer_profile_edit_unavailable_body',
                 null,
-                'Your account settings require Moodle’s profile editor (or an external identity provider).'
+                'Your organisation controls this account. Use Preferences for what LaunchPad allows, or ask your programme admin.'
             ),
             'profile_prefs_lead' => self::str(
                 'employer_profile_prefs_lead',
@@ -1461,14 +1461,14 @@ final class employer_tools {
             'native_tools_note' => self::str(
                 'employer_profile_prefs_note',
                 null,
-                'Password, tokens, and some notification channels may open an advanced settings page.'
+                'Changes save to your LaunchPad account.'
             ),
             'pref_back' => self::str('employer_pref_back', null, 'Back to preferences'),
             'pref_save' => self::str('employer_pref_save', null, 'Save preferences'),
             'pref_cancel' => self::str('employer_pref_cancel', null, 'Cancel'),
-            'pref_open_moodle' => self::str('employer_pref_open_moodle', null, 'Open in Moodle'),
+            'pref_open_moodle' => self::str('employer_pref_open_moodle', null, 'Open'),
             'pref_open_portal_edit' => self::str('employer_pref_open_portal_edit', null, 'Edit in LaunchPad'),
-            'pref_advanced_moodle' => self::str('employer_pref_advanced_moodle', null, 'Advanced in Moodle'),
+            'pref_advanced_moodle' => '',
         ];
     }
 
@@ -1534,7 +1534,8 @@ final class employer_tools {
         string $actionpath = '/local/launchpad/employee_action.php',
         string $pref = '',
         bool $prefsaved = false,
-        string $preferr = ''
+        string $preferr = '',
+        bool $hidemoodleescapes = false
     ): array {
         global $CFG, $PAGE;
 
@@ -1554,6 +1555,10 @@ final class employer_tools {
             $pref = '';
         }
         $allowedprefs = self::preference_whitelist();
+        // Fellowship: drop Moodle-only handoff prefs (Advanced / escape hatch).
+        if ($hidemoodleescapes) {
+            $allowedprefs = array_values(array_diff($allowedprefs, self::preference_moodle_only_keys()));
+        }
         if ($pref !== '' && !in_array($pref, $allowedprefs, true)) {
             $pref = '';
         }
@@ -1621,14 +1626,15 @@ final class employer_tools {
 
         $sections = self::profile_display_sections($user);
         $form = self::profile_edit_form($user);
-        $preflinks = self::profile_preference_links($userid, $portalpath);
+        $preflinks = self::profile_preference_links($userid, $portalpath, $hidemoodleescapes);
 
         $ctx = array_merge([
             'page_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Name, contact details, and preferences from your Moodle account.'
+                'Name, contact details, and preferences for your LaunchPad account.'
             ),
+            'hide_moodle_escapes' => $hidemoodleescapes,
             'moodle_url' => $moodleprofile,
             'moodle_edit_url' => $moodleedit,
             'moodle_prefs_url' => $moodleprefs,
@@ -2213,7 +2219,20 @@ final class employer_tools {
      * @param string $portalpath
      * @return list<array<string,mixed>>
      */
-    private static function profile_preference_links(int $userid, string $portalpath): array {
+    /**
+     * Preference keys that only hand off to Moodle (no in-portal editor).
+     *
+     * @return list<string>
+     */
+    private static function preference_moodle_only_keys(): array {
+        return ['edit', 'public', 'files', 'contentbank', 'tokens'];
+    }
+
+    private static function profile_preference_links(
+        int $userid,
+        string $portalpath,
+        bool $hidemoodleescapes = false
+    ): array {
         $prefurl = static function (string $key) use ($portalpath): string {
             return (new \moodle_url($portalpath, [
                 'view' => 'profile',
@@ -2221,12 +2240,14 @@ final class employer_tools {
                 'pref' => $key,
             ]))->out(false);
         };
+        $moodleonly = array_fill_keys(self::preference_moodle_only_keys(), true);
 
         $groups = [
             [
                 'title' => self::str('employer_profile_prefs_account', null, 'Account'),
                 'items' => [
                     [
+                        'key' => 'edit',
                         'label' => self::str('employer_profile_prefs_edit', null, 'Edit full profile'),
                         'desc' => self::str(
                             'employer_profile_prefs_edit_desc',
@@ -2237,6 +2258,7 @@ final class employer_tools {
                         'icon' => 'user-edit-01',
                     ],
                     [
+                        'key' => 'public',
                         'label' => self::str('employer_profile_prefs_public', null, 'Public profile'),
                         'desc' => self::str(
                             'employer_profile_prefs_public_desc',
@@ -2247,6 +2269,7 @@ final class employer_tools {
                         'icon' => 'user-circle',
                     ],
                     [
+                        'key' => 'password',
                         'label' => self::str('employer_profile_prefs_password', null, 'Change password'),
                         'desc' => self::str(
                             'employer_profile_prefs_password_desc',
@@ -2262,6 +2285,7 @@ final class employer_tools {
                 'title' => self::str('employer_profile_prefs_communication', null, 'Communication'),
                 'items' => [
                     [
+                        'key' => 'messages',
                         'label' => self::core_str('messagepreferences', 'message', 'Messaging preferences'),
                         'desc' => self::str(
                             'employer_profile_prefs_messages_desc',
@@ -2272,6 +2296,7 @@ final class employer_tools {
                         'icon' => 'message-01',
                     ],
                     [
+                        'key' => 'notifications',
                         'label' => self::core_str('notificationpreferences', 'message', 'Notification preferences'),
                         'desc' => self::str(
                             'employer_profile_prefs_notifs_desc',
@@ -2282,6 +2307,7 @@ final class employer_tools {
                         'icon' => 'notification-01',
                     ],
                     [
+                        'key' => 'forum',
                         'label' => self::core_str('forumpreferences', 'moodle', 'Forum preferences'),
                         'desc' => self::str(
                             'employer_profile_prefs_forum_desc',
@@ -2297,6 +2323,7 @@ final class employer_tools {
                 'title' => self::str('employer_profile_prefs_system', null, 'System'),
                 'items' => [
                     [
+                        'key' => 'language',
                         'label' => self::core_str('preferredlanguage', 'moodle', 'Preferred language'),
                         'desc' => self::str(
                             'employer_profile_prefs_lang_desc',
@@ -2307,6 +2334,7 @@ final class employer_tools {
                         'icon' => 'translate',
                     ],
                     [
+                        'key' => 'editor',
                         'label' => self::core_str('editorpreferences', 'moodle', 'Editor preferences'),
                         'desc' => self::str(
                             'employer_profile_prefs_editor_desc',
@@ -2317,6 +2345,7 @@ final class employer_tools {
                         'icon' => 'text-font',
                     ],
                     [
+                        'key' => 'calendar',
                         'label' => self::core_str('preferences', 'calendar', 'Calendar preferences'),
                         'desc' => self::str(
                             'employer_profile_prefs_cal_desc',
@@ -2327,6 +2356,7 @@ final class employer_tools {
                         'icon' => 'calendar-03',
                     ],
                     [
+                        'key' => 'files',
                         'label' => self::core_str('privatefiles', 'moodle', 'Private files'),
                         'desc' => self::str(
                             'employer_profile_prefs_files_desc',
@@ -2337,6 +2367,7 @@ final class employer_tools {
                         'icon' => 'folder-01',
                     ],
                     [
+                        'key' => 'contentbank',
                         'label' => self::core_str('contentbank', 'moodle', 'Content bank'),
                         'desc' => self::str(
                             'employer_profile_prefs_contentbank_desc',
@@ -2347,6 +2378,7 @@ final class employer_tools {
                         'icon' => 'database',
                     ],
                     [
+                        'key' => 'tokens',
                         'label' => self::core_str('managetokens', 'webservice', 'Manage tokens'),
                         'desc' => self::str(
                             'employer_profile_prefs_tokens_desc',
@@ -2367,6 +2399,11 @@ final class employer_tools {
                 if (empty($item['url'])) {
                     continue;
                 }
+                $key = (string) ($item['key'] ?? '');
+                if ($hidemoodleescapes && $key !== '' && isset($moodleonly[$key])) {
+                    continue;
+                }
+                unset($item['key']);
                 $items[] = $item;
             }
             if ($items !== []) {
@@ -2481,12 +2518,7 @@ final class employer_tools {
             if ($pref === 'password' && !empty($CFG->passwordpolicy)) {
                 $base['pref_password_policy'] = trim(strip_tags(print_password_policy()));
             }
-            // Notifications matrix lives at view=notificationprefs (no Moodle Advanced escape).
-            if ($pref === 'messages') {
-                $adv = (new \moodle_url('/message/edit.php', ['id' => $userid]))->out(false);
-                $base['pref_advanced_url'] = $adv;
-                $base['pref_has_advanced'] = true;
-            }
+            // No Moodle “Advanced settings” escape — edit in LaunchPad only.
             return $base;
         }
 
@@ -2508,7 +2540,7 @@ final class employer_tools {
                 $body = self::str(
                     'employer_pref_edit_body',
                     null,
-                    'Use the in-portal editor for common fields, or open advanced settings for picture upload and extra fields.'
+                    'Use the in-portal Edit tab for common fields.'
                 );
                 $base['pref_portal_edit_url'] = $editportal;
                 $base['pref_has_portal_edit'] = true;
@@ -2942,7 +2974,7 @@ final class employer_tools {
                 'help' => self::str(
                     'employer_pref_notifications_help',
                     null,
-                    'Quick toggles for email and popup on common alerts. Open advanced settings for the full matrix.'
+                    'Quick toggles for email and popup on common alerts.'
                 ),
                 'icon' => 'notification-01',
             ],
@@ -3841,7 +3873,7 @@ final class employer_tools {
                 'denied_message' => self::str(
                     'employer_grades_load_failed',
                     null,
-                    'Could not load the Moodle grade report for this course.'
+                    'Could not load the grade report for this course.'
                 ),
             ]);
         }

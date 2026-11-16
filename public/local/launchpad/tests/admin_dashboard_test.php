@@ -45,6 +45,13 @@ final class admin_dashboard_test extends \basic_testcase {
         $this->assertFalse(admin_dashboard::is_track_idnumber(''));
     }
 
+    public function test_is_orientation_idnumber(): void {
+        $this->assertTrue(admin_dashboard::is_orientation_idnumber('lp-orient-pilot'));
+        $this->assertTrue(admin_dashboard::is_orientation_idnumber('LP-ORIENT-2026'));
+        $this->assertFalse(admin_dashboard::is_orientation_idnumber('lp-ai-pilot'));
+        $this->assertFalse(admin_dashboard::is_orientation_idnumber(''));
+    }
+
     public function test_activity_and_teacher_count_invalid_course(): void {
         $this->assertSame(0, admin_dashboard::activity_count(0));
         $this->assertSame(0, admin_dashboard::activity_count(-3));

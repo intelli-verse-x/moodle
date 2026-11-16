@@ -33,11 +33,15 @@
 
   {{#has_assigns}}
     {{#show_tabs}}
-      <div class="lp-feedback-tabs-wrap">
+      <div class="lp-feedback-tabs-wrap"
+           data-lp-fb-filter-root
+           data-filter="{{ftab}}"
+           data-has-released="{{#has_released}}1{{/has_released}}{{^has_released}}0{{/has_released}}">
         <div class="lp-tabs lp-tabs-block lp-feedback-tabs" role="tablist" aria-label="{{#str}} fellowship_nav_feedback, local_launchpad {{/str}}">
           <a class="lp-tab{{#ftab_all}} is-on{{/ftab_all}}"
              role="tab"
              href="{{tab_all_url}}"
+             data-lp-fb-filter="all"
              aria-selected="{{#ftab_all}}true{{/ftab_all}}{{^ftab_all}}false{{/ftab_all}}">
             {{#str}} fellowship_feedback_tab_all, local_launchpad {{/str}}
             <span class="lp-tab-count">{{all_count}}</span>
@@ -45,6 +49,7 @@
           <a class="lp-tab{{#ftab_attention}} is-on{{/ftab_attention}}"
              role="tab"
              href="{{tab_attention_url}}"
+             data-lp-fb-filter="attention"
              aria-selected="{{#ftab_attention}}true{{/ftab_attention}}{{^ftab_attention}}false{{/ftab_attention}}">
             {{#str}} fellowship_feedback_tab_attention, local_launchpad {{/str}}
             <span class="lp-tab-count">{{attention_tab_count}}</span>
@@ -52,6 +57,7 @@
           <a class="lp-tab{{#ftab_reviewed}} is-on{{/ftab_reviewed}}"
              role="tab"
              href="{{tab_reviewed_url}}"
+             data-lp-fb-filter="reviewed"
              aria-selected="{{#ftab_reviewed}}true{{/ftab_reviewed}}{{^ftab_reviewed}}false{{/ftab_reviewed}}">
             {{#str}} fellowship_feedback_tab_reviewed, local_launchpad {{/str}}
             <span class="lp-tab-count">{{reviewed_count}}</span>
@@ -59,6 +65,7 @@
           <a class="lp-tab{{#ftab_pending}} is-on{{/ftab_pending}}"
              role="tab"
              href="{{tab_pending_url}}"
+             data-lp-fb-filter="pending"
              aria-selected="{{#ftab_pending}}true{{/ftab_pending}}{{^ftab_pending}}false{{/ftab_pending}}">
             {{#str}} fellowship_feedback_tab_pending, local_launchpad {{/str}}
             <span class="lp-tab-count">{{pending_count}}</span>
@@ -66,6 +73,7 @@
           <a class="lp-tab{{#ftab_not_submitted}} is-on{{/ftab_not_submitted}}"
              role="tab"
              href="{{tab_not_submitted_url}}"
+             data-lp-fb-filter="not_submitted"
              aria-selected="{{#ftab_not_submitted}}true{{/ftab_not_submitted}}{{^ftab_not_submitted}}false{{/ftab_not_submitted}}">
             {{#str}} fellowship_feedback_tab_not_submitted, local_launchpad {{/str}}
             <span class="lp-tab-count">{{not_submitted_count}}</span>
@@ -75,7 +83,9 @@
     {{/show_tabs}}
 
     {{#show_empty_released}}
-      <section class="lp-feedback-empty" role="status">
+      <section class="lp-feedback-empty"
+               data-lp-fb-empty-released
+               role="status"{{#empty_released_hidden}} hidden{{/empty_released_hidden}}>
         <div class="lp-feedback-empty-art" aria-hidden="true">
           {{#empty_avatar_url}}
             <span class="lp-feedback-empty-glow"></span>
@@ -108,20 +118,22 @@
     {{/show_empty_released}}
 
     {{#show_filter_empty}}
-      <div class="lp-empty lp-empty-inline" role="status">
+      <div class="lp-empty lp-empty-inline"
+           data-lp-fb-filter-empty
+           role="status"{{#filter_empty_hidden}} hidden{{/filter_empty_hidden}}>
         <h2>{{#str}} fellowship_feedback_filter_empty_title, local_launchpad {{/str}}</h2>
         <p>{{#str}} fellowship_feedback_filter_empty_body, local_launchpad {{/str}}</p>
         <div class="lp-empty-actions">
-          <a class="lp-btn lp-btn-light" href="{{tab_all_url}}">{{#str}} fellowship_feedback_tab_all, local_launchpad {{/str}}</a>
+          <a class="lp-btn lp-btn-light" href="{{tab_all_url}}" data-lp-fb-filter="all">{{#str}} fellowship_feedback_tab_all, local_launchpad {{/str}}</a>
         </div>
       </div>
     {{/show_filter_empty}}
 
     {{#has_attention_items}}
-      <section class="lp-feedback-block" aria-label="{{#str}} fellowship_feedback_section_attention, local_launchpad {{/str}}">
-        {{#ftab_all}}
-          <h2 class="lp-feedback-section">{{#str}} fellowship_feedback_section_attention, local_launchpad {{/str}}</h2>
-        {{/ftab_all}}
+      <section class="lp-feedback-block"
+               data-lp-fb-section="attention"
+               aria-label="{{#str}} fellowship_feedback_section_attention, local_launchpad {{/str}}"{{#attention_section_hidden}} hidden{{/attention_section_hidden}}>
+        <h2 class="lp-feedback-section" data-lp-fb-section-title{{^ftab_all}} hidden{{/ftab_all}}>{{#str}} fellowship_feedback_section_attention, local_launchpad {{/str}}</h2>
         <div class="lp-feedback-list">
           {{#attention_items}}
             {{> local_launchpad/fellowship_feedback_card}}
@@ -131,10 +143,10 @@
     {{/has_attention_items}}
 
     {{#has_reviewed_items}}
-      <section class="lp-feedback-block" aria-label="{{#str}} fellowship_feedback_section_released, local_launchpad {{/str}}">
-        {{#ftab_all}}
-          <h2 class="lp-feedback-section">{{#str}} fellowship_feedback_section_released, local_launchpad {{/str}}</h2>
-        {{/ftab_all}}
+      <section class="lp-feedback-block"
+               data-lp-fb-section="reviewed"
+               aria-label="{{#str}} fellowship_feedback_section_released, local_launchpad {{/str}}"{{#reviewed_section_hidden}} hidden{{/reviewed_section_hidden}}>
+        <h2 class="lp-feedback-section" data-lp-fb-section-title{{^ftab_all}} hidden{{/ftab_all}}>{{#str}} fellowship_feedback_section_released, local_launchpad {{/str}}</h2>
         <div class="lp-feedback-list">
           {{#reviewed_items}}
             {{> local_launchpad/fellowship_feedback_card}}
@@ -144,10 +156,10 @@
     {{/has_reviewed_items}}
 
     {{#has_pending_items}}
-      <section class="lp-feedback-block" aria-label="{{#str}} fellowship_feedback_section_pending, local_launchpad {{/str}}">
-        {{#ftab_all}}
-          <h2 class="lp-feedback-section">{{#str}} fellowship_feedback_section_pending, local_launchpad {{/str}}</h2>
-        {{/ftab_all}}
+      <section class="lp-feedback-block"
+               data-lp-fb-section="pending"
+               aria-label="{{#str}} fellowship_feedback_section_pending, local_launchpad {{/str}}"{{#pending_section_hidden}} hidden{{/pending_section_hidden}}>
+        <h2 class="lp-feedback-section" data-lp-fb-section-title{{^ftab_all}} hidden{{/ftab_all}}>{{#str}} fellowship_feedback_section_pending, local_launchpad {{/str}}</h2>
         <div class="lp-feedback-list">
           {{#pending_items}}
             {{> local_launchpad/fellowship_feedback_card}}
@@ -157,10 +169,10 @@
     {{/has_pending_items}}
 
     {{#has_not_submitted_items}}
-      <section class="lp-feedback-block" aria-label="{{#str}} fellowship_feedback_section_not_submitted, local_launchpad {{/str}}">
-        {{#ftab_all}}
-          <h2 class="lp-feedback-section">{{#str}} fellowship_feedback_section_not_submitted, local_launchpad {{/str}}</h2>
-        {{/ftab_all}}
+      <section class="lp-feedback-block"
+               data-lp-fb-section="not_submitted"
+               aria-label="{{#str}} fellowship_feedback_section_not_submitted, local_launchpad {{/str}}"{{#not_submitted_section_hidden}} hidden{{/not_submitted_section_hidden}}>
+        <h2 class="lp-feedback-section" data-lp-fb-section-title{{^ftab_all}} hidden{{/ftab_all}}>{{#str}} fellowship_feedback_section_not_submitted, local_launchpad {{/str}}</h2>
         <div class="lp-feedback-list">
           {{#not_submitted_items}}
             {{> local_launchpad/fellowship_feedback_card}}

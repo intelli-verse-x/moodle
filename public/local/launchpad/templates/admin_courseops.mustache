@@ -50,7 +50,12 @@
       </div>
       <div class="lp-courseops-chips">
         <span class="lp-chip {{#is_visible}}ok{{/is_visible}}{{^is_visible}}warn{{/is_visible}}">{{visibility_chip}}</span>
-        <span class="lp-chip {{#ready_ok}}ok{{/ready_ok}}{{^ready_ok}}warn{{/ready_ok}}">{{ready_chip}}</span>
+        {{#is_orientation}}
+          <span class="lp-chip line">{{orient_chip}}</span>
+        {{/is_orientation}}
+        {{#show_ready_chip}}
+          <span class="lp-chip {{#ready_ok}}ok{{/ready_ok}}{{^ready_ok}}warn{{/ready_ok}}">{{ready_chip}}</span>
+        {{/show_ready_chip}}
       </div>
     </div>
     <dl class="lp-theme-kv lp-courseops-kv">

@@ -31,6 +31,17 @@
       {{#graded_at}}<span class="lp-muted lp-sm">{{#str}} fellowship_feedback_released, local_launchpad {{/str}} {{graded_at}}</span>{{/graded_at}}
     </div>
   {{/has_grade}}
+  {{#has_rubric_breakdown}}
+    <ul class="lp-feedback-rubric" aria-label="{{#str}} fellowship_feedback_rubric_label, local_launchpad {{/str}}">
+      {{#rubric_rows}}
+        <li>
+          <span class="lp-feedback-rubric-label">{{label}}</span>
+          <span class="lp-feedback-rubric-level">{{level_label}}</span>
+          <span class="lp-feedback-rubric-score">{{score}}/{{score_max}}</span>
+        </li>
+      {{/rubric_rows}}
+    </ul>
+  {{/has_rubric_breakdown}}
   {{#has_next_step}}
     <div class="lp-feedback-nextstep" role="status">
       <span class="lp-feedback-nextstep-label">{{#str}} fellowship_feedback_nextstep_label, local_launchpad {{/str}}</span>

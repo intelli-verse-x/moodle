@@ -283,15 +283,15 @@ const CR = [
   ['Prioritisation / tradeoffs', 25],
   ['Communication / test plan', 20],
 ];
-const LVL = ['Missing', 'Partial', 'Solid', 'Strong'];
-const FR = [0.4, 0.6, 0.8, 1];
+const LVL = ['None', 'Missing', 'Partial', 'Solid', 'Strong'];
+const FR = [0, 0.4, 0.6, 0.8, 1];
 const critsEl = $('#crits');
 if (critsEl) {
   // Default Partial (0.6) on each criterion = 60/100, below the 70 pass bar.
   critsEl.innerHTML = CR.map((c, i) => `
     <div class="crit">
       <label for="c${i}">${c[0]}<small id="cl${i}">Partial</small></label>
-      <input type="range" id="c${i}" min="0" max="3" value="1" aria-valuemin="0" aria-valuemax="3" aria-describedby="cl${i}">
+      <input type="range" id="c${i}" min="0" max="4" value="2" aria-valuemin="0" aria-valuemax="4" aria-describedby="cl${i}">
       <output id="co${i}">${Math.round(c[1] * 0.6)}/${c[1]}</output>
     </div>`).join('');
 

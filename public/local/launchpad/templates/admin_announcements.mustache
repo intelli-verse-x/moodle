@@ -51,7 +51,16 @@
       </div>
     </div>
     {{^has_tracks}}
-      {{> local_launchpad/admin_empty}}
+      <div class="lp-empty" role="status">
+        <div class="lp-empty-mark" aria-hidden="true">AN</div>
+        <h2>{{compose_empty_title}}</h2>
+        <p>{{compose_empty_body}}</p>
+        {{#has_compose_empty_cta}}
+          <p class="lp-empty-actions" style="margin-top:12px">
+            <a class="lp-btn lp-btn-solid" href="{{compose_empty_cta_url}}">{{compose_empty_cta_label}}</a>
+          </p>
+        {{/has_compose_empty_cta}}
+      </div>
     {{/has_tracks}}
     {{#has_tracks}}
       <form method="post" action="{{form_action}}" class="lp-stack lp-ann-form" data-lp-ann-form enctype="multipart/form-data">
@@ -172,11 +181,14 @@
 
   <section class="lp-card lift lp-ann-feed">
     <div class="lp-ann-card-head lp-ann-feed-head">
-      <div class="lp-ann-feed-title-row">
-        <h3>{{list_title}}</h3>
-        {{#has_items}}
-          <span class="lp-ann-live-badge">{{live_badge}}</span>
-        {{/has_items}}
+      <div class="lp-ann-card-head-main">
+        <div class="lp-ann-feed-title-row">
+          <h3>{{list_title}}</h3>
+          {{#has_items}}
+            <span class="lp-ann-live-badge">{{live_badge}}</span>
+          {{/has_items}}
+        </div>
+        <p class="lp-ann-card-sub">{{#str}} admin_announcements_list_lead, local_launchpad {{/str}}</p>
       </div>
       <button type="button" class="lp-ann-text-btn" data-lp-ann-refresh>{{refresh_label}}</button>
     </div>

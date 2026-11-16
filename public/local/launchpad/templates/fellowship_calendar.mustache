@@ -16,6 +16,9 @@
   data-str-saved="{{#str}} fellowship_calendar_saved, local_launchpad {{/str}}"
   data-str-deleted="{{#str}} fellowship_calendar_deleted, local_launchpad {{/str}}"
   data-str-delete-confirm="{{#str}} fellowship_calendar_delete_confirm, local_launchpad {{/str}}"
+  data-str-delete-title="{{#str}} fellowship_calendar_delete_confirm_title, local_launchpad {{/str}}"
+  data-str-delete-cancel="{{#str}} fellowship_calendar_cancel, local_launchpad {{/str}}"
+  data-str-delete-ok="{{#str}} fellowship_calendar_delete, local_launchpad {{/str}}"
   data-str-network="{{#str}} fellowship_calendar_err_network, local_launchpad {{/str}}"
   data-str-course-required="{{#str}} fellowship_calendar_err_course, local_launchpad {{/str}}">
 
@@ -431,5 +434,23 @@
       </div>
     </div>
   </form>
+</div>
+
+<div class="lp-cal-confirm" data-lp-cal-confirm hidden aria-hidden="true" role="presentation">
+  <div class="lp-cal-confirm-scrim" data-lp-cal-confirm-cancel aria-hidden="true"></div>
+  <div class="lp-cal-confirm-card" role="dialog" aria-modal="true"
+       aria-labelledby="lp-cal-confirm-title" aria-describedby="lp-cal-confirm-body">
+    <p class="lp-eyebrow">{{#str}} fellowship_calendar_delete, local_launchpad {{/str}}</p>
+    <h2 id="lp-cal-confirm-title" data-lp-cal-confirm-title>{{#str}} fellowship_calendar_delete, local_launchpad {{/str}}</h2>
+    <p id="lp-cal-confirm-body" class="lp-sm" data-lp-cal-confirm-body>{{#str}} fellowship_calendar_delete_confirm, local_launchpad {{/str}}</p>
+    <div class="lp-cal-confirm-actions">
+      <button type="button" class="lp-btn lp-btn-light" data-lp-cal-confirm-cancel>
+        {{#str}} fellowship_calendar_cancel, local_launchpad {{/str}}
+      </button>
+      <button type="button" class="lp-btn lp-btn-primary" data-lp-cal-confirm-ok>
+        {{#str}} fellowship_calendar_delete, local_launchpad {{/str}}
+      </button>
+    </div>
+  </div>
 </div>
 </div>

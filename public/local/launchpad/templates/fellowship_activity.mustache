@@ -438,16 +438,18 @@
                   <dd>{{assign_grade_max}} · {{strings.assignpassbar}} {{assign_pass_bar}}</dd>
                 </div>
               {{/assign_has_grade}}
-              {{#assign_has_sub_status}}
+              {{^assign_has_receipt}}
+                {{#assign_has_sub_status}}
+                  <div>
+                    <dt>{{strings.assignstatus}}</dt>
+                    <dd><span class="lp-chip {{#assign_sub_status_key}}is-{{assign_sub_status_key}}{{/assign_sub_status_key}}">{{assign_sub_status}}</span></dd>
+                  </div>
+                {{/assign_has_sub_status}}
                 <div>
-                  <dt>{{strings.assignstatus}}</dt>
-                  <dd><span class="lp-chip {{#assign_sub_status_key}}is-{{assign_sub_status_key}}{{/assign_sub_status_key}}">{{assign_sub_status}}</span></dd>
+                  <dt>{{strings.assignattempt}}</dt>
+                  <dd>{{assign_attempt_label}}</dd>
                 </div>
-              {{/assign_has_sub_status}}
-              <div>
-                <dt>{{strings.assignattempt}}</dt>
-                <dd>{{assign_attempt_label}}</dd>
-              </div>
+              {{/assign_has_receipt}}
               <div>
                 <dt>{{strings.assigncompletion}}</dt>
                 <dd>{{assign_completion_note}}</dd>
@@ -472,16 +474,51 @@
               </section>
             {{/assign_has_feedback}}
 
-            {{#assign_has_current_files}}
-              <section class="lp-lesson-block">
-                <h3 class="lp-lesson-block-title">{{strings.assignfiles}}</h3>
-                <ul class="lp-assign-file-list">
-                  {{#assign_current_files}}
-                    <li><a href="{{url}}" target="_blank" rel="noopener">{{filename}}</a> <span class="lp-muted lp-sm">{{filesize}}</span></li>
-                  {{/assign_current_files}}
-                </ul>
+            {{#assign_has_receipt}}
+              <section class="lp-lesson-block lp-assign-receipt" data-region="assign-receipt">
+                <h3 class="lp-lesson-block-title">{{strings.assignreceipt}}</h3>
+                <dl class="lp-assign-receipt-meta">
+                  {{#assign_has_sub_status}}
+                    <div>
+                      <dt>{{strings.assignstatus}}</dt>
+                      <dd><span class="lp-chip {{#assign_sub_status_key}}is-{{assign_sub_status_key}}{{/assign_sub_status_key}}">{{assign_sub_status}}</span></dd>
+                    </div>
+                  {{/assign_has_sub_status}}
+                  <div>
+                    <dt>{{strings.assignattempt}}</dt>
+                    <dd>{{assign_attempt_label}}</dd>
+                  </div>
+                  {{#assign_has_receipt_when}}
+                    <div>
+                      <dt>{{assign_receipt_when_label}}</dt>
+                      <dd>{{assign_receipt_when}}</dd>
+                    </div>
+                  {{/assign_has_receipt_when}}
+                </dl>
+                {{#assign_has_receipt_content}}
+                  {{#assign_has_draft_html}}
+                    <div class="lp-assign-receipt-body">
+                      <h4 class="lp-assign-receipt-sub">{{strings.assignonlinetext}}</h4>
+                      <div class="lp-lesson-block-body">{{{assign_draft_html}}}</div>
+                    </div>
+                  {{/assign_has_draft_html}}
+                  {{#assign_has_current_files}}
+                    <div class="lp-assign-receipt-body">
+                      <h4 class="lp-assign-receipt-sub">{{strings.assignfiles}}</h4>
+                      <ul class="lp-assign-file-list">
+                        {{#assign_current_files}}
+                          <li><a href="{{url}}" target="_blank" rel="noopener">{{filename}}</a> <span class="lp-muted lp-sm">{{filesize}}</span></li>
+                        {{/assign_current_files}}
+                      </ul>
+                    </div>
+                  {{/assign_has_current_files}}
+                {{/assign_has_receipt_content}}
+                {{^assign_has_receipt_content}}
+                  <p class="lp-muted lp-sm">{{assign_receipt_empty}}</p>
+                {{/assign_has_receipt_content}}
+                <p class="lp-xs lp-muted lp-assign-receipt-honesty">{{assign_receipt_honesty}}</p>
               </section>
-            {{/assign_has_current_files}}
+            {{/assign_has_receipt}}
 
             {{#assign_can_edit}}
               <section class="lp-lesson-block">
@@ -523,12 +560,6 @@
               </section>
             {{/assign_can_edit}}
             {{^assign_can_edit}}
-              {{#assign_has_draft_html}}
-                <section class="lp-lesson-block">
-                  <h3 class="lp-lesson-block-title">{{strings.assignonlinetext}}</h3>
-                  <div class="lp-lesson-block-body">{{{assign_draft_html}}}</div>
-                </section>
-              {{/assign_has_draft_html}}
               <p class="lp-muted lp-sm">{{strings.assignlockednote}}</p>
             {{/assign_can_edit}}
 
@@ -555,6 +586,13 @@
                       {{#has_text}}
                         <div class="lp-lesson-block-body">{{{text_html}}}</div>
                       {{/has_text}}
+                      {{#has_files}}
+                        <ul class="lp-assign-file-list">
+                          {{#files}}
+                            <li><a href="{{url}}" target="_blank" rel="noopener">{{filename}}</a> <span class="lp-muted lp-sm">{{filesize}}</span></li>
+                          {{/files}}
+                        </ul>
+                      {{/has_files}}
                     </li>
                   {{/assign_prior_attempts}}
                 </ul>

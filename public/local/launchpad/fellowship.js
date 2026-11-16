@@ -264,34 +264,70 @@
         });
     }
 
-    var calRoot = shell.querySelector('[data-lp-cal-root]');
-    var calDetail = shell.querySelector('[data-lp-cal-detail]');
-    var calForm = shell.querySelector('[data-lp-cal-form]');
-    var calFormEl = shell.querySelector('[data-lp-cal-form-el]');
-    var calFlash = shell.querySelector('[data-lp-cal-flash]');
-    var calDayPanel = shell.querySelector('[data-lp-cal-daypanel]');
+    var calRoot = null;
+    var calDetail = null;
+    var calForm = null;
+    var calFormEl = null;
+    var calFlash = null;
+    var calDayPanel = null;
+    var calConfirm = null;
     var calMonthFetch = null;
+    var calSoftFetch = null;
     var calDetailSource = null;
     var calDragId = null;
     var calDragMoved = false;
+    var calDeletePendingId = '';
+    var calOverlaysBoundHost = null;
     var calStrings = {
         addTitle: 'Add event',
         editTitle: 'Edit event',
         saved: 'Event saved.',
         deleted: 'Event deleted.',
         deleteConfirm: 'Delete this event? It will also leave your Moodle calendar.',
+        deleteTitle: 'Delete this event?',
+        deleteCancel: 'Cancel',
+        deleteOk: 'Delete',
         network: 'Network error — try again.',
         courseRequired: 'Choose a course for this event.'
     };
-    if (calRoot) {
+    function cacheCalDom() {
+        calRoot = shell.querySelector('[data-lp-cal-root]');
+        calDetail = shell.querySelector('[data-lp-cal-detail]');
+        calForm = shell.querySelector('[data-lp-cal-form]');
+        calFormEl = shell.querySelector('[data-lp-cal-form-el]');
+        calFlash = shell.querySelector('[data-lp-cal-flash]');
+        calDayPanel = shell.querySelector('[data-lp-cal-daypanel]');
+        // Confirm may be parked on document.body while open.
+        calConfirm = shell.querySelector('[data-lp-cal-confirm]')
+            || document.querySelector('[data-lp-cal-confirm]');
+        if (!calRoot) {
+            return;
+        }
         calStrings.addTitle = calRoot.getAttribute('data-str-add-title') || calStrings.addTitle;
         calStrings.editTitle = calRoot.getAttribute('data-str-edit-title') || calStrings.editTitle;
         calStrings.saved = calRoot.getAttribute('data-str-saved') || calStrings.saved;
         calStrings.deleted = calRoot.getAttribute('data-str-deleted') || calStrings.deleted;
         calStrings.deleteConfirm = calRoot.getAttribute('data-str-delete-confirm') || calStrings.deleteConfirm;
+        calStrings.deleteTitle = calRoot.getAttribute('data-str-delete-title') || calStrings.deleteTitle;
+        calStrings.deleteCancel = calRoot.getAttribute('data-str-delete-cancel') || calStrings.deleteCancel;
+        calStrings.deleteOk = calRoot.getAttribute('data-str-delete-ok') || calStrings.deleteOk;
+        // Moodle unresolved strings look like [[key]] — never paint those.
+        ['deleteConfirm', 'deleteTitle', 'deleteCancel', 'deleteOk', 'saved', 'deleted'].forEach(function (k) {
+            if (calStrings[k] && String(calStrings[k]).indexOf('[[') === 0) {
+                delete calStrings[k];
+            }
+        });
+        calStrings.deleteConfirm = calStrings.deleteConfirm
+            || 'This removes the event from LaunchPad and your Moodle calendar. This cannot be undone.';
+        calStrings.deleteTitle = calStrings.deleteTitle || 'Delete this event?';
+        calStrings.deleteCancel = calStrings.deleteCancel || 'Cancel';
+        calStrings.deleteOk = calStrings.deleteOk || 'Delete';
+        calStrings.saved = calStrings.saved || 'Event saved.';
+        calStrings.deleted = calStrings.deleted || 'Event deleted.';
         calStrings.network = calRoot.getAttribute('data-str-network') || calStrings.network;
         calStrings.courseRequired = calRoot.getAttribute('data-str-course-required') || calStrings.courseRequired;
     }
+    cacheCalDom();
     function normalizeCalScope(value) {
         if (value === 'course' || value === 'site') {
             return value;
@@ -738,7 +774,8 @@
     function anyCalOverlayOpen() {
         return (calDetail && calDetail.classList.contains('is-open'))
             || (calForm && calForm.classList.contains('is-open'))
-            || (calDayPanel && calDayPanel.classList.contains('is-open'));
+            || (calDayPanel && calDayPanel.classList.contains('is-open'))
+            || (calConfirm && calConfirm.classList.contains('is-open'));
     }
     function closeCalDetail() {
         if (!calDetail) {
@@ -791,6 +828,7 @@
         document.body.classList.add('lp-cal-detail-lock');
     }
     function closeCalForm() {
+        closeCalConfirm();
         if (!calForm) {
             return;
         }
@@ -1048,13 +1086,150 @@
             nameEl.focus();
         }
     }
+    function closeCalConfirm() {
+        calDeletePendingId = '';
+        if (calForm) {
+            calForm.classList.remove('is-confirming');
+        }
+        if (!calConfirm) {
+            return;
+        }
+        calConfirm.classList.remove('is-open');
+        calConfirm.setAttribute('hidden', 'hidden');
+        calConfirm.setAttribute('aria-hidden', 'true');
+        var ok = calConfirm.querySelector('[data-lp-cal-confirm-ok]');
+        if (ok) {
+            ok.disabled = false;
+        }
+    }
+    function mountCalConfirm() {
+        if (!calConfirm) {
+            return;
+        }
+        // Park on body so stacking isn't trapped under the edit form / soft-nav root.
+        if (calConfirm.parentNode !== document.body) {
+            document.body.appendChild(calConfirm);
+        }
+    }
+    function openCalConfirm() {
+        if (!calConfirm) {
+            return;
+        }
+        mountCalConfirm();
+        var title = calConfirm.querySelector('[data-lp-cal-confirm-title]');
+        var body = calConfirm.querySelector('[data-lp-cal-confirm-body]');
+        var cancelBtns = calConfirm.querySelectorAll('button[data-lp-cal-confirm-cancel]');
+        var ok = calConfirm.querySelector('[data-lp-cal-confirm-ok]');
+        var titleText = calStrings.deleteTitle;
+        if (!titleText || titleText.indexOf('[[') === 0) {
+            titleText = 'Delete this event?';
+        }
+        var bodyText = calStrings.deleteConfirm;
+        if (!bodyText || bodyText.indexOf('[[') === 0) {
+            bodyText = 'This removes the event from LaunchPad and your Moodle calendar. This cannot be undone.';
+        }
+        if (title) {
+            title.textContent = titleText;
+        }
+        if (body) {
+            body.textContent = bodyText;
+        }
+        cancelBtns.forEach(function (btn) {
+            btn.textContent = calStrings.deleteCancel || 'Cancel';
+        });
+        if (ok) {
+            ok.textContent = calStrings.deleteOk || 'Delete';
+            ok.disabled = false;
+        }
+        if (calForm) {
+            calForm.classList.add('is-confirming');
+        }
+        calConfirm.classList.add('is-open');
+        calConfirm.removeAttribute('hidden');
+        calConfirm.setAttribute('aria-hidden', 'false');
+        if (ok) {
+            ok.focus();
+        }
+    }
     function refreshCalMonth() {
         var month = shell.querySelector('[data-lp-cal-month]');
         if (!month) {
-            window.location.reload();
-            return;
+            return softLoadCal(window.location.href, false);
         }
         loadCalMonth(month.getAttribute('data-time'), null, false);
+        return Promise.resolve();
+    }
+    function refreshCalView(afterFlash) {
+        if (shell.querySelector('[data-lp-cal-month]')) {
+            return refreshCalMonth().then(function () {
+                if (afterFlash) {
+                    showCalFlash(afterFlash);
+                }
+            });
+        }
+        return softLoadCal(window.location.href, false, afterFlash);
+    }
+    function softLoadCal(url, pushHistory, afterFlash) {
+        if (!url) {
+            return Promise.reject(new Error('no url'));
+        }
+        if (!calRoot) {
+            window.location.href = url;
+            return Promise.reject(new Error('no root'));
+        }
+        if (calSoftFetch && typeof calSoftFetch.abort === 'function') {
+            calSoftFetch.abort();
+        }
+        var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        calSoftFetch = controller;
+        closeCalConfirm();
+        closeCalForm();
+        closeCalDetail();
+        closeCalDayPanel();
+        // Body-mounted confirm would duplicate after root replace — drop it first.
+        if (calConfirm && calConfirm.parentNode === document.body) {
+            calConfirm.remove();
+            calConfirm = null;
+        }
+        document.querySelectorAll('body > [data-lp-cal-confirm]').forEach(function (el) {
+            el.remove();
+        });
+        calRoot.classList.add('is-soft-loading');
+        return fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'text/html' },
+            signal: controller ? controller.signal : undefined
+        }).then(function (res) {
+            if (!res.ok) {
+                throw new Error('calendar soft http ' + res.status);
+            }
+            return res.text();
+        }).then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var next = doc.querySelector('[data-lp-cal-root]');
+            if (!next || !calRoot.parentNode) {
+                throw new Error('calendar soft empty');
+            }
+            calRoot.replaceWith(next);
+            cacheCalDom();
+            bindCalOverlays();
+            initLpSelects();
+            if (pushHistory !== false) {
+                history.pushState({ lpCal: 1 }, '', url);
+            }
+            if (afterFlash) {
+                showCalFlash(afterFlash);
+            }
+        }).catch(function (err) {
+            if (err && err.name === 'AbortError') {
+                return;
+            }
+            window.location.href = url;
+        }).finally(function () {
+            if (calRoot) {
+                calRoot.classList.remove('is-soft-loading');
+            }
+        });
     }
     function postPersonal(payload) {
         if (!calRoot) {
@@ -1150,106 +1325,127 @@
             }
         });
     }
-    if (calDetail) {
-        calDetail.querySelectorAll('[data-lp-cal-detail-close]').forEach(function (el) {
-            el.addEventListener('click', closeCalDetail);
-        });
-        var detailEdit = calDetail.querySelector('[data-lp-cal-detail-edit]');
-        if (detailEdit) {
-            detailEdit.addEventListener('click', function () {
-                if (calDetailSource) {
-                    openCalForm('edit', calDetailSource);
-                }
-            });
+    function runCalDelete(id) {
+        if (!id) {
+            return;
         }
-    }
-    if (calDayPanel) {
-        calDayPanel.querySelectorAll('[data-lp-cal-daypanel-close]').forEach(function (el) {
-            el.addEventListener('click', closeCalDayPanel);
-        });
-    }
-    if (calForm) {
-        calForm.querySelectorAll('[data-lp-cal-form-close]').forEach(function (el) {
-            el.addEventListener('click', closeCalForm);
-        });
-        calForm.querySelectorAll('[data-lp-cal-form-scope]').forEach(function (radio) {
-            radio.addEventListener('change', function () {
-                syncCalScopeUi(getCalScope());
-            });
-        });
-        calForm.querySelectorAll('[data-lp-cal-form-duration-mode]').forEach(function (radio) {
-            radio.addEventListener('change', function () {
-                syncDurationModeUi(getDurationMode());
-            });
-        });
-        var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
-        if (repeatEl) {
-            repeatEl.addEventListener('change', function () {
-                var idEl = calForm.querySelector('[data-lp-cal-form-id]');
-                syncRepeatUi(!(idEl && idEl.value));
-            });
+        var ok = calConfirm ? calConfirm.querySelector('[data-lp-cal-confirm-ok]') : null;
+        var delBtn = calForm ? calForm.querySelector('[data-lp-cal-form-delete]') : null;
+        if (ok) {
+            ok.disabled = true;
         }
-        var minutesCustomInput = calForm.querySelector('[data-lp-cal-form-duration-custom]');
-        if (minutesCustomInput) {
-            minutesCustomInput.addEventListener('input', function () {
-                var hidden = calForm.querySelector('[data-lp-select-minutes] [data-lp-select-input]');
-                if (hidden) {
-                    hidden.value = minutesCustomInput.value || '0';
-                }
-            });
-        }
-        initLpSelects();
-        document.addEventListener('click', function (e) {
-            if (!calForm || !calForm.classList.contains('is-open')) {
-                return;
-            }
-            if (e.target.closest('[data-lp-select]')) {
-                return;
-            }
-            closeAllLpSelects(null);
-        });
-        document.addEventListener('keydown', function (e) {
-            if (!calForm || !calForm.classList.contains('is-open')) {
-                return;
-            }
-            if (e.key === 'Escape') {
-                var openSelect = calForm.querySelector('[data-lp-select].is-open');
-                if (openSelect) {
-                    e.preventDefault();
-                    closeLpSelect(openSelect);
-                }
-            }
-        });
-        var delBtn = calForm.querySelector('[data-lp-cal-form-delete]');
         if (delBtn) {
-            delBtn.addEventListener('click', function () {
-                var idEl = calForm.querySelector('[data-lp-cal-form-id]');
-                var id = idEl ? idEl.value : '';
-                if (!id) {
-                    return;
-                }
-                if (!window.confirm(calStrings.deleteConfirm)) {
-                    return;
-                }
-                delBtn.disabled = true;
-                postPersonal({ action: 'delete', id: id, scope: getCalScope() }).then(function () {
+            delBtn.disabled = true;
+        }
+        postPersonal({ action: 'delete', id: id, scope: getCalScope() }).then(function () {
+            closeCalConfirm();
+            closeCalForm();
+            refreshCalView(calStrings.deleted);
+        }).catch(function (err) {
+            closeCalConfirm();
+            var box = calForm ? calForm.querySelector('[data-lp-cal-form-error]') : null;
+            if (box) {
+                box.textContent = err.message || calStrings.network;
+                box.removeAttribute('hidden');
+            }
+        }).finally(function () {
+            if (ok) {
+                ok.disabled = false;
+            }
+            if (delBtn) {
+                delBtn.disabled = false;
+            }
+        });
+    }
+    function bindCalOverlays() {
+        if (!calRoot) {
+            return;
+        }
+        // Fresh nodes after soft nav — rebind once per host.
+        if (calOverlaysBoundHost === calRoot) {
+            return;
+        }
+        calOverlaysBoundHost = calRoot;
+        if (calDetail) {
+            calDetail.querySelectorAll('[data-lp-cal-detail-close]').forEach(function (el) {
+                el.addEventListener('click', closeCalDetail);
+            });
+            var detailEdit = calDetail.querySelector('[data-lp-cal-detail-edit]');
+            if (detailEdit) {
+                detailEdit.addEventListener('click', function () {
+                    if (calDetailSource) {
+                        openCalForm('edit', calDetailSource);
+                    }
+                });
+            }
+        }
+        if (calDayPanel) {
+            calDayPanel.querySelectorAll('[data-lp-cal-daypanel-close]').forEach(function (el) {
+                el.addEventListener('click', closeCalDayPanel);
+            });
+        }
+        if (calConfirm) {
+            calConfirm.querySelectorAll('[data-lp-cal-confirm-cancel]').forEach(function (el) {
+                el.addEventListener('click', closeCalConfirm);
+            });
+            var confirmOk = calConfirm.querySelector('[data-lp-cal-confirm-ok]');
+            if (confirmOk) {
+                confirmOk.addEventListener('click', function () {
+                    var id = calDeletePendingId;
+                    if (!id && calForm) {
+                        var idEl = calForm.querySelector('[data-lp-cal-form-id]');
+                        id = idEl ? idEl.value : '';
+                    }
+                    runCalDelete(id);
+                });
+            }
+        }
+        if (calForm) {
+            calForm.querySelectorAll('[data-lp-cal-form-close]').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    closeCalConfirm();
                     closeCalForm();
-                    showCalFlash(calStrings.deleted);
-                    if (shell.querySelector('[data-lp-cal-month]')) {
-                        refreshCalMonth();
-                    } else {
-                        window.location.reload();
-                    }
-                }).catch(function (err) {
-                    var box = calForm.querySelector('[data-lp-cal-form-error]');
-                    if (box) {
-                        box.textContent = err.message || calStrings.network;
-                        box.removeAttribute('hidden');
-                    }
-                }).finally(function () {
-                    delBtn.disabled = false;
                 });
             });
+            calForm.querySelectorAll('[data-lp-cal-form-scope]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    syncCalScopeUi(getCalScope());
+                });
+            });
+            calForm.querySelectorAll('[data-lp-cal-form-duration-mode]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    syncDurationModeUi(getDurationMode());
+                });
+            });
+            var repeatEl = calForm.querySelector('[data-lp-cal-form-repeat]');
+            if (repeatEl) {
+                repeatEl.addEventListener('change', function () {
+                    var idEl = calForm.querySelector('[data-lp-cal-form-id]');
+                    syncRepeatUi(!(idEl && idEl.value));
+                });
+            }
+            var minutesCustomInput = calForm.querySelector('[data-lp-cal-form-duration-custom]');
+            if (minutesCustomInput) {
+                minutesCustomInput.addEventListener('input', function () {
+                    var hidden = calForm.querySelector('[data-lp-select-minutes] [data-lp-select-input]');
+                    if (hidden) {
+                        hidden.value = minutesCustomInput.value || '0';
+                    }
+                });
+            }
+            initLpSelects();
+            var delBtn = calForm.querySelector('[data-lp-cal-form-delete]');
+            if (delBtn) {
+                delBtn.addEventListener('click', function () {
+                    var idEl = calForm.querySelector('[data-lp-cal-form-id]');
+                    var id = idEl ? idEl.value : '';
+                    if (!id) {
+                        return;
+                    }
+                    calDeletePendingId = id;
+                    openCalConfirm();
+                });
+            }
         }
         if (calFormEl) {
             calFormEl.addEventListener('submit', function (e) {
@@ -1258,7 +1454,6 @@
                 var nameEl = calForm.querySelector('[data-lp-cal-form-name]');
                 var dateEl = calForm.querySelector('[data-lp-cal-form-date]');
                 var timeEl = calForm.querySelector('[data-lp-cal-form-time]');
-                var durEl = calForm.querySelector('[data-lp-cal-form-duration]');
                 var descEl = calForm.querySelector('[data-lp-cal-form-description]');
                 var err = calForm.querySelector('[data-lp-cal-form-error]');
                 var id = idEl ? idEl.value : '';
@@ -1310,12 +1505,7 @@
                 }
                 postPersonal(payload).then(function () {
                     closeCalForm();
-                    showCalFlash(calStrings.saved);
-                    if (shell.querySelector('[data-lp-cal-month]')) {
-                        refreshCalMonth();
-                    } else {
-                        window.location.reload();
-                    }
+                    refreshCalView(calStrings.saved);
                 }).catch(function (ex) {
                     if (err) {
                         err.textContent = ex.message || calStrings.network;
@@ -1329,13 +1519,14 @@
             });
         }
     }
+    bindCalOverlays();
     shell.addEventListener('change', function (e) {
         var filter = e.target.closest('[data-lp-cal-filter], [data-lp-cal-track-filter]');
         if (filter) {
             var opt = filter.options[filter.selectedIndex];
             var url = opt ? opt.getAttribute('data-url') : '';
             if (url) {
-                window.location.href = url;
+                softLoadCal(url, true);
             }
             return;
         }
@@ -1345,11 +1536,31 @@
                 ? orient.getAttribute('data-url-on')
                 : orient.getAttribute('data-url-off');
             if (orientUrl) {
-                window.location.href = orientUrl;
+                softLoadCal(orientUrl, true);
             }
         }
     });
     shell.addEventListener('click', function (e) {
+        var tab = e.target.closest('.lp-cal-tab');
+        if (tab && calRoot && calRoot.contains(tab)) {
+            var tabHref = tab.getAttribute('href');
+            if (tabHref && !tab.classList.contains('is-on')) {
+                e.preventDefault();
+                softLoadCal(tabHref, true);
+            } else if (tabHref) {
+                e.preventDefault();
+            }
+            return;
+        }
+        var softNav = e.target.closest('a.lp-cal-nav-btn');
+        if (softNav && calRoot && calRoot.contains(softNav) && !softNav.hasAttribute('data-lp-cal-nav')) {
+            var softHref = softNav.getAttribute('href');
+            if (softHref) {
+                e.preventDefault();
+                softLoadCal(softHref, true);
+            }
+            return;
+        }
         var nav = e.target.closest('[data-lp-cal-nav]');
         if (nav) {
             e.preventDefault();
@@ -1501,6 +1712,13 @@
         );
     }
     window.addEventListener('popstate', function (e) {
+        if (!calRoot && !shell.querySelector('[data-lp-cal-root]')) {
+            return;
+        }
+        if (e.state && e.state.lpCal) {
+            softLoadCal(window.location.href, false);
+            return;
+        }
         if (!shell.querySelector('[data-lp-cal-month]')) {
             return;
         }
@@ -1513,6 +1731,10 @@
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            if (calConfirm && calConfirm.classList.contains('is-open')) {
+                closeCalConfirm();
+                return;
+            }
             if (calForm && calForm.classList.contains('is-open')) {
                 closeCalForm();
                 return;
@@ -1547,6 +1769,28 @@
         });
     }
     shell.querySelectorAll('.lp-journey-progress, .lp-ring-arc').forEach(animateDash);
+
+    // Mouse wheel is vertical-only; map it to horizontal pan on the journey strip
+    // (trackpads already send deltaX). Only trap the wheel while we can still pan.
+    shell.querySelectorAll('[data-lp-journey]').forEach(function (scroller) {
+        scroller.addEventListener('wheel', function (e) {
+            if (scroller.scrollWidth <= scroller.clientWidth + 1) {
+                return;
+            }
+            var mostlyVertical = Math.abs(e.deltaY) >= Math.abs(e.deltaX);
+            var delta = mostlyVertical ? e.deltaY : e.deltaX;
+            if (!delta) {
+                return;
+            }
+            var max = scroller.scrollWidth - scroller.clientWidth;
+            var next = Math.min(max, Math.max(0, scroller.scrollLeft + delta));
+            if (next === scroller.scrollLeft) {
+                return;
+            }
+            scroller.scrollLeft = next;
+            e.preventDefault();
+        }, {passive: false});
+    });
 
     // Sidebar XP bar + quest / weight bars (Employer home parity).
     if (!reduce) {
@@ -2116,6 +2360,17 @@
         });
 
         applyTab(root.getAttribute('data-lp-profile-active') || 'overview', false);
+
+        // Pref detail used to render under a still-visible hub (display:flex beat [hidden]).
+        // After CSS fix, still scroll the form into view so the change is obvious.
+        var prefDetail = root.querySelector('[data-lp-profile-pref-detail]');
+        if (prefDetail && !prefDetail.hidden) {
+            try {
+                prefDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (err) {
+                prefDetail.scrollIntoView(true);
+            }
+        }
     })();
 
     // Admin People tabs: filter in-place (no full-page reload).
@@ -2130,6 +2385,48 @@
         var table = root.querySelector('[data-lp-people-table]');
         if (!tabs.length) {
             return;
+        }
+
+        function emptyCopy(key) {
+            if (!emptyEl) {
+                return null;
+            }
+            return {
+                title: emptyEl.getAttribute('data-empty-' + key + '-title') || '',
+                body: emptyEl.getAttribute('data-empty-' + key + '-body') || '',
+                ctaUrl: emptyEl.getAttribute('data-empty-' + key + '-cta-url') || '',
+                ctaLabel: emptyEl.getAttribute('data-empty-' + key + '-cta-label') || '',
+                hasCta: emptyEl.getAttribute('data-empty-' + key + '-has-cta') === '1'
+            };
+        }
+
+        function applyEmptyCopy(key) {
+            if (!emptyEl) {
+                return;
+            }
+            var copy = emptyCopy(key) || emptyCopy('all');
+            if (!copy) {
+                return;
+            }
+            var titleEl = emptyEl.querySelector('[data-lp-people-empty-title]');
+            var bodyEl = emptyEl.querySelector('[data-lp-people-empty-body]');
+            var ctaWrap = emptyEl.querySelector('[data-lp-people-empty-cta-wrap]');
+            var ctaEl = emptyEl.querySelector('[data-lp-people-empty-cta]');
+            if (titleEl) {
+                titleEl.textContent = copy.title;
+            }
+            if (bodyEl) {
+                bodyEl.textContent = copy.body;
+            }
+            if (ctaWrap && ctaEl) {
+                if (copy.hasCta && copy.ctaUrl) {
+                    ctaWrap.style.display = '';
+                    ctaEl.setAttribute('href', copy.ctaUrl);
+                    ctaEl.textContent = copy.ctaLabel;
+                } else {
+                    ctaWrap.style.display = 'none';
+                }
+            }
         }
 
         function applyTab(tab, pushUrl) {
@@ -2153,6 +2450,8 @@
                 el.classList.toggle('is-on', on);
                 el.setAttribute('aria-selected', on ? 'true' : 'false');
             });
+
+            applyEmptyCopy(key);
 
             if (emptyEl) {
                 emptyEl.style.display = visible === 0 ? '' : 'none';
@@ -2504,15 +2803,79 @@
         setEdit(false);
     })();
 
-    // Confirm before deleting a whole activity (Manage + activity settings).
-    document.querySelectorAll('form[data-lp-delete-confirm]').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-            var msg = form.getAttribute('data-lp-delete-confirm') || '';
+    // Confirm before deleting (Manage activity/phase, activity settings, course ops remove).
+    // Uses LaunchPad dialog — never window.confirm / alert.
+    (function initLpDeleteConfirm() {
+        var dialog = document.getElementById('lp-confirm-dialog');
+        var pendingForm = null;
+
+        function fallbackConfirm(form, msg) {
             if (msg && !window.confirm(msg)) {
-                e.preventDefault();
+                return false;
+            }
+            return true;
+        }
+
+        function openDialog(form) {
+            var msg = form.getAttribute('data-lp-delete-confirm') || '';
+            if (!dialog || typeof dialog.showModal !== 'function') {
+                return fallbackConfirm(form, msg);
+            }
+            pendingForm = form;
+            var msgEl = dialog.querySelector('[data-lp-confirm-msg]');
+            if (msgEl) {
+                msgEl.textContent = msg;
+            }
+            if (!dialog.open) {
+                dialog.showModal();
+            }
+            return false;
+        }
+
+        document.addEventListener('submit', function (e) {
+            var form = e.target && e.target.closest
+                ? e.target.closest('form[data-lp-delete-confirm]')
+                : null;
+            if (!form) {
+                return;
+            }
+            if (form.getAttribute('data-lp-confirm-ok') === '1') {
+                form.removeAttribute('data-lp-confirm-ok');
+                return;
+            }
+            e.preventDefault();
+            if (openDialog(form) === true) {
+                form.setAttribute('data-lp-confirm-ok', '1');
+                form.submit();
             }
         });
-    });
+
+        if (!dialog) {
+            return;
+        }
+        var yesBtn = dialog.querySelector('[data-lp-confirm-yes]');
+        if (yesBtn) {
+            yesBtn.addEventListener('click', function () {
+                if (!pendingForm) {
+                    dialog.close();
+                    return;
+                }
+                var form = pendingForm;
+                pendingForm = null;
+                form.setAttribute('data-lp-confirm-ok', '1');
+                dialog.close();
+                form.submit();
+            });
+        }
+        dialog.addEventListener('close', function () {
+            pendingForm = null;
+        });
+        dialog.addEventListener('click', function (e) {
+            if (e.target === dialog) {
+                dialog.close();
+            }
+        });
+    })();
 
     // Admin File settings: pending picks with ×, mark attached files for removal on Save.
     document.querySelectorAll('[data-lp-file-picker]').forEach(function (root) {
@@ -4087,5 +4450,205 @@
         if (search) {
             search.addEventListener('input', applyNewsView);
         }
+    })();
+
+    // Fellow Achievements badges: All / Earned without full reload.
+    (function initFellowBadgeFilters() {
+        var root = shell.querySelector('[data-lp-badge-filter-root]');
+        if (!root) {
+            return;
+        }
+        var tabs = root.querySelectorAll('[data-lp-badge-filter]');
+        var items = root.querySelectorAll('[data-lp-badge-item]');
+        var emptyEl = root.querySelector('[data-lp-badge-empty]');
+        var panel = root.querySelector('#lp-fellow-badges-panel');
+        if (!tabs.length) {
+            return;
+        }
+
+        function pushBadgeUrl(mode) {
+            var href = '';
+            tabs.forEach(function (t) {
+                if (!href && t.getAttribute('data-lp-badge-filter') === mode) {
+                    href = t.getAttribute('href') || '';
+                }
+            });
+            if (!href || !window.history || !window.history.pushState) {
+                return;
+            }
+            try {
+                var next = new URL(href, window.location.href);
+                if (next.pathname === window.location.pathname) {
+                    window.history.pushState({ lpBadgeFilter: mode }, '', next.pathname + next.search);
+                }
+            } catch (err) {
+                // Ignore malformed hrefs — filter UI still works.
+            }
+        }
+
+        function applyBadgeFilter(mode, push) {
+            mode = mode === 'earned' ? 'earned' : 'all';
+            var shown = 0;
+            items.forEach(function (item) {
+                var earned = item.getAttribute('data-earned') === '1';
+                var show = mode === 'all' || earned;
+                item.hidden = !show;
+                if (show) {
+                    shown += 1;
+                }
+            });
+            if (emptyEl) {
+                emptyEl.hidden = shown > 0;
+            }
+            root.setAttribute('data-filter', mode);
+            tabs.forEach(function (tab) {
+                var on = tab.getAttribute('data-lp-badge-filter') === mode;
+                tab.classList.toggle('is-on', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+                if (on && panel) {
+                    panel.setAttribute('aria-labelledby', tab.id || '');
+                }
+            });
+            if (push) {
+                pushBadgeUrl(mode);
+            }
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function (e) {
+                e.preventDefault();
+                applyBadgeFilter(tab.getAttribute('data-lp-badge-filter') || 'all', true);
+            });
+        });
+
+        window.addEventListener('popstate', function () {
+            if (!shell.querySelector('[data-lp-badge-filter-root]')) {
+                return;
+            }
+            var params = new URLSearchParams(window.location.search);
+            applyBadgeFilter(params.get('tab') === 'earned' ? 'earned' : 'all', false);
+        });
+    })();
+
+    // Fellow Feedback status tabs: filter in place without reload.
+    (function initFellowFeedbackFilters() {
+        var page = shell.querySelector('[data-region="fellowship-feedback-page"]');
+        if (!page) {
+            return;
+        }
+        var root = page.querySelector('[data-lp-fb-filter-root]');
+        if (!root) {
+            return;
+        }
+        var tabs = page.querySelectorAll('[data-lp-fb-filter]');
+        var sections = page.querySelectorAll('[data-lp-fb-section]');
+        var emptyReleased = page.querySelector('[data-lp-fb-empty-released]');
+        var filterEmpty = page.querySelector('[data-lp-fb-filter-empty]');
+        var hasReleased = root.getAttribute('data-has-released') === '1';
+        if (!tabs.length) {
+            return;
+        }
+
+        function pushFeedbackUrl(mode) {
+            var href = '';
+            page.querySelectorAll('.lp-feedback-tabs [data-lp-fb-filter]').forEach(function (t) {
+                if (!href && t.getAttribute('data-lp-fb-filter') === mode) {
+                    href = t.getAttribute('href') || '';
+                }
+            });
+            if (!href || !window.history || !window.history.pushState) {
+                return;
+            }
+            try {
+                var next = new URL(href, window.location.href);
+                if (next.pathname === window.location.pathname) {
+                    window.history.pushState({ lpFbFilter: mode }, '', next.pathname + next.search);
+                }
+            } catch (err) {
+                // Ignore malformed hrefs — filter UI still works.
+            }
+        }
+
+        function applyFeedbackFilter(mode, push) {
+            var allowed = {
+                all: true,
+                attention: true,
+                reviewed: true,
+                pending: true,
+                not_submitted: true
+            };
+            mode = allowed[mode] ? mode : 'all';
+            var shown = 0;
+            sections.forEach(function (section) {
+                var bucket = section.getAttribute('data-lp-fb-section') || '';
+                var show = mode === 'all' || bucket === mode;
+                section.hidden = !show;
+                if (show) {
+                    shown += 1;
+                }
+                var title = section.querySelector('[data-lp-fb-section-title]');
+                if (title) {
+                    title.hidden = mode !== 'all';
+                }
+            });
+            if (emptyReleased) {
+                emptyReleased.hidden = !(mode === 'all' && !hasReleased);
+            }
+            if (filterEmpty) {
+                // On All, empty-released banner covers the no-feedback case; filter empty is for buckets.
+                filterEmpty.hidden = !(mode !== 'all' && shown === 0);
+            }
+            root.setAttribute('data-filter', mode);
+            page.querySelectorAll('.lp-feedback-tabs [data-lp-fb-filter]').forEach(function (tab) {
+                var on = tab.getAttribute('data-lp-fb-filter') === mode;
+                tab.classList.toggle('is-on', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            if (push) {
+                pushFeedbackUrl(mode);
+            }
+        }
+
+        page.addEventListener('click', function (e) {
+            var tab = e.target.closest('[data-lp-fb-filter]');
+            if (!tab || !page.contains(tab)) {
+                return;
+            }
+            e.preventDefault();
+            applyFeedbackFilter(tab.getAttribute('data-lp-fb-filter') || 'all', true);
+        });
+
+        window.addEventListener('popstate', function () {
+            if (!shell.querySelector('[data-region="fellowship-feedback-page"]')) {
+                return;
+            }
+            var params = new URLSearchParams(window.location.search);
+            applyFeedbackFilter(params.get('ftab') || 'all', false);
+        });
+    })();
+
+    // Portfolio case study: live word-count help (soft hint only).
+    (function portfolioCaseWordHelp() {
+        var form = shell.querySelector('[data-region="portfolio-case-form"]');
+        if (!form) {
+            return;
+        }
+        var body = form.querySelector('[data-lp-case-body]');
+        var help = form.querySelector('[data-lp-case-word-help]');
+        if (!body || !help) {
+            return;
+        }
+        function countWords(text) {
+            var trimmed = String(text || '').trim();
+            if (!trimmed) {
+                return 0;
+            }
+            return trimmed.split(/\s+/).filter(Boolean).length;
+        }
+        function refresh() {
+            help.textContent = countWords(body.value) + ' words · aim for 250–400';
+        }
+        body.addEventListener('input', refresh);
+        refresh();
     })();
 })();

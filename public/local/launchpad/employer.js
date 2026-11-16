@@ -280,6 +280,27 @@
     }
     shell.querySelectorAll('.lp-journey-progress, .lp-ring-arc').forEach(animateDash);
 
+    // Mouse wheel → horizontal pan on journey (same as fellowship.js).
+    shell.querySelectorAll('[data-lp-journey]').forEach(function (scroller) {
+        scroller.addEventListener('wheel', function (e) {
+            if (scroller.scrollWidth <= scroller.clientWidth + 1) {
+                return;
+            }
+            var mostlyVertical = Math.abs(e.deltaY) >= Math.abs(e.deltaX);
+            var delta = mostlyVertical ? e.deltaY : e.deltaX;
+            if (!delta) {
+                return;
+            }
+            var max = scroller.scrollWidth - scroller.clientWidth;
+            var next = Math.min(max, Math.max(0, scroller.scrollLeft + delta));
+            if (next === scroller.scrollLeft) {
+                return;
+            }
+            scroller.scrollLeft = next;
+            e.preventDefault();
+        }, {passive: false});
+    });
+
     if (!reduce) {
         shell.querySelectorAll('.lp-side-xpbar i, .lp-bar i').forEach(function (bar) {
             var w = bar.style.width;
@@ -402,7 +423,6 @@
             var desc = dialog.querySelector('[data-lp-badge-desc]');
             var status = dialog.querySelector('[data-lp-badge-status]');
             var scope = dialog.querySelector('[data-lp-badge-scope]');
-            var moodle = dialog.querySelector('[data-lp-badge-moodle]');
             if (img) {
                 img.onerror = function () {
                     img.onerror = null;
@@ -433,10 +453,6 @@
             if (scope) {
                 scope.textContent = badge.scope_label || '';
                 scope.hidden = !badge.scope_label;
-            }
-            if (moodle) {
-                moodle.href = badge.moodle_url || '#';
-                moodle.hidden = !badge.moodle_url;
             }
         }
 
@@ -689,6 +705,15 @@
         });
 
         applyTab(root.getAttribute('data-lp-profile-active') || 'overview', false);
+
+        var prefDetail = root.querySelector('[data-lp-profile-pref-detail]');
+        if (prefDetail && !prefDetail.hidden) {
+            try {
+                prefDetail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (err) {
+                prefDetail.scrollIntoView(true);
+            }
+        }
     })();
 
 })();

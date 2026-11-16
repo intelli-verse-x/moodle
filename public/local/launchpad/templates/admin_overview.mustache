@@ -79,7 +79,7 @@
   </div>
 
   <div class="lp-ov-ops">
-    <section class="lp-ov-card">
+    <section class="lp-ov-card" id="lp-ov-visibility">
       <div class="lp-ov-card-head">
         <div class="lp-ov-card-title-row">
           <span class="lp-ov-card-ico tone-blue" aria-hidden="true">
@@ -100,7 +100,10 @@
       </div>
 
       {{#visibility_empty}}
-        <p class="lp-muted lp-ov-empty">{{visibility_empty_body}}</p>
+        <div class="lp-ov-empty-block">
+          <p class="lp-muted lp-ov-empty">{{visibility_empty_body}}</p>
+          <a class="lp-btn lp-btn-primary" href="{{visibility_create_url}}">{{visibility_create_label}}</a>
+        </div>
       {{/visibility_empty}}
 
       {{#has_visibility_rows}}

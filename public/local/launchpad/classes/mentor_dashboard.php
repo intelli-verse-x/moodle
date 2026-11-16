@@ -31,6 +31,15 @@ final class mentor_dashboard {
     /** Prefix stored in assignfeedback_comments when Changes includes a Next step. */
     public const NEXT_STEP_MARKER = '[LP-NEXT]';
 
+    /** Prefix for JSON rubric breakdown in the same assignfeedback_comments body. */
+    public const RUBRIC_MARKER = '[LP-RUBRIC]';
+
+    /** Level index → weight fraction (None / Missing / Partial / Solid / Strong). */
+    public const RUBRIC_LEVEL_FRACTIONS = [0.0, 0.4, 0.6, 0.8, 1.0];
+
+    /** Packed [LP-RUBRIC] schema: v2 = five levels with None at index 0. */
+    public const RUBRIC_PAYLOAD_VERSION = 2;
+
     /**
      * Whether this user may open the mentor shell.
      */
@@ -39,7 +48,12 @@ final class mentor_dashboard {
             return false;
         }
         // Site admins use admin.php — do not linger on the Mentor shell.
-        return account_persona::is_mentor($userid);
+        if (account_persona::is_admin($userid)) {
+            return false;
+        }
+        // Teacher on lp-* OR mentor portal tag (empty queue OK until courses exist).
+        return account_persona::is_mentor($userid)
+            || registration::is_portal_mentor($userid);
     }
 
     /**
@@ -617,15 +631,16 @@ final class mentor_dashboard {
         $grade = $assign->get_user_grade($fellowid, false);
         $grademax = (float) $instance->grade;
         $gradepoints = '';
-        $gradepct = '';
+        $moodlepct = null;
         $comment = '';
         $nextstep = '';
+        $savedlevels = [];
         $hasgrade = false;
         if ($grade && $grade->grade !== null && (float) $grade->grade >= 0) {
             $hasgrade = true;
             $gradepoints = format_float((float) $grade->grade, 2);
             if ($grademax > 0) {
-                $gradepct = format_float((((float) $grade->grade) / $grademax) * 100, 0);
+                $moodlepct = (float) format_float((((float) $grade->grade) / $grademax) * 100, 0);
             }
             $fc = $DB->get_record('assignfeedback_comments', [
                 'assignment' => (int) $instance->id,
@@ -635,17 +650,26 @@ final class mentor_dashboard {
                 $parts = self::unpack_review_comment((string) $fc->commenttext);
                 $comment = $parts['comment'];
                 $nextstep = $parts['next_step'];
+                if (!empty($parts['has_rubric']) && $parts['levels'] !== []) {
+                    $savedlevels = $parts['levels'];
+                }
             }
         }
 
+        // Prefill: saved rubric levels, else Partial (index 2) on each criterion.
+        $rubricui = self::build_review_rubric_ui($savedlevels !== [] ? $savedlevels : [2, 2, 2, 2]);
+        $gradepct = (string) (int) $rubricui['total'];
+
         $cansubmitreview = ($substatus === 'submitted' || $substatus === 'reopened' || $hasgrade);
-        $moodlegrader = (new \moodle_url('/mod/assign/view.php', [
-            'id' => $cm->id,
-            'action' => 'grader',
-            'userid' => $fellowid,
-        ]))->out(false);
 
         $queueurl = (new \moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
+
+        // Outcome default: packed rubric total when present, else Moodle grade, else UI total.
+        $outcomeref = $savedlevels !== []
+            ? (float) $rubricui['total']
+            : ($moodlepct !== null ? $moodlepct : (float) $rubricui['total']);
+        $outcomemet = $outcomeref >= 70;
+        $outcomechanges = !$outcomemet;
 
         return [
             'cmid' => (int) $cm->id,
@@ -672,7 +696,6 @@ final class mentor_dashboard {
             'next_step' => $nextstep,
             'pass_bar' => 70,
             'queue_url' => $queueurl,
-            'moodle_grader_url' => $moodlegrader,
             'form_action' => self::review_url((int) $cm->id, $fellowid),
             'sesskey' => sesskey(),
             'is_released' => $hasgrade && $substatus !== 'reopened',
@@ -684,14 +707,21 @@ final class mentor_dashboard {
             'status_chip_class' => $hasgrade
                 ? ($substatus === 'reopened' ? 'warn' : 'ok')
                 : '',
-            'outcome_met' => true,
-            'outcome_changes' => false,
+            'outcome_met' => $outcomemet,
+            'outcome_changes' => $outcomechanges,
+            'rubric_criteria' => $rubricui['criteria'],
+            'rubric_total' => $rubricui['total'],
+            'rubric_fractions_json' => json_encode(array_values(self::RUBRIC_LEVEL_FRACTIONS)),
+            'rubric_weights_json' => json_encode($rubricui['weights']),
         ];
     }
 
     /**
      * Save grade + change note into Moodle assign (native save_grade).
      *
+     * Total is recomputed from $levels (ignore any client-only grade_pct).
+     *
+     * @param list<int> $levels Four level indexes 0–4 (None…Strong)
      * @param string $outcome met|changes
      * @return string redirect message key suffix
      */
@@ -699,7 +729,7 @@ final class mentor_dashboard {
         int $mentorid,
         int $cmid,
         int $fellowid,
-        string $gradepctraw,
+        array $levels,
         string $comment,
         string $outcome,
         string $nextstep = ''
@@ -719,14 +749,11 @@ final class mentor_dashboard {
             $grademax = 100.0;
         }
 
-        $pct = unformat_float($gradepctraw);
-        if ($pct === false || $pct === null) {
-            throw new \moodle_exception('mentor_review_grade_invalid', 'local_launchpad');
+        $scored = self::score_from_levels($levels);
+        if ($scored === null) {
+            throw new \moodle_exception('mentor_review_levels_invalid', 'local_launchpad');
         }
-        $pct = (float) $pct;
-        if ($pct < 0 || $pct > 100) {
-            throw new \moodle_exception('mentor_review_grade_invalid', 'local_launchpad');
-        }
+        $pct = (float) $scored['total'];
 
         $comment = trim($comment);
         if ($comment === '') {
@@ -745,9 +772,12 @@ final class mentor_dashboard {
         if ($outcome === 'changes' && $nextstep === '') {
             throw new \moodle_exception('mentor_review_nextstep_required', 'local_launchpad');
         }
-        // Persist Next step inside the Moodle comment (no dedicated assign field).
-        $comment = self::pack_review_comment($comment, $outcome === 'changes' ? $nextstep : '');
-
+        // Persist rubric + Next step inside the Moodle comment (no dedicated assign field).
+        $comment = self::pack_review_comment(
+            $comment,
+            $outcome === 'changes' ? $nextstep : '',
+            $scored
+        );
 
         // Change notes require assignfeedback_comments. Curriculum placeholders often ship with
         // that plugin disabled — enable before save_grade or Moodle silently drops the text.
@@ -793,58 +823,339 @@ final class mentor_dashboard {
     }
 
     /**
-     * Pack Next step + change note into one assignfeedback_comments body.
+     * Programme criteria with integer weights (Evidence 30 · Acceptance 25 · Prioritisation 25 · Communication 20).
+     *
+     * @return list<array{key:string,label:string,weight:int}>
      */
-    public static function pack_review_comment(string $comment, string $nextstep = ''): string {
-        $comment = trim($comment);
-        $nextstep = trim(preg_replace("/[\r\n]+/", ' ', $nextstep) ?? '');
-        if ($nextstep === '') {
-            return $comment;
-        }
-        return self::NEXT_STEP_MARKER . ' ' . $nextstep . "\n\n" . $comment;
+    public static function rubric_criteria(): array {
+        return [
+            [
+                'key' => 'evidence',
+                'label' => get_string('mentor_rubric_evidence', 'local_launchpad'),
+                'weight' => 30,
+            ],
+            [
+                'key' => 'acceptance',
+                'label' => get_string('mentor_rubric_acceptance', 'local_launchpad'),
+                'weight' => 25,
+            ],
+            [
+                'key' => 'prioritisation',
+                'label' => get_string('mentor_rubric_prioritisation', 'local_launchpad'),
+                'weight' => 25,
+            ],
+            [
+                'key' => 'communication',
+                'label' => get_string('mentor_rubric_communication', 'local_launchpad'),
+                'weight' => 20,
+            ],
+        ];
     }
 
     /**
-     * Split a stored feedback comment into Next step + body.
+     * Level labels None / Missing / Partial / Solid / Strong (indexes 0–4).
      *
-     * @return array{next_step: string, comment: string}
+     * @return list<string>
+     */
+    public static function rubric_level_labels(): array {
+        return [
+            get_string('mentor_review_level_none', 'local_launchpad'),
+            get_string('mentor_review_level_missing', 'local_launchpad'),
+            get_string('mentor_review_level_partial', 'local_launchpad'),
+            get_string('mentor_review_level_solid', 'local_launchpad'),
+            get_string('mentor_review_level_strong', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Integer points per criterion + total from level indexes.
+     *
+     * @param list<int|string> $levels
+     * @return array{levels:list<int>,scores:list<int>,total:int}|null
+     */
+    public static function score_from_levels(array $levels): ?array {
+        $criteria = self::rubric_criteria();
+        $maxlvl = count(self::RUBRIC_LEVEL_FRACTIONS) - 1;
+        if (count($levels) !== count($criteria)) {
+            return null;
+        }
+        $norm = [];
+        $scores = [];
+        $total = 0;
+        foreach ($criteria as $i => $crit) {
+            if (!isset($levels[$i]) || !is_numeric($levels[$i])) {
+                return null;
+            }
+            $lvl = (int) $levels[$i];
+            if ($lvl < 0 || $lvl > $maxlvl) {
+                return null;
+            }
+            $score = (int) round((int) $crit['weight'] * self::RUBRIC_LEVEL_FRACTIONS[$lvl]);
+            $norm[] = $lvl;
+            $scores[] = $score;
+            $total += $score;
+        }
+        return [
+            'levels' => $norm,
+            'scores' => $scores,
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * Mustache rows for the mentor review rubric form.
+     *
+     * @param list<int> $levels
+     * @return array{criteria:list<array>,total:int,weights:list<int>}
+     */
+    public static function build_review_rubric_ui(array $levels): array {
+        $scored = self::score_from_levels($levels);
+        if ($scored === null) {
+            $levels = [2, 2, 2, 2];
+            $scored = self::score_from_levels($levels);
+        }
+        $labels = self::rubric_level_labels();
+        $rows = [];
+        $weights = [];
+        foreach (self::rubric_criteria() as $i => $crit) {
+            $weights[] = (int) $crit['weight'];
+            $levelopts = [];
+            foreach ($labels as $li => $lab) {
+                $levelopts[] = [
+                    'value' => $li,
+                    'label' => $lab,
+                    'fraction' => self::RUBRIC_LEVEL_FRACTIONS[$li],
+                    'selected' => ((int) $scored['levels'][$i] === $li),
+                    'crit_index' => $i,
+                ];
+            }
+            $rows[] = [
+                'index' => $i,
+                'key' => $crit['key'],
+                'label' => $crit['label'],
+                'weight' => (int) $crit['weight'],
+                'score' => (int) $scored['scores'][$i],
+                'levels' => $levelopts,
+            ];
+        }
+        return [
+            'criteria' => $rows,
+            'total' => (int) $scored['total'],
+            'weights' => $weights,
+        ];
+    }
+
+    /**
+     * Fellow Feedback rows from an unpacked rubric payload.
+     *
+     * @param array{has_rubric?:bool,levels?:list<int>,scores?:list<int>,total?:int|null} $parts
+     * @return list<array{label:string,weight:int,level_label:string,score:int,score_max:int}>
+     */
+    public static function rubric_breakdown_rows(array $parts): array {
+        if (empty($parts['has_rubric']) || empty($parts['levels']) || empty($parts['scores'])) {
+            return [];
+        }
+        $labels = self::rubric_level_labels();
+        $rows = [];
+        foreach (self::rubric_criteria() as $i => $crit) {
+            if (!isset($parts['levels'][$i], $parts['scores'][$i])) {
+                return [];
+            }
+            $lvl = (int) $parts['levels'][$i];
+            $rows[] = [
+                'label' => $crit['label'],
+                'weight' => (int) $crit['weight'],
+                'level_label' => $labels[$lvl] ?? '',
+                'score' => (int) $parts['scores'][$i],
+                'score_max' => (int) $crit['weight'],
+            ];
+        }
+        return $rows;
+    }
+
+    /**
+     * Pack rubric JSON + optional Next step + change note into one assignfeedback_comments body.
+     *
+     * @param array{levels:list<int>,scores:list<int>,total:int}|null $rubric
+     */
+    public static function pack_review_comment(string $comment, string $nextstep = '', ?array $rubric = null): string {
+        $comment = trim($comment);
+        $nextstep = trim(preg_replace("/[\r\n]+/", ' ', $nextstep) ?? '');
+        $chunks = [];
+        if ($rubric !== null && isset($rubric['levels'], $rubric['scores'], $rubric['total'])) {
+            $payload = json_encode([
+                'v' => self::RUBRIC_PAYLOAD_VERSION,
+                'levels' => array_values(array_map('intval', $rubric['levels'])),
+                'scores' => array_values(array_map('intval', $rubric['scores'])),
+                'total' => (int) $rubric['total'],
+            ], JSON_UNESCAPED_SLASHES);
+            if ($payload !== false) {
+                $chunks[] = self::RUBRIC_MARKER . $payload;
+            }
+        }
+        if ($nextstep !== '') {
+            $chunks[] = self::NEXT_STEP_MARKER . ' ' . $nextstep;
+        }
+        if ($comment !== '') {
+            $chunks[] = $comment;
+        }
+        return implode("\n\n", $chunks);
+    }
+
+    /**
+     * Split a stored feedback comment into rubric + Next step + body.
+     *
+     * @return array{
+     *   next_step: string,
+     *   comment: string,
+     *   has_rubric: bool,
+     *   levels: list<int>,
+     *   scores: list<int>,
+     *   total: int|null
+     * }
      */
     public static function unpack_review_comment(string $raw): array {
+        $empty = [
+            'next_step' => '',
+            'comment' => '',
+            'has_rubric' => false,
+            'levels' => [],
+            'scores' => [],
+            'total' => null,
+        ];
         $raw = trim($raw);
         if ($raw === '') {
+            return $empty;
+        }
+
+        $working = $raw;
+        $rubric = self::extract_rubric_payload($working);
+        if ($rubric !== null) {
+            $working = $rubric['rest'];
+        } else {
+            // Legacy / Moodle HTML wrappers — normalise then retry markers.
+            $plain = trim(html_entity_decode(
+                strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>'], "\n", $raw)),
+                ENT_QUOTES | ENT_HTML5
+            ));
+            $rubric = self::extract_rubric_payload($plain);
+            if ($rubric !== null) {
+                $working = $rubric['rest'];
+            } else {
+                $working = $plain !== '' ? $plain : $raw;
+            }
+        }
+
+        $next = self::extract_next_step_payload($working);
+        $out = $empty;
+        $out['next_step'] = $next['next_step'];
+        $out['comment'] = $next['comment'];
+        if ($rubric !== null) {
+            $out['has_rubric'] = true;
+            $out['levels'] = $rubric['levels'];
+            $out['scores'] = $rubric['scores'];
+            $out['total'] = $rubric['total'];
+        }
+        return $out;
+    }
+
+    /**
+     * @return array{levels:list<int>,scores:list<int>,total:int,rest:string}|null
+     */
+    private static function extract_rubric_payload(string $text): ?array {
+        $text = ltrim($text);
+        if ($text === '' || stripos($text, self::RUBRIC_MARKER) !== 0) {
+            return null;
+        }
+        $after = ltrim(substr($text, strlen(self::RUBRIC_MARKER)));
+        if ($after === '' || $after[0] !== '{') {
+            return null;
+        }
+        // Brace-match so trailing Next step / comment does not break json_decode.
+        $depth = 0;
+        $instring = false;
+        $escape = false;
+        $end = -1;
+        $len = strlen($after);
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $after[$i];
+            if ($instring) {
+                if ($escape) {
+                    $escape = false;
+                } else if ($ch === '\\') {
+                    $escape = true;
+                } else if ($ch === '"') {
+                    $instring = false;
+                }
+                continue;
+            }
+            if ($ch === '"') {
+                $instring = true;
+                continue;
+            }
+            if ($ch === '{') {
+                $depth++;
+            } else if ($ch === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    $end = $i;
+                    break;
+                }
+            }
+        }
+        if ($end < 0) {
+            return null;
+        }
+        $decoded = json_decode(substr($after, 0, $end + 1), true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $levels = $decoded['levels'] ?? null;
+        $scores = $decoded['scores'] ?? null;
+        $total = $decoded['total'] ?? null;
+        if (!is_array($levels) || !is_array($scores) || !is_numeric($total)) {
+            return null;
+        }
+        if (count($levels) !== 4 || count($scores) !== 4) {
+            return null;
+        }
+        $levels = array_map('intval', array_values($levels));
+        // v1 packed Missing=0…Strong=3; v2+ inserts None at 0 → shift labels +1.
+        $payloadver = isset($decoded['v']) && is_numeric($decoded['v']) ? (int) $decoded['v'] : 1;
+        if ($payloadver < 2) {
+            $levels = array_map(static function (int $lvl): int {
+                return min(4, $lvl + 1);
+            }, $levels);
+        }
+        return [
+            'levels' => $levels,
+            'scores' => array_map('intval', array_values($scores)),
+            'total' => (int) $total,
+            'rest' => trim(substr($after, $end + 1)),
+        ];
+    }
+
+    /**
+     * @return array{next_step: string, comment: string}
+     */
+    private static function extract_next_step_payload(string $text): array {
+        $text = trim($text);
+        if ($text === '') {
             return ['next_step' => '', 'comment' => ''];
         }
-
-        // Plain FORMAT_MOODLE storage from save_review.
-        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+?)(?:\r?\n\r?\n|\r?\n)(.*)$/s', $raw, $m)) {
+        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+?)(?:\r?\n\r?\n|\r?\n)(.*)$/s', $text, $m)) {
             return [
                 'next_step' => trim($m[1]),
                 'comment' => trim($m[2]),
             ];
         }
-        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+)$/s', $raw, $m)) {
+        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+)$/s', $text, $m)) {
             return [
                 'next_step' => trim($m[1]),
                 'comment' => '',
             ];
         }
-
-        // Legacy / Moodle-formatted HTML wrappers around the same marker.
-        $plain = trim(html_entity_decode(strip_tags(str_replace(['<br>', '<br/>', '<br />', '</p>'], "\n", $raw)), ENT_QUOTES | ENT_HTML5));
-        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+?)(?:\n\n|\n)(.*)$/s', $plain, $m)) {
-            return [
-                'next_step' => trim($m[1]),
-                'comment' => trim($m[2]),
-            ];
-        }
-        if (preg_match('/^' . preg_quote(self::NEXT_STEP_MARKER, '/') . '\s*(.+)$/s', $plain, $m)) {
-            return [
-                'next_step' => trim($m[1]),
-                'comment' => '',
-            ];
-        }
-
-        return ['next_step' => '', 'comment' => $raw];
+        return ['next_step' => '', 'comment' => $text];
     }
 
     /**
@@ -881,24 +1192,14 @@ final class mentor_dashboard {
      * @return list<array{label:string,weight:string}>
      */
     public static function rubric_at_a_glance(): array {
-        return [
-            [
-                'label' => get_string('mentor_rubric_evidence', 'local_launchpad'),
-                'weight' => '30',
-            ],
-            [
-                'label' => get_string('mentor_rubric_acceptance', 'local_launchpad'),
-                'weight' => '25',
-            ],
-            [
-                'label' => get_string('mentor_rubric_prioritisation', 'local_launchpad'),
-                'weight' => '25',
-            ],
-            [
-                'label' => get_string('mentor_rubric_communication', 'local_launchpad'),
-                'weight' => '20',
-            ],
-        ];
+        $rows = [];
+        foreach (self::rubric_criteria() as $crit) {
+            $rows[] = [
+                'label' => $crit['label'],
+                'weight' => (string) (int) $crit['weight'],
+            ];
+        }
+        return $rows;
     }
 
     /**

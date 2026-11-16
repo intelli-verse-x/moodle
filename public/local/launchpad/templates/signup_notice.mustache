@@ -1,0 +1,24 @@
+{{!
+    @template local_launchpad/signup_notice
+
+    Branded Fellowship signup notice (email pending / confirmed).
+}}
+<div class="lp-signup-notice" data-region="local-launchpad-signup-notice">
+  <div class="lp-signup-notice-card">
+    <a class="lp-signup-notice-logo" href="{{{continue_url}}}">
+      <img src="{{assets}}/logo.webp" alt="ToBa Learn" width="140" height="40">
+    </a>
+    <p class="lp-signup-notice-eyebrow">{{eyebrow}}</p>
+    <h1>{{title}}</h1>
+    <p class="lp-signup-notice-body">{{body}}</p>
+    {{#note}}
+    <p class="lp-signup-notice-note">{{note}}</p>
+    {{/note}}
+    <div class="lp-signup-notice-actions">
+      <a class="lp-signup-notice-btn primary" href="{{{continue_url}}}">{{continue_label}}</a>
+      {{#has_secondary}}
+      <a class="lp-signup-notice-btn secondary" href="{{{secondary_url}}}">{{secondary_label}}</a>
+      {{/has_secondary}}
+    </div>
+  </div>
+</div>

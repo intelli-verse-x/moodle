@@ -26,12 +26,13 @@ namespace local_launchpad\privacy;
 
 use core_privacy\local\metadata\collection;
 use core_privacy\local\request\writer;
+use local_launchpad\fellowship_dashboard;
 use local_launchpad\registration;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Stores a Fellowship portal preference for self-registered users.
+ * Stores Fellowship preferences (portal, sticky active course, portfolio case studies).
  *
  * @copyright  2026 IntelliVerse-X
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -51,6 +52,15 @@ class provider implements
             registration::PREF_PORTAL,
             'privacy:metadata:preference:toba_portal'
         );
+        $collection->add_user_preference(
+            fellowship_dashboard::PREF_ACTIVE_COURSE,
+            'privacy:metadata:preference:local_launchpad_fellow_course'
+        );
+        // Per-course keys: local_launchpad_portfolio_case_{courseid}.
+        $collection->add_user_preference(
+            fellowship_dashboard::PREF_PORTFOLIO_CASE_PREFIX,
+            'privacy:metadata:preference:local_launchpad_portfolio_case'
+        );
         return $collection;
     }
 
@@ -60,6 +70,8 @@ class provider implements
      * @param int $userid
      */
     public static function export_user_preferences(int $userid): void {
+        global $DB;
+
         $portal = get_user_preferences(registration::PREF_PORTAL, null, $userid);
         if ($portal !== null && $portal !== '') {
             writer::export_user_preference(
@@ -67,6 +79,43 @@ class provider implements
                 registration::PREF_PORTAL,
                 $portal,
                 get_string('privacy:metadata:preference:toba_portal', 'local_launchpad')
+            );
+        }
+        $active = get_user_preferences(fellowship_dashboard::PREF_ACTIVE_COURSE, null, $userid);
+        if ($active !== null && $active !== '' && (int) $active > 0) {
+            writer::export_user_preference(
+                'local_launchpad',
+                fellowship_dashboard::PREF_ACTIVE_COURSE,
+                (string) $active,
+                get_string('privacy:metadata:preference:local_launchpad_fellow_course', 'local_launchpad')
+            );
+        }
+
+        $prefix = fellowship_dashboard::PREF_PORTFOLIO_CASE_PREFIX;
+        $caselabel = get_string(
+            'privacy:metadata:preference:local_launchpad_portfolio_case',
+            'local_launchpad'
+        );
+        $rows = $DB->get_records_select(
+            'user_preferences',
+            'userid = :userid AND ' . $DB->sql_like('name', ':name'),
+            [
+                'userid' => $userid,
+                'name' => $DB->sql_like_escape($prefix) . '%',
+            ],
+            'name ASC',
+            'id, name, value'
+        );
+        foreach ($rows as $row) {
+            $value = (string) ($row->value ?? '');
+            if ($value === '') {
+                continue;
+            }
+            writer::export_user_preference(
+                'local_launchpad',
+                (string) $row->name,
+                $value,
+                $caselabel
             );
         }
     }

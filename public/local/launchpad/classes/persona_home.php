@@ -75,13 +75,18 @@ final class persona_home {
         // is_admin() already covers is_siteadmin() — avoid a second native check.
         if (account_persona::is_admin($userid)) {
             $home = new \moodle_url(self::ADMIN_PATH);
-        } else if (account_persona::is_mentor($userid)) {
+        } else if (account_persona::is_mentor($userid)
+                || registration::is_portal_mentor($userid)) {
+            // Teacher on lp-* OR mentor portal tag (empty shell after course wipe).
             $home = new \moodle_url(self::MENTOR_PATH);
         } else if (account_persona::is_employee($userid)) {
             // Employer cohort before Fellowship: lp-* student enrolments are normal
             // for employee upskilling and must not force the Fellowship shell.
             $home = new \moodle_url(self::EMPLOYEE_PATH);
-        } else if (account_persona::is_fellowship($userid)) {
+        } else if (account_persona::is_fellowship($userid)
+                || registration::is_self_registered_fellow($userid)) {
+            // Enrolment OR Fellowship self-reg tag (toba_portal). Do not broaden
+            // account_persona::is_fellowship() — that stays enrolment-only for messaging.
             $home = new \moodle_url(self::FELLOW_PATH);
         }
 

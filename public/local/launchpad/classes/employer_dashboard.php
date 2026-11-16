@@ -77,12 +77,18 @@ final class employer_dashboard {
         string $profileerr = '',
         string $pref = '',
         bool $prefsaved = false,
-        string $preferr = ''
+        string $preferr = '',
+        string $calmode = 'month',
+        string $calfilter = 'all',
+        int $caltime = 0,
+        int $calyear = 0,
+        int $calmonth = 0
     ): array {
         global $CFG;
 
         require_once($CFG->libdir . '/enrollib.php');
         require_once($CFG->libdir . '/completionlib.php');
+        require_once(__DIR__ . '/calendar_service.php');
 
         $allowed = [
             'home', 'courses', 'course', 'grades', 'badges', 'calendar', 'messages',
@@ -180,7 +186,20 @@ final class employer_dashboard {
         } else if ($view === 'badges') {
             $toolpage = employer_tools::badges_page($userid, $urls, $courses, $tab);
         } else if ($view === 'calendar') {
-            $toolpage = employer_tools::calendar_page($userid, $courses);
+            $resolved = calendar_service::resolve_month(
+                $caltime > 0 ? $caltime : null,
+                $calyear > 0 ? $calyear : null,
+                $calmonth > 0 ? $calmonth : null
+            );
+            $toolpage = calendar_service::employer_context(
+                $userid,
+                $courses,
+                (int) $resolved['year'],
+                (int) $resolved['month'],
+                $calmode !== '' ? $calmode : 'month',
+                $calfilter !== '' ? $calfilter : 'all',
+                $caltime > 0 ? $caltime : null
+            );
         } else if ($view === 'messages') {
             $toolpage = employer_tools::messages_page($userid, $urls, $mtab, $convid, $msgsent, $msgerr);
         } else if ($view === 'notifications') {
@@ -210,7 +229,8 @@ final class employer_dashboard {
                 '/local/launchpad/employee_action.php',
                 $pref,
                 $prefsaved,
-                $preferr
+                $preferr,
+                true // LaunchPad-only: no Open public profile / Full editor Moodle buttons
             );
         }
 
@@ -573,7 +593,7 @@ final class employer_dashboard {
             'badges' => self::str('employer_badges_title', null, 'Your badges'),
             'badgeshelp' => self::str('employer_badges_help', null, ''),
             'badgesempty' => self::str('employer_badges_empty', null, 'No badges earned yet.'),
-            'badgesemptyhint' => self::str('employer_badges_empty_hint', null, 'Complete course criteria in Moodle to unlock them.'),
+            'badgesemptyhint' => self::str('employer_badges_empty_hint', null, 'Complete course criteria to unlock them.'),
             'badgesall' => self::str('employer_badges_all', null, 'My badges'),
             'recentbadges' => self::str('employer_recent_badges', null, 'Recent badges'),
             'sectioncurrent' => self::str('employer_section_current', null, 'Current'),
@@ -605,23 +625,23 @@ final class employer_dashboard {
             'grades_intro' => self::str(
                 'employer_grades_intro',
                 null,
-                'Moodle grade overview across your courses. Open a course for the full user report.'
+                'Grade overview across your courses. Open a course for the full user report.'
             ),
             'grades_detail_intro' => self::str(
                 'employer_grades_detail_intro',
                 null,
-                'Full Moodle user grade report for this course — weights, ranges, feedback, and contribution.'
+                'Full user grade report for this course — weights, ranges, feedback, and contribution.'
             ),
             'grades_progress_heading' => self::str('employer_grades_progress_heading', null, 'Your progress'),
             'grades_progress_sub' => self::str(
                 'employer_grades_progress_sub',
                 null,
-                'Track course totals and gradebook progress from Moodle.'
+                'Track course totals and gradebook progress.'
             ),
             'grades_progress_meta' => self::str(
                 'employer_grades_progress_meta',
                 null,
-                'Moodle course totals across your enrolled courses'
+                'Course totals across your enrolled courses'
             ),
             'grades_collection_heading' => self::str('employer_grades_collection_heading', null, 'Grade collection'),
             'grades_report_heading' => self::str('employer_grades_report_heading', null, 'Grade report'),
@@ -637,13 +657,13 @@ final class employer_dashboard {
             'grades_next_empty' => self::str(
                 'employer_grades_next_empty',
                 null,
-                'All enrolled courses have a course total in Moodle.'
+                'All enrolled courses have a course total.'
             ),
-            'grades_open_moodle' => self::str('employer_grades_open_moodle', null, 'Open grades in Moodle'),
+            'grades_open_moodle' => self::str('employer_grades_open_moodle', null, 'Open grades'),
             'grades_open_moodle_course' => self::str(
                 'employer_grades_open_moodle_course',
                 null,
-                'Open full report in Moodle'
+                'Open full report'
             ),
             'grades_back' => self::str('employer_grades_back', null, 'All courses'),
             'grades_col_item' => self::str('employer_grades_col_item', null, 'Grade item'),
@@ -683,7 +703,7 @@ final class employer_dashboard {
             'grades_empty_detail_body' => self::str(
                 'employer_grades_empty_detail_body',
                 null,
-                'When activities are graded in Moodle, they will show in this report.'
+                'When activities are graded, they will show in this report.'
             ),
             'grades_overview_title' => self::str('employer_grades_overview_title', null, 'Grade overview'),
             'grades_detail_title' => self::str('employer_grades_detail_title', null, 'User report'),
@@ -701,7 +721,7 @@ final class employer_dashboard {
             'badges_intro' => self::str(
                 'employer_badges_page_intro',
                 null,
-                'Badges come from Moodle criteria. Earned badges unlock here — open one for details in Moodle.'
+                'Badges come from course and site criteria. Earned badges unlock here — open one for details.'
             ),
             'badges_eyebrow' => self::str('employer_badges_eyebrow', null, 'My tools'),
             'badges_heading' => self::str('employer_nav_badges', null, 'Badges'),
@@ -714,7 +734,7 @@ final class employer_dashboard {
             'badges_progress_meta' => self::str(
                 'employer_badges_progress_meta',
                 null,
-                'Moodle badges earned across site and your courses'
+                'Badges earned across the site and your courses'
             ),
             'badges_collection_heading' => self::str('employer_badges_collection_heading', null, 'Badge collection'),
             'badges_next_heading' => self::str(
@@ -723,7 +743,7 @@ final class employer_dashboard {
                 'Badges you can earn next'
             ),
             'badges_dialog_close' => self::str('employer_badges_dialog_close', null, 'Close'),
-            'badges_dialog_open_moodle' => self::str('employer_badges_dialog_open_moodle', null, 'Open in Moodle'),
+            'badges_dialog_open_moodle' => self::str('employer_badges_dialog_open_moodle', null, 'Open badge'),
             'badges_tab_all' => self::str('employer_badges_tab_all', null, 'All badges'),
             'badges_tab_earned' => self::str('employer_badges_tab_earned', null, 'Earned badges'),
             'badges_all_empty_title' => self::str(
@@ -734,12 +754,12 @@ final class employer_dashboard {
             'badges_all_empty_body' => self::str(
                 'employer_badges_all_empty_body',
                 null,
-                'When site or course badges are created in Moodle, they will show here.'
+                'When site or course badges are available, they will show here.'
             ),
             'badges_earned_empty' => self::str(
                 'employer_badges_earned_empty',
                 null,
-                'No badges earned yet. Complete Moodle criteria to unlock them.'
+                'No badges earned yet. Complete course criteria to unlock them.'
             ),
             'badges_of' => self::str('employer_badges_of', null, 'of'),
             'badges_earned_label' => self::str('employer_badges_earned_label', null, 'earned'),
@@ -747,20 +767,20 @@ final class employer_dashboard {
             'badges_recent_empty' => self::str(
                 'employer_badges_recent_empty',
                 null,
-                'No badges earned yet. Complete Moodle criteria to unlock them.'
+                'No badges earned yet. Complete course criteria to unlock them.'
             ),
             'badges_how_heading' => self::str('employer_badges_how_heading', null, 'How badges work'),
             'badges_how_body' => self::str(
                 'employer_badges_how_body',
                 null,
-                'Badges are awarded by Moodle when you meet course or site criteria — completion, grades, or manual awards. Locked badges show what you can still earn.'
+                'Badges are awarded when you meet course or site criteria — completion, grades, or manual awards. Locked badges show what you can still earn.'
             ),
-            'badges_open_moodle' => self::str('employer_badges_open_moodle', null, 'Open badges in Moodle'),
+            'badges_open_moodle' => self::str('employer_badges_open_moodle', null, 'Open badges'),
             'badges_disabled_title' => self::str('employer_badges_disabled_title', null, 'Badges are turned off'),
             'badges_disabled_body' => self::str(
                 'employer_badges_disabled_body',
                 null,
-                'Moodle badges are disabled on this site. Ask an administrator if you need them enabled.'
+                'Badges are disabled on this site. Ask an administrator if you need them enabled.'
             ),
 
             'calendar_intro' => self::str(
@@ -778,14 +798,14 @@ final class employer_dashboard {
             'messages_intro' => self::str(
                 'employer_messages_intro',
                 null,
-                'Moodle conversations — starred, private, and group. Open a thread to read and reply here.'
+                'Your conversations — starred, private, and group. Open a thread to read and reply here.'
             ),
-            'messages_open_moodle' => self::str('employer_messages_open_moodle', null, 'Open messages in Moodle'),
+            'messages_open_moodle' => self::str('employer_messages_open_moodle', null, 'Open messages'),
             'messages_empty_title' => self::str('employer_messages_empty_title', null, 'No conversations yet'),
             'messages_empty_body' => self::str(
                 'employer_messages_empty_body',
                 null,
-                'When someone messages you in Moodle, conversations will appear here.'
+                'When someone messages you, conversations will appear here.'
             ),
             'messages_empty_filter_title' => self::str(
                 'employer_messages_empty_filter_title',
@@ -795,7 +815,7 @@ final class employer_dashboard {
             'messages_empty_filter_body' => self::str(
                 'employer_messages_empty_filter_body',
                 null,
-                'Try another tab, or open Moodle Messages to start a conversation.'
+                'Try another tab to see more conversations.'
             ),
             'messages_unread_label' => self::str('employer_messages_unread_label', null, 'Unread'),
             'messages_total_label' => self::str('employer_messages_total_label', null, 'Conversations'),
@@ -813,15 +833,15 @@ final class employer_dashboard {
             'messages_detail_empty_body' => self::str(
                 'employer_messages_detail_empty_body',
                 null,
-                'Pick a thread on the left for a Moodle overview. Reply and compose stay in Moodle Messages.'
+                'Pick a thread on the left to read and reply.'
             ),
             'messages_detail_no_preview' => self::str(
                 'employer_messages_detail_no_preview',
                 null,
                 'No messages to preview yet.'
             ),
-            'messages_open_thread' => self::str('employer_messages_open_thread', null, 'Open in Moodle'),
-            'messages_reply_moodle' => self::str('employer_messages_reply_moodle', null, 'Reply in Moodle'),
+            'messages_open_thread' => self::str('employer_messages_open_thread', null, 'Open conversation'),
+            'messages_reply_moodle' => self::str('employer_messages_reply_moodle', null, 'Reply'),
             'messages_compose_label' => self::str('employer_messages_compose_label', null, 'Write a message'),
             'messages_compose_placeholder' => self::str(
                 'employer_messages_compose_placeholder',
@@ -832,7 +852,7 @@ final class employer_dashboard {
             'messages_cannot_reply' => self::str(
                 'employer_messages_cannot_reply',
                 null,
-                'You cannot reply here. Open Moodle Messages or check messaging permissions.'
+                'You cannot reply to this conversation. Check messaging permissions with your administrator.'
             ),
             'notifications_intro' => self::str(
                 'employer_notifications_intro',
@@ -924,14 +944,14 @@ final class employer_dashboard {
             'profile_intro' => self::str(
                 'employer_profile_intro',
                 null,
-                'Your Moodle account details, editable profile fields, and preference links.'
+                'Name, contact details, and preferences for your LaunchPad account.'
             ),
             'profile_tabs_aria' => self::str('employer_profile_tabs_aria', null, 'Profile sections'),
             'profile_tab_overview' => self::str('employer_profile_tab_overview', null, 'Overview'),
             'profile_tab_edit' => self::str('employer_profile_tab_edit', null, 'Edit'),
             'profile_tab_preferences' => self::str('employer_profile_tab_preferences', null, 'Preferences'),
             'profile_edit_cta' => self::str('employer_profile_edit_cta', null, 'Edit profile'),
-            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor in Moodle'),
+            'profile_edit_moodle' => self::str('employer_profile_edit_moodle', null, 'Full editor'),
             'profile_edit_external' => self::str('employer_profile_edit_external', null, 'Edit in identity provider'),
             'profile_open_moodle' => self::str('employer_profile_open_moodle', null, 'Open public profile'),
             'profile_empty_title' => self::str('employer_profile_empty_title', null, 'No profile details yet'),
@@ -944,12 +964,12 @@ final class employer_dashboard {
             'profile_edit_help' => self::str(
                 'employer_profile_edit_help',
                 null,
-                'Changes save to your Moodle user account. Locked fields are controlled by your login method.'
+                'Changes save to your account. Locked fields are controlled by your login method.'
             ),
             'profile_edit_note' => self::str(
                 'employer_profile_edit_note',
                 null,
-                'Picture upload and advanced custom fields open in Moodle’s full profile editor.'
+                'Use Edit for name, contact, and bio. Preferences covers messages, notifications, and language.'
             ),
             'profile_custom_heading' => self::str('employer_profile_custom_heading', null, 'Additional fields'),
             'profile_save' => self::str('employer_profile_save', null, 'Save profile'),
@@ -957,22 +977,22 @@ final class employer_dashboard {
             'profile_edit_unavailable_title' => self::str(
                 'employer_profile_edit_unavailable_title',
                 null,
-                'Edit this profile in Moodle'
+                'Profile edit is managed by your login method'
             ),
             'profile_edit_unavailable_body' => self::str(
                 'employer_profile_edit_unavailable_body',
                 null,
-                'Your account settings require Moodle’s profile editor (or an external identity provider).'
+                'Your organisation controls this account. Use Preferences for what LaunchPad allows, or ask your programme admin.'
             ),
             'profile_prefs_lead' => self::str(
                 'employer_profile_prefs_lead',
                 null,
-                'Account, communication, and system preferences — edited here when possible, or opened in Moodle for heavy tools.'
+                'Account, communication, and system preferences — edit here when available.'
             ),
             'native_tools_note' => self::str(
                 'employer_native_tools_note',
                 null,
-                'Full grades, messaging, calendar editing, and notification settings stay in Moodle.'
+                'Grades, messaging, calendar, and notification settings are available in My tools.'
             ),
             'pref_back' => self::str('employer_pref_back', null, 'Back to preferences'),
             'pref_save' => self::str('employer_pref_save', null, 'Save preferences'),
@@ -1345,12 +1365,12 @@ final class employer_dashboard {
             'grades' => self::str(
                 'employer_orbit_tip_grades',
                 null,
-                'Tip: open a course for the detailed grade report. Use Open in Moodle for the full native report.'
+                'Tip: open a course row for the full grade report.'
             ),
             'badges' => self::str(
                 'employer_orbit_tip_badges',
                 null,
-                'Tip: earned badges glow here. Locked ones show what Moodle still needs — open an earned badge for details.'
+                'Tip: earned badges glow here. Locked ones show what you still need — open an earned badge for details.'
             ),
             'calendar' => self::str(
                 'employer_orbit_tip_calendar',
@@ -1360,7 +1380,7 @@ final class employer_dashboard {
             'messages' => self::str(
                 'employer_orbit_tip_messages',
                 null,
-                'Tip: preview conversations here, then open Moodle Messages to read and reply.'
+                'Tip: open a conversation to read the thread and reply here.'
             ),
             'notifications' => self::str(
                 'employer_orbit_tip_notifications',
@@ -2644,22 +2664,8 @@ final class employer_dashboard {
             ),
         ];
 
-        // Profile also in sidebar footer (lp-me); keep discoverable under You like Fellowship.
+        // Profile / Preferences live in the avatar menu (not duplicate sidebar items).
         $you = [
-            $item(
-                'profile',
-                self::str('employer_nav_profile', null, 'Profile'),
-                (string) ($urls['profile'] ?? $urls['home']),
-                'user-circle',
-                $view === 'profile' && $ptab !== 'preferences'
-            ),
-            $item(
-                'preferences',
-                self::str('employer_nav_preferences', null, 'Preferences'),
-                (string) ($urls['preferences'] ?? $urls['home']),
-                'settings-01',
-                $view === 'profile' && $ptab === 'preferences'
-            ),
             $item('public', self::str('employer_public_site', null, 'Public site'), $urls['public'],
                 'globe-02'),
         ];

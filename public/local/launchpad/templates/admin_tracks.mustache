@@ -13,12 +13,7 @@
         <h2>{{heading}}</h2>
         <p class="lp-hero-lead">{{lead}}</p>
         <p class="lp-sm lp-tr-cat">
-          {{#category_chip_ok}}
-            <span class="lp-chip ok">{{category_chip}}</span>
-          {{/category_chip_ok}}
-          {{^category_chip_ok}}
-            <span class="lp-chip line">{{category_chip}}</span>
-          {{/category_chip_ok}}
+          <span class="lp-chip {{category_chip_class}}">{{category_chip}}</span>
         </p>
       </div>
       <aside class="lp-tr-hero-stats" aria-label="{{heading}}">
@@ -44,6 +39,70 @@
       </aside>
     </div>
   </section>
+
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
+
+  {{#has_orientation}}
+    <section class="lp-tr-grid-wrap lp-tr-orient-wrap" aria-label="{{orientation_title}}">
+      <div class="lp-tr-grid-head">
+        <div>
+          <h3>{{orientation_title}}</h3>
+          <p class="lp-muted lp-sm">{{orientation_lead}}</p>
+          <p class="lp-muted lp-sm">{{orientation_help}}</p>
+        </div>
+      </div>
+      <div class="lp-tr-grid">
+        {{#orientation_courses}}
+          <article class="lp-tr-card lp-tr-orient-card{{^is_visible}} is-hidden-course{{/is_visible}}" data-lp-tr-orient-card>
+            <div class="lp-tr-card-top">
+              <span class="lp-tr-status lp-tr-status-orient">{{badge}}</span>
+              <span class="lp-tr-vis{{#is_visible}} is-on{{/is_visible}}{{^is_visible}} is-off{{/is_visible}}">{{visibility_label}}</span>
+            </div>
+            <div class="lp-tr-card-titles">
+              <h3>{{name}}</h3>
+              <div class="lp-tr-codes">
+                {{#idnumber}}<code class="lp-tr-idn">{{idnumber}}</code>{{/idnumber}}
+                {{#shortname}}<code class="lp-tr-idn">{{shortname}}</code>{{/shortname}}
+              </div>
+            </div>
+            <div class="lp-tr-meta">
+              <div class="lp-tr-meta-row">
+                <span class="lp-tr-section-label">{{enrolled_section_label}}</span>
+                <span class="lp-tr-meta-value{{#fellows_count}} is-enrolled{{/fellows_count}}">{{fellows_label}}</span>
+              </div>
+            </div>
+            <div class="lp-tr-card-foot">
+              {{#is_visible}}
+                <form method="post" action="{{form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_hide">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{id}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
+                </form>
+              {{/is_visible}}
+              {{#is_hidden}}
+                <form method="post" action="{{form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_unhide">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{id}}">
+                  <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_label}}</button>
+                </form>
+              {{/is_hidden}}
+              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{courseops_url}}">{{courseops_label}}</a>
+              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}">{{open_label}}</a>
+            </div>
+          </article>
+        {{/orientation_courses}}
+      </div>
+    </section>
+  {{/has_orientation}}
 
   {{#has_tracks}}
     <section class="lp-tr-grid-wrap">

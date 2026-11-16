@@ -38,6 +38,10 @@ final class hook_callbacks {
         persona_home::maybe_redirect_from_my();
         // Employer learners: stock mod/page|url|resource → LaunchPad activity shell.
         activity_portal::maybe_redirect_from_mod();
+        // Fellowship signup: replace stock "email sent" / confirm notices.
+        registration::maybe_redirect_stock_signup_notices();
+        // Forgot password placeholders (legacy lib before_http_headers is skipped when this hook is registered).
+        auth_chrome::maybe_enhance_forgot_password_page();
     }
 
     /**

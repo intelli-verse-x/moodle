@@ -293,4 +293,65 @@ final class fellowship_dashboard_test extends \basic_testcase {
         $this->assertFalse($out['has_attention']);
         $this->assertFalse($out['has_submitted']);
     }
+
+    /**
+     * Thin M2: one high score must not mark the whole phase Met.
+     */
+    public function test_phase_gate_requires_all_assigns_met(): void {
+        // Old bug: best=85 with another pending → was Met. Now In progress.
+        $partial = fellowship_dashboard::phase_gate_from_assign_stats([
+            'assigncount' => 2,
+            'metcount' => 1,
+            'gradedcount' => 1,
+            'below70' => false,
+            'pendingreview' => true,
+            'revising' => false,
+            'submitted' => true,
+            'sumpct' => 85.0,
+            'allcomplete' => false,
+        ]);
+        $this->assertSame('In progress', $partial['status']);
+        $this->assertNotSame('Met', $partial['status']);
+        $this->assertSame(85, $partial['score']);
+
+        $met = fellowship_dashboard::phase_gate_from_assign_stats([
+            'assigncount' => 2,
+            'metcount' => 2,
+            'gradedcount' => 2,
+            'below70' => false,
+            'pendingreview' => false,
+            'revising' => false,
+            'submitted' => true,
+            'sumpct' => 160.0,
+            'allcomplete' => true,
+        ]);
+        $this->assertSame('Met', $met['status']);
+        $this->assertSame(80, $met['score']);
+
+        $below = fellowship_dashboard::phase_gate_from_assign_stats([
+            'assigncount' => 2,
+            'metcount' => 1,
+            'gradedcount' => 2,
+            'below70' => true,
+            'pendingreview' => false,
+            'revising' => false,
+            'submitted' => true,
+            'sumpct' => 140.0,
+            'allcomplete' => true,
+        ]);
+        $this->assertSame('Not yet met', $below['status']);
+
+        $noassign = fellowship_dashboard::phase_gate_from_assign_stats([
+            'assigncount' => 0,
+            'metcount' => 0,
+            'gradedcount' => 0,
+            'below70' => false,
+            'pendingreview' => false,
+            'revising' => false,
+            'submitted' => false,
+            'sumpct' => 0,
+            'allcomplete' => true,
+        ]);
+        $this->assertSame('Complete', $noassign['status']);
+    }
 }

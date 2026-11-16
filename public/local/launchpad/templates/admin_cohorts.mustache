@@ -33,12 +33,21 @@
 </div>
 
 <div class="lp-grid-2" style="margin-top:16px">
-  <section class="lp-card lift lp-stack-lg">
+  <section class="lp-card lift lp-stack-lg" id="lp-cohorts-enrol">
     <div class="lp-card-head">
       <h3>{{form_title}}</h3>
+      <p class="lp-sm lp-muted" style="margin:4px 0 0">{{form_lead}}</p>
     </div>
     {{^has_ready_track}}
-      <p class="lp-muted">{{no_ready_body}}</p>
+      <div class="lp-empty" role="status">
+        <h2>{{enrol_empty_title}}</h2>
+        <p>{{enrol_empty_body}}</p>
+        {{#show_builder_cta}}
+          <p class="lp-empty-actions" style="margin-top:12px">
+            <a class="lp-btn lp-btn-solid" href="{{builder_url}}">{{builder_cta_label}}</a>
+          </p>
+        {{/show_builder_cta}}
+      </div>
     {{/has_ready_track}}
     {{#has_ready_track}}
       <form method="post" action="{{form_action}}" class="lp-stack lp-enrol-form">
@@ -64,11 +73,20 @@
             <span>{{orient_label}}</span>
           </label>
         {{/orient_available}}
-        {{#orient_missing}}
-          <p class="lp-sm lp-muted">{{orient_missing_body}}</p>
-        {{/orient_missing}}
         <button type="submit" class="lp-btn lp-btn-solid" style="align-self:flex-start">{{submit_label}}</button>
       </form>
+      {{#show_create_orient}}
+        <div class="lp-orient-create" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--lp-line,#E4E8EF)">
+          <p class="lp-sm" style="margin:0 0 4px"><b>{{orient_missing_body}}</b></p>
+          <p class="lp-sm lp-muted" style="margin:0 0 10px">{{orient_missing_help}}</p>
+          <form method="post" action="{{form_action}}" class="lp-inline-form">
+            <input type="hidden" name="sesskey" value="{{sesskey}}">
+            <input type="hidden" name="action" value="create_orientation">
+            <input type="hidden" name="cohort" value="{{create_orient_cohort}}">
+            <button type="submit" class="lp-btn lp-btn-light">{{create_orient_submit}}</button>
+          </form>
+        </div>
+      {{/show_create_orient}}
     {{/has_ready_track}}
 
     <div class="lp-table-wrap" style="margin-top:8px">
@@ -108,6 +126,7 @@
     <section class="lp-card lift lp-stack">
       <div class="lp-card-head">
         <h3>{{bytrack_title}}</h3>
+        <p class="lp-sm lp-muted" style="margin:4px 0 0">{{bytrack_lead}}</p>
       </div>
       {{#has_bytrack}}
         {{#bytrack}}
@@ -122,7 +141,10 @@
         {{/bytrack}}
       {{/has_bytrack}}
       {{^has_bytrack}}
-        <p class="lp-muted lp-sm" role="status">{{bytrack_empty}}</p>
+        <div class="lp-empty" role="status">
+          <h2>{{bytrack_empty_title}}</h2>
+          <p class="lp-muted lp-sm">{{bytrack_empty}}</p>
+        </div>
       {{/has_bytrack}}
     </section>
     <section class="lp-card soft">

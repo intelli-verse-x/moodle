@@ -64,8 +64,37 @@
         </tbody>
       </table>
     {{/has_people}}
-    <div data-lp-people-empty style="{{#has_people}}display:none{{/has_people}}" role="status">
-      {{> local_launchpad/admin_empty}}
+    <div data-lp-people-empty
+         style="{{#has_people}}display:none{{/has_people}}"
+         role="status"
+         data-empty-all-title="{{empty_tab_all_title}}"
+         data-empty-all-body="{{empty_tab_all_body}}"
+         data-empty-all-cta-url="{{empty_tab_all_cta_url}}"
+         data-empty-all-cta-label="{{empty_tab_all_cta_label}}"
+         data-empty-all-has-cta="{{empty_tab_all_has_cta}}"
+         data-empty-fellow-title="{{empty_tab_fellow_title}}"
+         data-empty-fellow-body="{{empty_tab_fellow_body}}"
+         data-empty-fellow-cta-url="{{empty_tab_fellow_cta_url}}"
+         data-empty-fellow-cta-label="{{empty_tab_fellow_cta_label}}"
+         data-empty-fellow-has-cta="{{empty_tab_fellow_has_cta}}"
+         data-empty-mentor-title="{{empty_tab_mentor_title}}"
+         data-empty-mentor-body="{{empty_tab_mentor_body}}"
+         data-empty-mentor-cta-url="{{empty_tab_mentor_cta_url}}"
+         data-empty-mentor-cta-label="{{empty_tab_mentor_cta_label}}"
+         data-empty-mentor-has-cta="{{empty_tab_mentor_has_cta}}"
+         data-empty-admin-title="{{empty_tab_admin_title}}"
+         data-empty-admin-body="{{empty_tab_admin_body}}"
+         data-empty-admin-cta-url="{{empty_tab_admin_cta_url}}"
+         data-empty-admin-cta-label="{{empty_tab_admin_cta_label}}"
+         data-empty-admin-has-cta="{{empty_tab_admin_has_cta}}">
+      <div class="lp-empty" role="status">
+        <div class="lp-empty-mark" aria-hidden="true">{{empty_mark}}</div>
+        <h2 data-lp-people-empty-title>{{empty_title}}</h2>
+        <p data-lp-people-empty-body>{{empty_body}}</p>
+        <p class="lp-empty-actions" style="margin-top:12px{{^has_empty_cta}};display:none{{/has_empty_cta}}" data-lp-people-empty-cta-wrap>
+          <a class="lp-btn lp-btn-solid" href="{{empty_cta_url}}" data-lp-people-empty-cta>{{empty_cta_label}}</a>
+        </p>
+      </div>
     </div>
   </div>
 </div>

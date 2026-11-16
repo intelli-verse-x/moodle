@@ -61,6 +61,7 @@ final class assign_submit_ui {
         $submission = $assign->get_user_submission($userid, false);
         $substatus = $submission ? (string) $submission->status : '';
         $attemptnumber = $submission ? ((int) $submission->attemptnumber + 1) : 0;
+        $statuskey = self::status_key($substatus);
 
         $canedit = false;
         if ($assign->submissions_open($userid) && $assign->is_any_submission_plugin_enabled()) {
@@ -220,6 +221,27 @@ final class assign_submit_ui {
                     $priorfeedback = format_text((string) $fc->commenttext, FORMAT_HTML, ['context' => $context]);
                 }
             }
+            $priorfiles = [];
+            if ($hasfile && $fileplugin) {
+                foreach ($fileplugin->get_files($sub, $user) as $storedfile) {
+                    /** @var \stored_file $storedfile */
+                    if ($storedfile->is_directory()) {
+                        continue;
+                    }
+                    $priorfiles[] = [
+                        'filename' => $storedfile->get_filename(),
+                        'filesize' => display_size($storedfile->get_filesize()),
+                        'url' => \moodle_url::make_pluginfile_url(
+                            $storedfile->get_contextid(),
+                            $storedfile->get_component(),
+                            $storedfile->get_filearea(),
+                            $storedfile->get_itemid(),
+                            $storedfile->get_filepath(),
+                            $storedfile->get_filename()
+                        )->out(false),
+                    ];
+                }
+            }
             $priors[] = [
                 'attempt_label' => get_string(
                     'fellowship_assign_attempt_n',
@@ -236,6 +258,8 @@ final class assign_submit_ui {
                 ),
                 'has_text' => $priortext !== '',
                 'text_html' => $priortext,
+                'has_files' => $priorfiles !== [],
+                'files' => $priorfiles,
                 'has_grade' => $priorgrade !== '',
                 'grade_label' => $priorgrade,
                 'has_feedback' => $priorfeedback !== '',
@@ -243,6 +267,27 @@ final class assign_submit_ui {
             ];
         }
         $priors = array_reverse($priors);
+
+        $hascontent = ($drafthtml !== '') || ($currentfiles !== []);
+        $hasattempt = $submission
+            && $substatus !== ''
+            && $substatus !== ASSIGN_SUBMISSION_STATUS_NEW;
+        $hasreceipt = $hasattempt || $hascontent;
+        $modifiedts = $submission ? (int) ($submission->timemodified ?: $submission->timecreated) : 0;
+        $receiptwhen = $modifiedts > 0
+            ? userdate($modifiedts, get_string('strftimedatetimeshort', 'langconfig'))
+            : '';
+        $receiptwhenlabel = '';
+        if ($receiptwhen !== '') {
+            if ($substatus === ASSIGN_SUBMISSION_STATUS_SUBMITTED) {
+                $receiptwhenlabel = get_string('fellowship_assign_submitted_at', 'local_launchpad');
+            } else if ($substatus === ASSIGN_SUBMISSION_STATUS_DRAFT
+                || $substatus === ASSIGN_SUBMISSION_STATUS_REOPENED) {
+                $receiptwhenlabel = get_string('fellowship_assign_saved_at', 'local_launchpad');
+            } else {
+                $receiptwhenlabel = get_string('fellowship_assign_updated_at', 'local_launchpad');
+            }
+        }
 
         $flash = optional_param('assignmsg', '', PARAM_ALPHAEXT);
         $flashok = '';
@@ -270,6 +315,15 @@ final class assign_submit_ui {
             'assign_has_draft_html' => $drafthtml !== '',
             'assign_current_files' => $currentfiles,
             'assign_has_current_files' => $currentfiles !== [],
+            'assign_has_receipt' => $hasreceipt,
+            'assign_has_receipt_content' => $hascontent,
+            'assign_receipt_when' => $receiptwhen,
+            'assign_has_receipt_when' => $receiptwhen !== '',
+            'assign_receipt_when_label' => $receiptwhenlabel,
+            'assign_receipt_honesty' => get_string('fellowship_assign_receipt_honesty', 'local_launchpad'),
+            'assign_receipt_empty' => get_string('fellowship_assign_receipt_empty', 'local_launchpad'),
+            'assign_is_draft' => $statuskey === 'draft',
+            'assign_is_submitted' => $statuskey === 'submitted',
             'assign_attempt_n' => $attemptnumber,
             'assign_attempt_label' => $attemptnumber > 0
                 ? get_string('fellowship_assign_attempt_n', 'local_launchpad', $attemptnumber)

@@ -54,8 +54,7 @@ if (!signup_is_enabled()) {
 }
 
 $SESSION->toba_signup_portal = 'fellowship';
-if (empty($SESSION->wantsurl)) {
-    $SESSION->wantsurl = (new moodle_url('/my/'))->out(false);
-}
+// Pin return URL to fellow.php (overwrite empty /my/ seeded by landing).
+\local_launchpad\registration::ensure_fellowship_wantsurl();
 
 redirect(new moodle_url('/login/signup.php', ['portal' => 'fellowship']));
