@@ -53,5 +53,11 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111602, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111603) {
+        // Seed per-track mentor rubric packs for existing lp-* track courses.
+        \local_launchpad\track_rubric::backfill_missing_packs();
+        upgrade_plugin_savepoint(true, 2026111603, 'local', 'launchpad');
+    }
+
     return true;
 }

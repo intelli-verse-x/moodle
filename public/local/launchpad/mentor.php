@@ -383,14 +383,16 @@ switch ($view) {
         $haspostedlevels = true;
         for ($i = 0; $i < 4; $i++) {
             $lv = optional_param('crit_' . $i, -1, PARAM_INT);
-            if ($lv < 0 || $lv > 3) {
+            // Levels are None…Strong (0–4).
+            if ($lv < 0 || $lv > 4) {
                 $haspostedlevels = false;
                 break;
             }
             $postedlevels[] = $lv;
         }
         if ($haspostedlevels) {
-            $rubricui = mentor_dashboard::build_review_rubric_ui($postedlevels);
+            $reviewcourseid = (int) ($reviewdata['course_id'] ?? 0);
+            $rubricui = mentor_dashboard::build_review_rubric_ui($postedlevels, $reviewcourseid);
             $reviewdata['rubric_criteria'] = $rubricui['criteria'];
             $reviewdata['rubric_total'] = $rubricui['total'];
             $reviewdata['grade_pct'] = (string) (int) $rubricui['total'];

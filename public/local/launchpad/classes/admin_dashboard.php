@@ -676,6 +676,9 @@ final class admin_dashboard {
                 }
             }
 
+            // Seed per-track mentor rubric pack (AI / Full Stack / … or shared default).
+            track_rubric::ensure_course_pack((int) $course->id, $trackname);
+
             // One Shared orientation per cohort — create if missing (shared by all tracks).
             $orient = self::ensure_shared_orientation($actor, $cohort);
             $ok = get_string('admin_builder_create_ok', 'local_launchpad', format_string($course->fullname));
@@ -1670,7 +1673,39 @@ final class admin_dashboard {
             'advanced_url' => (new \moodle_url('/course/edit.php', ['id' => $trackid]))->out(false),
             'advanced_label' => get_string('admin_courseops_settings_advanced', 'local_launchpad'),
             'advanced_help' => get_string('admin_courseops_settings_advanced_help', 'local_launchpad'),
+            // Per-track rubric editor (tracks only — orientation skips).
+            'show_rubric_editor' => !$isorientation,
+            'rubric_title' => get_string('admin_rubric_title', 'local_launchpad'),
+            'rubric_lead' => get_string('admin_rubric_lead', 'local_launchpad'),
+            'rubric_form_action' => $opsurl('settings'),
+            'rubric_label_col' => get_string('admin_rubric_col_label', 'local_launchpad'),
+            'rubric_weight_col' => get_string('admin_rubric_col_weight', 'local_launchpad'),
+            'rubric_desc_col' => get_string('admin_rubric_col_descriptor', 'local_launchpad'),
+            'rubric_sum_label' => get_string('admin_rubric_sum_label', 'local_launchpad'),
+            'rubric_save_label' => get_string('admin_rubric_save', 'local_launchpad'),
+            'rubric_criteria' => [],
+            'rubric_weight_sum' => 0,
         ];
+
+        if (!$isorientation) {
+            $pack = track_rubric::get_course_pack($trackid);
+            $rubricrows = [];
+            $wsum = 0;
+            foreach ($pack['criteria'] as $i => $crit) {
+                $w = (int) $crit['weight'];
+                $wsum += $w;
+                $rubricrows[] = [
+                    'index' => $i,
+                    'n' => $i + 1,
+                    'key' => (string) $crit['key'],
+                    'label' => (string) $crit['label'],
+                    'weight' => $w,
+                    'descriptor' => (string) ($crit['descriptor'] ?? ''),
+                ];
+            }
+            $ctx['rubric_criteria'] = $rubricrows;
+            $ctx['rubric_weight_sum'] = $wsum;
+        }
 
         // Keep the user's draft after a failed save (validate → error → reload).
         $posted = $flash['posted'] ?? null;
@@ -1695,6 +1730,30 @@ final class admin_dashboard {
             }
             if (array_key_exists('summary', $posted)) {
                 $ctx['summary_value'] = (string) $posted['summary'];
+            }
+            if (!empty($posted['rubric_criteria']) && is_array($posted['rubric_criteria'])) {
+                $draftrows = [];
+                $draftsum = 0;
+                foreach ($posted['rubric_criteria'] as $i => $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $w = (int) ($row['weight'] ?? 0);
+                    $draftsum += $w;
+                    $draftrows[] = [
+                        'index' => $i,
+                        'n' => ((int) $i) + 1,
+                        'key' => (string) ($row['key'] ?? ('c' . ($i + 1))),
+                        'label' => (string) ($row['label'] ?? ''),
+                        'weight' => $w,
+                        'descriptor' => (string) ($row['descriptor'] ?? ''),
+                    ];
+                }
+                if (count($draftrows) === 4) {
+                    $ctx['show_rubric_editor'] = true;
+                    $ctx['rubric_criteria'] = $draftrows;
+                    $ctx['rubric_weight_sum'] = $draftsum;
+                }
             }
         }
 
@@ -2958,6 +3017,38 @@ final class admin_dashboard {
         }
 
         return ['ok' => get_string('admin_courseops_settings_ok', 'local_launchpad')];
+    }
+
+    /**
+     * Save the 4-criterion mentor rubric pack for a LaunchPad track (not orientation).
+     *
+     * @param list<array{key?:string,label?:string,weight?:int|string,descriptor?:string}> $criteria
+     * @return array{ok?:string,error?:string,posted?:array}
+     */
+    public static function save_courseops_rubric(\stdClass $user, int $trackid, array $criteria): array {
+        $posted = ['rubric_criteria' => $criteria];
+        $fail = static function (string $error) use ($posted): array {
+            return ['error' => $error, 'posted' => $posted];
+        };
+
+        $course = self::resolve_courseops_course($trackid);
+        if ($course === null || (int) $course->id !== $trackid) {
+            return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
+        }
+        if (self::is_orientation_idnumber((string) ($course->idnumber ?? ''))) {
+            return $fail(get_string('admin_rubric_err_orientation', 'local_launchpad'));
+        }
+
+        $modcontext = \context_course::instance($trackid);
+        if (!has_capability('moodle/course:update', $modcontext, $user)) {
+            return $fail(get_string('admin_courseops_err_cap', 'local_launchpad'));
+        }
+
+        $result = track_rubric::save_course_pack($trackid, $criteria);
+        if (!empty($result['error'])) {
+            return $fail((string) $result['error']);
+        }
+        return ['ok' => (string) ($result['ok'] ?? get_string('admin_rubric_ok_saved', 'local_launchpad'))];
     }
 
     /**

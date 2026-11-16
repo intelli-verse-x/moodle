@@ -6668,6 +6668,19 @@ body.local-launchpad-mentor .lp-xp-chip { display: none; }
   border-radius: 6px;
   padding: 2px 6px;
 }
+.lp-review-crit-desc {
+  margin: -2px 0 8px;
+  line-height: 1.35;
+}
+.lp-courseops-rubric-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 88px minmax(0, 2.2fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+@media (max-width: 720px) {
+  .lp-courseops-rubric-row { grid-template-columns: 1fr; }
+}
 .lp-review-levels {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

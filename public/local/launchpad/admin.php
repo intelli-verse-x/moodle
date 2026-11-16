@@ -175,6 +175,29 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             'section' => 'settings',
         ]));
     }
+    if ($view === 'courseops' && $action === 'save_track_rubric') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $labels = optional_param_array('rubric_label', [], PARAM_TEXT);
+        $weights = optional_param_array('rubric_weight', [], PARAM_INT);
+        $descriptors = optional_param_array('rubric_descriptor', [], PARAM_TEXT);
+        $keys = optional_param_array('rubric_key', [], PARAM_ALPHANUMEXT);
+        $criteria = [];
+        for ($i = 0; $i < 4; $i++) {
+            $criteria[] = [
+                'key' => (string) ($keys[$i] ?? ('c' . ($i + 1))),
+                'label' => (string) ($labels[$i] ?? ''),
+                'weight' => (int) ($weights[$i] ?? 0),
+                'descriptor' => (string) ($descriptors[$i] ?? ''),
+            ];
+        }
+        $flash = admin_dashboard::save_courseops_rubric($USER, $trackid, $criteria);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'settings',
+        ]));
+    }
     if ($view === 'courseops' && $action === 'unenrol_fellow') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $targetuserid = optional_param('userid', 0, PARAM_INT);

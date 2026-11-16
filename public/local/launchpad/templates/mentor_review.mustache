@@ -107,6 +107,9 @@
                 <span class="lp-review-crit-label">{{label}}</span>
                 <span class="lp-review-crit-pts"><output class="lp-review-crit-score" data-crit-score>{{score}}</output>/{{weight}}</span>
               </div>
+              {{#has_descriptor}}
+                <p class="lp-review-crit-desc lp-muted lp-sm">{{descriptor}}</p>
+              {{/has_descriptor}}
               <div class="lp-review-levels" role="radiogroup" aria-label="{{label}}">
                 {{#levels}}
                   <label class="lp-review-level">

@@ -130,6 +130,22 @@ final class mentor_dashboard_test extends \basic_testcase {
         $this->assertSame(get_string('mentor_review_level_solid', 'local_launchpad'), $rows[0]['level_label']);
         $this->assertSame(get_string('mentor_review_level_partial', 'local_launchpad'), $rows[2]['level_label']);
 
+        // v3 stores labels/weights so fellow rows stay honest after pack edits.
+        $this->assertSame($scored['labels'], $parts['labels']);
+        $this->assertSame($scored['weights'], $parts['weights']);
+        $this->assertStringContainsString('"labels"', $packed);
+        $v3rows = mentor_dashboard::rubric_breakdown_rows([
+            'has_rubric' => true,
+            'levels' => [4, 4, 4, 4],
+            'scores' => [35, 30, 20, 15],
+            'total' => 100,
+            'labels' => ['Routing', 'Eval', 'Safe', 'Runbook'],
+            'weights' => [35, 30, 20, 15],
+        ]);
+        $this->assertSame('Routing', $v3rows[0]['label']);
+        $this->assertSame(35, $v3rows[0]['weight']);
+        $this->assertSame(35, $v3rows[0]['score_max']);
+
         $legacy = mentor_dashboard::unpack_review_comment(
             mentor_dashboard::NEXT_STEP_MARKER . " Fix the brief\n\nPlain change note"
         );
