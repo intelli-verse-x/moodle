@@ -49,7 +49,7 @@ After code deploy, visit Site administration so Moodle installs/upgrades the `lo
 - Default is **dry-run** (always allowed; no writes)
 - `--apply` is **fail-closed**: requires loopback `wwwroot` (`localhost` / `127.0.0.1` / `::1`) **and** a positive local signal (`moodle_phpunit` / `*_local` dbname, or `MOODLE_DOCKER_PHPUNIT`, or `MOODLE_LAUNCHPAD_ALLOW_APPLY=1`). Denied hosts (e.g. `*.toba-tech*`, `learn.*`) never apply.
 - Idempotent via `idnumber` keys (`launchpad-*`, `lp-*`)
-- **New** categories/courses/activities are created **hidden**. **Existing** objects keep admin visibility / name / placement (no force-hide, rename, or move on re-apply — category hide would cascade in Moodle core)
+- **New** LaunchPad **categories** are created **visible** (so Moodle course management lists them). **New courses/activities** still start **hidden** until Show to fellows. **Existing** objects keep admin visibility / name / placement (no force-hide, rename, or move on re-apply — category hide would cascade in Moodle core)
 - `--cohort` is validated (non-empty slug, Moodle shortname/idnumber length limits). Invalid values are rejected; there is **no** silent fallback to `pilot`
 - Partial failure prints the **operation + course/activity** and exits non-zero. **Safe retry:** re-run the same command after fixing the cause — no DB reset required
 

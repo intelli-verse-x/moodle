@@ -615,7 +615,9 @@ final class admin_dashboard {
                     'name' => $trackname,
                     'idnumber' => $catidnumber,
                     'parent' => (int) $root->id,
-                    'visible' => 0,
+                    // Categories stay visible so Moodle course management lists them;
+                    // fellows are gated by course.visible (Show to fellows), not category hide.
+                    'visible' => 1,
                     'description' => 'LaunchPad track category — created from Course builder.',
                     'descriptionformat' => FORMAT_PLAIN,
                 ]);
@@ -1009,17 +1011,53 @@ final class admin_dashboard {
 
         $root = self::fellowship_root_category();
         if ($root) {
-            return $root;
+            // Repair older installs that created LaunchPad folders hidden.
+            self::reveal_launchpad_categories_for_management();
+            $root = self::fellowship_root_category();
+            if ($root) {
+                return $root;
+            }
         }
         $created = \core_course_category::create((object) [
             'name' => blueprint::ROOT_CATEGORY,
             'idnumber' => blueprint::ROOT_IDNUMBER,
             'parent' => 0,
-            'visible' => 0,
+            // Visible to site admins in course management; courses start hidden.
+            'visible' => 1,
             'description' => 'LaunchPad root — created from Course builder.',
             'descriptionformat' => FORMAT_PLAIN,
         ]);
         return $DB->get_record('course_categories', ['id' => $created->id], '*', MUST_EXIST);
+    }
+
+    /**
+     * Show LaunchPad category folders in Moodle course management without changing
+     * course.visible (do not use core_course_category::show() — it restores courses
+     * from visibleold and can unhide tracks still withheld from fellows).
+     *
+     * @return int Number of categories updated.
+     */
+    public static function reveal_launchpad_categories_for_management(): int {
+        global $DB;
+
+        $ids = $DB->get_fieldset_select(
+            'course_categories',
+            'id',
+            "idnumber LIKE ? AND visible = 0",
+            ['launchpad-%']
+        );
+        if ($ids === [] || $ids === false) {
+            return 0;
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal(array_map('intval', $ids));
+        $DB->execute(
+            "UPDATE {course_categories} SET visible = 1, visibleold = 1 WHERE id {$insql}",
+            $params
+        );
+        \cache_helper::purge_by_event('changesincoursecat');
+
+        return count($ids);
     }
 
     /**
@@ -1195,10 +1233,8 @@ final class admin_dashboard {
         }
 
         try {
-            update_course((object) [
-                'id' => $courseid,
-                'visible' => $want,
-            ]);
+            // Sets visible + visibleold together so a later category show cannot undo this.
+            course_change_visibility($courseid, $visible);
         } catch (\Throwable $e) {
             return $out(null, self::flash_error_message($e));
         }
@@ -2902,7 +2938,6 @@ final class admin_dashboard {
             'id' => $trackid,
             'fullname' => $fullname,
             'shortname' => $shortname,
-            'visible' => $wantvisible,
             'startdate' => $startdate,
             'enddate' => $enddate,
             'enablecompletion' => $completion,
@@ -2912,6 +2947,12 @@ final class admin_dashboard {
 
         try {
             update_course($data);
+            if ($wantvisible !== (int) $full->visible) {
+                course_change_visibility($trackid, $wantvisible === 1);
+            } else if ((int) ($full->visibleold ?? -1) !== $wantvisible) {
+                // Keep visibleold aligned so category restore cannot flip fellows visibility.
+                $DB->set_field('course', 'visibleold', $wantvisible, ['id' => $trackid]);
+            }
         } catch (\Throwable $e) {
             return $fail(self::flash_error_message($e));
         }

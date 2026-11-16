@@ -46,5 +46,12 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026102814, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111602) {
+        // Reveal LaunchPad category folders for Moodle course management without
+        // restoring course.visible (fellows stay gated by Show to fellows).
+        \local_launchpad\admin_dashboard::reveal_launchpad_categories_for_management();
+        upgrade_plugin_savepoint(true, 2026111602, 'local', 'launchpad');
+    }
+
     return true;
 }

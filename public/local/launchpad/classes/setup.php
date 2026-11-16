@@ -176,9 +176,9 @@ final class setup {
             return $existing;
         }
 
-        $this->line("CATEGORY create (hidden): {$name} [{$idnumber}] parent={$parentid}");
+        $this->line("CATEGORY create (management-visible): {$name} [{$idnumber}] parent={$parentid}");
         if ($this->dryrun) {
-            return (object) ['id' => 0, 'idnumber' => $idnumber, 'name' => $name, 'visible' => 0];
+            return (object) ['id' => 0, 'idnumber' => $idnumber, 'name' => $name, 'visible' => 1];
         }
 
         return $this->run_op('create_category', $idnumber, function () use ($DB, $name, $idnumber, $parentid) {
@@ -186,7 +186,8 @@ final class setup {
                 'name' => $name,
                 'idnumber' => $idnumber,
                 'parent' => $parentid,
-                'visible' => 0,
+                // Folders visible in Moodle manage; courses still created hidden below.
+                'visible' => 1,
                 'description' => 'LaunchPad structure — managed by local_launchpad CLI.',
                 'descriptionformat' => FORMAT_PLAIN,
             ]);
