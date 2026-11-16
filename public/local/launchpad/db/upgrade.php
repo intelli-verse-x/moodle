@@ -74,5 +74,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111606, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111607) {
+        // Employer staff admin Phase 1: create/list/revoke + persona exclusivity.
+        upgrade_plugin_savepoint(true, 2026111607, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111608) {
+        // Mentor in-shell profile/password; Employer staff Phase 2 course enrol/unenrol.
+        upgrade_plugin_savepoint(true, 2026111608, 'local', 'launchpad');
+    }
+
     return true;
 }

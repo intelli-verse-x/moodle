@@ -2431,7 +2431,8 @@
 
         function applyTab(tab, pushUrl) {
             var key = tab || 'all';
-            if (key !== 'all' && key !== 'fellow' && key !== 'mentor' && key !== 'admin') {
+            if (key !== 'all' && key !== 'fellow' && key !== 'mentor'
+                    && key !== 'employee' && key !== 'admin') {
                 key = 'all';
             }
             root.setAttribute('data-lp-people-active', key);
