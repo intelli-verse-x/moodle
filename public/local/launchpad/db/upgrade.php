@@ -59,5 +59,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111603, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111604) {
+        // Manage tracks merged into Tracks & courses (nav + Danger zone UI only).
+        upgrade_plugin_savepoint(true, 2026111604, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111605) {
+        // Tracks & courses clean dashboard UI polish (template/CSS only).
+        upgrade_plugin_savepoint(true, 2026111605, 'local', 'launchpad');
+    }
+
     return true;
 }
