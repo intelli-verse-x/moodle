@@ -196,6 +196,50 @@
           </div>
         </form>
       {{/show_rubric_editor}}
+      {{#show_cert_panel}}
+        <div class="lp-card-head lp-card-head-stack" style="margin-top:28px">
+          <h3>{{cert_title}}</h3>
+          <p class="lp-muted">{{cert_lead}}</p>
+        </div>
+        {{#cert_plugin_missing}}
+          <p class="lp-flash lp-flash-err" role="status">{{cert_plugin_missing_msg}}</p>
+        {{/cert_plugin_missing}}
+        {{^cert_plugin_missing}}
+          <p class="lp-sm"><strong>{{cert_status_label}}</strong>{{#cert_attached}} — {{cert_name}}{{/cert_attached}}</p>
+          {{#cert_has_issues}}
+            <p class="lp-muted lp-sm">{{cert_issues_label}}</p>
+          {{/cert_has_issues}}
+          {{#cert_attached}}
+            <p class="lp-muted lp-sm">{{cert_already_msg}}</p>
+            <div class="lp-courseops-settings-actions">
+              {{#cert_has_design_url}}
+                <a class="lp-btn lp-btn-solid" href="{{cert_design_url}}" target="_blank" rel="noopener noreferrer">{{cert_design_label}}</a>
+              {{/cert_has_design_url}}
+              {{#cert_can_detach}}
+                <form method="post" action="{{cert_form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{cert_detach_confirm}}">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="detach_track_certificate">
+                  <input type="hidden" name="trackid" value="{{trackid}}">
+                  <button type="submit" class="lp-btn lp-btn-light">{{cert_detach_label}}</button>
+                </form>
+              {{/cert_can_detach}}
+            </div>
+            <p class="lp-muted lp-sm">{{cert_design_help}}</p>
+          {{/cert_attached}}
+          {{^cert_attached}}
+            {{#cert_can_attach}}
+              <form method="post" action="{{cert_form_action}}" class="lp-stack">
+                <input type="hidden" name="sesskey" value="{{sesskey}}">
+                <input type="hidden" name="action" value="attach_track_certificate">
+                <input type="hidden" name="trackid" value="{{trackid}}">
+                <div class="lp-courseops-settings-actions">
+                  <button type="submit" class="lp-btn lp-btn-solid">{{cert_attach_label}}</button>
+                </div>
+              </form>
+            {{/cert_can_attach}}
+          {{/cert_attached}}
+        {{/cert_plugin_missing}}
+      {{/show_cert_panel}}
       <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
         {{#primary_nav}}
           <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>

@@ -40,6 +40,7 @@ use local_launchpad\persona_home;
 use local_launchpad\portal_gate;
 use local_launchpad\assign_submit_ui;
 use local_launchpad\quiz_attempt_ui;
+use local_launchpad\track_certificate;
 
 /**
  * Resolve a Moodle lang key for Fellowship UI (never show [[missing]] markers).
@@ -780,6 +781,22 @@ switch ($view) {
 
     case 'progress':
         $pagetitle = $lpstr('fellowship_nav_progress', null, 'Progress');
+        // Eligible Download: auto-issue + stream PDF (exits).
+        if (optional_param('downloadcert', 0, PARAM_BOOL) && confirm_sesskey()) {
+            global $SESSION;
+            $downloadcourseid = $selected !== null ? (int) $selected->id : 0;
+            try {
+                track_certificate::serve_pdf_download($userid, $downloadcourseid);
+            } catch (\Throwable $e) {
+                $SESSION->lp_fellow_flash = [
+                    'error' => get_string('fellowship_cert_err_not_eligible', 'local_launchpad'),
+                ];
+                redirect(new moodle_url(persona_home::FELLOW_PATH, [
+                    'view' => 'progress',
+                    'id' => $downloadcourseid,
+                ]));
+            }
+        }
         $progressdata = fellowship_dashboard::completion_for_user($userid, $courses, $selected);
         $progressswitch = [];
         $progressselectedid = $selected !== null ? (int) $selected->id : 0;

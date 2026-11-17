@@ -44,6 +44,8 @@ final class hook_callbacks {
         persona_home::maybe_redirect_from_my();
         // Employer learners: stock mod/page|url|resource → LaunchPad activity shell.
         activity_portal::maybe_redirect_from_mod();
+        // LaunchPad track certificates: fellows never open Moodle customcert directly.
+        track_certificate::maybe_gate_customcert_view();
         // Fellowship signup: replace stock "email sent" / confirm notices.
         registration::maybe_redirect_stock_signup_notices();
         // Forgot password placeholders.

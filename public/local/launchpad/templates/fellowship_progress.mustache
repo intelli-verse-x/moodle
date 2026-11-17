@@ -194,13 +194,27 @@
           </div>
         </div>
       </div>
+      {{#certificate_locked}}
       <div class="lp-cert locked">
         <span class="lp-cert-lock" aria-hidden="true">
           <iconify-icon icon="hugeicons:square-lock-02" width="34" height="34"></iconify-icon>
         </span>
         <b>{{strings.cert_title}}</b>
-        <small>{{strings.cert_na}}</small>
+        <small>{{cert_na_label}}</small>
       </div>
+      {{/certificate_locked}}
+      {{#certificate_ready}}
+      <div class="lp-cert ready">
+        <span class="lp-cert-lock" aria-hidden="true">
+          <iconify-icon icon="hugeicons:certificate-01" width="34" height="34"></iconify-icon>
+        </span>
+        <b>{{strings.cert_title}}</b>
+        <small>{{cert_ready_label}}</small>
+        {{#cert_has_download}}
+          <a class="lp-btn lp-btn-solid" href="{{cert_download_url}}">{{cert_download_label}}</a>
+        {{/cert_has_download}}
+      </div>
+      {{/certificate_ready}}
       <div class="lp-mascot">
         {{#prof_url}}
           <img src="{{prof_url}}" alt="" width="90" height="90" decoding="async">

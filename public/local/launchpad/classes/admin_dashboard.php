@@ -1698,6 +1698,8 @@ final class admin_dashboard {
             'rubric_save_label' => get_string('admin_rubric_save', 'local_launchpad'),
             'rubric_criteria' => [],
             'rubric_weight_sum' => 0,
+            // Certificate panel defaults (tracks only — filled below).
+            'show_cert_panel' => false,
         ];
 
         if (!$isorientation) {
@@ -1718,6 +1720,7 @@ final class admin_dashboard {
             }
             $ctx['rubric_criteria'] = $rubricrows;
             $ctx['rubric_weight_sum'] = $wsum;
+            $ctx = array_merge($ctx, track_certificate::panel_context($trackid, $opsurl('settings')));
         }
 
         // Keep the user's draft after a failed save (validate → error → reload).
@@ -3062,6 +3065,38 @@ final class admin_dashboard {
             return $fail((string) $result['error']);
         }
         return ['ok' => (string) ($result['ok'] ?? get_string('admin_rubric_ok_saved', 'local_launchpad'))];
+    }
+
+    /**
+     * Attach the single customcert for a track (Course ops Certificate panel).
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function attach_track_certificate(\stdClass $user, int $trackid): array {
+        $course = self::resolve_courseops_course($trackid);
+        if ($course === null || (int) $course->id !== $trackid) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        if (self::is_orientation_idnumber((string) ($course->idnumber ?? ''))) {
+            return ['error' => get_string('admin_cert_err_orientation', 'local_launchpad')];
+        }
+        return track_certificate::attach($user, $trackid);
+    }
+
+    /**
+     * Detach (issue-safe) the track customcert association.
+     *
+     * @return array{ok:string}|array{error:string}
+     */
+    public static function detach_track_certificate(\stdClass $user, int $trackid): array {
+        $course = self::resolve_courseops_course($trackid);
+        if ($course === null || (int) $course->id !== $trackid) {
+            return ['error' => get_string('admin_courseops_err_track', 'local_launchpad')];
+        }
+        if (self::is_orientation_idnumber((string) ($course->idnumber ?? ''))) {
+            return ['error' => get_string('admin_cert_err_orientation', 'local_launchpad')];
+        }
+        return track_certificate::detach($user, $trackid);
     }
 
     /**
