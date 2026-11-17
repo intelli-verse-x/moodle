@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin portal — Overview, Tracks, Structure, Builder, Calendar, Announcements, Cohorts, People, Mentors, Reviews.
+ * Admin portal — Overview, Tracks, Builder, Calendar, Announcements, Cohorts, People, Employer staff, Mentors, Reviews.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -47,11 +47,15 @@ portal_gate::assert_or_redirect_home(
 $view = optional_param('view', 'home', PARAM_ALPHA);
 $allowedviews = [
     'home', 'tracks', 'structure', 'courseops', 'builder', 'manage', 'activity', 'calendar',
-    'announcements', 'cohorts', 'people', 'mentors', 'reviews',
+    'announcements', 'cohorts', 'people', 'employer', 'mentors', 'reviews',
     'notifications', 'notificationprefs',
 ];
 if (!in_array($view, $allowedviews, true)) {
     $view = 'home';
+}
+// Former Manage tracks page — bookmarks land on Tracks & courses.
+if ($view === 'structure' && !data_submitted()) {
+    redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']));
 }
 
 $ntab = optional_param('ntab', 'all', PARAM_ALPHA);
@@ -95,7 +99,7 @@ if (!in_array($courseopssection, ['hub', 'settings', 'participants', 'grades', '
 }
 
 $peopletab = optional_param('tab', 'all', PARAM_ALPHA);
-if (!in_array($peopletab, ['all', 'fellow', 'mentor', 'admin'], true)) {
+if (!in_array($peopletab, ['all', 'fellow', 'mentor', 'employee', 'admin'], true)) {
     $peopletab = 'all';
 }
 
@@ -109,7 +113,7 @@ if (!empty($SESSION->lp_admin_flash) && is_array($SESSION->lp_admin_flash)) {
     unset($SESSION->lp_admin_flash);
 }
 
-if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view === 'manage'
+if (($view === 'cohorts' || $view === 'mentors' || $view === 'employer' || $view === 'builder' || $view === 'manage'
             || $view === 'activity' || $view === 'announcements' || $view === 'reviews'
             || $view === 'courseops' || $view === 'structure' || $view === 'tracks')
         && data_submitted() && confirm_sesskey()) {
@@ -118,14 +122,14 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
         $flash = admin_dashboard::run_structure_preview($USER, $cohort);
         $SESSION->lp_admin_flash = $flash;
-        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']));
     }
     if ($view === 'structure' && $action === 'structure_apply') {
         $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
         $confirmed = (bool) optional_param('structure_confirm', 0, PARAM_BOOL);
         $flash = admin_dashboard::run_structure_apply($USER, $cohort, $confirmed);
         $SESSION->lp_admin_flash = $flash;
-        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']));
     }
     if (($view === 'structure' || $view === 'tracks')
             && ($action === 'structure_hide' || $action === 'structure_unhide')) {
@@ -138,15 +142,15 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $cohort
         );
         $SESSION->lp_admin_flash = $flash;
-        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => $view]));
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']));
     }
-    if ($view === 'structure' && $action === 'structure_delete') {
+    if (($view === 'structure' || $view === 'tracks') && $action === 'structure_delete') {
         $cohort = optional_param('cohort', 'Pilot', PARAM_TEXT);
         $courseid = optional_param('courseid', 0, PARAM_INT);
         $confirmtext = optional_param('confirmtext', '', PARAM_TEXT);
         $flash = admin_dashboard::run_structure_delete($USER, $courseid, $confirmtext, $cohort);
         $SESSION->lp_admin_flash = $flash;
-        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']));
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']));
     }
     if ($view === 'courseops' && $action === 'save_course_settings') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
@@ -168,6 +172,29 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
             $enablecompletion,
             $summary
         );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'settings',
+        ]));
+    }
+    if ($view === 'courseops' && $action === 'save_track_rubric') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $labels = optional_param_array('rubric_label', [], PARAM_TEXT);
+        $weights = optional_param_array('rubric_weight', [], PARAM_INT);
+        $descriptors = optional_param_array('rubric_descriptor', [], PARAM_TEXT);
+        $keys = optional_param_array('rubric_key', [], PARAM_ALPHANUMEXT);
+        $criteria = [];
+        for ($i = 0; $i < 4; $i++) {
+            $criteria[] = [
+                'key' => (string) ($keys[$i] ?? ('c' . ($i + 1))),
+                'label' => (string) ($labels[$i] ?? ''),
+                'weight' => (int) ($weights[$i] ?? 0),
+                'descriptor' => (string) ($descriptors[$i] ?? ''),
+            ];
+        }
+        $flash = admin_dashboard::save_courseops_rubric($USER, $trackid, $criteria);
         $SESSION->lp_admin_flash = $flash;
         redirect(new moodle_url(persona_home::ADMIN_PATH, [
             'view' => 'courseops',
@@ -326,6 +353,36 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'builder' || $view 
         $email = optional_param('email', '', PARAM_RAW_TRIMMED);
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $flash = admin_dashboard::assign_mentor_by_email($USER, $email, $trackid);
+    } else if ($view === 'employer' && $action === 'create_employee') {
+        $flash = admin_dashboard::create_employer_staff(
+            $USER,
+            optional_param('firstname', '', PARAM_TEXT),
+            optional_param('lastname', '', PARAM_TEXT),
+            optional_param('email', '', PARAM_RAW_TRIMMED),
+            optional_param('username', '', PARAM_RAW_TRIMMED)
+        );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']));
+    } else if ($view === 'employer' && $action === 'revoke_employee') {
+        $flash = admin_dashboard::revoke_employer_staff($USER, optional_param('userid', 0, PARAM_INT));
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']));
+    } else if ($view === 'employer' && $action === 'enrol_employee') {
+        $flash = admin_dashboard::enrol_employer_staff_to_course(
+            $USER,
+            optional_param('userid', 0, PARAM_INT),
+            optional_param('trackid', 0, PARAM_INT)
+        );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']));
+    } else if ($view === 'employer' && $action === 'unenrol_employee') {
+        $flash = admin_dashboard::unenrol_employer_staff_from_course(
+            $USER,
+            optional_param('userid', 0, PARAM_INT),
+            optional_param('trackid', 0, PARAM_INT)
+        );
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']));
     } else if (($view === 'builder' || $view === 'manage') && $action === 'mark_reviewed') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $cmid = optional_param('cmid', 0, PARAM_INT);
@@ -502,13 +559,13 @@ $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->ou
 $profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
 $homeurl = (new moodle_url(persona_home::ADMIN_PATH))->out(false);
 $tracksurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
-$structureurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
 $builderurl = (new moodle_url(persona_home::ADMIN_PATH, array_filter([
     'view' => 'builder',
     'trackid' => $trackid > 0 ? $trackid : null,
 ])))->out(false);
 $cohortsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
 $peopleurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'people']))->out(false);
+$employerurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']))->out(false);
 $mentorsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
 $reviewsurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'reviews']))->out(false);
 $calendarurl = (new moodle_url(persona_home::ADMIN_PATH, ['view' => 'calendar']))->out(false);
@@ -539,19 +596,10 @@ $nav = [
             [
                 'label' => get_string('admin_nav_tracks', 'local_launchpad'),
                 'url' => $tracksurl,
-                'current' => ($view === 'tracks' || $view === 'courseops'),
+                'current' => ($view === 'tracks' || $view === 'courseops' || $view === 'structure'),
                 'key' => 'tracks',
                 'icon_svg' => $icon(
                     '<path d="M4 6h16M4 12h10M4 18h14"/>'
-                ),
-            ],
-            [
-                'label' => get_string('admin_nav_structure', 'local_launchpad'),
-                'url' => $structureurl,
-                'current' => $view === 'structure',
-                'key' => 'structure',
-                'icon_svg' => $icon(
-                    '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>'
                 ),
             ],
             [
@@ -614,6 +662,17 @@ $nav = [
                 ),
             ],
             [
+                'label' => get_string('admin_nav_employer', 'local_launchpad'),
+                'url' => $employerurl,
+                'current' => $view === 'employer',
+                'key' => 'employer',
+                'icon_svg' => $icon(
+                    '<path d="M3 21h18"/>'
+                    . '<path d="M5 21V7l7-4 7 4v14"/>'
+                    . '<path d="M9 21v-6h6v6"/>'
+                ),
+            ],
+            [
                 'label' => get_string('admin_nav_mentors', 'local_launchpad'),
                 'url' => $mentorsurl,
                 'current' => $view === 'mentors',
@@ -637,17 +696,12 @@ $nav = [
     ],
 ];
 
-if ($view === 'tracks') {
+if ($view === 'tracks' || $view === 'structure') {
+    // structure GET already redirected; POST fall-through still renders tracks.
     $pagetitle = get_string('admin_nav_tracks', 'local_launchpad');
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_tracks',
         admin_dashboard::tracks_context($USER, $flash)
-    );
-} else if ($view === 'structure') {
-    $pagetitle = get_string('admin_nav_structure', 'local_launchpad');
-    $content = $OUTPUT->render_from_template(
-        'local_launchpad/admin_structure',
-        admin_dashboard::structure_context($USER, $flash)
     );
 } else if ($view === 'courseops') {
     $pagetitle = get_string('admin_courseops_heading', 'local_launchpad');
@@ -751,6 +805,12 @@ if ($view === 'tracks') {
     $content = $OUTPUT->render_from_template(
         'local_launchpad/admin_people',
         admin_dashboard::people_context($USER, $peopletab)
+    );
+} else if ($view === 'employer') {
+    $pagetitle = get_string('admin_nav_employer', 'local_launchpad');
+    $content = $OUTPUT->render_from_template(
+        'local_launchpad/admin_employer_staff',
+        admin_dashboard::employer_staff_context($USER, $flash)
     );
 } else if ($view === 'mentors') {
     $pagetitle = get_string('admin_nav_mentors', 'local_launchpad');

@@ -4218,7 +4218,7 @@ final class fellowship_dashboard {
                     }
                 }
 
-                $rubricrows = mentor_dashboard::rubric_breakdown_rows($rubricparts);
+                $rubricrows = mentor_dashboard::rubric_breakdown_rows($rubricparts, (int) $course->id);
 
                 $attempt = $latest ? ((int) $latest->attemptnumber + 1) : 0;
                 $submittedat = 0;

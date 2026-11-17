@@ -1,8 +1,8 @@
 {{!
     @template local_launchpad/admin_tracks
 
-    Admin Tracks & courses — Stitch-inspired layout.
-    Navbar stays in admin_shell. Live track cards only (no reorder/sync/search/archive chrome).
+    Admin Tracks & courses — clean dashboard (Stitch-inspired, LP theme).
+    Navbar stays in admin_shell. Live data only (no fake sync/docs chrome).
 }}
 <div class="lp-tr" data-region="local-launchpad-admin-tracks" data-lp-tracks-page>
 
@@ -23,18 +23,24 @@
         </div>
         <div class="lp-tr-hero-stat">
           <span class="lp-tr-hero-stat-label">{{stat_ready_label}}</span>
-          <b>{{stat_ready_value}}</b>
-          <span class="lp-tr-hero-stat-sub is-ok">{{stat_ready_sub}}</span>
+          <div class="lp-tr-hero-stat-line">
+            <b>{{stat_ready_value}}</b>
+            <span class="lp-tr-hero-stat-sub is-ok">{{stat_ready_sub}}</span>
+          </div>
         </div>
         <div class="lp-tr-hero-stat">
           <span class="lp-tr-hero-stat-label">{{stat_outline_label}}</span>
-          <b>{{stat_outline_value}}</b>
-          <span class="lp-tr-hero-stat-sub is-warn">{{stat_outline_sub}}</span>
+          <div class="lp-tr-hero-stat-line">
+            <b>{{stat_outline_value}}</b>
+            <span class="lp-tr-hero-stat-sub is-warn">{{stat_outline_sub}}</span>
+          </div>
         </div>
         <div class="lp-tr-hero-stat">
           <span class="lp-tr-hero-stat-label">{{stat_fellows_label}}</span>
-          <b>{{stat_fellows_value}}</b>
-          <span class="lp-tr-hero-stat-sub">{{stat_fellows_sub}}</span>
+          <div class="lp-tr-hero-stat-line">
+            <b>{{stat_fellows_value}}</b>
+            <span class="lp-tr-hero-stat-sub">{{stat_fellows_sub}}</span>
+          </div>
         </div>
       </aside>
     </div>
@@ -56,7 +62,7 @@
           <p class="lp-muted lp-sm">{{orientation_help}}</p>
         </div>
       </div>
-      <div class="lp-tr-grid">
+      <div class="lp-tr-orient-grid">
         {{#orientation_courses}}
           <article class="lp-tr-card lp-tr-orient-card{{^is_visible}} is-hidden-course{{/is_visible}}" data-lp-tr-orient-card>
             <div class="lp-tr-card-top">
@@ -70,33 +76,35 @@
                 {{#shortname}}<code class="lp-tr-idn">{{shortname}}</code>{{/shortname}}
               </div>
             </div>
-            <div class="lp-tr-meta">
+            <div class="lp-tr-meta lp-tr-meta-single">
               <div class="lp-tr-meta-row">
                 <span class="lp-tr-section-label">{{enrolled_section_label}}</span>
                 <span class="lp-tr-meta-value{{#fellows_count}} is-enrolled{{/fellows_count}}">{{fellows_label}}</span>
               </div>
             </div>
             <div class="lp-tr-card-foot">
-              {{#is_visible}}
-                <form method="post" action="{{form_action}}" class="lp-inline-form">
-                  <input type="hidden" name="sesskey" value="{{sesskey}}">
-                  <input type="hidden" name="action" value="structure_hide">
-                  <input type="hidden" name="cohort" value="{{cohort_value}}">
-                  <input type="hidden" name="courseid" value="{{id}}">
-                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
-                </form>
-              {{/is_visible}}
-              {{#is_hidden}}
-                <form method="post" action="{{form_action}}" class="lp-inline-form">
-                  <input type="hidden" name="sesskey" value="{{sesskey}}">
-                  <input type="hidden" name="action" value="structure_unhide">
-                  <input type="hidden" name="cohort" value="{{cohort_value}}">
-                  <input type="hidden" name="courseid" value="{{id}}">
-                  <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_label}}</button>
-                </form>
-              {{/is_hidden}}
-              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{courseops_url}}">{{courseops_label}}</a>
-              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}">{{open_label}}</a>
+              <div class="lp-tr-card-actions">
+                {{#is_visible}}
+                  <form method="post" action="{{form_action}}" class="lp-inline-form">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="structure_hide">
+                    <input type="hidden" name="cohort" value="{{cohort_value}}">
+                    <input type="hidden" name="courseid" value="{{id}}">
+                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{hide_label}}</button>
+                  </form>
+                {{/is_visible}}
+                {{#is_hidden}}
+                  <form method="post" action="{{form_action}}" class="lp-inline-form">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="structure_unhide">
+                    <input type="hidden" name="cohort" value="{{cohort_value}}">
+                    <input type="hidden" name="courseid" value="{{id}}">
+                    <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{show_label}}</button>
+                  </form>
+                {{/is_hidden}}
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{courseops_url}}">{{courseops_label}}</a>
+              </div>
+              <a class="lp-tr-preview-link" href="{{course_url}}">{{open_label}}</a>
             </div>
           </article>
         {{/orientation_courses}}
@@ -148,7 +156,7 @@
               </div>
             </div>
 
-            <div class="lp-tr-meta">
+            <div class="lp-tr-meta lp-tr-meta-grid">
               <div class="lp-tr-meta-row">
                 <span class="lp-tr-section-label">{{mentors_section_label}}</span>
                 {{#has_teacher}}
@@ -165,9 +173,11 @@
             </div>
 
             <div class="lp-tr-card-foot">
-              <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{courseops_url}}">{{courseops_label}}</a>
-              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
-              <a class="lp-btn lp-btn-light lp-btn-sm" href="{{course_url}}">{{open_label}}</a>
+              <div class="lp-tr-card-actions">
+                <a class="lp-btn lp-btn-solid lp-btn-sm" href="{{courseops_url}}">{{courseops_label}}</a>
+                <a class="lp-btn lp-btn-light lp-btn-sm" href="{{builder_url}}">{{builder_label}}</a>
+              </div>
+              <a class="lp-tr-preview-link" href="{{course_url}}">{{open_label}}</a>
             </div>
           </article>
         {{/tracks}}
@@ -187,6 +197,67 @@
       {{> local_launchpad/admin_empty}}
     </div>
   {{/has_tracks}}
+
+  {{#has_danger}}
+    <section class="lp-tr-danger" aria-label="{{danger_title}}">
+      <div class="lp-tr-danger-head">
+        <h3><span class="lp-tr-danger-dot" aria-hidden="true"></span>{{danger_title}}</h3>
+        <p class="lp-muted lp-sm">{{danger_lead}}</p>
+      </div>
+      <div class="lp-st-danger-list">
+        {{#danger_rows}}
+          <article class="lp-st-danger-row{{#is_hidden}} is-delete-ready{{/is_hidden}}">
+            <div class="lp-st-danger-meta">
+              <p class="lp-st-danger-name"><b>{{fullname}}</b>
+                <span class="lp-muted lp-sm"> · {{kind_label}}</span>
+              </p>
+              <p class="lp-st-danger-meta-line lp-sm lp-muted">
+                <code class="lp-tr-idn">{{idnumber}}</code>
+                <span class="lp-st-danger-sep" aria-hidden="true">·</span>
+                <span>{{enrol_count_label}}</span>
+                <span class="lp-st-danger-sep" aria-hidden="true">·</span>
+                <span class="lp-st-vis{{#is_visible}} is-on{{/is_visible}}{{^is_visible}} is-off{{/is_visible}}">{{visibility_label}}</span>
+              </p>
+            </div>
+            <div class="lp-st-danger-actions">
+              {{#is_visible}}
+                <p class="lp-sm lp-muted lp-tr-danger-hint">{{danger_delete_need_hide}}</p>
+                <form method="post" action="{{form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_hide">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{courseid}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{danger_hide_label}}</button>
+                </form>
+              {{/is_visible}}
+              {{#is_hidden}}
+                <form method="post" action="{{form_action}}" class="lp-inline-form">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_unhide">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{courseid}}">
+                  <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{danger_unhide_label}}</button>
+                </form>
+                <form method="post" action="{{form_action}}" class="lp-st-danger-delete">
+                  <input type="hidden" name="sesskey" value="{{sesskey}}">
+                  <input type="hidden" name="action" value="structure_delete">
+                  <input type="hidden" name="cohort" value="{{cohort_value}}">
+                  <input type="hidden" name="courseid" value="{{courseid}}">
+                  <p class="lp-sm lp-st-danger-warn">{{danger_delete_warn}}</p>
+                  <label class="lp-field">
+                    <span>{{danger_confirm_label}}</span>
+                    <input type="text" name="confirmtext" value="" required maxlength="200" autocomplete="off" placeholder="{{idnumber}}">
+                  </label>
+                  <p class="lp-sm lp-muted">{{danger_confirm_help}}</p>
+                  <button type="submit" class="lp-btn lp-btn-sm lp-btn-danger-solid">{{danger_delete_label}}</button>
+                </form>
+              {{/is_hidden}}
+            </div>
+          </article>
+        {{/danger_rows}}
+      </div>
+    </section>
+  {{/has_danger}}
 
   <aside class="lp-tr-footer-tip" aria-label="{{footer_tip}}">
     <span class="lp-tr-footer-ico" aria-hidden="true">

@@ -46,5 +46,43 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026102814, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111602) {
+        // Reveal LaunchPad category folders for Moodle course management without
+        // restoring course.visible (fellows stay gated by Show to fellows).
+        \local_launchpad\admin_dashboard::reveal_launchpad_categories_for_management();
+        upgrade_plugin_savepoint(true, 2026111602, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111603) {
+        // Seed per-track mentor rubric packs for existing lp-* track courses.
+        \local_launchpad\track_rubric::backfill_missing_packs();
+        upgrade_plugin_savepoint(true, 2026111603, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111604) {
+        // Manage tracks merged into Tracks & courses (nav + Danger zone UI only).
+        upgrade_plugin_savepoint(true, 2026111604, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111605) {
+        // Tracks & courses clean dashboard UI polish (template/CSS only).
+        upgrade_plugin_savepoint(true, 2026111605, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111606) {
+        // E8/E9 honesty: assign upload-fail blocks save/submit; clearer flashes; submit confirm.
+        upgrade_plugin_savepoint(true, 2026111606, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111607) {
+        // Employer staff admin Phase 1: create/list/revoke + persona exclusivity.
+        upgrade_plugin_savepoint(true, 2026111607, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111608) {
+        // Mentor in-shell profile/password; Employer staff Phase 2 course enrol/unenrol.
+        upgrade_plugin_savepoint(true, 2026111608, 'local', 'launchpad');
+    }
+
     return true;
 }

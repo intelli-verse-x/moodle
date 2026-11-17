@@ -526,7 +526,7 @@
                 {{#assign_prefilled}}
                   <p class="lp-sm lp-assign-prefill-note">{{assign_prefilled_label}}</p>
                 {{/assign_prefilled}}
-                <form method="post" action="{{assign_form_action}}" enctype="multipart/form-data" class="lp-assign-submit-form" data-region="assign-submit">
+                <form method="post" action="{{assign_form_action}}" enctype="multipart/form-data" class="lp-assign-submit-form" data-region="assign-submit" data-confirm-submit="{{strings.assignconfirmsubmit}}">
                   <input type="hidden" name="sesskey" value="{{assign_sesskey}}">
                   <input type="hidden" name="action" value="assign_process">
                   <input type="hidden" name="cmid" value="{{assign_cmid}}">
@@ -554,7 +554,7 @@
                   {{/assign_require_statement}}
                   <div class="lp-quiz-attempt-actions">
                     <button type="submit" name="assign_save" value="1" class="lp-btn lp-btn-light">{{strings.assignsavedraft}}</button>
-                    <button type="submit" name="assign_submit" value="1" class="lp-btn lp-btn-solid">{{strings.assignsubmit}}</button>
+                    <button type="submit" name="assign_submit" value="1" class="lp-btn lp-btn-solid" data-lp-assign-submit>{{strings.assignsubmit}}</button>
                   </div>
                 </form>
               </section>

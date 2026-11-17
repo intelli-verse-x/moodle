@@ -261,6 +261,7 @@ final class admin_dashboard {
         }
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
+        $dangerrows = self::structure_all_rows();
 
         return array_merge([
             'firstname' => $firstname,
@@ -303,12 +304,24 @@ final class admin_dashboard {
             'filter_ready_label' => get_string('admin_tracks_filter_ready', 'local_launchpad', $readycount),
             'filter_outline_label' => get_string('admin_tracks_filter_outline', 'local_launchpad', $outlinecount),
             'filter_empty' => get_string('admin_tracks_filter_empty', 'local_launchpad'),
-            // Builder CTA tile (authors inside existing tracks — Structure owns create/sync).
+            // Builder CTA tile (authors inside existing tracks — create new tracks in Course builder).
             'builder_tile_title' => get_string('admin_tracks_builder_tile_title', 'local_launchpad'),
             'builder_tile_body' => get_string('admin_tracks_builder_tile_body', 'local_launchpad'),
             'builder_tile_cta' => get_string('admin_tracks_builder_tile_cta', 'local_launchpad'),
             'builder_url' => $builderurl,
             'footer_tip' => get_string('admin_tracks_footer_tip', 'local_launchpad'),
+            // Danger zone (hide / type-confirm delete) — formerly Manage tracks.
+            'has_danger' => $dangerrows !== [],
+            'danger_rows' => $dangerrows,
+            'danger_title' => get_string('admin_structure_danger_title', 'local_launchpad'),
+            'danger_lead' => get_string('admin_structure_danger_lead', 'local_launchpad'),
+            'danger_hide_label' => get_string('admin_structure_danger_hide', 'local_launchpad'),
+            'danger_unhide_label' => get_string('admin_structure_danger_unhide', 'local_launchpad'),
+            'danger_delete_label' => get_string('admin_structure_danger_delete', 'local_launchpad'),
+            'danger_delete_warn' => get_string('admin_structure_danger_delete_warn', 'local_launchpad'),
+            'danger_delete_need_hide' => get_string('admin_structure_danger_need_hide', 'local_launchpad'),
+            'danger_confirm_label' => get_string('admin_structure_danger_confirm_label', 'local_launchpad'),
+            'danger_confirm_help' => get_string('admin_structure_danger_confirm_help', 'local_launchpad'),
         ], self::empty_state(
             'admin_tracks_empty',
             'admin_empty_title_no_tracks',
@@ -369,7 +382,7 @@ final class admin_dashboard {
     public static function structure_context(\stdClass $user, array $flash = []): array {
         unset($user);
 
-        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
         $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
         $existing = self::structure_all_rows();
@@ -615,7 +628,9 @@ final class admin_dashboard {
                     'name' => $trackname,
                     'idnumber' => $catidnumber,
                     'parent' => (int) $root->id,
-                    'visible' => 0,
+                    // Categories stay visible so Moodle course management lists them;
+                    // fellows are gated by course.visible (Show to fellows), not category hide.
+                    'visible' => 1,
                     'description' => 'LaunchPad track category — created from Course builder.',
                     'descriptionformat' => FORMAT_PLAIN,
                 ]);
@@ -673,6 +688,9 @@ final class admin_dashboard {
                     $plugin->add_instance($course);
                 }
             }
+
+            // Seed per-track mentor rubric pack (AI / Full Stack / … or shared default).
+            track_rubric::ensure_course_pack((int) $course->id, $trackname);
 
             // One Shared orientation per cohort — create if missing (shared by all tracks).
             $orient = self::ensure_shared_orientation($actor, $cohort);
@@ -1009,17 +1027,53 @@ final class admin_dashboard {
 
         $root = self::fellowship_root_category();
         if ($root) {
-            return $root;
+            // Repair older installs that created LaunchPad folders hidden.
+            self::reveal_launchpad_categories_for_management();
+            $root = self::fellowship_root_category();
+            if ($root) {
+                return $root;
+            }
         }
         $created = \core_course_category::create((object) [
             'name' => blueprint::ROOT_CATEGORY,
             'idnumber' => blueprint::ROOT_IDNUMBER,
             'parent' => 0,
-            'visible' => 0,
+            // Visible to site admins in course management; courses start hidden.
+            'visible' => 1,
             'description' => 'LaunchPad root — created from Course builder.',
             'descriptionformat' => FORMAT_PLAIN,
         ]);
         return $DB->get_record('course_categories', ['id' => $created->id], '*', MUST_EXIST);
+    }
+
+    /**
+     * Show LaunchPad category folders in Moodle course management without changing
+     * course.visible (do not use core_course_category::show() — it restores courses
+     * from visibleold and can unhide tracks still withheld from fellows).
+     *
+     * @return int Number of categories updated.
+     */
+    public static function reveal_launchpad_categories_for_management(): int {
+        global $DB;
+
+        $ids = $DB->get_fieldset_select(
+            'course_categories',
+            'id',
+            "idnumber LIKE ? AND visible = 0",
+            ['launchpad-%']
+        );
+        if ($ids === [] || $ids === false) {
+            return 0;
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal(array_map('intval', $ids));
+        $DB->execute(
+            "UPDATE {course_categories} SET visible = 1, visibleold = 1 WHERE id {$insql}",
+            $params
+        );
+        \cache_helper::purge_by_event('changesincoursecat');
+
+        return count($ids);
     }
 
     /**
@@ -1195,10 +1249,8 @@ final class admin_dashboard {
         }
 
         try {
-            update_course((object) [
-                'id' => $courseid,
-                'visible' => $want,
-            ]);
+            // Sets visible + visibleold together so a later category show cannot undo this.
+            course_change_visibility($courseid, $visible);
         } catch (\Throwable $e) {
             return $out(null, self::flash_error_message($e));
         }
@@ -1367,7 +1419,7 @@ final class admin_dashboard {
         $tracks = self::list_track_courses();
         $orients = self::list_orientation_courses();
         if ($tracks === [] && $orients === []) {
-            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
+            $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
             return array_merge([
                 'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
                 'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
@@ -1388,14 +1440,14 @@ final class admin_dashboard {
             ], self::empty_state(
                 'admin_tracks_empty',
                 'admin_empty_title_no_tracks',
-                $structureurl,
-                'admin_empty_cta_structure'
+                $builderurl,
+                'admin_empty_cta_create_track'
             ));
         }
 
         $selected = self::resolve_courseops_course($trackid);
         if ($selected === null) {
-            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
+            $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
             return array_merge([
                 'eyebrow' => get_string('admin_courseops_eyebrow', 'local_launchpad'),
                 'heading' => get_string('admin_courseops_heading', 'local_launchpad'),
@@ -1416,8 +1468,8 @@ final class admin_dashboard {
             ], self::empty_state(
                 'admin_tracks_empty',
                 'admin_empty_title_no_tracks',
-                $structureurl,
-                'admin_empty_cta_structure'
+                $builderurl,
+                'admin_empty_cta_create_track'
             ));
         }
         $trackid = (int) $selected->id;
@@ -1634,7 +1686,39 @@ final class admin_dashboard {
             'advanced_url' => (new \moodle_url('/course/edit.php', ['id' => $trackid]))->out(false),
             'advanced_label' => get_string('admin_courseops_settings_advanced', 'local_launchpad'),
             'advanced_help' => get_string('admin_courseops_settings_advanced_help', 'local_launchpad'),
+            // Per-track rubric editor (tracks only — orientation skips).
+            'show_rubric_editor' => !$isorientation,
+            'rubric_title' => get_string('admin_rubric_title', 'local_launchpad'),
+            'rubric_lead' => get_string('admin_rubric_lead', 'local_launchpad'),
+            'rubric_form_action' => $opsurl('settings'),
+            'rubric_label_col' => get_string('admin_rubric_col_label', 'local_launchpad'),
+            'rubric_weight_col' => get_string('admin_rubric_col_weight', 'local_launchpad'),
+            'rubric_desc_col' => get_string('admin_rubric_col_descriptor', 'local_launchpad'),
+            'rubric_sum_label' => get_string('admin_rubric_sum_label', 'local_launchpad'),
+            'rubric_save_label' => get_string('admin_rubric_save', 'local_launchpad'),
+            'rubric_criteria' => [],
+            'rubric_weight_sum' => 0,
         ];
+
+        if (!$isorientation) {
+            $pack = track_rubric::get_course_pack($trackid);
+            $rubricrows = [];
+            $wsum = 0;
+            foreach ($pack['criteria'] as $i => $crit) {
+                $w = (int) $crit['weight'];
+                $wsum += $w;
+                $rubricrows[] = [
+                    'index' => $i,
+                    'n' => $i + 1,
+                    'key' => (string) $crit['key'],
+                    'label' => (string) $crit['label'],
+                    'weight' => $w,
+                    'descriptor' => (string) ($crit['descriptor'] ?? ''),
+                ];
+            }
+            $ctx['rubric_criteria'] = $rubricrows;
+            $ctx['rubric_weight_sum'] = $wsum;
+        }
 
         // Keep the user's draft after a failed save (validate → error → reload).
         $posted = $flash['posted'] ?? null;
@@ -1659,6 +1743,30 @@ final class admin_dashboard {
             }
             if (array_key_exists('summary', $posted)) {
                 $ctx['summary_value'] = (string) $posted['summary'];
+            }
+            if (!empty($posted['rubric_criteria']) && is_array($posted['rubric_criteria'])) {
+                $draftrows = [];
+                $draftsum = 0;
+                foreach ($posted['rubric_criteria'] as $i => $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $w = (int) ($row['weight'] ?? 0);
+                    $draftsum += $w;
+                    $draftrows[] = [
+                        'index' => $i,
+                        'n' => ((int) $i) + 1,
+                        'key' => (string) ($row['key'] ?? ('c' . ($i + 1))),
+                        'label' => (string) ($row['label'] ?? ''),
+                        'weight' => $w,
+                        'descriptor' => (string) ($row['descriptor'] ?? ''),
+                    ];
+                }
+                if (count($draftrows) === 4) {
+                    $ctx['show_rubric_editor'] = true;
+                    $ctx['rubric_criteria'] = $draftrows;
+                    $ctx['rubric_weight_sum'] = $draftsum;
+                }
             }
         }
 
@@ -2902,7 +3010,6 @@ final class admin_dashboard {
             'id' => $trackid,
             'fullname' => $fullname,
             'shortname' => $shortname,
-            'visible' => $wantvisible,
             'startdate' => $startdate,
             'enddate' => $enddate,
             'enablecompletion' => $completion,
@@ -2912,11 +3019,49 @@ final class admin_dashboard {
 
         try {
             update_course($data);
+            if ($wantvisible !== (int) $full->visible) {
+                course_change_visibility($trackid, $wantvisible === 1);
+            } else if ((int) ($full->visibleold ?? -1) !== $wantvisible) {
+                // Keep visibleold aligned so category restore cannot flip fellows visibility.
+                $DB->set_field('course', 'visibleold', $wantvisible, ['id' => $trackid]);
+            }
         } catch (\Throwable $e) {
             return $fail(self::flash_error_message($e));
         }
 
         return ['ok' => get_string('admin_courseops_settings_ok', 'local_launchpad')];
+    }
+
+    /**
+     * Save the 4-criterion mentor rubric pack for a LaunchPad track (not orientation).
+     *
+     * @param list<array{key?:string,label?:string,weight?:int|string,descriptor?:string}> $criteria
+     * @return array{ok?:string,error?:string,posted?:array}
+     */
+    public static function save_courseops_rubric(\stdClass $user, int $trackid, array $criteria): array {
+        $posted = ['rubric_criteria' => $criteria];
+        $fail = static function (string $error) use ($posted): array {
+            return ['error' => $error, 'posted' => $posted];
+        };
+
+        $course = self::resolve_courseops_course($trackid);
+        if ($course === null || (int) $course->id !== $trackid) {
+            return $fail(get_string('admin_courseops_err_track', 'local_launchpad'));
+        }
+        if (self::is_orientation_idnumber((string) ($course->idnumber ?? ''))) {
+            return $fail(get_string('admin_rubric_err_orientation', 'local_launchpad'));
+        }
+
+        $modcontext = \context_course::instance($trackid);
+        if (!has_capability('moodle/course:update', $modcontext, $user)) {
+            return $fail(get_string('admin_courseops_err_cap', 'local_launchpad'));
+        }
+
+        $result = track_rubric::save_course_pack($trackid, $criteria);
+        if (!empty($result['error'])) {
+            return $fail((string) $result['error']);
+        }
+        return ['ok' => (string) ($result['ok'] ?? get_string('admin_rubric_ok_saved', 'local_launchpad'))];
     }
 
     /**
@@ -3324,7 +3469,6 @@ final class admin_dashboard {
             $trackid = (int) $course->id;
         }
         if ($course === null) {
-            $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
             $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
             return array_merge([
                 'has_course' => false,
@@ -3337,8 +3481,8 @@ final class admin_dashboard {
             ], self::empty_state(
                 'admin_builder_empty',
                 'admin_empty_title_no_tracks',
-                $structureurl,
-                'admin_empty_cta_structure'
+                $builderurl,
+                'admin_empty_cta_create_track'
             ));
         }
 
@@ -5396,15 +5540,15 @@ final class admin_dashboard {
     }
 
     /**
-     * People directory (HTML people) — fellows, mentors, admins from live Moodle.
+     * People directory (HTML people) — fellows, mentors, employees, admins from live Moodle.
      *
      * @param \stdClass $user
-     * @param string $tab all|fellow|mentor|admin
+     * @param string $tab all|fellow|mentor|employee|admin
      * @return array<string, mixed>
      */
     public static function people_context(\stdClass $user, string $tab = 'all'): array {
         $tab = strtolower(trim($tab));
-        if (!in_array($tab, ['all', 'fellow', 'mentor', 'admin'], true)) {
+        if (!in_array($tab, ['all', 'fellow', 'mentor', 'employee', 'admin'], true)) {
             $tab = 'all';
         }
 
@@ -5413,6 +5557,7 @@ final class admin_dashboard {
             'all' => count($all),
             'fellow' => 0,
             'mentor' => 0,
+            'employee' => 0,
             'admin' => 0,
         ];
         foreach ($all as $row) {
@@ -5421,7 +5566,7 @@ final class admin_dashboard {
 
         // Always render the full list; client filters tabs without a reload.
         $tabs = [];
-        foreach (['all', 'fellow', 'mentor', 'admin'] as $key) {
+        foreach (['all', 'fellow', 'mentor', 'employee', 'admin'] as $key) {
             $tabs[] = [
                 'key' => $key,
                 'label' => get_string('admin_people_tab_' . $key, 'local_launchpad'),
@@ -5436,6 +5581,7 @@ final class admin_dashboard {
 
         $cohortsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'cohorts']))->out(false);
         $mentorsurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
+        $employerurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']))->out(false);
 
         // Resolve lang with English fallback — never ship Moodle's [[missing]] markers to the UI.
         $pstr = static function (string $key, string $fallback): string {
@@ -5470,6 +5616,13 @@ final class admin_dashboard {
                 'body' => $pstr('admin_people_empty_mentor', 'No mentors assigned to LaunchPad tracks yet.'),
                 'cta_url' => $mentorsurl,
                 'cta_label' => $pstr('admin_empty_cta_mentors', 'Assign a mentor'),
+                'has_cta' => true,
+            ],
+            'employee' => [
+                'title' => $pstr('admin_people_empty_title_employee', 'No employer staff here'),
+                'body' => $pstr('admin_people_empty_employee', 'No Employer staff in the lp-employee cohort yet.'),
+                'cta_url' => $employerurl,
+                'cta_label' => $pstr('admin_empty_cta_employer', 'Create Employer staff'),
                 'has_cta' => true,
             ],
             'admin' => [
@@ -5516,6 +5669,11 @@ final class admin_dashboard {
             'empty_tab_mentor_cta_url' => $emptybytab['mentor']['cta_url'],
             'empty_tab_mentor_cta_label' => $emptybytab['mentor']['cta_label'],
             'empty_tab_mentor_has_cta' => $emptybytab['mentor']['has_cta'] ? '1' : '0',
+            'empty_tab_employee_title' => $emptybytab['employee']['title'],
+            'empty_tab_employee_body' => $emptybytab['employee']['body'],
+            'empty_tab_employee_cta_url' => $emptybytab['employee']['cta_url'],
+            'empty_tab_employee_cta_label' => $emptybytab['employee']['cta_label'],
+            'empty_tab_employee_has_cta' => $emptybytab['employee']['has_cta'] ? '1' : '0',
             'empty_tab_admin_title' => $emptybytab['admin']['title'],
             'empty_tab_admin_body' => $emptybytab['admin']['body'],
             'empty_tab_admin_cta_url' => $emptybytab['admin']['cta_url'],
@@ -5525,13 +5683,14 @@ final class admin_dashboard {
     }
 
     /**
-     * People rows: one row per user×role (fellow / mentor / admin).
+     * People rows: one row per user×role (fellow / mentor / employee / admin).
      *
      * @return list<array<string, mixed>>
      */
     public static function list_people_rows(): array {
         $fellows = self::list_track_people_by_archetype(['student'], true);
         $mentors = self::list_track_people_by_archetype(['teacher', 'editingteacher'], false);
+        $employees = self::list_employee_people();
         $admins = self::list_admin_people();
 
         $rows = [];
@@ -5540,6 +5699,9 @@ final class admin_dashboard {
         }
         foreach ($mentors as $row) {
             $rows[] = self::people_row_context($row, 'mentor');
+        }
+        foreach ($employees as $row) {
+            $rows[] = self::people_row_context($row, 'employee');
         }
         foreach ($admins as $row) {
             $rows[] = self::people_row_context($row, 'admin');
@@ -5632,6 +5794,35 @@ final class admin_dashboard {
     }
 
     /**
+     * Employer cohort members for the People directory.
+     *
+     * @return list<array{user:\stdClass,courses:list<string>}>
+     */
+    public static function list_employee_people(): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/cohort/lib.php');
+
+        $cohortid = account_provision::ensure_employee_cohort();
+        $reach = get_string('admin_people_reach_employee', 'local_launchpad');
+        $sql = "SELECT u.*
+                  FROM {cohort_members} cm
+                  JOIN {user} u ON u.id = cm.userid
+                 WHERE cm.cohortid = :cid
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC";
+        $users = $DB->get_records_sql($sql, ['cid' => $cohortid]);
+        $out = [];
+        foreach ($users as $u) {
+            $out[] = [
+                'user' => $u,
+                'courses' => [$reach],
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Site admins for the People directory.
      *
      * @return list<array{user:\stdClass,courses:list<string>}>
@@ -5660,7 +5851,7 @@ final class admin_dashboard {
      * One People table row.
      *
      * @param array{user:\stdClass,courses:list<string>} $row
-     * @param string $rolekey fellow|mentor|admin
+     * @param string $rolekey fellow|mentor|employee|admin
      * @return array<string, mixed>
      */
     public static function people_row_context(array $row, string $rolekey): array {
@@ -5668,11 +5859,13 @@ final class admin_dashboard {
         $courses = $row['courses'];
         $tone = match ($rolekey) {
             'mentor' => 'green',
+            'employee' => 'amber',
             'admin' => 'navy',
             default => 'blue',
         };
         $chip = match ($rolekey) {
             'mentor' => 'ok',
+            'employee' => 'line',
             'admin' => 'line',
             default => '',
         };
@@ -6486,7 +6679,7 @@ final class admin_dashboard {
         $maxfellows = account_provision::pilot_max_fellows_per_track();
         $seats = $trackcount * $maxmentors;
         $builderurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'builder']))->out(false);
-        $structureurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'structure']))->out(false);
+        $tracksurl = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'tracks']))->out(false);
         $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'mentors']))->out(false);
         return array_merge([
             'eyebrow' => get_string('admin_mentors_eyebrow', 'local_launchpad'),
@@ -6541,8 +6734,8 @@ final class admin_dashboard {
         ], self::empty_state(
             'admin_mentors_empty',
             'admin_empty_title_no_tracks',
-            $structureurl,
-            'admin_empty_cta_structure'
+            $tracksurl,
+            'admin_nav_tracks'
         ));
     }
 
@@ -6740,6 +6933,342 @@ final class admin_dashboard {
         $key = $result['status'] === 'already_enrolled'
             ? 'admin_mentors_ok_already'
             : 'admin_mentors_ok_assigned';
+        return [
+            'ok' => get_string($key, 'local_launchpad', (object) [
+                'name' => fullname($user),
+                'track' => format_string($course->fullname),
+            ]),
+        ];
+    }
+
+    /**
+     * Employer staff page — create creds + list/revoke lp-employee cohort (Phase 1).
+     *
+     * @param array{ok?:string,error?:string,password_once?:string,username_once?:string} $flash
+     * @return array<string, mixed>
+     */
+    public static function employer_staff_context(\stdClass $user, array $flash = []): array {
+        unset($user);
+        $staff = self::list_employer_staff_rows();
+        $trackoptions = self::employer_track_options();
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']))->out(false);
+
+        $flashok = '';
+        $flasherr = '';
+        $passwordonce = '';
+        $usernameonce = '';
+        if (!empty($flash['ok'])) {
+            $flashok = (string) $flash['ok'];
+        }
+        if (!empty($flash['error'])) {
+            $flasherr = (string) $flash['error'];
+        }
+        if (!empty($flash['password_once'])) {
+            $passwordonce = (string) $flash['password_once'];
+        }
+        if (!empty($flash['username_once'])) {
+            $usernameonce = (string) $flash['username_once'];
+        }
+
+        return [
+            'eyebrow' => get_string('admin_employer_eyebrow', 'local_launchpad'),
+            'heading' => get_string('admin_employer_heading', 'local_launchpad'),
+            'lead' => get_string('admin_employer_lead', 'local_launchpad'),
+            'note_body' => get_string('admin_employer_note', 'local_launchpad'),
+            'form_action' => $formaction,
+            'sesskey' => sesskey(),
+            'form_title' => get_string('admin_employer_form_title', 'local_launchpad'),
+            'form_lead' => get_string('admin_employer_form_lead', 'local_launchpad'),
+            'firstname_label' => get_string('admin_employer_firstname', 'local_launchpad'),
+            'lastname_label' => get_string('admin_employer_lastname', 'local_launchpad'),
+            'email_label' => get_string('admin_employer_email', 'local_launchpad'),
+            'username_label' => get_string('admin_employer_username', 'local_launchpad'),
+            'username_help' => get_string('admin_employer_username_help', 'local_launchpad'),
+            'submit_label' => get_string('admin_employer_submit', 'local_launchpad'),
+            'list_title' => get_string('admin_employer_list_title', 'local_launchpad'),
+            'list_lead' => get_string('admin_employer_list_lead', 'local_launchpad'),
+            'col_name' => get_string('admin_people_col_name', 'local_launchpad'),
+            'col_email' => get_string('admin_people_col_email', 'local_launchpad'),
+            'col_username' => get_string('admin_employer_col_username', 'local_launchpad'),
+            'col_created' => get_string('admin_employer_col_created', 'local_launchpad'),
+            'col_actions' => get_string('admin_employer_col_actions', 'local_launchpad'),
+            'col_courses' => get_string('admin_employer_courses_label', 'local_launchpad'),
+            'revoke_label' => get_string('admin_employer_revoke', 'local_launchpad'),
+            'revoke_confirm' => get_string('admin_employer_revoke_confirm', 'local_launchpad'),
+            'enrol_label' => get_string('admin_employer_enrol_label', 'local_launchpad'),
+            'enrol_submit' => get_string('admin_employer_enrol_submit', 'local_launchpad'),
+            'enrol_pick' => get_string('admin_employer_pick_track', 'local_launchpad'),
+            'unenrol_label' => get_string('admin_employer_unenrol', 'local_launchpad'),
+            'unenrol_confirm' => get_string('admin_employer_unenrol_confirm', 'local_launchpad'),
+            'courses_none' => get_string('admin_employer_courses_none', 'local_launchpad'),
+            'track_options' => $trackoptions,
+            'has_track_options' => $trackoptions !== [],
+            'staff' => $staff,
+            'has_staff' => $staff !== [],
+            'empty_title' => get_string('admin_employer_empty_title', 'local_launchpad'),
+            'empty_body' => get_string('admin_employer_empty_body', 'local_launchpad'),
+            'flash_ok' => $flashok !== '',
+            'flash_ok_body' => $flashok,
+            'flash_err' => $flasherr !== '',
+            'flash_err_body' => $flasherr,
+            'has_password_once' => $passwordonce !== '' && $usernameonce !== '',
+            'password_once' => $passwordonce,
+            'username_once' => $usernameonce,
+            'password_once_title' => get_string('admin_employer_password_once_title', 'local_launchpad'),
+            'password_once_body' => get_string('admin_employer_password_once_body', 'local_launchpad'),
+            'username_once_label' => get_string('admin_employer_username_once_label', 'local_launchpad'),
+            'password_once_label' => get_string('admin_employer_password_once_label', 'local_launchpad'),
+            'login_tip' => get_string('admin_employer_login_tip', 'local_launchpad'),
+            'phase2_note' => get_string('admin_employer_phase2_note', 'local_launchpad'),
+        ];
+    }
+
+    /**
+     * Track options for Employer staff enrol picker (lp-* tracks only).
+     *
+     * @return list<array{id:int,name:string}>
+     */
+    public static function employer_track_options(): array {
+        $out = [];
+        foreach (self::list_track_courses() as $course) {
+            $out[] = [
+                'id' => (int) $course->id,
+                'name' => format_string($course->fullname),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Members of the lp-employee cohort for Employer staff list (+ course seats).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function list_employer_staff_rows(): array {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/cohort/lib.php');
+        require_once($CFG->libdir . '/enrollib.php');
+
+        $cohortid = account_provision::ensure_employee_cohort();
+        $sql = "SELECT u.id, u.username, u.email, u.firstname, u.lastname, u.firstnamephonetic,
+                       u.lastnamephonetic, u.middlename, u.alternatename, u.timecreated,
+                       cm.timeadded
+                  FROM {cohort_members} cm
+                  JOIN {user} u ON u.id = cm.userid
+                 WHERE cm.cohortid = :cid
+                   AND u.deleted = 0
+              ORDER BY u.lastname ASC, u.firstname ASC, u.id ASC";
+        $users = $DB->get_records_sql($sql, ['cid' => $cohortid]);
+        $rows = [];
+        $formaction = (new \moodle_url(persona_home::ADMIN_PATH, ['view' => 'employer']))->out(false);
+        $tracks = self::list_track_courses();
+        foreach ($users as $u) {
+            $createdts = (int) ($u->timeadded ?: $u->timecreated);
+            $courses = [];
+            foreach (enrol_get_users_courses((int) $u->id, true) as $c) {
+                // Show lp-* seats only (tracks + orientation if present).
+                if (!account_provision::is_launchpad_idnumber((string) ($c->idnumber ?? ''))) {
+                    continue;
+                }
+                $courses[] = [
+                    'id' => (int) $c->id,
+                    'name' => format_string($c->fullname),
+                    'form_action' => $formaction,
+                    'sesskey' => sesskey(),
+                    'userid' => (int) $u->id,
+                ];
+            }
+            $enrolledids = array_map(static fn($row) => (int) $row['id'], $courses);
+            $enroloptions = [];
+            foreach ($tracks as $t) {
+                $tid = (int) $t->id;
+                if (in_array($tid, $enrolledids, true)) {
+                    continue;
+                }
+                $enroloptions[] = [
+                    'id' => $tid,
+                    'name' => format_string($t->fullname),
+                ];
+            }
+            $rows[] = [
+                'id' => (int) $u->id,
+                'name' => fullname($u),
+                'email' => s($u->email ?? ''),
+                'username' => s($u->username ?? ''),
+                'initials' => fellowship_dashboard::initials($u),
+                'created' => $createdts > 0
+                    ? userdate($createdts, get_string('strftimedatetimeshort', 'langconfig'))
+                    : '—',
+                'form_action' => $formaction,
+                'sesskey' => sesskey(),
+                'courses' => $courses,
+                'has_courses' => $courses !== [],
+                'enrol_options' => $enroloptions,
+                'has_enrol_options' => $enroloptions !== [],
+            ];
+        }
+        return $rows;
+    }
+
+    /**
+     * Create Employer staff account + lp-employee cohort (password shown once).
+     *
+     * @return array{ok?:string,error?:string,password_once?:string,username_once?:string}
+     */
+    public static function create_employer_staff(
+        \stdClass $actor,
+        string $firstname,
+        string $lastname,
+        string $email,
+        string $username = ''
+    ): array {
+        $firstname = trim($firstname);
+        $lastname = trim($lastname);
+        $email = trim($email);
+        $username = \core_text::strtolower(trim($username));
+
+        if ($firstname === '' || $lastname === '' || $email === '') {
+            return ['error' => get_string('admin_employer_err_required', 'local_launchpad')];
+        }
+        if (strpos($email, '@') === false || !validate_email($email)) {
+            return ['error' => get_string('admin_employer_err_email', 'local_launchpad')];
+        }
+        if ($username === '') {
+            $local = preg_replace('/[^a-z0-9._-]/', '', \core_text::strtolower((string) strstr($email, '@', true)));
+            $username = $local !== '' ? $local : 'employee' . time();
+        }
+
+        try {
+            $created = account_provision::create_manual_user($actor, [
+                'username' => $username,
+                'email' => $email,
+                'firstname' => $firstname,
+                'lastname' => $lastname,
+            ]);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        if (($created['status'] ?? '') === 'exists') {
+            return ['error' => get_string('admin_employer_err_username_taken', 'local_launchpad', s($username))];
+        }
+
+        $userid = (int) ($created['userid'] ?? 0);
+        $plain = (string) ($created['password'] ?? '');
+        if ($userid <= 0 || $plain === '') {
+            return ['error' => get_string('admin_err_generic', 'local_launchpad')];
+        }
+
+        // Do not set auth_forcepasswordchange — that sends staff to stock Moodle
+        // change-password. Optional rotate lives in Employer Profile → Preferences.
+        unset_user_preference('auth_forcepasswordchange', $userid);
+        unset_user_preference('create_password', $userid);
+
+        try {
+            account_provision::grant_employee($actor, $userid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $user = account_provision::require_user($userid);
+        return [
+            'ok' => get_string('admin_employer_ok_created', 'local_launchpad', (object) [
+                'name' => fullname($user),
+                'username' => $user->username,
+            ]),
+            'password_once' => $plain,
+            'username_once' => (string) $user->username,
+        ];
+    }
+
+    /**
+     * Revoke Employer portal access (cohort only).
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function revoke_employer_staff(\stdClass $actor, int $userid): array {
+        if ($userid <= 0) {
+            return ['error' => get_string('admin_employer_err_user', 'local_launchpad')];
+        }
+        try {
+            $user = account_provision::require_user($userid);
+            $result = account_provision::revoke_employee($actor, $userid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+
+        $key = ($result['status'] ?? '') === 'not_member'
+            ? 'admin_employer_ok_revoke_already'
+            : 'admin_employer_ok_revoked';
+        return [
+            'ok' => get_string($key, 'local_launchpad', fullname($user)),
+        ];
+    }
+
+    /**
+     * Enrol Employer staff on a LaunchPad track (Phase 2).
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function enrol_employer_staff_to_course(
+        \stdClass $actor,
+        int $userid,
+        int $trackcourseid
+    ): array {
+        if ($userid <= 0) {
+            return ['error' => get_string('admin_employer_err_user', 'local_launchpad')];
+        }
+        if ($trackcourseid <= 0) {
+            return ['error' => get_string('admin_employer_err_track', 'local_launchpad')];
+        }
+        try {
+            $user = account_provision::require_user($userid);
+            $course = account_provision::require_launchpad_course($trackcourseid);
+            if (!self::is_track_idnumber((string) $course->idnumber)) {
+                return ['error' => get_string('admin_employer_err_track', 'local_launchpad')];
+            }
+            $result = account_provision::enrol_employee_to_course($actor, $userid, $trackcourseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+        $key = ($result['status'] ?? '') === 'already_enrolled'
+            ? 'admin_employer_ok_enrol_already'
+            : 'admin_employer_ok_enrolled';
+        return [
+            'ok' => get_string($key, 'local_launchpad', (object) [
+                'name' => fullname($user),
+                'track' => format_string($course->fullname),
+            ]),
+        ];
+    }
+
+    /**
+     * Unenrol Employer staff from a LaunchPad course seat (Phase 2).
+     *
+     * @return array{ok?:string,error?:string}
+     */
+    public static function unenrol_employer_staff_from_course(
+        \stdClass $actor,
+        int $userid,
+        int $courseid
+    ): array {
+        if ($userid <= 0) {
+            return ['error' => get_string('admin_employer_err_user', 'local_launchpad')];
+        }
+        if ($courseid <= 0) {
+            return ['error' => get_string('admin_employer_err_track', 'local_launchpad')];
+        }
+        try {
+            $user = account_provision::require_user($userid);
+            $course = account_provision::require_launchpad_course($courseid);
+            $result = account_provision::unenrol_employee_from_course($actor, $userid, $courseid);
+        } catch (account_provision_exception $e) {
+            return ['error' => self::flash_error_message($e)];
+        }
+        $key = ($result['status'] ?? '') === 'not_enrolled'
+            ? 'admin_employer_ok_unenrol_already'
+            : 'admin_employer_ok_unenrolled';
         return [
             'ok' => get_string($key, 'local_launchpad', (object) [
                 'name' => fullname($user),

@@ -32,6 +32,7 @@ require_once(__DIR__ . '/classes/calendar_service.php');
 
 use local_launchpad\account_persona;
 use local_launchpad\employer_dashboard;
+use local_launchpad\employer_tools;
 use local_launchpad\fellowship_dashboard;
 use local_launchpad\login_portal;
 use local_launchpad\mentor_dashboard;
@@ -48,12 +49,80 @@ portal_gate::assert_or_redirect_home(
 );
 
 $view = optional_param('view', 'home', PARAM_ALPHA);
+$allowedviews = [
+    'home', 'queue', 'review', 'fellows', 'fellow', 'calendar', 'messages',
+    'notifications', 'notificationprefs', 'profile',
+];
+if (!in_array($view, $allowedviews, true)) {
+    $view = 'home';
+}
 $filter = optional_param('filter', 'waiting', PARAM_ALPHA);
 $cmid = optional_param('id', 0, PARAM_INT);
 $fellowid = optional_param('userid', 0, PARAM_INT);
 $courseid = optional_param('course', 0, PARAM_INT);
 $saved = optional_param('saved', '', PARAM_ALPHA);
 $err = optional_param('err', '', PARAM_ALPHANUMEXT);
+$ptab = optional_param('ptab', 'overview', PARAM_ALPHA);
+if (!in_array($ptab, ['overview', 'edit', 'preferences'], true)) {
+    $ptab = 'overview';
+}
+$profilesaved = optional_param('profilesaved', 0, PARAM_INT);
+$profileerr = optional_param('profileerr', '', PARAM_ALPHAEXT);
+$prefsaved = optional_param('prefsaved', 0, PARAM_INT);
+$preferr = optional_param('preferr', '', PARAM_ALPHAEXT);
+$pref = optional_param('pref', '', PARAM_ALPHAEXT);
+$allowedprefs = [
+    'password', 'language', 'editor', 'forum', 'calendar', 'messages', 'notifications',
+    'edit', 'public', 'files', 'contentbank', 'tokens',
+];
+if ($pref !== '' && !in_array($pref, $allowedprefs, true)) {
+    $pref = '';
+}
+if ($view !== 'profile') {
+    $ptab = 'overview';
+    $pref = '';
+}
+if ($ptab !== 'preferences') {
+    $pref = '';
+}
+
+// Save profile / preference inside Mentor shell (same Moodle engine as Employer/Fellow).
+if (data_submitted() && confirm_sesskey()) {
+    $postaction = optional_param('action', '', PARAM_ALPHAEXT);
+    if ($postaction === 'update_profile') {
+        $perr = employer_tools::save_profile($USER, employer_tools::profile_post_payload());
+        if ($perr !== '') {
+            redirect(new moodle_url(persona_home::MENTOR_PATH, [
+                'view' => 'profile',
+                'ptab' => 'edit',
+                'profileerr' => $perr,
+            ]));
+        }
+        redirect(new moodle_url(persona_home::MENTOR_PATH, [
+            'view' => 'profile',
+            'ptab' => 'overview',
+            'profilesaved' => 1,
+        ]));
+    }
+    if ($postaction === 'update_preference') {
+        $prefkey = optional_param('pref', '', PARAM_ALPHAEXT);
+        $perr = employer_tools::save_preference($USER, $prefkey, employer_tools::preference_post_payload($prefkey));
+        if ($perr !== '') {
+            redirect(new moodle_url(persona_home::MENTOR_PATH, array_filter([
+                'view' => 'profile',
+                'ptab' => 'preferences',
+                'pref' => $prefkey !== '' ? $prefkey : null,
+                'preferr' => $perr,
+            ])));
+        }
+        redirect(new moodle_url(persona_home::MENTOR_PATH, array_filter([
+            'view' => 'profile',
+            'ptab' => 'preferences',
+            'pref' => $prefkey !== '' ? $prefkey : null,
+            'prefsaved' => 1,
+        ])));
+    }
+}
 $messageconvid = 0;
 $messagetab = 'all';
 if ($view === 'messages') {
@@ -181,6 +250,8 @@ $PAGE->set_url(new moodle_url(persona_home::MENTOR_PATH, array_filter([
     'id' => ($view === 'review' && $cmid > 0) ? $cmid : null,
     'userid' => (($view === 'review' || $view === 'fellow') && $fellowid > 0) ? $fellowid : null,
     'course' => ($view === 'fellow' && $courseid > 0) ? $courseid : null,
+    'ptab' => ($view === 'profile' && $ptab !== 'overview') ? $ptab : null,
+    'pref' => ($view === 'profile' && $ptab === 'preferences' && $pref !== '') ? $pref : null,
 ])));
 $PAGE->set_pagelayout('embedded');
 $PAGE->set_title(get_string('mentor_area_title', 'local_launchpad'));
@@ -191,7 +262,11 @@ $assetv = (string) (get_config('local_launchpad', 'version') ?: '1');
 $cssurl = $pluginbase . '/styles_fellowship.css?v=' . rawurlencode($assetv);
 $jsurl = $pluginbase . '/fellowship.js?v=' . rawurlencode($assetv);
 $logouturl = (new moodle_url('/login/logout.php', ['sesskey' => sesskey()]))->out(false);
-$profileurl = (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false);
+$profileurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'profile']))->out(false);
+$preferencesurl = (new moodle_url(persona_home::MENTOR_PATH, [
+    'view' => 'profile',
+    'ptab' => 'preferences',
+]))->out(false);
 $homeurl = (new moodle_url(persona_home::MENTOR_PATH))->out(false);
 $queueurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'queue']))->out(false);
 $fellowsurl = (new moodle_url(persona_home::MENTOR_PATH, ['view' => 'fellows']))->out(false);
@@ -348,6 +423,47 @@ switch ($view) {
         );
         break;
 
+    case 'profile':
+        $pagetitle = get_string('mentor_nav_profile', 'local_launchpad');
+        $profilectx = employer_tools::profile_page(
+            $USER,
+            [
+                'moodle_profile' => (new moodle_url('/user/profile.php', ['id' => $userid]))->out(false),
+                'moodle_profile_edit' => (new moodle_url('/user/edit.php', [
+                    'id' => $userid,
+                    'returnto' => 'profile',
+                ]))->out(false),
+                'preferences' => (new moodle_url('/user/preferences.php'))->out(false),
+            ],
+            $ptab,
+            $profilesaved > 0,
+            $profileerr,
+            persona_home::MENTOR_PATH,
+            persona_home::MENTOR_PATH,
+            $pref,
+            $prefsaved > 0,
+            $preferr,
+            true
+        );
+        $profilestrings = employer_tools::profile_strings();
+        $profilestrings['profile_intro'] = get_string('mentor_profile_intro', 'local_launchpad');
+        $profilestrings['profile_edit_help'] = get_string('mentor_profile_edit_help', 'local_launchpad');
+        $profilestrings['profile_edit_note'] = get_string('mentor_profile_edit_note', 'local_launchpad');
+        $profilestrings['profile_prefs_lead'] = get_string('mentor_profile_prefs_lead', 'local_launchpad');
+        $profilestrings['native_tools_note'] = get_string('mentor_profile_prefs_note', 'local_launchpad');
+        $profilestrings['pref_open_moodle'] = '';
+        $profilestrings['pref_advanced_moodle'] = '';
+        $content = $OUTPUT->render_from_template('local_launchpad/employer_profile', array_merge(
+            $profilectx,
+            [
+                'hide_moodle_escapes' => true,
+                'course_details' => [],
+                'has_course_details' => false,
+                'strings' => $profilestrings,
+            ]
+        ));
+        break;
+
     case 'calendar':
         $pagetitle = get_string('fellowship_nav_calendar', 'local_launchpad');
         $calmode = optional_param('cal', 'month', PARAM_ALPHA);
@@ -383,14 +499,16 @@ switch ($view) {
         $haspostedlevels = true;
         for ($i = 0; $i < 4; $i++) {
             $lv = optional_param('crit_' . $i, -1, PARAM_INT);
-            if ($lv < 0 || $lv > 3) {
+            // Levels are None…Strong (0–4).
+            if ($lv < 0 || $lv > 4) {
                 $haspostedlevels = false;
                 break;
             }
             $postedlevels[] = $lv;
         }
         if ($haspostedlevels) {
-            $rubricui = mentor_dashboard::build_review_rubric_ui($postedlevels);
+            $reviewcourseid = (int) ($reviewdata['course_id'] ?? 0);
+            $rubricui = mentor_dashboard::build_review_rubric_ui($postedlevels, $reviewcourseid);
             $reviewdata['rubric_criteria'] = $rubricui['criteria'];
             $reviewdata['rubric_total'] = $rubricui['total'];
             $reviewdata['grade_pct'] = (string) (int) $rubricui['total'];
@@ -442,6 +560,7 @@ $navcurrentkey = match ($view) {
     'review' => 'queue',
     'fellow' => 'fellows',
     'notificationprefs' => 'notifications',
+    'profile' => 'home',
     default => $view,
 };
 foreach ($nav as &$group) {
@@ -457,7 +576,6 @@ $notificationslabel = messaging::notifications_label($unread);
 $mismatch = portal_gate::consume_modal_context();
 $mentorinitials = fellowship_dashboard::initials($USER);
 $mentoremail = trim((string) ($USER->email ?? ''));
-$preferencesurl = (new moodle_url('/user/preferences.php'))->out(false);
 $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_merge([
     'data_region' => mentor_dashboard::DATA_REGION,
     'displayname' => $displayname,

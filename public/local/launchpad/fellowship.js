@@ -2431,7 +2431,8 @@
 
         function applyTab(tab, pushUrl) {
             var key = tab || 'all';
-            if (key !== 'all' && key !== 'fellow' && key !== 'mentor' && key !== 'admin') {
+            if (key !== 'all' && key !== 'fellow' && key !== 'mentor'
+                    && key !== 'employee' && key !== 'admin') {
                 key = 'all';
             }
             root.setAttribute('data-lp-people-active', key);
@@ -3769,6 +3770,23 @@
             tab.addEventListener('click', function () {
                 applyFilter(tab.getAttribute('data-lp-tr-filter') || 'all');
             });
+        });
+    })();
+
+    /* Assign submit: confirm before submit-for-review (Save draft skips confirm) */
+    (function () {
+        var form = document.querySelector('[data-region="assign-submit"]');
+        if (!form) {
+            return;
+        }
+        form.addEventListener('submit', function (ev) {
+            var submitter = ev.submitter || document.activeElement;
+            if (submitter && submitter.getAttribute('name') === 'assign_submit') {
+                var msg = form.getAttribute('data-confirm-submit') || 'Submit for review?';
+                if (!window.confirm(msg)) {
+                    ev.preventDefault();
+                }
+            }
         });
     })();
 

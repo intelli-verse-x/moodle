@@ -37,8 +37,8 @@ final class mentor_dashboard {
     /** Level index → weight fraction (None / Missing / Partial / Solid / Strong). */
     public const RUBRIC_LEVEL_FRACTIONS = [0.0, 0.4, 0.6, 0.8, 1.0];
 
-    /** Packed [LP-RUBRIC] schema: v2 = five levels with None at index 0. */
-    public const RUBRIC_PAYLOAD_VERSION = 2;
+    /** Packed [LP-RUBRIC] schema: v2 = five levels with None at 0; v3 adds labels+weights. */
+    public const RUBRIC_PAYLOAD_VERSION = 3;
 
     /**
      * Whether this user may open the mentor shell.
@@ -656,8 +656,13 @@ final class mentor_dashboard {
             }
         }
 
+        $courseid = (int) $course->id;
+
         // Prefill: saved rubric levels, else Partial (index 2) on each criterion.
-        $rubricui = self::build_review_rubric_ui($savedlevels !== [] ? $savedlevels : [2, 2, 2, 2]);
+        $rubricui = self::build_review_rubric_ui(
+            $savedlevels !== [] ? $savedlevels : [2, 2, 2, 2],
+            $courseid
+        );
         $gradepct = (string) (int) $rubricui['total'];
 
         $cansubmitreview = ($substatus === 'submitted' || $substatus === 'reopened' || $hasgrade);
@@ -673,6 +678,7 @@ final class mentor_dashboard {
 
         return [
             'cmid' => (int) $cm->id,
+            'course_id' => $courseid,
             'fellow_id' => $fellowid,
             'fellow_name' => fullname($fellow),
             'assign_name' => $cm->get_formatted_name(),
@@ -749,7 +755,7 @@ final class mentor_dashboard {
             $grademax = 100.0;
         }
 
-        $scored = self::score_from_levels($levels);
+        $scored = self::score_from_levels($levels, (int) $course->id);
         if ($scored === null) {
             throw new \moodle_exception('mentor_review_levels_invalid', 'local_launchpad');
         }
@@ -823,33 +829,15 @@ final class mentor_dashboard {
     }
 
     /**
-     * Programme criteria with integer weights (Evidence 30 · Acceptance 25 · Prioritisation 25 · Communication 20).
+     * Criteria for a track course (seeded pack) or the shared default when $courseid is omitted.
      *
-     * @return list<array{key:string,label:string,weight:int}>
+     * @return list<array{key:string,label:string,weight:int,descriptor?:string}>
      */
-    public static function rubric_criteria(): array {
-        return [
-            [
-                'key' => 'evidence',
-                'label' => get_string('mentor_rubric_evidence', 'local_launchpad'),
-                'weight' => 30,
-            ],
-            [
-                'key' => 'acceptance',
-                'label' => get_string('mentor_rubric_acceptance', 'local_launchpad'),
-                'weight' => 25,
-            ],
-            [
-                'key' => 'prioritisation',
-                'label' => get_string('mentor_rubric_prioritisation', 'local_launchpad'),
-                'weight' => 25,
-            ],
-            [
-                'key' => 'communication',
-                'label' => get_string('mentor_rubric_communication', 'local_launchpad'),
-                'weight' => 20,
-            ],
-        ];
+    public static function rubric_criteria(?int $courseid = null): array {
+        if ($courseid !== null && $courseid > 0) {
+            return track_rubric::criteria_for_course($courseid);
+        }
+        return track_rubric::default_pack()['criteria'];
     }
 
     /**
@@ -871,16 +859,18 @@ final class mentor_dashboard {
      * Integer points per criterion + total from level indexes.
      *
      * @param list<int|string> $levels
-     * @return array{levels:list<int>,scores:list<int>,total:int}|null
+     * @return array{levels:list<int>,scores:list<int>,total:int,labels:list<string>,weights:list<int>}|null
      */
-    public static function score_from_levels(array $levels): ?array {
-        $criteria = self::rubric_criteria();
+    public static function score_from_levels(array $levels, ?int $courseid = null): ?array {
+        $criteria = self::rubric_criteria($courseid);
         $maxlvl = count(self::RUBRIC_LEVEL_FRACTIONS) - 1;
         if (count($levels) !== count($criteria)) {
             return null;
         }
         $norm = [];
         $scores = [];
+        $labels = [];
+        $weights = [];
         $total = 0;
         foreach ($criteria as $i => $crit) {
             if (!isset($levels[$i]) || !is_numeric($levels[$i])) {
@@ -890,15 +880,20 @@ final class mentor_dashboard {
             if ($lvl < 0 || $lvl > $maxlvl) {
                 return null;
             }
-            $score = (int) round((int) $crit['weight'] * self::RUBRIC_LEVEL_FRACTIONS[$lvl]);
+            $weight = (int) $crit['weight'];
+            $score = (int) round($weight * self::RUBRIC_LEVEL_FRACTIONS[$lvl]);
             $norm[] = $lvl;
             $scores[] = $score;
+            $labels[] = (string) $crit['label'];
+            $weights[] = $weight;
             $total += $score;
         }
         return [
             'levels' => $norm,
             'scores' => $scores,
             'total' => $total,
+            'labels' => $labels,
+            'weights' => $weights,
         ];
     }
 
@@ -908,16 +903,16 @@ final class mentor_dashboard {
      * @param list<int> $levels
      * @return array{criteria:list<array>,total:int,weights:list<int>}
      */
-    public static function build_review_rubric_ui(array $levels): array {
-        $scored = self::score_from_levels($levels);
+    public static function build_review_rubric_ui(array $levels, ?int $courseid = null): array {
+        $scored = self::score_from_levels($levels, $courseid);
         if ($scored === null) {
             $levels = [2, 2, 2, 2];
-            $scored = self::score_from_levels($levels);
+            $scored = self::score_from_levels($levels, $courseid);
         }
         $labels = self::rubric_level_labels();
         $rows = [];
         $weights = [];
-        foreach (self::rubric_criteria() as $i => $crit) {
+        foreach (self::rubric_criteria($courseid) as $i => $crit) {
             $weights[] = (int) $crit['weight'];
             $levelopts = [];
             foreach ($labels as $li => $lab) {
@@ -929,11 +924,14 @@ final class mentor_dashboard {
                     'crit_index' => $i,
                 ];
             }
+            $descriptor = trim((string) ($crit['descriptor'] ?? ''));
             $rows[] = [
                 'index' => $i,
                 'key' => $crit['key'],
                 'label' => $crit['label'],
                 'weight' => (int) $crit['weight'],
+                'descriptor' => $descriptor,
+                'has_descriptor' => $descriptor !== '',
                 'score' => (int) $scored['scores'][$i],
                 'levels' => $levelopts,
             ];
@@ -948,26 +946,47 @@ final class mentor_dashboard {
     /**
      * Fellow Feedback rows from an unpacked rubric payload.
      *
-     * @param array{has_rubric?:bool,levels?:list<int>,scores?:list<int>,total?:int|null} $parts
+     * Prefer stored v3 labels/weights so historical reviews stay honest after pack edits.
+     *
+     * @param array{
+     *   has_rubric?:bool,
+     *   levels?:list<int>,
+     *   scores?:list<int>,
+     *   total?:int|null,
+     *   labels?:list<string>,
+     *   weights?:list<int>
+     * } $parts
      * @return list<array{label:string,weight:int,level_label:string,score:int,score_max:int}>
      */
-    public static function rubric_breakdown_rows(array $parts): array {
+    public static function rubric_breakdown_rows(array $parts, ?int $courseid = null): array {
         if (empty($parts['has_rubric']) || empty($parts['levels']) || empty($parts['scores'])) {
             return [];
         }
-        $labels = self::rubric_level_labels();
+        $levellabels = self::rubric_level_labels();
+        $storedlabels = (isset($parts['labels']) && is_array($parts['labels']))
+            ? array_values($parts['labels']) : [];
+        $storedweights = (isset($parts['weights']) && is_array($parts['weights']))
+            ? array_values($parts['weights']) : [];
+        $fallback = self::rubric_criteria($courseid);
         $rows = [];
-        foreach (self::rubric_criteria() as $i => $crit) {
+        for ($i = 0; $i < 4; $i++) {
             if (!isset($parts['levels'][$i], $parts['scores'][$i])) {
                 return [];
             }
+            $crit = $fallback[$i] ?? null;
+            $label = isset($storedlabels[$i]) && trim((string) $storedlabels[$i]) !== ''
+                ? (string) $storedlabels[$i]
+                : (string) ($crit['label'] ?? ('Criterion ' . ($i + 1)));
+            $weight = isset($storedweights[$i]) && is_numeric($storedweights[$i])
+                ? (int) $storedweights[$i]
+                : (int) ($crit['weight'] ?? 0);
             $lvl = (int) $parts['levels'][$i];
             $rows[] = [
-                'label' => $crit['label'],
-                'weight' => (int) $crit['weight'],
-                'level_label' => $labels[$lvl] ?? '',
+                'label' => $label,
+                'weight' => $weight,
+                'level_label' => $levellabels[$lvl] ?? '',
                 'score' => (int) $parts['scores'][$i],
-                'score_max' => (int) $crit['weight'],
+                'score_max' => $weight,
             ];
         }
         return $rows;
@@ -976,19 +995,26 @@ final class mentor_dashboard {
     /**
      * Pack rubric JSON + optional Next step + change note into one assignfeedback_comments body.
      *
-     * @param array{levels:list<int>,scores:list<int>,total:int}|null $rubric
+     * @param array{levels:list<int>,scores:list<int>,total:int,labels?:list<string>,weights?:list<int>}|null $rubric
      */
     public static function pack_review_comment(string $comment, string $nextstep = '', ?array $rubric = null): string {
         $comment = trim($comment);
         $nextstep = trim(preg_replace("/[\r\n]+/", ' ', $nextstep) ?? '');
         $chunks = [];
         if ($rubric !== null && isset($rubric['levels'], $rubric['scores'], $rubric['total'])) {
-            $payload = json_encode([
+            $body = [
                 'v' => self::RUBRIC_PAYLOAD_VERSION,
                 'levels' => array_values(array_map('intval', $rubric['levels'])),
                 'scores' => array_values(array_map('intval', $rubric['scores'])),
                 'total' => (int) $rubric['total'],
-            ], JSON_UNESCAPED_SLASHES);
+            ];
+            if (!empty($rubric['labels']) && is_array($rubric['labels'])) {
+                $body['labels'] = array_values(array_map('strval', $rubric['labels']));
+            }
+            if (!empty($rubric['weights']) && is_array($rubric['weights'])) {
+                $body['weights'] = array_values(array_map('intval', $rubric['weights']));
+            }
+            $payload = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if ($payload !== false) {
                 $chunks[] = self::RUBRIC_MARKER . $payload;
             }
@@ -1011,7 +1037,9 @@ final class mentor_dashboard {
      *   has_rubric: bool,
      *   levels: list<int>,
      *   scores: list<int>,
-     *   total: int|null
+     *   total: int|null,
+     *   labels: list<string>,
+     *   weights: list<int>
      * }
      */
     public static function unpack_review_comment(string $raw): array {
@@ -1022,6 +1050,8 @@ final class mentor_dashboard {
             'levels' => [],
             'scores' => [],
             'total' => null,
+            'labels' => [],
+            'weights' => [],
         ];
         $raw = trim($raw);
         if ($raw === '') {
@@ -1055,12 +1085,21 @@ final class mentor_dashboard {
             $out['levels'] = $rubric['levels'];
             $out['scores'] = $rubric['scores'];
             $out['total'] = $rubric['total'];
+            $out['labels'] = $rubric['labels'];
+            $out['weights'] = $rubric['weights'];
         }
         return $out;
     }
 
     /**
-     * @return array{levels:list<int>,scores:list<int>,total:int,rest:string}|null
+     * @return array{
+     *   levels:list<int>,
+     *   scores:list<int>,
+     *   total:int,
+     *   labels:list<string>,
+     *   weights:list<int>,
+     *   rest:string
+     * }|null
      */
     private static function extract_rubric_payload(string $text): ?array {
         $text = ltrim($text);
@@ -1127,10 +1166,24 @@ final class mentor_dashboard {
                 return min(4, $lvl + 1);
             }, $levels);
         }
+        $packedlabels = [];
+        if (!empty($decoded['labels']) && is_array($decoded['labels'])) {
+            foreach (array_values($decoded['labels']) as $lab) {
+                $packedlabels[] = (string) $lab;
+            }
+        }
+        $packedweights = [];
+        if (!empty($decoded['weights']) && is_array($decoded['weights'])) {
+            foreach (array_values($decoded['weights']) as $w) {
+                $packedweights[] = (int) $w;
+            }
+        }
         return [
             'levels' => $levels,
             'scores' => array_map('intval', array_values($scores)),
             'total' => (int) $total,
+            'labels' => $packedlabels,
+            'weights' => $packedweights,
             'rest' => trim(substr($after, $end + 1)),
         ];
     }

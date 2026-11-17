@@ -1,0 +1,168 @@
+{{!
+    @template local_launchpad/admin_employer_staff
+
+    Admin Employer staff — create exclusive employee accounts, list, revoke cohort access.
+}}
+<div class="lp-employer" data-region="local-launchpad-admin-employer">
+
+  <section class="lp-hero">
+    <div class="lp-hero-row">
+      <div class="lp-hero-main">
+        <span class="lp-eyebrow">{{eyebrow}}</span>
+        <h2>{{heading}}</h2>
+        <p class="lp-hero-lead">{{lead}}</p>
+      </div>
+    </div>
+  </section>
+
+  {{#flash_ok}}
+    <div class="lp-flash is-ok" role="status">{{flash_ok_body}}</div>
+  {{/flash_ok}}
+  {{#flash_err}}
+    <div class="lp-flash is-err" role="alert">{{flash_err_body}}</div>
+  {{/flash_err}}
+
+  {{#has_password_once}}
+    <section class="lp-card lift lp-employer-password-once" role="status">
+      <h3>{{password_once_title}}</h3>
+      <p class="lp-sm">{{password_once_body}}</p>
+      <dl class="lp-employer-creds">
+        <div>
+          <dt>{{username_once_label}}</dt>
+          <dd><code data-lp-copy>{{username_once}}</code></dd>
+        </div>
+        <div>
+          <dt>{{password_once_label}}</dt>
+          <dd><code data-lp-copy>{{password_once}}</code></dd>
+        </div>
+      </dl>
+      <p class="lp-xs lp-muted">{{login_tip}}</p>
+    </section>
+  {{/has_password_once}}
+
+  <section class="lp-card lift">
+    <p class="lp-sm">{{note_body}}</p>
+    <p class="lp-xs lp-muted">{{phase2_note}}</p>
+  </section>
+
+  <section class="lp-card lift">
+    <h3>{{form_title}}</h3>
+    <p class="lp-muted lp-sm">{{form_lead}}</p>
+    <form method="post" action="{{form_action}}" class="lp-stack" style="margin-top:12px">
+      <input type="hidden" name="sesskey" value="{{sesskey}}">
+      <input type="hidden" name="action" value="create_employee">
+      <div class="lp-pilot-fields">
+        <label class="lp-field">
+          <span>{{firstname_label}}</span>
+          <input type="text" name="firstname" required maxlength="100" autocomplete="off">
+        </label>
+        <label class="lp-field">
+          <span>{{lastname_label}}</span>
+          <input type="text" name="lastname" required maxlength="100" autocomplete="off">
+        </label>
+        <label class="lp-field">
+          <span>{{email_label}}</span>
+          <input type="email" name="email" required maxlength="100" autocomplete="off">
+        </label>
+        <label class="lp-field">
+          <span>{{username_label}}</span>
+          <input type="text" name="username" maxlength="100" autocomplete="off">
+          <span class="lp-xs lp-muted">{{username_help}}</span>
+        </label>
+      </div>
+      <div class="lp-mc-pilot-actions">
+        <button type="submit" class="lp-btn lp-btn-solid">{{submit_label}}</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="lp-card lift" style="margin-top:16px">
+    <h3>{{list_title}}</h3>
+    <p class="lp-muted lp-sm">{{list_lead}}</p>
+    {{#has_staff}}
+      <div class="lp-table-wrap" style="margin-top:12px">
+        <table class="lp-table">
+          <thead>
+            <tr>
+              <th>{{col_name}}</th>
+              <th>{{col_email}}</th>
+              <th>{{col_username}}</th>
+              <th>{{col_courses}}</th>
+              <th>{{col_actions}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#staff}}
+              <tr>
+                <td>
+                  <div class="lp-people-name">
+                    <span class="lp-av lp-av-sm tone-amber" aria-hidden="true">{{initials}}</span>
+                    <div>
+                      <b>{{name}}</b>
+                      <div class="lp-xs lp-muted">{{created}}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="lp-sm">{{email}}</td>
+                <td class="lp-sm"><code>{{username}}</code></td>
+                <td class="lp-sm">
+                  {{#has_courses}}
+                    <ul class="lp-employer-course-list">
+                      {{#courses}}
+                        <li>
+                          <span>{{name}}</span>
+                          <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{unenrol_confirm}}">
+                            <input type="hidden" name="sesskey" value="{{sesskey}}">
+                            <input type="hidden" name="action" value="unenrol_employee">
+                            <input type="hidden" name="userid" value="{{userid}}">
+                            <input type="hidden" name="trackid" value="{{id}}">
+                            <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{unenrol_label}}</button>
+                          </form>
+                        </li>
+                      {{/courses}}
+                    </ul>
+                  {{/has_courses}}
+                  {{^has_courses}}
+                    <span class="lp-muted">{{courses_none}}</span>
+                  {{/has_courses}}
+                  {{#has_enrol_options}}
+                    <form method="post" action="{{form_action}}" class="lp-employer-enrol-form" style="margin-top:8px">
+                      <input type="hidden" name="sesskey" value="{{sesskey}}">
+                      <input type="hidden" name="action" value="enrol_employee">
+                      <input type="hidden" name="userid" value="{{id}}">
+                      <label class="lp-field lp-field-inline">
+                        <span class="lp-xs">{{enrol_label}}</span>
+                        <select name="trackid" required>
+                          <option value="">{{enrol_pick}}</option>
+                          {{#enrol_options}}
+                            <option value="{{id}}">{{name}}</option>
+                          {{/enrol_options}}
+                        </select>
+                      </label>
+                      <button type="submit" class="lp-btn lp-btn-solid lp-btn-sm">{{enrol_submit}}</button>
+                    </form>
+                  {{/has_enrol_options}}
+                </td>
+                <td>
+                  <form method="post" action="{{form_action}}" class="lp-inline-form" data-lp-delete-confirm="{{revoke_confirm}}">
+                    <input type="hidden" name="sesskey" value="{{sesskey}}">
+                    <input type="hidden" name="action" value="revoke_employee">
+                    <input type="hidden" name="userid" value="{{id}}">
+                    <button type="submit" class="lp-btn lp-btn-light lp-btn-sm">{{revoke_label}}</button>
+                  </form>
+                </td>
+              </tr>
+            {{/staff}}
+          </tbody>
+        </table>
+      </div>
+    {{/has_staff}}
+    {{^has_staff}}
+      <div class="lp-empty" role="status" style="margin-top:12px">
+        <h3>{{empty_title}}</h3>
+        <p>{{empty_body}}</p>
+      </div>
+    {{/has_staff}}
+  </section>
+
+</div>

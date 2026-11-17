@@ -300,6 +300,12 @@ final class assign_submit_ui {
             $flasherr = get_string('fellowship_assign_err_empty', 'local_launchpad');
         } else if ($flash === 'denied') {
             $flasherr = get_string('fellowship_assign_err_denied', 'local_launchpad');
+        } else if ($flash === 'uploadsize') {
+            $flasherr = get_string('fellowship_assign_err_uploadsize', 'local_launchpad');
+        } else if ($flash === 'uploadpartial') {
+            $flasherr = get_string('fellowship_assign_err_uploadpartial', 'local_launchpad');
+        } else if ($flash === 'uploadfail') {
+            $flasherr = get_string('fellowship_assign_err_uploadfail', 'local_launchpad');
         } else if ($flash === 'error') {
             $flasherr = get_string('fellowship_assign_err_generic', 'local_launchpad');
         }
@@ -375,9 +381,38 @@ final class assign_submit_ui {
     }
 
     /**
+     * If the fellow chose a file but PHP rejected the upload, return a flash code.
+     * Does not invent a submit — caller must abort before save_submission.
+     *
+     * @return string|null flash code or null when no failed upload to report
+     */
+    private static function file_upload_flash_if_failed(): ?string {
+        if (empty($_FILES['assignfile']) || !is_array($_FILES['assignfile'])) {
+            return null;
+        }
+        $err = (int) ($_FILES['assignfile']['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($err === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if ($err === UPLOAD_ERR_OK) {
+            $tmp = (string) ($_FILES['assignfile']['tmp_name'] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                return 'uploadfail';
+            }
+            return null;
+        }
+        return match ($err) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'uploadsize',
+            UPLOAD_ERR_PARTIAL => 'uploadpartial',
+            default => 'uploadfail',
+        };
+    }
+
+    /**
      * Save draft and/or submit for grading from LaunchPad POST.
      *
-     * @return string flash code for redirect (saved|submitted|empty|denied|error)
+     * @return string flash code for redirect
+     *         (saved|submitted|empty|denied|error|uploadsize|uploadpartial|uploadfail)
      */
     public static function process_post(int $cmid, int $userid): string {
         global $CFG, $USER;
@@ -396,6 +431,12 @@ final class assign_submit_ui {
         $assign = new \assign($context, $cm, $course);
         if (!$assign->submissions_open($userid)) {
             return 'denied';
+        }
+
+        // Honesty: failed / oversized / partial upload must not look saved or submitted.
+        $uploadflash = self::file_upload_flash_if_failed();
+        if ($uploadflash !== null) {
+            return $uploadflash;
         }
 
         $submit = (bool) optional_param('assign_submit', 0, PARAM_BOOL);
@@ -451,8 +492,9 @@ final class assign_submit_ui {
         $status = $submission ? (string) $submission->status : '';
 
         // Assignments without draft mode mark SUBMITTED inside save_submission already.
+        // Always report that truth — never call a live submit a "draft saved".
         if ($status === ASSIGN_SUBMISSION_STATUS_SUBMITTED) {
-            return $submit ? 'submitted' : 'saved';
+            return 'submitted';
         }
 
         if (!$submit) {

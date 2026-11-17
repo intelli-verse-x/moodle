@@ -162,6 +162,40 @@
         <a class="lp-ann-link" href="{{advanced_url}}">{{advanced_label}}</a>
         <span class="lp-muted lp-sm">{{advanced_help}}</span>
       </p>
+      {{#show_rubric_editor}}
+        <div class="lp-card-head lp-card-head-stack" style="margin-top:28px">
+          <h3>{{rubric_title}}</h3>
+          <p class="lp-muted">{{rubric_lead}}</p>
+        </div>
+        <form method="post" action="{{rubric_form_action}}" class="lp-stack lp-courseops-rubric-form">
+          <input type="hidden" name="sesskey" value="{{sesskey}}">
+          <input type="hidden" name="action" value="save_track_rubric">
+          <input type="hidden" name="trackid" value="{{trackid}}">
+          <div class="lp-courseops-rubric-table" role="group" aria-label="{{rubric_title}}">
+            {{#rubric_criteria}}
+              <div class="lp-courseops-rubric-row">
+                <input type="hidden" name="rubric_key[{{index}}]" value="{{key}}">
+                <label class="lp-field">
+                  <span>{{rubric_label_col}} {{n}}</span>
+                  <input type="text" name="rubric_label[{{index}}]" required maxlength="120" value="{{label}}" autocomplete="off">
+                </label>
+                <label class="lp-field">
+                  <span>{{rubric_weight_col}}</span>
+                  <input type="number" name="rubric_weight[{{index}}]" required min="1" max="100" value="{{weight}}">
+                </label>
+                <label class="lp-field">
+                  <span>{{rubric_desc_col}}</span>
+                  <input type="text" name="rubric_descriptor[{{index}}]" maxlength="255" value="{{descriptor}}" autocomplete="off">
+                </label>
+              </div>
+            {{/rubric_criteria}}
+          </div>
+          <p class="lp-sm">{{rubric_sum_label}} <strong>{{rubric_weight_sum}}</strong> / 100</p>
+          <div class="lp-courseops-settings-actions">
+            <button type="submit" class="lp-btn lp-btn-solid">{{rubric_save_label}}</button>
+          </div>
+        </form>
+      {{/show_rubric_editor}}
       <nav class="lp-courseops-subnav" aria-label="{{ops_title}}">
         {{#primary_nav}}
           <a class="lp-courseops-sublink{{#current}} is-current{{/current}}" href="{{url}}">{{label}}</a>

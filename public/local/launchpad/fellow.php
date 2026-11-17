@@ -712,6 +712,7 @@ switch ($view) {
                 'assignfilehint' => get_string('fellowship_assign_filehint', 'local_launchpad'),
                 'assignsavedraft' => get_string('fellowship_assign_savedraft', 'local_launchpad'),
                 'assignsubmit' => get_string('fellowship_assign_submit', 'local_launchpad'),
+                'assignconfirmsubmit' => get_string('fellowship_assign_confirmsubmit', 'local_launchpad'),
                 'assignsubmitsection' => get_string('fellowship_assign_submitsection', 'local_launchpad'),
                 'assignreceipt' => get_string('fellowship_assign_receipt', 'local_launchpad'),
                 'assignpriors' => get_string('fellowship_assign_priors', 'local_launchpad'),

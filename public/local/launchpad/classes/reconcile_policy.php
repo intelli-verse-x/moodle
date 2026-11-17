@@ -19,9 +19,10 @@ namespace local_launchpad;
 /**
  * Policy for reconciling existing LaunchPad objects on re-apply.
  *
- * New objects still use hidden defaults in setup. Existing objects must not be
- * force-hidden, renamed, or moved — admins may have deliberately shown a course
- * (MVP §4 / §10). Moodle category hide cascades to child categories and courses.
+ * New categories are management-visible; new courses/activities still start hidden.
+ * Existing objects must not be force-hidden, renamed, or moved — admins may have
+ * deliberately shown a course (MVP §4 / §10). Moodle category hide cascades to
+ * child categories and courses — never hide LaunchPad folders to “withhold” a track.
  *
  * @package    local_launchpad
  * @copyright  2026 IntelliVerse-X
