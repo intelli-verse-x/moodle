@@ -37,7 +37,7 @@ class page {
      * Emit the full landing page and stop further Moodle output.
      */
     public static function serve(): void {
-        global $CFG, $PAGE, $OUTPUT, $SITE, $SESSION;
+        global $CFG, $PAGE, $OUTPUT, $SITE, $SESSION, $USER;
 
         $context = \context_system::instance();
         $PAGE->set_context($context);
@@ -51,25 +51,32 @@ class page {
         $pluginbase = $CFG->wwwroot . '/local/launchpad';
         $assets = $pluginbase . '/assets/img';
         $loginurl = (new \moodle_url('/login/index.php'))->out(false);
-        $portalurl = (new \moodle_url('/my/'))->out(false);
-        // Gated portals — same as pre-#14: CTA hits the PHP gate; require_login()
-        // sends guests to Moodle login with that page as return URL. Wrong persona
-        // sees access-denied (still logged in). Do NOT send these to /my/.
-        $employeeurl = (new \moodle_url('/local/launchpad/employee.php'))->out(false);
-        $fellowurl = (new \moodle_url('/local/launchpad/fellow.php'))->out(false);
+        // Guests: Access portal later resolves via /my/ → persona_home.
+        // Signed-in: go straight to the persona shell (Employee must not depend on
+        // /my/ rewrite — Employer has no toba_portal tag fallback like Fellow/Mentor).
+        $defaultportal = new \moodle_url('/my/');
+        $employeeurl = (new \moodle_url(persona_home::EMPLOYEE_PATH))->out(false);
+        $fellowurl = (new \moodle_url(persona_home::FELLOW_PATH))->out(false);
         // Always offer Fellowship register entry; register.php enables email signup.
         $signupurl = registration::fellowship_signup_url();
         $cansignup = true;
 
         // Real signed-in users (not the guest account) get portal CTAs.
         $loggedin = isloggedin() && !isguestuser();
+        $portalurl = $defaultportal->out(false);
+        if ($loggedin) {
+            $home = persona_home::home_url_for((int) ($USER->id ?? 0));
+            if ($home !== null) {
+                $portalurl = $home->out(false);
+            }
+        }
 
         // Do not force wantsurl=/my/ on every landing hit — that overwrote portal
         // gates after login (persona_home then sent fellows/emps to their own home).
         if (!$loggedin) {
             $current = isset($SESSION->wantsurl) ? (string) $SESSION->wantsurl : '';
             if (persona_home::should_override_default_home($current === '' ? null : $current)) {
-                $SESSION->wantsurl = $portalurl;
+                $SESSION->wantsurl = $defaultportal->out(false);
             }
         }
 

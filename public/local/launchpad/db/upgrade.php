@@ -84,5 +84,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111608, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111700) {
+        // Landing Sign-in handoff: clear is-leaving overlay on bfcache Back/Forward.
+        upgrade_plugin_savepoint(true, 2026111700, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111701) {
+        // Employer login/Access portal: restore pin in hook; skip testsession steal; persona Access portal.
+        upgrade_plugin_savepoint(true, 2026111701, 'local', 'launchpad');
+    }
+
     return true;
 }

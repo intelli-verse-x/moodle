@@ -12,6 +12,14 @@ const PORTAL_LABEL = LOGGED_IN ? 'Access portal' : 'Sign in to Learn';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2400)}
+function clearLeaving(){
+  document.body.classList.remove('is-leaving');
+  const t=$('#toast');
+  if(t){t.classList.remove('on');clearTimeout(t._t);}
+}
+/* Back/Forward cache restores the leaving overlay; clear on leave + restore. */
+window.addEventListener('pagehide', clearLeaving);
+window.addEventListener('pageshow', clearLeaving);
 document.addEventListener('click',e=>{const a=e.target.closest('[data-toast]');if(a){e.preventDefault();toast(a.dataset.toast)}});
 /** Hugeicons (Iconify) helper, stroke-rounded set */
 const hi=(name,size=18)=>`<iconify-icon icon="hugeicons:${name}" width="${size}" height="${size}" aria-hidden="true"></iconify-icon>`;

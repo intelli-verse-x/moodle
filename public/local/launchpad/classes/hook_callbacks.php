@@ -34,13 +34,19 @@ final class hook_callbacks {
      * @param before_http_headers $hook
      */
     public static function before_http_headers(before_http_headers $hook): void {
+        // Legacy local_launchpad_before_http_headers() is skipped once this hook
+        // is registered — keep the same work here.
+        registration::ensure_email_self_registration(true);
+        // On /login/index.php?portal=… pin gated wantsurl early (GET display + POST).
+        login_portal::maybe_pin_wantsurl_from_request();
+        // Logged-in browser-back to login → landing (never steal ?testsession=).
         login_portal::maybe_redirect_logged_in_from_login();
         persona_home::maybe_redirect_from_my();
         // Employer learners: stock mod/page|url|resource → LaunchPad activity shell.
         activity_portal::maybe_redirect_from_mod();
         // Fellowship signup: replace stock "email sent" / confirm notices.
         registration::maybe_redirect_stock_signup_notices();
-        // Forgot password placeholders (legacy lib before_http_headers is skipped when this hook is registered).
+        // Forgot password placeholders.
         auth_chrome::maybe_enhance_forgot_password_page();
     }
 

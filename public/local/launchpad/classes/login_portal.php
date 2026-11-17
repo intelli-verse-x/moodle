@@ -128,12 +128,18 @@ final class login_portal {
         bool $loggedin,
         bool $isguest,
         string $method,
-        string $script
+        string $script,
+        int $testsession = 0
     ): bool {
         if (!$loggedin || $isguest) {
             return false;
         }
         if (strtoupper($method) !== 'GET') {
+            return false;
+        }
+        // Moodle finishes login via GET /login/index.php?testsession=<id>.
+        // Stealing that hop dumps every persona on the public landing (/).
+        if ($testsession > 0) {
             return false;
         }
         $script = str_replace('\\', '/', $script);
@@ -154,11 +160,13 @@ final class login_portal {
 
         $method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
         $script = (string) ($SCRIPT ?? ($_SERVER['SCRIPT_NAME'] ?? ''));
+        $testsession = optional_param('testsession', 0, PARAM_INT);
         if (!self::should_redirect_logged_in_from_login(
             isloggedin(),
             isguestuser(),
             $method,
-            $script
+            $script,
+            $testsession
         )) {
             return false;
         }
