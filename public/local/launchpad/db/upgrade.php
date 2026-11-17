@@ -94,5 +94,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111701, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111702) {
+        // Cross-role portal: wrong login tab must not stamp/open another shell.
+        upgrade_plugin_savepoint(true, 2026111702, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111703) {
+        // Mentor tag must not be overwritten by fellow login / labelled as Fellow.
+        upgrade_plugin_savepoint(true, 2026111703, 'local', 'launchpad');
+    }
+
     return true;
 }
