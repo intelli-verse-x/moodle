@@ -71,7 +71,8 @@ final class self_registered_fellow_test extends \advanced_testcase {
         account_provision::grant_employee($USER, (int) $target->id);
         persona_home::reset_home_cache();
 
-        $this->assertTrue(registration::is_self_registered_fellow((int) $target->id));
+        // Employee wins: poisoned fellowship tag must not count as self-reg fellow.
+        $this->assertFalse(registration::is_self_registered_fellow((int) $target->id));
         $this->assertTrue(account_persona::is_employee((int) $target->id));
 
         $home = persona_home::home_url_for((int) $target->id);
@@ -80,6 +81,7 @@ final class self_registered_fellow_test extends \advanced_testcase {
         $this->assertSame('employee', portal_gate::role_key_for_user((int) $target->id));
         // Employee wins: tag must not open fellow.php.
         $this->assertFalse(fellowship_dashboard::can_access((int) $target->id));
+        $this->assertFalse(mentor_dashboard::can_access((int) $target->id));
     }
 
     public function test_mentor_wins_over_toba_portal_tag(): void {

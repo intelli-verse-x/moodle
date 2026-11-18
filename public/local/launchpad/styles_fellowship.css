@@ -3647,6 +3647,13 @@ body.local-launchpad-mentor {
   background: linear-gradient(135deg, #F6F8FC, #E5EDFA);
   border: 2px dashed #CBD5E6;
 }
+.lp-cert.ready {
+  border-style: solid;
+  border-color: #86efac;
+  background: #f0fdf4;
+  gap: 10px;
+}
+.lp-cert.ready .lp-btn { margin-top: 4px; }
 .lp-cert-lock {
   display: grid;
   place-items: center;

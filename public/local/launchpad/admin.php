@@ -202,6 +202,26 @@ if (($view === 'cohorts' || $view === 'mentors' || $view === 'employer' || $view
             'section' => 'settings',
         ]));
     }
+    if ($view === 'courseops' && $action === 'attach_track_certificate') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $flash = admin_dashboard::attach_track_certificate($USER, $trackid);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'settings',
+        ]));
+    }
+    if ($view === 'courseops' && $action === 'detach_track_certificate') {
+        $trackid = optional_param('trackid', 0, PARAM_INT);
+        $flash = admin_dashboard::detach_track_certificate($USER, $trackid);
+        $SESSION->lp_admin_flash = $flash;
+        redirect(new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+            'section' => 'settings',
+        ]));
+    }
     if ($view === 'courseops' && $action === 'unenrol_fellow') {
         $trackid = optional_param('trackid', 0, PARAM_INT);
         $targetuserid = optional_param('userid', 0, PARAM_INT);

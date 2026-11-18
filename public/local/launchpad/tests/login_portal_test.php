@@ -92,5 +92,13 @@ final class login_portal_test extends \basic_testcase {
             'GET',
             '/local/launchpad/fellow.php'
         ));
+        // Post-login cookie check hop must not be redirected to landing.
+        $this->assertFalse(login_portal::should_redirect_logged_in_from_login(
+            true,
+            false,
+            'GET',
+            '/login/index.php',
+            42
+        ));
     }
 }

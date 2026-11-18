@@ -2043,7 +2043,7 @@ final class fellowship_dashboard {
             'orientation' => self::str('fellowship_completion_orientation', null, 'Shared orientation'),
         ];
 
-        return array_merge($base, [
+        $out = array_merge($base, [
             'gates_met' => $met,
             'gates_total' => $gatestotal,
             'gates_label' => get_string_manager()->string_exists('fellowship_completion_gates', 'local_launchpad')
@@ -2079,12 +2079,6 @@ final class fellowship_dashboard {
                     ? self::str('fellowship_completion_weighted_ok', null, 'On track')
                     : self::str('fellowship_completion_weighted_low', null, 'Below 70'))
                 : self::str('fellowship_completion_weighted_pending', null, 'Pending'),
-            'certificate_locked' => true,
-            'cert_message' => self::str(
-                'fellowship_completion_cert_body',
-                null,
-                '<b>Certificate issuance is not available</b> yet. Your results are your record until the programme confirms the tool and you meet the criteria.'
-            ),
             'track_url' => (new \moodle_url(persona_home::FELLOW_PATH, ['view' => 'track']))->out(false),
             'empty_message' => self::str(
                 'fellowship_no_courses',
@@ -2093,6 +2087,15 @@ final class fellowship_dashboard {
             ),
             'strings' => $strings,
         ]);
+
+        $courseid = $selected !== null ? (int) $selected->id : 0;
+        // Cert card uses this snapshot — do not call eligibility_for_user here (re-entry).
+        return array_merge($out, track_certificate::fellow_card_from_completion(
+            $userid,
+            $courseid,
+            $out,
+            $courses
+        ));
     }
 
     /**
@@ -4526,9 +4529,10 @@ final class fellowship_dashboard {
             return false;
         }
         // Higher-priority personas use their own shells (portal_gate mismatch).
-        // Do not let a leftover toba_portal tag open fellow.php for them.
+        // Do not let a leftover / wrong-tab toba_portal open fellow.php for them.
         if (account_persona::is_admin($userid) || account_persona::is_mentor($userid)
                 || registration::is_portal_mentor($userid)
+                || registration::has_raw_mentor_portal_pref($userid)
                 || account_persona::is_employee($userid)) {
             return false;
         }

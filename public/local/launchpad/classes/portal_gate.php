@@ -122,7 +122,10 @@ final class portal_gate {
         if (account_persona::is_admin($userid)) {
             return 'admin';
         }
-        if (account_persona::is_mentor($userid) || registration::is_portal_mentor($userid)) {
+        if (account_persona::is_mentor($userid)
+                || registration::is_portal_mentor($userid)
+                || registration::has_raw_mentor_portal_pref($userid)) {
+            // Raw mentor tag before fellowship — wrong-tab must not label mentors as Fellow.
             return 'mentor';
         }
         if (account_persona::is_employee($userid)) {
