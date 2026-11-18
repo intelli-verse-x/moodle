@@ -74,9 +74,26 @@
 
           {{#hasvideo}}
             <div class="lp-activity-player">
-              <video controls playsinline preload="metadata" controlslist="nodownload">
+              {{#videowatch_enabled}}
+                <p class="lp-videowatch-note local-videowatch-note" role="status">{{videowatch_notice}}</p>
+                <div
+                  id="local-videowatch"
+                  class="local-videowatch"
+                  data-lp-videowatch-guard
+                  data-lp-videowatch-progress="{{videowatch_frontier}}"
+                  data-cmid="{{videowatch_cmid}}"
+                  data-sesskey="{{videowatch_sesskey}}"
+                  data-url="{{videowatch_url}}"
+                  data-frontier="{{videowatch_frontier}}"
+                  hidden
+                ></div>
+              {{/videowatch_enabled}}
+              <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
                 <source src="{{videourl}}" type="video/mp4">
               </video>
+              {{#videowatch_enabled}}
+                <script src="{{videowatch_guardscript}}"></script>
+              {{/videowatch_enabled}}
             </div>
           {{/hasvideo}}
 

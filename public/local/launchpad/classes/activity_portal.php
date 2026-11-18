@@ -170,6 +170,7 @@ final class activity_portal {
         $hasvideo = false;
         $files = [];
         $hasfiles = false;
+        $videowatch = self::empty_videowatch();
         $isinportal = self::is_portal_renderable($modname);
         $needsengine = !$isinportal;
         $callouttext = '';
@@ -276,6 +277,14 @@ final class activity_portal {
                 ]);
             }
             $hasfiles = $files !== [];
+            // Slice 0: mount local_videowatch guard when this file is a deferred video.
+            if ($hasvideo && class_exists(\local_videowatch\policy::class)
+                    && method_exists(\local_videowatch\policy::class, 'export_mount')) {
+                $vw = \local_videowatch\policy::export_mount($cm, $context, (int) $user->id);
+                if ($vw !== null) {
+                    $videowatch = $vw;
+                }
+            }
         } else if ($modname === 'assign') {
             // Assignment brief + submit/status/feedback run inside LaunchPad.
             require_capability('mod/assign:view', $context);
@@ -329,6 +338,22 @@ final class activity_portal {
             ? self::build_lesson_layout($bodyhtml, $introhtml, $hasintro, $course, $cm, (int) $user->id, $courseurl)
             : self::empty_lesson_layout();
 
+        // Slice 1: shared shell chrome — phase playlist + prev/next for all in-shell types.
+        $shell = self::build_shell_nav($cm, $course, (int) $user->id, $courseurl, $sectionname);
+
+        // Keep E7 lesson next fields in sync with shared next when present.
+        if ($islesson && !empty($shell['nav_has_next'])) {
+            $lesson['lesson_has_next'] = true;
+            $lesson['lesson_next_name'] = $shell['nav_next_name'];
+            $lesson['lesson_next_url'] = $shell['nav_next_url'];
+            $lesson['lesson_next_mod'] = $shell['nav_next_mod'];
+        }
+        if ($islesson) {
+            $lesson['lesson_track_label'] = $shell['shell_track_label'];
+            $lesson['lesson_phase_label'] = $shell['shell_phase_label'];
+            $lesson['lesson_back_url'] = $courseurl;
+        }
+
         return [
             'is_activity' => true,
             'is_home' => false,
@@ -375,8 +400,139 @@ final class activity_portal {
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
                 'is_lesson' => $islesson,
-            ], $lesson, $assignbrief, $quizbrief),
+            ], $videowatch, $shell, $lesson, $assignbrief, $quizbrief),
         ];
+    }
+
+    /**
+     * Empty videowatch mount context (non-video / policy off).
+     *
+     * @return array<string,mixed>
+     */
+    public static function empty_videowatch(): array {
+        return [
+            'videowatch_enabled' => false,
+            'videowatch_cmid' => 0,
+            'videowatch_sesskey' => '',
+            'videowatch_url' => '',
+            'videowatch_frontier' => 0,
+            'videowatch_guardscript' => '',
+            'videowatch_notice' => '',
+        ];
+    }
+
+    /**
+     * Shared Fellow shell chrome: phase label, playlist, prev/next.
+     *
+     * @return array<string,mixed>
+     */
+    public static function build_shell_nav(
+        \cm_info $cm,
+        \stdClass $course,
+        int $userid,
+        string $courseurl,
+        string $sectionname
+    ): array {
+        $prev = self::previous_activity_before($cm, $course, $userid);
+        $next = self::next_activity_after($cm, $course, $userid);
+        $playlist = self::phase_playlist($cm, $course, $userid);
+
+        $phaselabel = $sectionname !== ''
+            ? format_string($sectionname)
+            : format_string(get_section_name($course, (int) $cm->sectionnum));
+
+        return [
+            'shell_track_label' => format_string($course->fullname),
+            'shell_phase_label' => $phaselabel,
+            'shell_has_phase' => trim($phaselabel) !== '',
+            'shell_back_url' => $courseurl,
+            'nav_has_prev' => $prev !== null,
+            'nav_prev_name' => $prev['name'] ?? '',
+            'nav_prev_url' => $prev['url'] ?? '',
+            'nav_prev_mod' => $prev['modname'] ?? '',
+            'nav_has_next' => $next !== null,
+            'nav_next_name' => $next['name'] ?? '',
+            'nav_next_url' => $next['url'] ?? '',
+            'nav_next_mod' => $next['modname'] ?? '',
+            'nav_has_either' => $prev !== null || $next !== null,
+            'playlist' => $playlist,
+            'has_playlist' => $playlist !== [],
+            'playlist_count' => count($playlist),
+        ];
+    }
+
+    /**
+     * Visible CMs in the current section/phase with completion flags.
+     *
+     * @return list<array{
+     *   cmid:int,
+     *   name:string,
+     *   url:string,
+     *   modname:string,
+     *   complete:bool,
+     *   tracked:bool,
+     *   current:bool,
+     *   status_label:string
+     * }>
+     */
+    public static function phase_playlist(\cm_info $cm, \stdClass $course, int $userid): array {
+        global $CFG;
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $modinfo = get_fast_modinfo($course, $userid);
+        $sectionnum = (int) $cm->sectionnum;
+        $sectioncms = $modinfo->get_sections()[$sectionnum] ?? [];
+        if ($sectioncms === []) {
+            return [];
+        }
+
+        $completion = new \completion_info($course);
+        $completionenabled = $completion->is_enabled();
+        $cms = $modinfo->get_cms();
+        $items = [];
+
+        foreach ($sectioncms as $otherid) {
+            if (!isset($cms[$otherid])) {
+                continue;
+            }
+            $other = $cms[$otherid];
+            if (!$other->uservisible || $other->deletioninprogress) {
+                continue;
+            }
+            if ($other->modname === 'label') {
+                continue;
+            }
+
+            $tracked = false;
+            $iscomplete = false;
+            if ($completionenabled && $completion->is_enabled($other) != COMPLETION_TRACKING_NONE) {
+                $tracked = true;
+                $data = $completion->get_data($other, false, $userid);
+                $state = (int) $data->completionstate;
+                $iscomplete = ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS);
+            }
+
+            if ($iscomplete) {
+                $statuslabel = get_string('fellowship_playlist_done', 'local_launchpad');
+            } else if ($tracked) {
+                $statuslabel = get_string('fellowship_playlist_todo', 'local_launchpad');
+            } else {
+                $statuslabel = get_string('fellowship_playlist_untracked', 'local_launchpad');
+            }
+
+            $items[] = [
+                'cmid' => (int) $other->id,
+                'name' => fellowship_dashboard::display_label($other->get_formatted_name()),
+                'url' => self::fellow_url((int) $other->id),
+                'modname' => (string) $other->modname,
+                'complete' => $iscomplete,
+                'tracked' => $tracked,
+                'current' => ((int) $other->id === (int) $cm->id),
+                'status_label' => $statuslabel,
+            ];
+        }
+
+        return $items;
     }
 
     /**
@@ -994,8 +1150,32 @@ final class activity_portal {
      * @return array{cmid:int,name:string,url:string,modname:string}|null
      */
     public static function next_activity_after(\cm_info $cm, \stdClass $course, int $userid): ?array {
+        return self::adjacent_activity($cm, $course, $userid, 'next');
+    }
+
+    /**
+     * Previous visible activity before this CM on the course (fellow shell URL).
+     *
+     * @return array{cmid:int,name:string,url:string,modname:string}|null
+     */
+    public static function previous_activity_before(\cm_info $cm, \stdClass $course, int $userid): ?array {
+        return self::adjacent_activity($cm, $course, $userid, 'prev');
+    }
+
+    /**
+     * Walk visible course CMs in modinfo order and return the neighbour.
+     *
+     * @param 'next'|'prev' $direction
+     * @return array{cmid:int,name:string,url:string,modname:string}|null
+     */
+    private static function adjacent_activity(
+        \cm_info $cm,
+        \stdClass $course,
+        int $userid,
+        string $direction
+    ): ?array {
         $modinfo = get_fast_modinfo($course, $userid);
-        $found = false;
+        $list = [];
         foreach ($modinfo->get_cms() as $other) {
             if (!$other->uservisible || $other->deletioninprogress) {
                 continue;
@@ -1004,19 +1184,36 @@ final class activity_portal {
             if ($other->modname === 'label') {
                 continue;
             }
-            if ($found) {
-                return [
-                    'cmid' => (int) $other->id,
-                    'name' => fellowship_dashboard::display_label($other->get_formatted_name()),
-                    'url' => self::fellow_url((int) $other->id),
-                    'modname' => (string) $other->modname,
-                ];
-            }
+            $list[] = $other;
+        }
+
+        $idx = null;
+        foreach ($list as $i => $other) {
             if ((int) $other->id === (int) $cm->id) {
-                $found = true;
+                $idx = $i;
+                break;
             }
         }
-        return null;
+        if ($idx === null) {
+            return null;
+        }
+
+        $target = null;
+        if ($direction === 'next' && isset($list[$idx + 1])) {
+            $target = $list[$idx + 1];
+        } else if ($direction === 'prev' && $idx > 0) {
+            $target = $list[$idx - 1];
+        }
+        if ($target === null) {
+            return null;
+        }
+
+        return [
+            'cmid' => (int) $target->id,
+            'name' => fellowship_dashboard::display_label($target->get_formatted_name()),
+            'url' => self::fellow_url((int) $target->id),
+            'modname' => (string) $target->modname,
+        ];
     }
 
     /**

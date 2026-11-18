@@ -2,6 +2,7 @@
     @template local_launchpad/fellowship_activity
 
     Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource/quiz/assign in-shell).
+    Slice 0: local_videowatch guard on video resources. Slice 1: phase playlist + prev/next chrome.
 }}
 {{#activity}}
   <div class="lp-activity-page" data-region="fellowship-activity">
@@ -12,6 +13,45 @@
       <span aria-hidden="true">/</span>
       <span aria-current="page">{{title_main}}</span>
     </nav>
+
+    <div class="lp-lesson-shell{{#has_playlist}} has-playlist{{/has_playlist}}">
+      {{#has_playlist}}
+        <aside class="lp-lesson-playlist" data-region="phase-playlist" data-lp-playlist aria-label="{{strings.playlisttitle}}">
+          <details class="lp-lesson-playlist-panel" open>
+            <summary class="lp-lesson-playlist-sum">
+              <span class="lp-lesson-playlist-heading">{{strings.playlisttitle}}</span>
+              {{#shell_has_phase}}
+                <span class="lp-lesson-playlist-phase">{{shell_phase_label}}</span>
+              {{/shell_has_phase}}
+            </summary>
+            <ol class="lp-lesson-playlist-list">
+              {{#playlist}}
+                <li class="lp-lesson-playlist-item{{#current}} is-current{{/current}}{{#complete}} is-done{{/complete}}"
+                    data-lp-playlist-item
+                    data-cmid="{{cmid}}"
+                    data-complete="{{#complete}}1{{/complete}}{{^complete}}0{{/complete}}"
+                    data-current="{{#current}}1{{/current}}{{^current}}0{{/current}}"
+                    {{#current}}data-lp-playlist-current{{/current}}>
+                  {{#current}}
+                    <span class="lp-lesson-playlist-link is-current" aria-current="page">
+                      <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}•{{/complete}}</span>
+                      <span class="lp-lesson-playlist-name">{{name}}</span>
+                      <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                    </span>
+                  {{/current}}
+                  {{^current}}
+                    <a class="lp-lesson-playlist-link" href="{{url}}">
+                      <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}○{{/complete}}</span>
+                      <span class="lp-lesson-playlist-name">{{name}}</span>
+                      <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                    </a>
+                  {{/current}}
+                </li>
+              {{/playlist}}
+            </ol>
+          </details>
+        </aside>
+      {{/has_playlist}}
 
     <article class="lp-activity-hero">
       <div class="lp-activity-hero-copy">
@@ -25,26 +65,22 @@
           <p class="lp-activity-sub">{{title_sub}}</p>
         {{/hastitlesub}}
 
-        {{#is_lesson}}
-          <p class="lp-lesson-meta">
-            <span>{{lesson_track_label}}</span>
-            {{#hassection}}
-              <span aria-hidden="true">·</span>
-              <span>{{lesson_phase_label}}</span>
-            {{/hassection}}
-          </p>
-        {{/is_lesson}}
+        <p class="lp-lesson-meta">
+          <span>{{shell_track_label}}</span>
+          {{#shell_has_phase}}
+            <span aria-hidden="true">·</span>
+            <span>{{shell_phase_label}}</span>
+          {{/shell_has_phase}}
+        </p>
 
         <div class="lp-activity-head-actions">
           <a class="lp-btn lp-btn-light lp-activity-back" href="{{courseurl}}">{{strings.backtotrack}}</a>
           {{#needsengine}}
             <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
           {{/needsengine}}
-          {{#is_lesson}}
-            {{#lesson_has_next}}
-              <a class="lp-btn lp-btn-solid" href="{{lesson_next_url}}">{{strings.lessonnext}}: {{lesson_next_name}}</a>
-            {{/lesson_has_next}}
-          {{/is_lesson}}
+          {{#nav_has_next}}
+            <a class="lp-btn lp-btn-solid" href="{{nav_next_url}}">{{strings.lessonnext}}: {{nav_next_name}}</a>
+          {{/nav_has_next}}
         </div>
 
         {{#show_judging}}
@@ -97,12 +133,6 @@
                   <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
                 {{/lesson_has_exercise}}
               </section>
-              {{#lesson_has_next}}
-                <div class="lp-lesson-next">
-                  <span class="lp-xs lp-muted">{{strings.lessonnextlabel}}</span>
-                  <a class="lp-btn lp-btn-solid" href="{{lesson_next_url}}">{{lesson_next_name}}</a>
-                </div>
-              {{/lesson_has_next}}
             </div>
           {{/is_lesson}}
 
@@ -120,11 +150,28 @@
           {{/isplaceholder}}
 
           {{#hasvideo}}
-            <div class="lp-activity-player">
-              <video controls playsinline preload="metadata" controlslist="nodownload">
+            <div class="lp-activity-player" data-lp-video-stage>
+              {{#videowatch_enabled}}
+                <p class="lp-videowatch-note local-videowatch-note" role="status">{{videowatch_notice}}</p>
+                <div
+                  id="local-videowatch"
+                  class="local-videowatch"
+                  data-lp-videowatch-guard
+                  data-lp-videowatch-progress="{{videowatch_frontier}}"
+                  data-cmid="{{videowatch_cmid}}"
+                  data-sesskey="{{videowatch_sesskey}}"
+                  data-url="{{videowatch_url}}"
+                  data-frontier="{{videowatch_frontier}}"
+                  hidden
+                ></div>
+              {{/videowatch_enabled}}
+              <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
                 <source src="{{videourl}}" type="video/mp4">
                 Your browser does not support HTML5 video.
               </video>
+              {{#videowatch_enabled}}
+                <script src="{{videowatch_guardscript}}"></script>
+              {{/videowatch_enabled}}
             </div>
           {{/hasvideo}}
 
@@ -277,14 +324,6 @@
           {{^quiz_summarising}}
           {{^quiz_reviewing}}
           <div class="lp-assign-layout" data-region="quiz-brief">
-            <p class="lp-lesson-meta">
-              <span>{{quiz_track_label}}</span>
-              {{#quiz_has_phase}}
-                <span aria-hidden="true">·</span>
-                <span>{{quiz_phase_label}}</span>
-              {{/quiz_has_phase}}
-            </p>
-
             <aside class="lp-judge-note" aria-label="{{strings.quizpractice}}">
               <b>{{strings.quizpractice}}</b>
               <p>{{quiz_practice_note}}</p>
@@ -376,14 +415,6 @@
 
         {{#is_assign}}
           <div class="lp-assign-layout" data-region="assign-workspace">
-            <p class="lp-lesson-meta">
-              <span>{{assign_track_label}}</span>
-              {{#assign_has_phase}}
-                <span aria-hidden="true">·</span>
-                <span>{{assign_phase_label}}</span>
-              {{/assign_has_phase}}
-            </p>
-
             {{#assign_has_flash_ok}}
               <p class="lp-flash ok" role="status">{{assign_flash_ok}}</p>
             {{/assign_has_flash_ok}}
@@ -614,7 +645,22 @@
           {{/is_assign}}
           {{/is_quiz}}
         {{/needsengine}}
+
+        {{#nav_has_either}}
+          <nav class="lp-lesson-nav" data-lp-activity-nav aria-label="{{strings.lessonnav}}">
+            {{#nav_has_prev}}
+              <a class="lp-btn lp-btn-light" href="{{nav_prev_url}}" data-lp-activity-prev>{{strings.lessonprev}}: {{nav_prev_name}}</a>
+            {{/nav_has_prev}}
+            {{^nav_has_prev}}
+              <span class="lp-lesson-nav-spacer" aria-hidden="true"></span>
+            {{/nav_has_prev}}
+            {{#nav_has_next}}
+              <a class="lp-btn lp-btn-solid" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
+            {{/nav_has_next}}
+          </nav>
+        {{/nav_has_either}}
       </div>
     </article>
+    </div>
   </div>
 {{/activity}}

@@ -84,5 +84,45 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111608, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111609) {
+        // Interim tip used briefly on wip/fellow-lesson-ux before cert tips were restored.
+        upgrade_plugin_savepoint(true, 2026111609, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111700) {
+        // Landing Sign-in handoff: clear is-leaving overlay on bfcache Back/Forward.
+        upgrade_plugin_savepoint(true, 2026111700, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111701) {
+        // Employer login/Access portal: restore pin in hook; skip testsession steal; persona Access portal.
+        upgrade_plugin_savepoint(true, 2026111701, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111702) {
+        // Cross-role portal: wrong login tab must not stamp/open another shell.
+        upgrade_plugin_savepoint(true, 2026111702, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111703) {
+        // Mentor tag must not be overwritten by fellow login / labelled as Fellow.
+        upgrade_plugin_savepoint(true, 2026111703, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111704) {
+        // Course ops Certificate panel: attach once / edit design / issue-safe detach.
+        upgrade_plugin_savepoint(true, 2026111704, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111705) {
+        // Cert Step 3: criteria gate, customcert URL → Progress, Download auto-issue PDF.
+        upgrade_plugin_savepoint(true, 2026111705, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111706) {
+        // Fellow lesson UX Slice 0–1: videowatch in LaunchPad shell + phase playlist / prev-next.
+        upgrade_plugin_savepoint(true, 2026111706, 'local', 'launchpad');
+    }
+
     return true;
 }
