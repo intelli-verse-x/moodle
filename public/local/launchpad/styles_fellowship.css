@@ -10215,6 +10215,22 @@ a.lp-lesson-playlist-link:hover {
   background: #E8F0FF;
   color: #1A4FB8;
 }
+.lp-activity-badge.is-status.is-warn {
+  background: #FFF4DF;
+  color: #9A6700;
+}
+.lp-activity-badge.is-status.is-line {
+  background: #F1F3F7;
+  color: #5C667A;
+}
+.lp-crumbs-track {
+  max-width: min(42vw, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+}
 .lp-activity-title {
   margin: 0;
   font-family: var(--lp-head);

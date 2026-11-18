@@ -9,7 +9,7 @@
     <nav class="lp-crumbs" aria-label="Breadcrumb">
       <a href="{{home_url}}">{{strings.navhome}}</a>
       <span aria-hidden="true">/</span>
-      <a href="{{courseurl}}">{{strings.navtrack}}</a>
+      <a href="{{courseurl}}" class="lp-crumbs-track" title="{{shell_track_label}}">{{shell_track_label}}</a>
       <span aria-hidden="true">/</span>
       <span aria-current="page">{{title_main}}</span>
     </nav>
@@ -36,14 +36,18 @@
                     <span class="lp-lesson-playlist-link is-current" aria-current="page">
                       <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}•{{/complete}}</span>
                       <span class="lp-lesson-playlist-name">{{name}}</span>
-                      <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                      {{#has_status}}
+                        <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                      {{/has_status}}
                     </span>
                   {{/current}}
                   {{^current}}
                     <a class="lp-lesson-playlist-link" href="{{url}}">
                       <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}○{{/complete}}</span>
                       <span class="lp-lesson-playlist-name">{{name}}</span>
-                      <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                      {{#has_status}}
+                        <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                      {{/has_status}}
                     </a>
                   {{/current}}
                 </li>
@@ -57,7 +61,9 @@
       <div class="lp-activity-hero-copy">
         <div class="lp-activity-badges">
           <span class="lp-activity-badge is-type">{{modname}}</span>
-          <span class="lp-activity-badge is-status is-{{statustone}}">{{status}}</span>
+          {{#status}}
+            <span class="lp-activity-badge is-status is-{{statustone}}">{{status}}</span>
+          {{/status}}
         </div>
 
         <h2 class="lp-activity-title">{{title_main}}</h2>

@@ -136,13 +136,27 @@ final class activity_portal {
             : (new \moodle_url('/mod/' . $modname . '/view.php', ['id' => $cm->id]))->out(false);
 
         $completion = new \completion_info($course);
-        $tracked = false;
-        $complete = false;
-        if ($completion->is_enabled($cm) != COMPLETION_TRACKING_NONE) {
-            $tracked = true;
+        $completiontracked = $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE;
+        $completioncomplete = false;
+        if ($completiontracked) {
             $data = $completion->get_data($cm, false, (int) $user->id);
-            $complete = ((int) $data->completionstate === COMPLETION_COMPLETE
+            $completioncomplete = ((int) $data->completionstate === COMPLETION_COMPLETE
                 || (int) $data->completionstate === COMPLETION_COMPLETE_PASS);
+        }
+        // Same fellow-facing labels as Home / My track (assign submit ≠ Moodle completion).
+        $rowstatus = fellowship_dashboard::activity_row_status(
+            $cm,
+            (int) $user->id,
+            $completiontracked,
+            $completioncomplete
+        );
+        $tracked = !empty($rowstatus['tracked']) || !empty($rowstatus['show_status']);
+        $complete = !empty($rowstatus['complete']);
+        $status = (string) ($rowstatus['status_label'] ?? '');
+        $statustone = self::status_chip_tone((string) ($rowstatus['status_chip'] ?? ''));
+        if ($status === '' && !empty($rowstatus['show_status'])) {
+            $status = get_string('fellowship_incomplete', 'local_launchpad');
+            $statustone = 'run';
         }
 
         $typename = method_exists($cm, 'get_module_type_name')
@@ -309,17 +323,6 @@ final class activity_portal {
             // Interactive Moodle engines — keep completion for the native mod view.
             $needsengine = true;
             $isinportal = false;
-        }
-
-        if ($tracked && $complete) {
-            $status = get_string('employer_activity_complete', 'local_launchpad');
-            $statustone = 'ok';
-        } else if ($tracked) {
-            $status = get_string('employer_activity_incomplete', 'local_launchpad');
-            $statustone = 'run';
-        } else {
-            $status = get_string('employer_activity_not_tracked', 'local_launchpad');
-            $statustone = 'line';
         }
 
         $sectionname = '';
@@ -503,21 +506,29 @@ final class activity_portal {
                 continue;
             }
 
-            $tracked = false;
-            $iscomplete = false;
+            $completiontracked = false;
+            $completioncomplete = false;
             if ($completionenabled && $completion->is_enabled($other) != COMPLETION_TRACKING_NONE) {
-                $tracked = true;
+                $completiontracked = true;
                 $data = $completion->get_data($other, false, $userid);
                 $state = (int) $data->completionstate;
-                $iscomplete = ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS);
+                $completioncomplete = ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS);
             }
 
-            if ($iscomplete) {
-                $statuslabel = get_string('fellowship_playlist_done', 'local_launchpad');
-            } else if ($tracked) {
-                $statuslabel = get_string('fellowship_playlist_todo', 'local_launchpad');
-            } else {
-                $statuslabel = get_string('fellowship_playlist_untracked', 'local_launchpad');
+            $rowstatus = fellowship_dashboard::activity_row_status(
+                $other,
+                $userid,
+                $completiontracked,
+                $completioncomplete
+            );
+            $iscomplete = !empty($rowstatus['complete']);
+            $tracked = !empty($rowstatus['tracked']) || !empty($rowstatus['show_status']);
+            $statuslabel = (string) ($rowstatus['status_label'] ?? '');
+            // Prefer Home labels; fall back to short playlist copy only when still empty + tracked.
+            if ($statuslabel === '' && $tracked) {
+                $statuslabel = $iscomplete
+                    ? get_string('fellowship_playlist_done', 'local_launchpad')
+                    : get_string('fellowship_playlist_todo', 'local_launchpad');
             }
 
             $items[] = [
@@ -529,10 +540,24 @@ final class activity_portal {
                 'tracked' => $tracked,
                 'current' => ((int) $other->id === (int) $cm->id),
                 'status_label' => $statuslabel,
+                'has_status' => $statuslabel !== '',
+                'status_chip' => (string) ($rowstatus['status_chip'] ?? ''),
             ];
         }
 
         return $items;
+    }
+
+    /**
+     * Map Home/My-track status_chip → activity badge tone class.
+     */
+    public static function status_chip_tone(string $chip): string {
+        return match ($chip) {
+            'ok' => 'ok',
+            'warn' => 'warn',
+            'line' => 'line',
+            default => 'run',
+        };
     }
 
     /**

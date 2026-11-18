@@ -124,5 +124,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111706, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111707) {
+        // Playlist/hero use Home fellow status labels; activity crumbs show track name.
+        upgrade_plugin_savepoint(true, 2026111707, 'local', 'launchpad');
+    }
+
     return true;
 }
