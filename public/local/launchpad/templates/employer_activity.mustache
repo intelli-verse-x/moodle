@@ -75,7 +75,6 @@
           {{#hasvideo}}
             <div class="lp-activity-player">
               {{#videowatch_enabled}}
-                <p class="lp-videowatch-note local-videowatch-note" role="status">{{videowatch_notice}}</p>
                 <div
                   id="local-videowatch"
                   class="local-videowatch"
@@ -85,6 +84,10 @@
                   data-sesskey="{{videowatch_sesskey}}"
                   data-url="{{videowatch_url}}"
                   data-frontier="{{videowatch_frontier}}"
+                  data-duration="{{videowatch_duration}}"
+                  data-required="{{videowatch_required}}"
+                  data-completed="{{#videowatch_completed}}1{{/videowatch_completed}}{{^videowatch_completed}}0{{/videowatch_completed}}"
+                  data-pct="{{videowatch_pct}}"
                   hidden
                 ></div>
               {{/videowatch_enabled}}

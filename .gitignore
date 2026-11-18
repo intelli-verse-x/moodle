@@ -63,4 +63,5 @@ tsconfig.aliases.json
 
 # Local personal notes / tooling (not part of Moodle / ToBa deploy).
 /personal-resources/
+/.cursor/
 config.bat

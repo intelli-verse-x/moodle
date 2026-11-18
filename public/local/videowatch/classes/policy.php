@@ -209,6 +209,25 @@ class policy {
     }
 
     /**
+     * Snap watch % to milestone steps for LaunchPad UI.
+     */
+    public static function step_pct(int $rawpct, bool $completed = false): int {
+        if ($completed || $rawpct >= 100) {
+            return 100;
+        }
+        if ($rawpct >= 75) {
+            return 75;
+        }
+        if ($rawpct >= 50) {
+            return 50;
+        }
+        if ($rawpct >= 25) {
+            return 25;
+        }
+        return 0;
+    }
+
+    /**
      * Watched seconds already stored for this user, used to resume the player.
      */
     public static function frontier_seconds(int $cmid, int $userid): float {
@@ -236,13 +255,32 @@ class policy {
         }
 
         $cmid = (int) $cm->id;
+        $file = self::main_file((int) $context->id);
+        $duration = ($file instanceof \stored_file) ? (duration::from_file($file) ?? 0.0) : 0.0;
+        $required = $duration > 0 ? ($duration * self::THRESHOLD) : 0.0;
+        $frontier = self::frontier_seconds($cmid, $userid);
+        $rawpct = 0;
+        if ($required > 0) {
+            $rawpct = (int) min(100, max(0, (int) floor(($frontier / $required) * 100)));
+        }
+        $completed = $required > 0 && $frontier >= $required;
+        // UI milestones only (0 / 25 / 50 / 75 / 100) — not a continuous ticker.
+        $pct = self::step_pct($rawpct, $completed);
+
+        // Cache-bust guard.js when the plugin tip moves (raw <script src>, not AMD).
+        $guardver = (string) (get_config('local_videowatch', 'version') ?: '0');
+
         return [
             'videowatch_enabled' => true,
             'videowatch_cmid' => $cmid,
             'videowatch_sesskey' => sesskey(),
             'videowatch_url' => (new \moodle_url('/local/videowatch/progress.php'))->out(false),
-            'videowatch_frontier' => self::frontier_seconds($cmid, $userid),
-            'videowatch_guardscript' => (new \moodle_url('/local/videowatch/guard.js'))->out(false),
+            'videowatch_frontier' => $frontier,
+            'videowatch_duration' => $duration,
+            'videowatch_required' => $required,
+            'videowatch_pct' => $pct,
+            'videowatch_completed' => $completed,
+            'videowatch_guardscript' => (new \moodle_url('/local/videowatch/guard.js', ['v' => $guardver]))->out(false),
             'videowatch_notice' => get_string('watchnotice', 'local_videowatch'),
         ];
     }

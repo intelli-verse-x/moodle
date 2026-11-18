@@ -129,5 +129,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111707, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111708) {
+        // Fellow lesson UX Slice 2: live watch progress bar + Done without reload.
+        upgrade_plugin_savepoint(true, 2026111708, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111709) {
+        // Slice 2 tweak: stepped watch % in phase playlist; drop under-video notice.
+        upgrade_plugin_savepoint(true, 2026111709, 'local', 'launchpad');
+    }
+
     return true;
 }

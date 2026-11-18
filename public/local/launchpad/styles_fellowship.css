@@ -10128,6 +10128,66 @@ a.lp-lesson-playlist-link:hover {
   font-size: 11.5px;
   color: var(--lp-muted, #667085);
 }
+.lp-videowatch-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.15rem;
+  padding-left: 1.55rem; /* align under playlist name (past mark) */
+}
+.lp-videowatch-bar-playlist {
+  width: 100%;
+  box-sizing: border-box;
+}
+.lp-videowatch-bar-track {
+  flex: 1;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+.lp-videowatch-bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 0.2s ease;
+}
+.lp-videowatch-bar.is-complete .lp-videowatch-bar-fill {
+  background: #15803d;
+}
+.lp-videowatch-bar-label {
+  min-width: 2.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+  text-align: right;
+}
+.lp-videowatch-toast {
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.4rem 0.55rem;
+  padding-left: 1.55rem;
+  border-radius: 0.45rem;
+  background: #ecfdf5;
+  color: #166534;
+  font-size: 0.75rem;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.lp-videowatch-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+[data-lp-activity-next].is-watch-complete {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
+.lp-lesson-playlist-item.is-current {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .lp-lesson-nav {
   display: flex;
   flex-wrap: wrap;

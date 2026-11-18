@@ -357,6 +357,19 @@ final class activity_portal {
             $lesson['lesson_back_url'] = $courseurl;
         }
 
+        // Slice 2: stepped watch bar on the current playlist row (This phase), not under the video.
+        if (!empty($videowatch['videowatch_enabled']) && !empty($shell['playlist']) && is_array($shell['playlist'])) {
+            foreach ($shell['playlist'] as $idx => $item) {
+                if (!empty($item['current'])) {
+                    $shell['playlist'][$idx]['show_watch_bar'] = true;
+                    $shell['playlist'][$idx]['watch_pct'] = (int) ($videowatch['videowatch_pct'] ?? 0);
+                    $shell['playlist'][$idx]['watch_completed'] = !empty($videowatch['videowatch_completed']);
+                } else {
+                    $shell['playlist'][$idx]['show_watch_bar'] = false;
+                }
+            }
+        }
+
         return [
             'is_activity' => true,
             'is_home' => false,
@@ -419,6 +432,10 @@ final class activity_portal {
             'videowatch_sesskey' => '',
             'videowatch_url' => '',
             'videowatch_frontier' => 0,
+            'videowatch_duration' => 0,
+            'videowatch_required' => 0,
+            'videowatch_pct' => 0,
+            'videowatch_completed' => false,
             'videowatch_guardscript' => '',
             'videowatch_notice' => '',
         ];
