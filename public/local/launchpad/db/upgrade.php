@@ -139,5 +139,25 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111709, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111710) {
+        // Fellow lesson UX Slice 3: Moodle VideoJS stage + downloads under player.
+        upgrade_plugin_savepoint(true, 2026111710, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111711) {
+        // Slice 3 fix: flush VideoJS AMD/CSS in custom Fellow/Employer shells.
+        upgrade_plugin_savepoint(true, 2026111711, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111712) {
+        // Slice 3 fix: also flush top-of-body JS (javascript-static / M.util.js_pending) so VideoJS boots.
+        upgrade_plugin_savepoint(true, 2026111712, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111713) {
+        // Slice 3: click-open speed menu, custom speed UI, quality gear for Moodle-stored videos.
+        upgrade_plugin_savepoint(true, 2026111713, 'local', 'launchpad');
+    }
+
     return true;
 }

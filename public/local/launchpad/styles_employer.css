@@ -2575,7 +2575,54 @@ a.lp-bdg {
   max-height: min(70vh, 480px);
   background: #000;
 }
+.lp-activity-videojs {
+  width: 100%;
+  background: #000;
+}
+.lp-activity-videojs .video-js {
+  width: 100% !important;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.lp-activity-videojs .video-js .vjs-control-bar {
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  height: 3.25rem;
+}
+.lp-activity-videojs .video-js.vjs-workinghover .vjs-menu-button-popup.vjs-hover .vjs-menu {
+  display: none !important;
+}
+.lp-activity-videojs .video-js .vjs-menu-button-popup.vjs-lock-showing .vjs-menu {
+  display: block !important;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+  background: linear-gradient(180deg, #13284f 0%, #0b1b3a 100%);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  max-height: 14rem;
+  padding: 0.25rem 0;
+  overflow-y: auto;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item {
+  color: #fff;
+  text-align: center;
+  padding: 0.4em 0.55em;
+  margin: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item.vjs-selected {
+  background: #fff;
+  color: #0b1b3a;
+  font-weight: 700;
+}
+.lp-activity-videojs .lp-vjs-quality .lp-vjs-gear-icon {
+  display: block;
+  margin: 0 auto;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+}
 .lp-activity-video {
+
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;

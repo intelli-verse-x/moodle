@@ -91,12 +91,28 @@
                   hidden
                 ></div>
               {{/videowatch_enabled}}
-              <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
-                <source src="{{videourl}}" type="video/mp4">
-              </video>
+              {{#hasvideoembed}}
+                <div class="lp-activity-videojs" data-lp-video-player data-lp-video-qualities='{{{videoqualities_json}}}'>
+                  {{{videoembedhtml}}}
+                </div>
+              {{/hasvideoembed}}
+              {{^hasvideoembed}}
+                <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
+                  <source src="{{videourl}}" type="video/mp4">
+                </video>
+              {{/hasvideoembed}}
               {{#videowatch_enabled}}
                 <script src="{{videowatch_guardscript}}"></script>
               {{/videowatch_enabled}}
+              {{#has_video_resources}}
+                <ul class="lp-activity-files" data-lp-video-resources>
+                  {{#video_resources}}
+                    <li>
+                      <a class="lp-activity-file" href="{{url}}">{{displayname}}</a>
+                    </li>
+                  {{/video_resources}}
+                </ul>
+              {{/has_video_resources}}
             </div>
           {{/hasvideo}}
 

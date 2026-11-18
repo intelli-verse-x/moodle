@@ -557,6 +557,7 @@ if ($selected && $outline === null) {
 }
 
 $content = '';
+$needvideojs = false;
 $pagetitle = $lpstr('fellowship_area_heading', null, 'Fellowship');
 $nocourses = $lpstr(
     'fellowship_no_courses',
@@ -640,6 +641,8 @@ switch ($view) {
         $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
         $modtype = (string) ($act['modtype'] ?? '');
         $showjudging = in_array($modtype, ['assign', 'quiz'], true);
+        // Slice 3: custom shell must flush Moodle AMD so media_videojs/loader can upgrade the player.
+        $needvideojs = !empty($act['hasvideoembed']);
 
         $quizui = [];
         if ($modtype === 'quiz') {
@@ -698,6 +701,7 @@ switch ($view) {
                 'playlistdone' => get_string('fellowship_playlist_done', 'local_launchpad'),
                 'videowatchprogress' => get_string('fellowship_videowatch_progress', 'local_launchpad'),
                 'videowatchdone' => get_string('fellowship_videowatch_done', 'local_launchpad'),
+                'videoresources' => get_string('fellowship_video_resources', 'local_launchpad'),
                 'assignbrief' => get_string('fellowship_assign_brief', 'local_launchpad'),
                 'assignbriefmissing' => get_string('fellowship_assign_brief_missing', 'local_launchpad'),
                 'assigndeliverable' => get_string('fellowship_assign_deliverable', 'local_launchpad'),
@@ -1583,6 +1587,11 @@ echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
+if (!empty($needvideojs)) {
+    // VideoJS CSS + Moodle AMD/RequireJS head (loader registered during activity_portal export).
+    echo '<link rel="stylesheet" href="' . s((new moodle_url('/media/player/videojs/styles.css'))->out(false)) . '">' . "\n";
+    echo $PAGE->requires->get_head_code($PAGE, $OUTPUT);
+}
 echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '</head>' . "\n";
 $bodyclass = 'local-launchpad-fellowship';
@@ -1590,7 +1599,16 @@ if (!empty($mismatch['show_portal_mismatch'])) {
     $bodyclass .= ' lp-portal-mismatch-lock';
 }
 echo '<body class="' . $bodyclass . '">' . "\n";
+if (!empty($needvideojs)) {
+    // javascript-static.js + jQuery/YUI live here — without this, media_videojs/loader dies on M.util.js_pending.
+    echo $PAGE->requires->get_top_of_body_code($OUTPUT);
+}
 echo $shell;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
+if (!empty($needvideojs)) {
+    echo $PAGE->requires->get_end_code();
+    // After AMD end_code so media_videojs/video-lazy is available for quality switching.
+    echo '<script src="' . s($pluginbase . '/video_player.js?v=' . rawurlencode($assetv)) . '" defer></script>' . "\n";
+}
 echo '</body>' . "\n";
 echo '</html>';

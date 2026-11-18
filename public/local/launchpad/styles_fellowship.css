@@ -10460,19 +10460,164 @@ a.lp-lesson-playlist-link:hover {
 }
 .lp-activity-player {
   width: 100%;
-  max-width: 720px;
+  max-width: min(960px, 100%);
   border-radius: 12px;
   overflow: hidden;
   background: #0D1429;
   border: 1px solid var(--lp-line);
 }
-.lp-activity-player video {
+.lp-activity-player video,
+.lp-activity-videojs .video-js,
+.lp-activity-videojs video {
   display: block;
   width: 100%;
   height: auto;
-  max-height: min(70vh, 480px);
+  max-height: min(72vh, 560px);
   background: #000;
   vertical-align: middle;
+}
+.lp-activity-videojs {
+  width: 100%;
+  background: #000;
+}
+.lp-activity-videojs .mediaplugin,
+.lp-activity-videojs .mediaplugin > div {
+  max-width: 100% !important;
+  width: 100%;
+}
+.lp-activity-videojs .video-js {
+  width: 100% !important;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: min(56vw, 420px);
+}
+.lp-activity-videojs .video-js .vjs-big-play-button {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: none;
+  width: 4rem;
+  height: 4rem;
+  margin: 0;
+  line-height: 4rem;
+  background: rgba(37, 99, 235, 0.92);
+}
+.lp-activity-videojs .video-js .vjs-control-bar {
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  height: 3.25rem;
+  font-size: 13px;
+  padding: 0 0.35rem 0.15rem;
+}
+/* Click-only menus (kill VideoJS hover-open). */
+.lp-activity-videojs .video-js.vjs-workinghover .vjs-menu-button-popup.vjs-hover .vjs-menu,
+.lp-activity-videojs .lp-vjs-click-menus.vjs-workinghover .vjs-menu-button-popup.vjs-hover .vjs-menu {
+  display: none !important;
+}
+.lp-activity-videojs .video-js .vjs-menu-button-popup.vjs-lock-showing .vjs-menu,
+.lp-activity-videojs .video-js .vjs-menu-button-popup .vjs-menu.vjs-lock-showing {
+  display: block !important;
+}
+/* Hide unused chrome — keep play / volume / time / progress / rate / quality / fullscreen. */
+.lp-activity-videojs .lp-vjs-skin .vjs-picture-in-picture-control,
+.lp-activity-videojs .lp-vjs-skin .vjs-chapters-button,
+.lp-activity-videojs .lp-vjs-skin .vjs-descriptions-button,
+.lp-activity-videojs .lp-vjs-skin .vjs-audio-button,
+.lp-activity-videojs .lp-vjs-skin .vjs-remaining-time,
+.lp-activity-videojs .lp-vjs-skin .vjs-skip-backward-undefined,
+.lp-activity-videojs .lp-vjs-skin .vjs-skip-forward-undefined {
+  display: none !important;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-playback-rate .vjs-playback-rate-value {
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 3.25rem;
+  letter-spacing: 0.02em;
+}
+/* Custom speed / quality popup — dark navy + white selected (ref). */
+.lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu {
+  width: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 2.6rem;
+  height: auto;
+  bottom: 0;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+  background: #0b1b3a;
+  background: linear-gradient(180deg, #13284f 0%, #0b1b3a 100%);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  max-height: 14rem;
+  bottom: 0;
+  padding: 0.25rem 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9aa3b5 #e8ecf3;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar {
+  width: 10px;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar-track {
+  background: #e8ecf3;
+  border-radius: 0 6px 6px 0;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content::-webkit-scrollbar-thumb {
+  background: #9aa3b5;
+  border-radius: 999px;
+  border: 2px solid #e8ecf3;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item {
+  color: #fff;
+  font-size: 0.92em;
+  font-weight: 500;
+  text-align: center;
+  padding: 0.4em 0.55em;
+  margin: 0.1em 0.35em;
+  border-radius: 4px;
+  text-transform: none;
+  line-height: 1.25;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item:hover,
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item:focus {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item.vjs-selected,
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item.vjs-selected:hover,
+.lp-activity-videojs .lp-vjs-skin .vjs-menu li.vjs-menu-item.vjs-selected:focus {
+  background: #fff;
+  color: #0b1b3a;
+  font-weight: 700;
+}
+.lp-activity-videojs .lp-vjs-quality {
+  cursor: pointer;
+  width: 3em;
+}
+.lp-activity-videojs .lp-vjs-quality .lp-vjs-gear-icon {
+  display: block;
+  margin: 0 auto;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.95;
+}
+.lp-activity-videojs .lp-vjs-quality.vjs-lock-showing .lp-vjs-gear-icon {
+  opacity: 1;
+}
+.lp-activity-videojs .lp-vjs-quality .vjs-menu {
+  width: 6.5rem;
+}
+.lp-activity-video-resources {
+  padding: 0.85rem 1rem 1rem;
+  background: #fff;
+  border-top: 1px solid var(--lp-line);
+}
+.lp-activity-video-resources-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: #0f172a;
 }
 .lp-activity-video {
   position: relative;

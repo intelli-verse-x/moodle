@@ -182,8 +182,15 @@ final class activity_portal {
         $hasembed = false;
         $videourl = '';
         $hasvideo = false;
+        $videoembedhtml = '';
+        $hasvideoembed = false;
+        $videoqualities = [];
+        /** @var \moodle_url|null */
+        $videoembedurl = null;
         $files = [];
         $hasfiles = false;
+        $videoresources = [];
+        $hasvideoresources = false;
         $videowatch = self::empty_videowatch();
         $isinportal = self::is_portal_renderable($modname);
         $needsengine = !$isinportal;
@@ -260,7 +267,7 @@ final class activity_portal {
                 }
                 $mimetype = (string) $file->get_mimetype();
                 $isvideo = str_starts_with($mimetype, 'video/');
-                $streamurl = \moodle_url::make_pluginfile_url(
+                $streammoodleurl = \moodle_url::make_pluginfile_url(
                     $context->id,
                     'mod_resource',
                     'content',
@@ -268,7 +275,8 @@ final class activity_portal {
                     $file->get_filepath(),
                     $file->get_filename(),
                     false
-                )->out(false);
+                );
+                $streamurl = $streammoodleurl->out(false);
                 $downloadurl = \moodle_url::make_pluginfile_url(
                         $context->id,
                         'mod_resource',
@@ -278,10 +286,11 @@ final class activity_portal {
                     $file->get_filename(),
                     true
                 )->out(false);
-                // First video file plays in-shell (Udemy-style showcase player).
+                // First video file plays in-shell (Slice 3: Moodle VideoJS when possible).
                 if ($isvideo && !$hasvideo) {
                     $hasvideo = true;
                     $videourl = $streamurl;
+                    $videoembedurl = $streammoodleurl;
                 }
                 $card = self::describe_resource_file($file, $context);
                 $files[] = array_merge($card, [
@@ -291,6 +300,94 @@ final class activity_portal {
                 ]);
             }
             $hasfiles = $files !== [];
+            // Supporting downloads under the player (non-video files on the same resource).
+            if ($hasvideo) {
+                foreach ($files as $card) {
+                    if (empty($card['isvideo'])) {
+                        $videoresources[] = $card;
+                    }
+                }
+                $hasvideoresources = $videoresources !== [];
+            }
+            // Slice 3: Moodle core_media_manager → VideoJS (same path as mod_resource).
+            // Stock resource embed uses resource->revision as the pluginfile itemid (cache-bust).
+            if ($hasvideo && $videoembedurl instanceof \moodle_url) {
+                global $PAGE;
+                $videofile = null;
+                foreach ($stored as $candidate) {
+                    if ($candidate->is_directory()) {
+                        continue;
+                    }
+                    if (str_starts_with((string) $candidate->get_mimetype(), 'video/')) {
+                        $videofile = $candidate;
+                        break;
+                    }
+                }
+                if ($videofile instanceof \stored_file) {
+                    $videoembedurl = \moodle_url::make_pluginfile_url(
+                        $context->id,
+                        'mod_resource',
+                        'content',
+                        (int) ($resource->revision ?? 0),
+                        $videofile->get_filepath(),
+                        $videofile->get_filename(),
+                        false
+                    );
+                    $videourl = $videoembedurl->out(false);
+                }
+                // Quality variants: every video file in this resource (Moodle pluginfile).
+                // Filename hints like "1080p" / "720p" become labels; otherwise JS uses height.
+                $videoqualities = [];
+                foreach ($stored as $candidate) {
+                    if ($candidate->is_directory()) {
+                        continue;
+                    }
+                    if (!str_starts_with((string) $candidate->get_mimetype(), 'video/')) {
+                        continue;
+                    }
+                    $qurl = \moodle_url::make_pluginfile_url(
+                        $context->id,
+                        'mod_resource',
+                        'content',
+                        (int) ($resource->revision ?? 0),
+                        $candidate->get_filepath(),
+                        $candidate->get_filename(),
+                        false
+                    );
+                    $videoqualities[] = [
+                        'src' => $qurl->out(false),
+                        'type' => (string) $candidate->get_mimetype(),
+                        'label' => self::video_quality_label_from_filename($candidate->get_filename()),
+                        'filename' => $candidate->get_filename(),
+                        'filesize' => (int) $candidate->get_filesize(),
+                    ];
+                }
+                usort($videoqualities, static function (array $a, array $b): int {
+                    $ha = self::video_quality_sort_height($a['label']);
+                    $hb = self::video_quality_sort_height($b['label']);
+                    if ($ha !== $hb) {
+                        return $hb <=> $ha;
+                    }
+                    return ($b['filesize'] ?? 0) <=> ($a['filesize'] ?? 0);
+                });
+                $mediamanager = \core_media_manager::instance($PAGE);
+                // Omit OPTION_BLOCK — LaunchPad already wraps the stage (.lp-activity-player).
+                $embedoptions = [
+                    \core_media_manager::OPTION_TRUSTED => true,
+                ];
+                if ($mediamanager->can_embed_url($videoembedurl, $embedoptions)) {
+                    // Trust core embed HTML as-is. Do not format_text/filter — mediaplugin
+                    // would nest a second VideoJS wrapper and LaunchPad shells flush JS separately.
+                    $videoembedhtml = $mediamanager->embed_url(
+                        $videoembedurl,
+                        $titleplain !== '' ? $titleplain : $title,
+                        0,
+                        0,
+                        $embedoptions
+                    );
+                    $hasvideoembed = trim($videoembedhtml) !== '';
+                }
+            }
             // Slice 0: mount local_videowatch guard when this file is a deferred video.
             if ($hasvideo && class_exists(\local_videowatch\policy::class)
                     && method_exists(\local_videowatch\policy::class, 'export_mount')) {
@@ -411,8 +508,17 @@ final class activity_portal {
                 'hasembed' => $hasembed,
                 'videourl' => $videourl,
                 'hasvideo' => $hasvideo,
+                'videoembedhtml' => $videoembedhtml,
+                'hasvideoembed' => $hasvideoembed,
+                'videoqualities_json' => json_encode(
+                    array_values($videoqualities),
+                    JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS
+                ),
+                'video_resources' => $videoresources,
+                'has_video_resources' => $hasvideoresources,
                 'files' => $files,
-                'hasfiles' => $hasfiles && !$hasvideo, // When playing video, don't duplicate as a file list.
+                // Non-video resource lists; video case uses video_resources under the player.
+                'hasfiles' => $hasfiles && !$hasvideo,
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
                 'is_lesson' => $islesson,
@@ -1256,6 +1362,26 @@ final class activity_portal {
             'url' => self::fellow_url((int) $target->id),
             'modname' => (string) $target->modname,
         ];
+    }
+
+    /**
+     * Quality label from filename hints (e.g. lesson-1080p.mp4 → 1080p).
+     */
+    private static function video_quality_label_from_filename(string $filename): string {
+        if (preg_match('/\b(2160|1440|1080|720|480|360|240)p\b/i', $filename, $m)) {
+            return $m[1] . 'p';
+        }
+        return '';
+    }
+
+    /**
+     * Sort key for quality labels (higher first). Unknown labels sort last.
+     */
+    private static function video_quality_sort_height(string $label): int {
+        if (preg_match('/^(\d+)p$/i', trim($label), $m)) {
+            return (int) $m[1];
+        }
+        return 0;
     }
 
     /**

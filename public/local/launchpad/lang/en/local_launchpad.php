@@ -1446,6 +1446,7 @@ $string['fellowship_playlist_todo'] = 'To do';
 $string['fellowship_playlist_untracked'] = 'Not tracked';
 $string['fellowship_videowatch_progress'] = 'Watch progress';
 $string['fellowship_videowatch_done'] = 'Lesson marked done — continue when you are ready.';
+$string['fellowship_video_resources'] = 'Downloads';
 $string['fellowship_assign_brief'] = 'Brief';
 $string['fellowship_assign_brief_missing'] = 'No brief published yet. Ask your programme if this assignment should have instructions.';
 $string['fellowship_assign_deliverable'] = 'Deliverable';

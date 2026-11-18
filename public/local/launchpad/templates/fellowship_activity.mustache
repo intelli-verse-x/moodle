@@ -2,7 +2,8 @@
     @template local_launchpad/fellowship_activity
 
     Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource/quiz/assign in-shell).
-    Slice 0: local_videowatch guard on video resources. Slice 1: phase playlist + prev/next chrome.
+    Slice 0: videowatch guard. Slice 1: playlist + prev/next. Slice 2: live Done/progress.
+    Slice 3: Moodle VideoJS stage + supporting downloads under player.
 }}
 {{#activity}}
   <div class="lp-activity-page" data-region="fellowship-activity">
@@ -204,10 +205,17 @@
                   hidden
                 ></div>
               {{/videowatch_enabled}}
-              <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
-                <source src="{{videourl}}" type="video/mp4">
-                Your browser does not support HTML5 video.
-              </video>
+              {{#hasvideoembed}}
+                <div class="lp-activity-videojs" data-lp-video-player data-lp-video-qualities='{{{videoqualities_json}}}'>
+                  {{{videoembedhtml}}}
+                </div>
+              {{/hasvideoembed}}
+              {{^hasvideoembed}}
+                <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
+                  <source src="{{videourl}}" type="video/mp4">
+                  Your browser does not support HTML5 video.
+                </video>
+              {{/hasvideoembed}}
               {{#videowatch_enabled}}
                 <script src="{{videowatch_guardscript}}"></script>
                 <script>
@@ -250,6 +258,32 @@
                 })();
                 </script>
               {{/videowatch_enabled}}
+              {{#has_video_resources}}
+                <div class="lp-activity-video-resources" data-lp-video-resources>
+                  <h3 class="lp-activity-video-resources-title">{{strings.videoresources}}</h3>
+                  <ul class="lp-activity-files">
+                    {{#video_resources}}
+                      <li>
+                        <a class="lp-activity-file{{#isimage}} has-thumb{{/isimage}}" href="{{url}}" title="{{filename}} — {{download_label}}">
+                          {{#isimage}}
+                            <span class="lp-activity-file-thumb" aria-hidden="true">
+                              <img src="{{previewurl}}" alt="">
+                            </span>
+                          {{/isimage}}
+                          {{^isimage}}
+                            <span class="lp-activity-file-ico" aria-hidden="true">{{#ext}}{{ext}}{{/ext}}{{^ext}}FILE{{/ext}}</span>
+                          {{/isimage}}
+                          <span class="lp-activity-file-body">
+                            <span class="lp-activity-file-name">{{displayname}}</span>
+                            <span class="lp-activity-file-meta">{{size}} · {{download_label}}</span>
+                          </span>
+                          <span class="lp-activity-file-action" aria-hidden="true">↓</span>
+                        </a>
+                      </li>
+                    {{/video_resources}}
+                  </ul>
+                </div>
+              {{/has_video_resources}}
             </div>
           {{/hasvideo}}
 
