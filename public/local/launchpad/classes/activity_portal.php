@@ -539,7 +539,7 @@ final class activity_portal {
                 // Length only when videowatch already measured a real duration.
                 'has_video_length' => !empty($videowatch['videowatch_enabled'])
                     && (int) ($videowatch['videowatch_duration'] ?? 0) > 0,
-                'video_length_label' => self::format_video_length_label(
+                'video_length_meta' => self::format_video_length_meta(
                     (int) ($videowatch['videowatch_duration'] ?? 0)
                 ),
                 'files' => $files,
@@ -554,23 +554,49 @@ final class activity_portal {
 
     /**
      * Short length label from a real videowatch duration (seconds). Empty if unknown.
+     * Falls back to plain English when lang cache is stale so UI never shows [[keys]].
      */
     public static function format_video_length_label(int $seconds): string {
         if ($seconds <= 0) {
             return '';
         }
+        $sm = get_string_manager();
         if ($seconds < 60) {
-            return get_string('fellowship_video_length_sec', 'local_launchpad', $seconds);
+            if ($sm->string_exists('fellowship_video_length_sec', 'local_launchpad')) {
+                return get_string('fellowship_video_length_sec', 'local_launchpad', $seconds);
+            }
+            return '~' . $seconds . ' sec';
         }
         $mins = (int) floor($seconds / 60);
         $rem = $seconds % 60;
         if ($rem === 0) {
-            return get_string('fellowship_video_length_min', 'local_launchpad', $mins);
+            if ($sm->string_exists('fellowship_video_length_min', 'local_launchpad')) {
+                return get_string('fellowship_video_length_min', 'local_launchpad', $mins);
+            }
+            return '~' . $mins . ' min';
         }
-        return get_string('fellowship_video_length_minsec', 'local_launchpad', (object) [
-            'min' => $mins,
-            'sec' => $rem,
-        ]);
+        if ($sm->string_exists('fellowship_video_length_minsec', 'local_launchpad')) {
+            return get_string('fellowship_video_length_minsec', 'local_launchpad', (object) [
+                'min' => $mins,
+                'sec' => $rem,
+            ]);
+        }
+        return '~' . $mins . ' min ' . $rem . 's';
+    }
+
+    /**
+     * Meta line for video length, e.g. "Length: ~24 sec". Empty when duration unknown.
+     */
+    public static function format_video_length_meta(int $seconds): string {
+        $value = self::format_video_length_label($seconds);
+        if ($value === '') {
+            return '';
+        }
+        $sm = get_string_manager();
+        if ($sm->string_exists('fellowship_video_length', 'local_launchpad')) {
+            return get_string('fellowship_video_length', 'local_launchpad') . ': ' . $value;
+        }
+        return 'Length: ' . $value;
     }
 
     /**

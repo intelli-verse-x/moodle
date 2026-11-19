@@ -136,7 +136,7 @@
           {{/shell_has_phase}}
           {{#has_video_length}}
             <span aria-hidden="true">·</span>
-            <span>{{strings.videolength}}: {{video_length_label}}</span>
+            <span>{{video_length_meta}}</span>
           {{/has_video_length}}
         </p>
 
@@ -819,33 +819,11 @@
           {{/is_quiz}}
         {{/needsengine}}
 
-        {{#nav_has_either}}
+        {{#nav_has_prev}}
           <nav class="lp-lesson-nav" data-lp-activity-nav aria-label="{{strings.lessonnav}}">
-            {{#nav_has_prev}}
-              <a class="lp-btn lp-btn-light" href="{{nav_prev_url}}" data-lp-activity-prev>{{strings.lessonprev}}: {{nav_prev_name}}</a>
-            {{/nav_has_prev}}
-            {{^nav_has_prev}}
-              <span class="lp-lesson-nav-spacer" aria-hidden="true"></span>
-            {{/nav_has_prev}}
-            {{#nav_has_next}}
-              {{#nav_next_locked}}
-                <span
-                  class="lp-btn lp-btn-solid lp-lesson-nav-next is-locked"
-                  data-lp-activity-next
-                  data-lp-next-locked="1"
-                  data-lp-next-url="{{nav_next_url}}"
-                  tabindex="0"
-                  role="link"
-                  aria-disabled="true"
-                  title="{{strings.lessonnextlocked}}"
-                >{{strings.lessonnext}}: {{nav_next_name}}</span>
-              {{/nav_next_locked}}
-              {{^nav_next_locked}}
-                <a class="lp-btn lp-btn-solid lp-lesson-nav-next" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
-              {{/nav_next_locked}}
-            {{/nav_has_next}}
+            <a class="lp-btn lp-btn-light" href="{{nav_prev_url}}" data-lp-activity-prev>{{strings.lessonprev}}: {{nav_prev_name}}</a>
           </nav>
-        {{/nav_has_either}}
+        {{/nav_has_prev}}
       </div>
     </article>
     </div>

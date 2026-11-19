@@ -179,5 +179,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111717, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111718) {
+        // Fix video length meta when lang cache is stale; drop duplicate bottom Next.
+        upgrade_plugin_savepoint(true, 2026111718, 'local', 'launchpad');
+    }
+
     return true;
 }
