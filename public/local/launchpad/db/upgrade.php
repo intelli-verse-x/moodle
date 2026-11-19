@@ -194,5 +194,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111720, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111721) {
+        // Assign file dropzone: PDF/DOCX only, 1 file, Moodle file plugin + size/type checks.
+        upgrade_plugin_savepoint(true, 2026111721, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111722) {
+        // Draft Remove file; honour assignsubmission_file max files/size/types; submitted stays locked.
+        upgrade_plugin_savepoint(true, 2026111722, 'local', 'launchpad');
+    }
+
     return true;
 }

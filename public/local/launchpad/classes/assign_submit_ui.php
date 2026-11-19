@@ -63,17 +63,16 @@ final class assign_submit_ui {
         $attemptnumber = $submission ? ((int) $submission->attemptnumber + 1) : 0;
         $statuskey = self::status_key($substatus);
 
+        // Product rule (prototype): after Submit for review the attempt is locked.
+        // Upload/edit returns only when Moodle reopens (REOPENED) or while still a draft.
+        // Do not treat Moodle "submissiondrafts + can_edit submitted" as editable here.
         $canedit = false;
         if ($assign->submissions_open($userid) && $assign->is_any_submission_plugin_enabled()) {
             if (!$submission
                 || $substatus === ASSIGN_SUBMISSION_STATUS_NEW
                 || $substatus === ASSIGN_SUBMISSION_STATUS_DRAFT
                 || $substatus === ASSIGN_SUBMISSION_STATUS_REOPENED) {
-                $canedit = true;
-            } else if ($substatus === ASSIGN_SUBMISSION_STATUS_SUBMITTED
-                && !empty($instance->submissiondrafts)
-                && $assign->can_edit_submission($userid, $userid)) {
-                $canedit = true;
+                $canedit = $assign->can_edit_submission($userid, $userid);
             }
         }
 
@@ -107,8 +106,11 @@ final class assign_submit_ui {
                 if ($storedfile->is_directory()) {
                     continue;
                 }
+                $fname = $storedfile->get_filename();
+                $ext = strtoupper(pathinfo($fname, PATHINFO_EXTENSION) ?: 'FILE');
                 $currentfiles[] = [
-                    'filename' => $storedfile->get_filename(),
+                    'filename' => $fname,
+                    'ext' => $ext,
                     'filesize' => display_size($storedfile->get_filesize()),
                     'url' => \moodle_url::make_pluginfile_url(
                         $storedfile->get_contextid(),
@@ -306,9 +308,25 @@ final class assign_submit_ui {
             $flasherr = get_string('fellowship_assign_err_uploadpartial', 'local_launchpad');
         } else if ($flash === 'uploadfail') {
             $flasherr = get_string('fellowship_assign_err_uploadfail', 'local_launchpad');
+        } else if ($flash === 'filetype') {
+            $flasherr = get_string('fellowship_assign_err_filetype', 'local_launchpad');
+        } else if ($flash === 'filemax') {
+            $flasherr = get_string('fellowship_assign_err_filemax', 'local_launchpad');
+        } else if ($flash === 'removed') {
+            $flashok = get_string('fellowship_assign_file_removed', 'local_launchpad');
         } else if ($flash === 'error') {
             $flasherr = get_string('fellowship_assign_err_generic', 'local_launchpad');
         }
+
+        $filerules = $hasfile && $fileplugin
+            ? self::file_upload_rules($fileplugin)
+            : [
+                'extensions' => [],
+                'maxbytes' => 0,
+                'maxfiles' => 0,
+                'accept' => '',
+                'hint' => '',
+            ];
 
         return [
             'assign_needsengine' => false,
@@ -316,6 +334,25 @@ final class assign_submit_ui {
             'assign_can_edit' => $canedit,
             'assign_has_text' => $hastext,
             'assign_has_file' => $hasfile,
+            'assign_file_accept' => $filerules['accept'],
+            'assign_file_rules_hint' => $filerules['hint'],
+            'assign_work_heading' => $attemptnumber > 0
+                ? get_string('fellowship_assign_work_attempt', 'local_launchpad', $attemptnumber)
+                : get_string('fellowship_assign_work_new', 'local_launchpad'),
+            'assign_drop_title' => get_string('fellowship_assign_drop_title', 'local_launchpad'),
+            'assign_choose_file' => get_string('fellowship_assign_choose_file', 'local_launchpad'),
+            'assign_nothing_yet' => get_string('fellowship_assign_nothing_yet', 'local_launchpad'),
+            'assign_has_attached' => $currentfiles !== [],
+            'assign_attached_label' => get_string('fellowship_assign_attached', 'local_launchpad'),
+            'assign_can_remove_file' => $canedit && $hasfile && $currentfiles !== []
+                && in_array($statuskey, ['draft', 'reopened', 'none'], true),
+            'assign_remove_file_label' => get_string('fellowship_assign_remove_file', 'local_launchpad'),
+            'assign_file_max' => (int) ($filerules['maxfiles'] ?? 1),
+            'assign_file_slots_left' => max(0, (int) ($filerules['maxfiles'] ?? 1) - count($currentfiles)),
+            'assign_show_file_drop' => $hasfile && (
+                count($currentfiles) < (int) ($filerules['maxfiles'] ?? 1)
+                || (int) ($filerules['maxfiles'] ?? 1) === 1
+            ),
             'assign_draft_text' => $drafttext,
             'assign_draft_html' => $drafthtml,
             'assign_has_draft_html' => $drafthtml !== '',
@@ -409,10 +446,94 @@ final class assign_submit_ui {
     }
 
     /**
+     * Upload rules from Moodle assignsubmission_file (LaunchPad defaults: pdf/docx, 10MB, 1 file).
+     *
+     * @param \assign_submission_plugin $fileplugin
+     * @return array{extensions:list<string>,maxbytes:int,maxfiles:int,accept:string,hint:string}
+     */
+    public static function file_upload_rules(\assign_submission_plugin $fileplugin): array {
+        $extensions = self::parse_file_extensions((string) $fileplugin->get_config('filetypeslist'));
+        if ($extensions === []) {
+            $extensions = ['pdf', 'docx'];
+        }
+        // Honour Moodle assignsubmission_file admin settings (default 1 when unset).
+        $maxfiles = (int) $fileplugin->get_config('maxfilesubmissions');
+        if ($maxfiles < 1) {
+            $maxfiles = 1;
+        }
+        $maxbytes = (int) $fileplugin->get_config('maxsubmissionsizebytes');
+        if ($maxbytes <= 0) {
+            $maxbytes = 10 * 1024 * 1024;
+        }
+        $accept = '.' . implode(',.', $extensions);
+        $label = strtoupper(implode(' or ', $extensions));
+        $hint = get_string('fellowship_assign_file_rules', 'local_launchpad', (object) [
+            'types' => $label,
+            'size' => display_size($maxbytes),
+            'files' => $maxfiles,
+        ]);
+        return [
+            'extensions' => $extensions,
+            'maxbytes' => $maxbytes,
+            'maxfiles' => $maxfiles,
+            'accept' => $accept,
+            'hint' => $hint,
+        ];
+    }
+
+    /**
+     * @return list<string> lowercase extensions without dots
+     */
+    public static function parse_file_extensions(string $filetypeslist): array {
+        $filetypeslist = trim($filetypeslist);
+        if ($filetypeslist === '') {
+            return [];
+        }
+        $out = [];
+        foreach (preg_split('/[\s,;]+/', $filetypeslist) ?: [] as $part) {
+            $part = strtolower(trim($part));
+            $part = ltrim($part, '.');
+            if ($part === '' || str_contains($part, '/')) {
+                // Skip MIME groups like "document" — LaunchPad keeps explicit extensions.
+                continue;
+            }
+            $out[] = $part;
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Validate $_FILES['assignfile'] against Moodle/plugin rules before draft save.
+     *
+     * @param array<string,mixed> $fileinfo
+     * @param array{extensions:list<string>,maxbytes:int,maxfiles:int,accept:string,hint:string} $rules
+     * @return string|null flash code
+     */
+    public static function validate_uploaded_assign_file(array $fileinfo, array $rules): ?string {
+        $tmp = (string) ($fileinfo['tmp_name'] ?? '');
+        $name = clean_filename((string) ($fileinfo['name'] ?? ''));
+        $size = (int) ($fileinfo['size'] ?? 0);
+        if ($tmp === '' || !is_uploaded_file($tmp) || $name === '') {
+            return 'uploadfail';
+        }
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if ($ext === '' || !in_array($ext, $rules['extensions'], true)) {
+            return 'filetype';
+        }
+        if ($size <= 0) {
+            $size = (int) filesize($tmp);
+        }
+        if ($size > (int) $rules['maxbytes']) {
+            return 'uploadsize';
+        }
+        return null;
+    }
+
+    /**
      * Save draft and/or submit for grading from LaunchPad POST.
      *
      * @return string flash code for redirect
-     *         (saved|submitted|empty|denied|error|uploadsize|uploadpartial|uploadfail)
+     *         (saved|submitted|empty|denied|error|uploadsize|uploadpartial|uploadfail|filetype|filemax|removed)
      */
     public static function process_post(int $cmid, int $userid): string {
         global $CFG, $USER;
@@ -432,6 +553,37 @@ final class assign_submit_ui {
         if (!$assign->submissions_open($userid)) {
             return 'denied';
         }
+        // Moodle truth: submitted/locked attempts cannot be rewritten from LaunchPad.
+        if (!$assign->can_edit_submission($userid, $userid)) {
+            return 'denied';
+        }
+        $existingsub = $assign->get_user_submission($userid, false);
+        $existingstatus = $existingsub ? (string) $existingsub->status : '';
+        // Handed-in attempts stay locked until mentor reopen (ignore Moodle draft-edit-on-submitted).
+        if ($existingstatus === ASSIGN_SUBMISSION_STATUS_SUBMITTED) {
+            return 'denied';
+        }
+
+        $textplugin = $assign->get_submission_plugin_by_type('onlinetext');
+        $hastext = $textplugin && $textplugin->is_enabled();
+        $fileplugin = $assign->get_submission_plugin_by_type('file');
+        $hasfile = $fileplugin && $fileplugin->is_enabled();
+
+        // Draft-only: clear attached files via Moodle assignsubmission_file::remove().
+        if ((bool) optional_param('assign_remove_file', 0, PARAM_BOOL)) {
+            if (!$hasfile || !$existingsub) {
+                return 'denied';
+            }
+            if (!in_array($existingstatus, [
+                ASSIGN_SUBMISSION_STATUS_DRAFT,
+                ASSIGN_SUBMISSION_STATUS_NEW,
+                ASSIGN_SUBMISSION_STATUS_REOPENED,
+            ], true)) {
+                return 'denied';
+            }
+            $fileplugin->remove($existingsub);
+            return 'removed';
+        }
 
         // Honesty: failed / oversized / partial upload must not look saved or submitted.
         $uploadflash = self::file_upload_flash_if_failed();
@@ -442,9 +594,6 @@ final class assign_submit_ui {
         $submit = (bool) optional_param('assign_submit', 0, PARAM_BOOL);
         $text = optional_param('onlinetext', '', PARAM_RAW);
         $statement = optional_param('submissionstatement', 0, PARAM_BOOL);
-
-        $textplugin = $assign->get_submission_plugin_by_type('onlinetext');
-        $hastext = $textplugin && $textplugin->is_enabled();
 
         $data = (object) [
             'userid' => $userid,
@@ -458,21 +607,54 @@ final class assign_submit_ui {
             ];
         }
 
-        // Optional file — only touch the file plugin when a new file was chosen.
-        $fileplugin = $assign->get_submission_plugin_by_type('file');
-        if ($fileplugin && $fileplugin->is_enabled()
+        // File plugin: validate against Moodle assignsubmission_file admin rules.
+        $newfilechosen = $hasfile
             && !empty($_FILES['assignfile']['tmp_name'])
-            && is_uploaded_file($_FILES['assignfile']['tmp_name'])) {
+            && is_uploaded_file($_FILES['assignfile']['tmp_name']);
+        if ($newfilechosen) {
+            $rules = self::file_upload_rules($fileplugin);
+            $check = self::validate_uploaded_assign_file($_FILES['assignfile'], $rules);
+            if ($check !== null) {
+                return $check;
+            }
+            $user = \core_user::get_user($userid, '*', MUST_EXIST);
+            $existingfiles = [];
+            if ($existingsub) {
+                foreach ($fileplugin->get_files($existingsub, $user) as $storedfile) {
+                    if (!$storedfile->is_directory()) {
+                        $existingfiles[] = $storedfile;
+                    }
+                }
+            }
+            $maxfiles = (int) $rules['maxfiles'];
+            // maxfiles=1 → replace; otherwise append until the admin cap.
+            if ($maxfiles === 1) {
+                $existingfiles = [];
+            } else if (count($existingfiles) >= $maxfiles) {
+                return 'filemax';
+            }
+
             $draftid = file_get_unused_draft_itemid();
             $usercontext = \context_user::instance($userid);
             $fs = get_file_storage();
+            $fs->delete_area_files($usercontext->id, 'user', 'draft', $draftid);
+            foreach ($existingfiles as $storedfile) {
+                $fs->create_file_from_storedfile([
+                    'contextid' => $usercontext->id,
+                    'component' => 'user',
+                    'filearea' => 'draft',
+                    'itemid' => $draftid,
+                    'filepath' => $storedfile->get_filepath(),
+                    'filename' => $storedfile->get_filename(),
+                ], $storedfile);
+            }
             $fs->create_file_from_pathname([
                 'contextid' => $usercontext->id,
                 'component' => 'user',
                 'filearea' => 'draft',
                 'itemid' => $draftid,
                 'filepath' => '/',
-                'filename' => clean_filename($_FILES['assignfile']['name']),
+                'filename' => clean_filename((string) $_FILES['assignfile']['name']),
             ], $_FILES['assignfile']['tmp_name']);
             $data->files_filemanager = $draftid;
         }
@@ -481,8 +663,16 @@ final class assign_submit_ui {
         $saved = $assign->save_submission($data, $notices);
         if (!$saved) {
             foreach ($notices as $n) {
-                if (stripos($n, 'empty') !== false) {
+                $low = core_text::strtolower((string) $n);
+                if (str_contains($low, 'empty')) {
                     return 'empty';
+                }
+                if (str_contains($low, 'type') || str_contains($low, 'extension')
+                        || str_contains($low, 'not accepted') || str_contains($low, 'filetype')) {
+                    return 'filetype';
+                }
+                if (str_contains($low, 'size') || str_contains($low, 'large') || str_contains($low, 'bytes')) {
+                    return 'uploadsize';
                 }
             }
             return 'error';

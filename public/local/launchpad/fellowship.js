@@ -3779,6 +3779,33 @@
         if (!form) {
             return;
         }
+        var input = form.querySelector('input[name="assignfile"]');
+        var chosen = form.querySelector('[data-lp-assign-chosen]');
+        if (input && chosen) {
+            input.addEventListener('change', function () {
+                var file = input.files && input.files[0];
+                if (!file) {
+                    chosen.hidden = true;
+                    chosen.textContent = '';
+                    return;
+                }
+                var name = file.name || '';
+                var ext = name.indexOf('.') >= 0 ? name.split('.').pop().toLowerCase() : '';
+                var accept = (input.getAttribute('accept') || '').toLowerCase();
+                var allowed = accept.split(',').map(function (p) {
+                    return p.trim().replace(/^\./, '');
+                }).filter(Boolean);
+                if (allowed.length && allowed.indexOf(ext) === -1) {
+                    input.value = '';
+                    chosen.hidden = false;
+                    chosen.textContent = input.getAttribute('data-lp-assign-filetype-msg')
+                        || 'That file type is not allowed.';
+                    return;
+                }
+                chosen.hidden = false;
+                chosen.textContent = name;
+            });
+        }
         form.addEventListener('submit', function (ev) {
             var submitter = ev.submitter || document.activeElement;
             if (submitter && submitter.getAttribute('name') === 'assign_submit') {

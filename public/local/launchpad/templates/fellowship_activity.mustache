@@ -758,8 +758,8 @@
             {{/assign_has_receipt}}
 
             {{#assign_can_edit}}
-              <section class="lp-lesson-block">
-                <h3 class="lp-lesson-block-title">{{strings.assignsubmitsection}}</h3>
+              <section class="lp-lesson-block lp-assign-work" data-region="assign-work">
+                <h3 class="lp-lesson-block-title">{{assign_work_heading}}</h3>
                 {{#assign_prefilled}}
                   <p class="lp-sm lp-assign-prefill-note">{{assign_prefilled_label}}</p>
                 {{/assign_prefilled}}
@@ -775,11 +775,46 @@
                     </label>
                   {{/assign_has_text}}
                   {{#assign_has_file}}
-                    <label class="lp-field">
-                      <span>{{strings.assignfileupload}}</span>
-                      <input type="file" name="assignfile">
-                      <span class="lp-sm lp-muted">{{strings.assignfilehint}}</span>
-                    </label>
+                    {{#assign_has_attached}}
+                      <div class="lp-assign-attached" data-region="assign-attached">
+                        <p class="lp-sm"><b>{{assign_attached_label}}</b></p>
+                        <ul class="lp-assign-file-list">
+                          {{#assign_current_files}}
+                            <li class="lp-assign-file-chip">
+                              <span class="lp-assign-file-ext" aria-hidden="true">{{ext}}</span>
+                              <a href="{{url}}" target="_blank" rel="noopener">{{filename}}</a>
+                              <span class="lp-muted lp-sm">{{filesize}}</span>
+                            </li>
+                          {{/assign_current_files}}
+                        </ul>
+                        {{#assign_can_remove_file}}
+                          <button type="submit" name="assign_remove_file" value="1" class="lp-btn lp-btn-light lp-btn-sm lp-assign-remove-file">
+                            {{assign_remove_file_label}}
+                          </button>
+                        {{/assign_can_remove_file}}
+                        {{#assign_show_file_drop}}
+                          <p class="lp-xs lp-muted">{{strings.assignfilereplacehint}}</p>
+                        {{/assign_show_file_drop}}
+                      </div>
+                    {{/assign_has_attached}}
+                    {{#assign_show_file_drop}}
+                      <div class="lp-assign-drop" data-region="assign-drop">
+                        <div class="lp-assign-drop-ico" aria-hidden="true">⇪</div>
+                        <p class="lp-assign-drop-title"><b>{{assign_drop_title}}</b></p>
+                        <p class="lp-sm lp-muted">{{assign_file_rules_hint}}</p>
+                        <label class="lp-btn lp-btn-light lp-btn-sm lp-assign-choose">
+                          {{assign_choose_file}}
+                          <input
+                            type="file"
+                            name="assignfile"
+                            accept="{{assign_file_accept}}"
+                            class="lp-assign-file-input"
+                            data-lp-assign-filetype-msg="{{strings.assignfiletypeclient}}"
+                          >
+                        </label>
+                        <p class="lp-sm lp-muted lp-assign-chosen" data-lp-assign-chosen hidden></p>
+                      </div>
+                    {{/assign_show_file_drop}}
                   {{/assign_has_file}}
                   {{#assign_require_statement}}
                     <label class="lp-field lp-field-check">
@@ -789,9 +824,12 @@
                       </span>
                     </label>
                   {{/assign_require_statement}}
-                  <div class="lp-quiz-attempt-actions">
-                    <button type="submit" name="assign_save" value="1" class="lp-btn lp-btn-light">{{strings.assignsavedraft}}</button>
-                    <button type="submit" name="assign_submit" value="1" class="lp-btn lp-btn-solid" data-lp-assign-submit>{{strings.assignsubmit}}</button>
+                  <div class="lp-assign-work-actions">
+                    <p class="lp-sm lp-muted lp-assign-work-status">{{#assign_has_attached}}{{assign_attached_label}}{{/assign_has_attached}}{{^assign_has_attached}}{{assign_nothing_yet}}{{/assign_has_attached}}</p>
+                    <div class="lp-assign-work-btns">
+                      <button type="submit" name="assign_save" value="1" class="lp-btn lp-btn-light">{{strings.assignsavedraft}}</button>
+                      <button type="submit" name="assign_submit" value="1" class="lp-btn lp-btn-solid" data-lp-assign-submit>{{strings.assignsubmit}}</button>
+                    </div>
                   </div>
                 </form>
               </section>

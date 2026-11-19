@@ -14321,13 +14321,111 @@ a.lp-ov-attention-row:focus-visible .lp-ov-attention-title-row b {
 .lp-assign-submit-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   margin-top: 8px;
 }
 .lp-assign-submit-form .lp-field textarea {
   width: 100%;
   min-height: 180px;
   resize: vertical;
+}
+.lp-assign-work .lp-lesson-block-title {
+  margin-bottom: 4px;
+}
+.lp-assign-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+  text-align: center;
+}
+.lp-assign-drop-ico {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1a4fb8;
+  font-size: 20px;
+  font-weight: 700;
+}
+.lp-assign-drop-title {
+  margin: 0;
+  font-size: 15px;
+  color: #0f172a;
+}
+.lp-assign-choose {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.lp-assign-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.lp-assign-chosen:not([hidden]) {
+  margin: 0;
+  color: #1a4fb8;
+  font-weight: 600;
+}
+.lp-assign-attached {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+.lp-assign-remove-file {
+  align-self: flex-start;
+}
+.lp-assign-file-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.lp-assign-file-ext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #e8f0ff;
+  color: #1a4fb8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.lp-assign-work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+.lp-assign-work-status {
+  margin: 0;
+  max-width: 360px;
+}
+.lp-assign-work-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
 }
 .lp-assign-feedback {
   border: 1px solid #f0c36a;

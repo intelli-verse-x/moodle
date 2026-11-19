@@ -725,6 +725,8 @@ switch ($view) {
                 'assignonlinetext' => get_string('fellowship_assign_onlinetext', 'local_launchpad'),
                 'assignfileupload' => get_string('fellowship_assign_fileupload', 'local_launchpad'),
                 'assignfilehint' => get_string('fellowship_assign_filehint', 'local_launchpad'),
+                'assignfilereplacehint' => get_string('fellowship_assign_filereplacehint', 'local_launchpad'),
+                'assignfiletypeclient' => get_string('fellowship_assign_filetype_client', 'local_launchpad'),
                 'assignsavedraft' => get_string('fellowship_assign_savedraft', 'local_launchpad'),
                 'assignsubmit' => get_string('fellowship_assign_submit', 'local_launchpad'),
                 'assignconfirmsubmit' => get_string('fellowship_assign_confirmsubmit', 'local_launchpad'),
