@@ -11734,15 +11734,38 @@ a.lp-lesson-chevron:hover {
   pointer-events: none !important;
 }
 @media (max-width: 900px) {
-  /* Full width only — never stretch to viewport height (Stitch compact 16:9 island). */
+  /* Stitch “Expanded Modern Video”: tighter card chrome, full-bleed 16:9 stage. */
+  .lp-activity-hero {
+    border-radius: 16px;
+  }
+  .lp-activity-hero-copy {
+    padding: 16px 14px 18px;
+  }
+  /* Stage stays padded for downloads; only the player bleeds full card width. */
+  .lp-activity-hero-copy .lp-video-stage {
+    align-self: stretch;
+    width: 100%;
+    max-width: none;
+    margin-top: 8px;
+    margin-bottom: 0;
+  }
+  .lp-activity-hero-copy .lp-video-stage > .lp-activity-player {
+    width: calc(100% + 28px);
+    max-width: none;
+    margin-left: -14px;
+    margin-right: -14px;
+  }
   .lp-video-stage,
   .lp-activity-player {
     width: 100%;
-    max-width: 100%;
+    max-width: none;
     height: auto;
   }
   .lp-activity-player {
-    border-radius: 16px;
+    border-radius: 0; /* square sides like Stitch border-y full-bleed */
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
   }
   .lp-activity-videojs {
     width: 100%;
@@ -11750,6 +11773,7 @@ a.lp-lesson-chevron:hover {
     height: auto !important;
     min-height: 0 !important;
     max-height: none;
+    border-radius: 0;
   }
   .lp-activity-player video,
   .lp-activity-videojs .video-js,
@@ -11774,35 +11798,37 @@ a.lp-lesson-chevron:hover {
     padding-top: 0 !important; /* kill VideoJS fluid padding that fights our box */
     aspect-ratio: auto;
   }
-  /* Stitch compact controls: play · vol · time | 1x · CC · gear · FS */
+  /* Stitch compact controls: play · vol · time | spacer | 1x · CC · gear · FS */
   .lp-activity-videojs .video-js .vjs-control-bar {
-    padding: 2rem 1rem 0.75rem;
+    padding: 1.75rem 0.75rem 0.65rem;
     font-size: 12px;
     gap: 0;
+    justify-content: flex-start;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-progress-control {
-    left: 1rem;
-    right: 1rem;
-    top: 0.65rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: 0.55rem;
     height: 0.9rem !important;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-progress-holder {
-    height: 4px;
+    height: 3px;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-control,
   .lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-quality {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 1.65rem;
+    height: 1.65rem;
+    flex: 0 0 auto;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-play-control {
-    margin-right: 0.35rem;
+    margin-right: 0.2rem;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel,
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel.vjs-volume-panel-horizontal {
-    width: 1.75rem !important;
-    min-width: 1.75rem;
-    height: 1.75rem;
-    margin-right: 0.35rem;
+    width: 1.65rem !important;
+    min-width: 1.65rem;
+    height: 1.65rem;
+    margin-right: 0.2rem;
   }
   /* Icon-only volume on mobile — expanding slider was blowing the row. */
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-control,
@@ -11822,36 +11848,36 @@ a.lp-lesson-chevron:hover {
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-duration,
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-time-divider {
     width: auto !important;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
-    padding: 0 0.05rem;
-    height: 1.75rem;
+    padding: 0 0.04rem;
+    height: 1.65rem;
     letter-spacing: -0.01em;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-playback-rate {
     width: auto;
-    min-width: 1.5rem;
-    height: 1.75rem;
-    margin-left: 0.15rem;
+    min-width: 1.4rem;
+    height: 1.65rem;
+    margin-left: 0;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-playback-rate .vjs-playback-rate-value {
-    height: 1.75rem;
-    font-size: 11px;
+    height: 1.65rem;
+    font-size: 10.5px;
     font-weight: 700;
-    padding: 0 0.2rem;
+    padding: 0 0.15rem;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-subs-caps-button,
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-captions-button,
   .lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-quality,
   .lp-activity-videojs .video-js .vjs-control-bar .vjs-fullscreen-control {
-    width: 1.75rem;
-    height: 1.75rem;
-    margin-left: 0.15rem;
+    width: 1.65rem;
+    height: 1.65rem;
+    margin-left: 0.1rem;
   }
   .lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-spacer {
     flex: 1 1 auto !important;
-    min-width: 0.5rem;
-    height: 1.75rem;
+    min-width: 0.75rem;
+    height: 1.65rem;
   }
   .lp-activity-videojs .lp-vjs-quality .lp-vjs-gear-icon {
     width: 16px;

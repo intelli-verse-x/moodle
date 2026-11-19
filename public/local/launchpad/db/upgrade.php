@@ -289,5 +289,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111743, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111744) {
+        // Mobile video full-bleed in lesson card (Stitch expanded layout); roomier controls.
+        upgrade_plugin_savepoint(true, 2026111744, 'local', 'launchpad');
+    }
+
     return true;
 }
