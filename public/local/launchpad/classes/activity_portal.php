@@ -516,6 +516,12 @@ final class activity_portal {
                 ),
                 'video_resources' => $videoresources,
                 'has_video_resources' => $hasvideoresources,
+                // Length only when videowatch already measured a real duration.
+                'has_video_length' => !empty($videowatch['videowatch_enabled'])
+                    && (int) ($videowatch['videowatch_duration'] ?? 0) > 0,
+                'video_length_label' => self::format_video_length_label(
+                    (int) ($videowatch['videowatch_duration'] ?? 0)
+                ),
                 'files' => $files,
                 // Non-video resource lists; video case uses video_resources under the player.
                 'hasfiles' => $hasfiles && !$hasvideo,
@@ -524,6 +530,27 @@ final class activity_portal {
                 'is_lesson' => $islesson,
             ], $videowatch, $shell, $lesson, $assignbrief, $quizbrief),
         ];
+    }
+
+    /**
+     * Short length label from a real videowatch duration (seconds). Empty if unknown.
+     */
+    public static function format_video_length_label(int $seconds): string {
+        if ($seconds <= 0) {
+            return '';
+        }
+        if ($seconds < 60) {
+            return get_string('fellowship_video_length_sec', 'local_launchpad', $seconds);
+        }
+        $mins = (int) floor($seconds / 60);
+        $rem = $seconds % 60;
+        if ($rem === 0) {
+            return get_string('fellowship_video_length_min', 'local_launchpad', $mins);
+        }
+        return get_string('fellowship_video_length_minsec', 'local_launchpad', (object) [
+            'min' => $mins,
+            'sec' => $rem,
+        ]);
     }
 
     /**
@@ -567,6 +594,31 @@ final class activity_portal {
             ? format_string($sectionname)
             : format_string(get_section_name($course, (int) $cm->sectionnum));
 
+        // Real phase progress from Moodle completion on playlist rows (no cosmetics).
+        $playlistdone = 0;
+        $playlisttotal = count($playlist);
+        $foundcurrent = false;
+        $markedupnext = false;
+        foreach ($playlist as $idx => $item) {
+            if (!empty($item['complete'])) {
+                $playlistdone++;
+            }
+            $playlist[$idx]['is_now'] = !empty($item['current']);
+            $playlist[$idx]['is_up_next'] = false;
+            if (!empty($item['current'])) {
+                $foundcurrent = true;
+                continue;
+            }
+            // First item after the current row = Up next (real neighbour).
+            if ($foundcurrent && !$markedupnext) {
+                $playlist[$idx]['is_up_next'] = true;
+                $markedupnext = true;
+            }
+        }
+        $playlistpct = $playlisttotal > 0
+            ? (int) round(($playlistdone / $playlisttotal) * 100)
+            : 0;
+
         return [
             'shell_track_label' => format_string($course->fullname),
             'shell_phase_label' => $phaselabel,
@@ -583,7 +635,16 @@ final class activity_portal {
             'nav_has_either' => $prev !== null || $next !== null,
             'playlist' => $playlist,
             'has_playlist' => $playlist !== [],
-            'playlist_count' => count($playlist),
+            'playlist_count' => $playlisttotal,
+            'playlist_done' => $playlistdone,
+            'playlist_progress_pct' => $playlistpct,
+            'playlist_has_progress' => $playlisttotal > 0,
+            'playlist_progress_label' => $playlisttotal > 0
+                ? get_string('fellowship_playlist_progress', 'local_launchpad', (object) [
+                    'done' => $playlistdone,
+                    'total' => $playlisttotal,
+                ])
+                : '',
         ];
     }
 

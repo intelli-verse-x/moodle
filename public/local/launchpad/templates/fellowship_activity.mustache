@@ -4,6 +4,7 @@
     Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource/quiz/assign in-shell).
     Slice 0: videowatch guard. Slice 1: playlist + prev/next. Slice 2: live Done/progress.
     Slice 3: Moodle VideoJS stage + supporting downloads under player.
+    Stitch-aligned shell: stage left, phase playlist right — real progress only.
 }}
 {{#activity}}
   <div class="lp-activity-page" data-region="fellowship-activity">
@@ -24,10 +25,21 @@
               {{#shell_has_phase}}
                 <span class="lp-lesson-playlist-phase">{{shell_phase_label}}</span>
               {{/shell_has_phase}}
+              {{#playlist_has_progress}}
+                <div class="lp-lesson-playlist-progress" data-lp-playlist-progress>
+                  <div class="lp-lesson-playlist-progress-meta">
+                    <span class="lp-lesson-playlist-progress-label">{{playlist_progress_label}}</span>
+                    <span class="lp-lesson-playlist-progress-pct">{{playlist_progress_pct}}%</span>
+                  </div>
+                  <div class="lp-lesson-playlist-progress-track" aria-hidden="true">
+                    <div class="lp-lesson-playlist-progress-fill" style="width: {{playlist_progress_pct}}%;"></div>
+                  </div>
+                </div>
+              {{/playlist_has_progress}}
             </summary>
             <ol class="lp-lesson-playlist-list">
               {{#playlist}}
-                <li class="lp-lesson-playlist-item{{#current}} is-current{{/current}}{{#complete}} is-done{{/complete}}"
+                <li class="lp-lesson-playlist-item{{#current}} is-current{{/current}}{{#complete}} is-done{{/complete}}{{#is_up_next}} is-up-next{{/is_up_next}}"
                     data-lp-playlist-item
                     data-cmid="{{cmid}}"
                     data-complete="{{#complete}}1{{/complete}}{{^complete}}0{{/complete}}"
@@ -36,10 +48,15 @@
                   {{#current}}
                     <span class="lp-lesson-playlist-link is-current" aria-current="page">
                       <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}•{{/complete}}</span>
-                      <span class="lp-lesson-playlist-name">{{name}}</span>
-                      {{#has_status}}
-                        <span class="lp-lesson-playlist-status">{{status_label}}</span>
-                      {{/has_status}}
+                      <span class="lp-lesson-playlist-copy">
+                        {{#is_now}}
+                          <span class="lp-lesson-playlist-eyebrow">{{strings.playlistnow}}</span>
+                        {{/is_now}}
+                        <span class="lp-lesson-playlist-name">{{name}}</span>
+                        {{#has_status}}
+                          <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                        {{/has_status}}
+                      </span>
                     </span>
                     {{#show_watch_bar}}
                       <div
@@ -75,10 +92,15 @@
                   {{^current}}
                     <a class="lp-lesson-playlist-link" href="{{url}}">
                       <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}○{{/complete}}</span>
-                      <span class="lp-lesson-playlist-name">{{name}}</span>
-                      {{#has_status}}
-                        <span class="lp-lesson-playlist-status">{{status_label}}</span>
-                      {{/has_status}}
+                      <span class="lp-lesson-playlist-copy">
+                        {{#is_up_next}}
+                          <span class="lp-lesson-playlist-eyebrow is-up-next">{{strings.playlistupnext}}</span>
+                        {{/is_up_next}}
+                        <span class="lp-lesson-playlist-name">{{name}}</span>
+                        {{#has_status}}
+                          <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                        {{/has_status}}
+                      </span>
                     </a>
                   {{/current}}
                 </li>
@@ -95,6 +117,9 @@
           {{#status}}
             <span class="lp-activity-badge is-status is-{{statustone}}">{{status}}</span>
           {{/status}}
+          {{#shell_has_phase}}
+            <span class="lp-activity-badge is-phase">{{shell_phase_label}}</span>
+          {{/shell_has_phase}}
         </div>
 
         <h2 class="lp-activity-title">{{title_main}}</h2>
@@ -108,6 +133,10 @@
             <span aria-hidden="true">·</span>
             <span>{{shell_phase_label}}</span>
           {{/shell_has_phase}}
+          {{#has_video_length}}
+            <span aria-hidden="true">·</span>
+            <span>{{strings.videolength}}: {{video_length_label}}</span>
+          {{/has_video_length}}
         </p>
 
         <div class="lp-activity-head-actions">
@@ -261,10 +290,10 @@
               {{#has_video_resources}}
                 <div class="lp-activity-video-resources" data-lp-video-resources>
                   <h3 class="lp-activity-video-resources-title">{{strings.videoresources}}</h3>
-                  <ul class="lp-activity-files">
+                  <ul class="lp-activity-files lp-activity-files-cards">
                     {{#video_resources}}
                       <li>
-                        <a class="lp-activity-file{{#isimage}} has-thumb{{/isimage}}" href="{{url}}" title="{{filename}} — {{download_label}}">
+                        <a class="lp-activity-file lp-activity-file-card{{#isimage}} has-thumb{{/isimage}}" href="{{url}}" title="{{filename}} — {{download_label}}">
                           {{#isimage}}
                             <span class="lp-activity-file-thumb" aria-hidden="true">
                               <img src="{{previewurl}}" alt="">
@@ -275,9 +304,9 @@
                           {{/isimage}}
                           <span class="lp-activity-file-body">
                             <span class="lp-activity-file-name">{{displayname}}</span>
-                            <span class="lp-activity-file-meta">{{size}} · {{download_label}}</span>
+                            <span class="lp-activity-file-meta">{{size}}</span>
                           </span>
-                          <span class="lp-activity-file-action" aria-hidden="true">↓</span>
+                          <span class="lp-activity-file-download">{{download_label}}</span>
                         </a>
                       </li>
                     {{/video_resources}}
@@ -767,7 +796,7 @@
               <span class="lp-lesson-nav-spacer" aria-hidden="true"></span>
             {{/nav_has_prev}}
             {{#nav_has_next}}
-              <a class="lp-btn lp-btn-solid" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
+              <a class="lp-btn lp-btn-solid lp-lesson-nav-next" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
             {{/nav_has_next}}
           </nav>
         {{/nav_has_either}}

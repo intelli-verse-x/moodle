@@ -64,6 +64,17 @@ body.local-launchpad-mentor {
   outline-offset: 2px;
 }
 
+/*
+ * Video lessons call get_top_of_body_code() for VideoJS AMD. That injects Moodle's
+ * "Skip to main content" (access/tocontent) with class visually-hidden-focusable.
+ * Boost CSS (which hides it until Tab) is not loaded on this custom shell — so the
+ * link appeared as a bare purple underline above the header. We already ship .lp-skip
+ * → #lp-main; drop the orphan Moodle skip (it also targets #maincontent, which we omit).
+ */
+body.local-launchpad-fellowship a.visually-hidden-focusable[href="#maincontent"] {
+  display: none !important;
+}
+
 .lp-shell {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
@@ -10046,12 +10057,20 @@ body.lp-portal-mismatch-lock {
 }
 .lp-lesson-shell.has-playlist {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: 16px;
+  /* Stitch: stage primary, playlist on the right */
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: 18px;
   align-items: start;
 }
-.lp-lesson-playlist {
+.lp-lesson-shell.has-playlist > .lp-activity-hero {
+  order: 1;
   min-width: 0;
+}
+.lp-lesson-playlist {
+  order: 2;
+  min-width: 0;
+  position: sticky;
+  top: 12px;
 }
 .lp-lesson-playlist-panel {
   background: #fff;
@@ -10065,7 +10084,7 @@ body.lp-portal-mismatch-lock {
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--lp-line);
 }
@@ -10081,6 +10100,34 @@ body.lp-portal-mismatch-lock {
 .lp-lesson-playlist-phase {
   font-size: 13px;
   color: var(--lp-muted, #667085);
+}
+.lp-lesson-playlist-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.lp-lesson-playlist-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--lp-muted, #667085);
+}
+.lp-lesson-playlist-progress-pct {
+  font-weight: 700;
+  color: #1A4FB8;
+}
+.lp-lesson-playlist-progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+.lp-lesson-playlist-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
 }
 .lp-lesson-playlist-list {
   list-style: none;
@@ -10098,15 +10145,29 @@ body.lp-portal-mismatch-lock {
 .lp-lesson-playlist-link {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
-  grid-template-rows: auto auto;
   column-gap: 8px;
-  row-gap: 2px;
   align-items: start;
   padding: 10px 10px;
   border-radius: 12px;
   text-decoration: none;
   color: var(--lp-ink);
   border: 1px solid transparent;
+}
+.lp-lesson-playlist-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lp-lesson-playlist-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #1A4FB8;
+}
+.lp-lesson-playlist-eyebrow.is-up-next {
+  color: #0F6B3A;
 }
 a.lp-lesson-playlist-link:hover {
   background: #F5F7FB;
@@ -10116,11 +10177,13 @@ a.lp-lesson-playlist-link:hover {
   border-color: #D9E6FF;
   cursor: default;
 }
+.lp-lesson-playlist-item.is-up-next .lp-lesson-playlist-link {
+  border-color: #D9F0E3;
+}
 .lp-lesson-playlist-item.is-done .lp-lesson-playlist-mark {
   color: #1E7A3B;
 }
 .lp-lesson-playlist-mark {
-  grid-row: 1 / span 2;
   font-size: 13px;
   line-height: 1.4;
   color: var(--lp-muted, #667085);
@@ -10208,6 +10271,46 @@ a.lp-lesson-playlist-link:hover {
 .lp-lesson-nav-spacer {
   flex: 1 1 auto;
 }
+.lp-lesson-nav-next {
+  padding: 12px 18px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.lp-activity-badge.is-phase {
+  background: #E3F5E8;
+  color: #15803d;
+}
+.lp-activity-files-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-activity-file-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--lp-line, #e6eaf2);
+  border-radius: 12px;
+  background: #fff;
+}
+.lp-activity-file-card:hover {
+  border-color: #D9E6FF;
+  background: #F8FAFF;
+}
+.lp-activity-file-download {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #EEF4FF;
+  color: #1A4FB8;
+  font-size: 12.5px;
+  font-weight: 700;
+}
 .lp-videowatch-note {
   margin: 0 0 10px;
   padding: 10px 12px;
@@ -10224,6 +10327,7 @@ a.lp-lesson-playlist-link:hover {
   }
   .lp-lesson-playlist {
     order: 2;
+    position: static;
   }
   .lp-lesson-shell.has-playlist > .lp-activity-hero {
     order: 1;
@@ -10616,15 +10720,20 @@ a.lp-lesson-playlist-link:hover {
   width: 6.5rem;
 }
 .lp-activity-video-resources {
-  padding: 0.85rem 1rem 1rem;
-  background: #fff;
+  padding: 0.9rem 1rem 1rem;
+  background: #F8FAFC;
   border-top: 1px solid var(--lp-line);
 }
 .lp-activity-video-resources-title {
-  margin: 0 0 0.55rem;
-  font-size: 0.9rem;
-  font-weight: 650;
-  color: #0f172a;
+  margin: 0 0 0.65rem;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #334155;
+}
+.lp-activity-video-resources .lp-activity-files {
+  max-width: none;
 }
 .lp-activity-video {
   position: relative;
