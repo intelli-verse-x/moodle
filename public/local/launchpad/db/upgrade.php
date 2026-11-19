@@ -184,5 +184,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111718, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111719) {
+        // Drop native VideoJS title tooltip over the player (title already in hero).
+        upgrade_plugin_savepoint(true, 2026111719, 'local', 'launchpad');
+    }
+
     return true;
 }

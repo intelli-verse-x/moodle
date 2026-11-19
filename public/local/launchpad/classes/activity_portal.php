@@ -362,14 +362,20 @@ final class activity_portal {
                 if ($mediamanager->can_embed_url($videoembedurl, $embedoptions)) {
                     // Trust core embed HTML as-is. Do not format_text/filter — mediaplugin
                     // would nest a second VideoJS wrapper and LaunchPad shells flush JS separately.
+                    // Pass empty name — LaunchPad already shows the lesson title in the hero.
+                    // Moodle VideoJS still stamps a title (filename fallback); strip it so the
+                    // browser does not show a native tooltip over the player on hover.
                     $videoembedhtml = $mediamanager->embed_url(
                         $videoembedurl,
-                        $titleplain !== '' ? $titleplain : $title,
+                        '',
                         0,
                         0,
                         $embedoptions
                     );
-                    $hasvideoembed = trim($videoembedhtml) !== '';
+                    if (trim($videoembedhtml) !== '') {
+                        $videoembedhtml = preg_replace('/\s+title=(["\']).*?\1/i', '', $videoembedhtml) ?? $videoembedhtml;
+                        $hasvideoembed = true;
+                    }
                 }
             }
             // Slice 0: mount local_videowatch guard when this file is a deferred video.
