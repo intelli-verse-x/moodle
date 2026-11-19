@@ -559,6 +559,7 @@ if ($selected && $outline === null) {
 
 $content = '';
 $needvideojs = false;
+$mobilecontextphase = '';
 $pagetitle = $lpstr('fellowship_area_heading', null, 'Fellowship');
 $nocourses = $lpstr(
     'fellowship_no_courses',
@@ -641,6 +642,10 @@ switch ($view) {
         $act = $activityctx['activity'] ?? [];
         $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
         $modtype = (string) ($act['modtype'] ?? '');
+        // Mobile topbar context row: real phase name only (no fake badges).
+        if (!empty($act['shell_has_phase']) && trim((string) ($act['shell_phase_label'] ?? '')) !== '') {
+            $mobilecontextphase = (string) $act['shell_phase_label'];
+        }
         $showjudging = in_array($modtype, ['assign', 'quiz'], true);
         // Slice 3: custom shell must flush Moodle AMD so media_videojs/loader can upgrade the player.
         $needvideojs = !empty($act['hasvideoembed']);
@@ -1550,6 +1555,17 @@ if (count($courses) > 1 && $selected !== null) {
     $activecourselabel = fellowship_dashboard::display_label(format_string($selected->fullname));
 }
 
+// Mobile two-tier topbar context (Stitch): track + optional phase — real data only.
+$mobilecontexttrack = '';
+$mobilecontexttrackurl = '';
+if ($selected !== null) {
+    $mobilecontexttrack = fellowship_dashboard::display_label(format_string($selected->fullname));
+    $mobilecontexttrackurl = (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+        'view' => 'track',
+        'id' => (int) $selected->id,
+    ])))->out(false);
+}
+
 $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array_merge([
     'data_region' => fellowship_dashboard::DATA_REGION,
     'assets' => $pluginbase . '/assets/img',
@@ -1558,6 +1574,11 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     'greeting' => $greeting,
     'portallabel' => $lpstr('fellowship_portal_label', null, 'Fellowship portal'),
     'active_course_label' => $activecourselabel,
+    'has_mobile_context' => $mobilecontexttrack !== '',
+    'mobile_context_track' => $mobilecontexttrack,
+    'mobile_context_track_url' => $mobilecontexttrackurl,
+    'has_mobile_context_phase' => $mobilecontextphase !== '',
+    'mobile_context_phase' => $mobilecontextphase,
     'role_label' => $fellowrole,
     'is_home' => $view === 'home',
     'has_courses' => $courses !== [],

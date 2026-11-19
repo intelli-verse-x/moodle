@@ -2,6 +2,7 @@
     @template local_launchpad/fellowship_shell
 
     Fellowship authenticated shell: skip → sidebar → topbar → main → orbit.
+    Mobile: Stitch two-tier topbar (brand row + track/phase context) — Fellow first.
 }}
 <a class="lp-skip" href="#lp-main">{{#str}} fellowship_skip_to_content, local_launchpad {{/str}}</a>
 <div class="lp-shell" data-region="{{data_region}}" id="lp-shell">
@@ -10,28 +11,51 @@
 
   <div class="lp-main-wrap">
     <header class="lp-topbar">
-      <div class="lp-topbar-start">
-        <button type="button" class="lp-menu-btn" data-lp-nav-toggle aria-expanded="false" aria-controls="lp-side">
-          <iconify-icon icon="hugeicons:menu-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-          {{#str}} fellowship_menu, local_launchpad {{/str}}
-        </button>
-        <div class="lp-greet">
-          <h1 class="lp-page-title">{{#is_home}}{{greeting}}{{/is_home}}{{^is_home}}{{pagetitle}}{{/is_home}}</h1>
-          <p class="lp-greet-sub">{{portallabel}}{{#active_course_label}} · <span class="lp-greet-track">{{{active_course_label}}}</span>{{/active_course_label}}</p>
+      <div class="lp-topbar-primary">
+        <div class="lp-topbar-start">
+          <button type="button" class="lp-menu-btn" data-lp-nav-toggle aria-expanded="false" aria-controls="lp-side" aria-label="{{#str}} fellowship_menu, local_launchpad {{/str}}">
+            <iconify-icon icon="hugeicons:menu-01" width="20" height="20" aria-hidden="true"></iconify-icon>
+            <span class="lp-menu-btn-label">{{#str}} fellowship_menu, local_launchpad {{/str}}</span>
+          </button>
+          <a class="lp-topbar-brand" href="{{home_url}}" title="ToBa Learn">
+            <img class="lp-topbar-brand-img" src="{{assets}}/logo.webp" alt="ToBa Learn" width="120" height="32">
+          </a>
+          <div class="lp-greet">
+            <h1 class="lp-page-title">{{#is_home}}{{greeting}}{{/is_home}}{{^is_home}}{{pagetitle}}{{/is_home}}</h1>
+            <p class="lp-greet-sub">{{portallabel}}{{#active_course_label}} · <span class="lp-greet-track">{{{active_course_label}}}</span>{{/active_course_label}}</p>
+          </div>
+        </div>
+        <div class="lp-topbar-actions">
+          {{#has_courses}}
+            <a class="lp-xp-chip" href="{{achievements_url}}" title="{{#str}} fellowship_xp_title, local_launchpad {{/str}}">
+              <iconify-icon icon="hugeicons:star" width="16" height="16" aria-hidden="true"></iconify-icon>
+              <b>{{xp_total}}</b> <span>XP</span>
+            </a>
+          {{/has_courses}}
+          {{> local_launchpad/notification_dropdown }}
+          {{> local_launchpad/profile_menu }}
         </div>
       </div>
-      <div class="lp-topbar-actions">
-        {{#has_courses}}
-          <a class="lp-xp-chip" href="{{achievements_url}}" title="{{#str}} fellowship_xp_title, local_launchpad {{/str}}">
-            <iconify-icon icon="hugeicons:star" width="16" height="16" aria-hidden="true"></iconify-icon>
-            <b>{{xp_total}}</b> <span>XP</span>
+      {{#has_mobile_context}}
+        <div class="lp-topbar-context" data-region="mobile-topbar-context">
+          <a class="lp-topbar-context-track" href="{{mobile_context_track_url}}">
+            <iconify-icon icon="hugeicons:arrow-left-01" width="14" height="14" aria-hidden="true"></iconify-icon>
+            <span class="lp-topbar-context-track-name">{{mobile_context_track}}</span>
           </a>
-        {{/has_courses}}
-        {{> local_launchpad/notification_dropdown }}
-        {{> local_launchpad/profile_menu }}
-      </div>
+          {{#has_mobile_context_phase}}
+            <span class="lp-topbar-context-sep" aria-hidden="true">/</span>
+            <span class="lp-topbar-context-phase">
+              <span class="lp-topbar-context-phase-dot" aria-hidden="true"></span>
+              {{mobile_context_phase}}
+            </span>
+          {{/has_mobile_context_phase}}
+        </div>
+      {{/has_mobile_context}}
     </header>
     <main class="lp-main" id="lp-main" tabindex="-1">
+      <div class="lp-mobile-pagehead">
+        <h1 class="lp-mobile-page-title">{{#is_home}}{{greeting}}{{/is_home}}{{^is_home}}{{pagetitle}}{{/is_home}}</h1>
+      </div>
       <div class="lp-inner">{{{content}}}</div>
     </main>
   </div>

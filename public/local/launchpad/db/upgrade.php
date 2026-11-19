@@ -204,5 +204,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111722, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111723) {
+        // Fellow mobile topbar: Stitch two-tier brand + track/phase context (portal only).
+        upgrade_plugin_savepoint(true, 2026111723, 'local', 'launchpad');
+    }
+
     return true;
 }
