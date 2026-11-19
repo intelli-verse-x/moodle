@@ -1222,6 +1222,8 @@ $ach = fellowship_dashboard::achievements_context_from_live($live, $view === 'ac
 $xptotal = (int) $ach['xp_total'];
 $badgesearned = (int) $ach['badges_earned'];
 $badgestotal = (int) $ach['badges_total'];
+// Level-up modal + badge toast when XP/badges newly unlock since last visit.
+$achunlocks = fellowship_dashboard::consume_achievement_unlocks($userid, $live, $ach);
 
 if ($view === 'home') {
     $homeoutline = $outline;
@@ -1625,7 +1627,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     ],
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,
-], messaging::notification_dropdown_context($userid, 'fellow'), $mismatch));
+], $achunlocks, messaging::notification_dropdown_context($userid, 'fellow'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";

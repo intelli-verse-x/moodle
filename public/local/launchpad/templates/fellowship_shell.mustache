@@ -47,6 +47,23 @@
   </div>
 </div>
 {{> local_launchpad/portal_mismatch_modal}}
+{{#has_level_up}}
+<div class="lp-levelup-scrim" data-lp-levelup-scrim hidden>
+  <div class="lp-levelup-modal" role="dialog" aria-modal="true" aria-labelledby="lp-levelup-title">
+    {{#bot_url}}
+      <img class="lp-levelup-bot" src="{{bot_url}}" alt="">
+    {{/bot_url}}
+    <span class="lp-levelup-eyebrow">{{level_up_eyebrow}}</span>
+    <h2 id="lp-levelup-title" class="lp-levelup-title">{{level_up_title}}</h2>
+    <div class="lp-levelup-badge" style="background:{{level_up_color}}">{{level_up_index}}</div>
+    <p class="lp-levelup-blurb">{{level_up_blurb}}</p>
+    <button type="button" class="lp-levelup-cta" data-lp-levelup-dismiss>{{level_up_cta}}</button>
+  </div>
+</div>
+{{/has_level_up}}
+{{#has_badge_unlocks}}
+<script type="application/json" id="lp-badge-unlock-data">{{{badge_unlocks_json}}}</script>
+{{/has_badge_unlocks}}
 {{#bot_url}}
 <div class="lp-orbit" id="lp-orbit" data-lp-orbit>
   <div class="lp-orbit-say{{^orbit_tip}} is-hide{{/orbit_tip}}" id="lp-orbit-say" role="status">

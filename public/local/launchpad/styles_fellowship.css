@@ -6086,6 +6086,182 @@ body.lp-orbit-is-hidden .lp-orbit { display: none; }
   }
 }
 
+/* —— Level-up modal + badge toast (ToBa-Learn-LaunchPad.html parity) —— */
+.lp-levelup-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(13, 20, 41, 0.5);
+  animation: lp-levelup-fade 0.2s ease;
+}
+.lp-levelup-scrim[hidden] {
+  display: none !important;
+}
+body.lp-levelup-lock {
+  overflow: hidden;
+}
+.lp-levelup-modal {
+  width: 100%;
+  max-width: 460px;
+  padding: 26px;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  overflow: hidden;
+  position: relative;
+  animation: lp-levelup-modalin 0.3s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+.lp-levelup-bot {
+  width: 120px;
+  margin: -6px auto 0;
+  height: auto;
+  animation: lp-levelup-hop 0.8s ease 2;
+}
+.lp-levelup-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lp-blue, #1a61f2);
+}
+.lp-levelup-title {
+  margin: 0;
+  font-family: var(--lp-head);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--lp-ink, #0d1429);
+}
+.lp-levelup-badge {
+  width: 84px;
+  height: 84px;
+  margin: 6px auto;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: var(--lp-head);
+  font-weight: 700;
+  font-size: 38px;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  transform: rotate(-6deg);
+  animation: lp-levelup-spinin 0.8s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.lp-levelup-blurb {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--lp-muted, #5c667a);
+}
+.lp-levelup-cta {
+  width: 100%;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  background: var(--lp-blue, #1a61f2);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+}
+.lp-levelup-cta:hover {
+  filter: brightness(1.05);
+}
+.lp-levelup-cta:focus-visible {
+  outline: 3px solid var(--lp-blue, #1a61f2);
+  outline-offset: 2px;
+}
+.lp-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 94;
+  pointer-events: none;
+}
+.lp-badge-toast {
+  position: fixed;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  z-index: 96;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #f5dfae;
+  border-radius: 20px;
+  padding: 12px 20px 12px 12px;
+  box-shadow: 0 20px 50px rgba(13, 20, 41, 0.2);
+  animation: lp-badge-toast-in 3.6s ease forwards;
+  pointer-events: none;
+}
+.lp-badge-toast-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #e5edfa, #fff4d6);
+  color: #0d2461;
+  flex: none;
+}
+.lp-badge-toast small {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8a5a00;
+}
+.lp-badge-toast b {
+  font-size: 15px;
+  color: var(--lp-ink, #0d1429);
+}
+@keyframes lp-levelup-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes lp-levelup-modalin {
+  from { opacity: 0; transform: scale(0.92) translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lp-levelup-hop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.12, 0.9) translateY(4px); }
+  60% { transform: scale(0.95, 1.08) translateY(-16px); }
+  100% { transform: scale(1); }
+}
+@keyframes lp-levelup-spinin {
+  from { transform: rotate(-30deg) scale(0.3); opacity: 0; }
+  to { transform: rotate(-6deg) scale(1); opacity: 1; }
+}
+@keyframes lp-badge-toast-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.94); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  78% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-levelup-scrim,
+  .lp-levelup-modal,
+  .lp-levelup-bot,
+  .lp-levelup-badge,
+  .lp-badge-toast {
+    animation: none !important;
+  }
+}
+
+
 /* —— Achievements tools chrome (Employer badges patterns) —— */
 .lp-tools-page {
   display: flex;

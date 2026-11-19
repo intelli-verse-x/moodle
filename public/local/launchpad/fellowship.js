@@ -1860,6 +1860,164 @@
         });
     }
 
+    // Achievement celebrations when a new level/badge unlocks (HTML LaunchPad parity).
+    (function initAchievementUnlocks() {
+        var reduceMotion = false;
+        try {
+            reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        } catch (e) {
+            reduceMotion = false;
+        }
+
+        function confetti(n) {
+            if (reduceMotion) {
+                return;
+            }
+            n = n || 140;
+            var canvas = document.createElement('canvas');
+            canvas.className = 'lp-confetti';
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            document.body.appendChild(canvas);
+            var g = canvas.getContext('2d');
+            if (!g) {
+                canvas.remove();
+                return;
+            }
+            var cols = ['#1A61F2', '#5B8DF6', '#FFBF33', '#4DCC66', '#FF5959', '#9CC0FF'];
+            var parts = [];
+            var i;
+            for (i = 0; i < n; i++) {
+                parts.push({
+                    x: canvas.width / 2 + (Math.random() - 0.5) * 200,
+                    y: canvas.height * 0.35,
+                    vx: (Math.random() - 0.5) * 14,
+                    vy: -Math.random() * 13 - 4,
+                    s: Math.random() * 8 + 4,
+                    r: Math.random() * 6,
+                    vr: (Math.random() - 0.5) * 0.3,
+                    c: cols[Math.floor(Math.random() * cols.length)]
+                });
+            }
+            var t = 0;
+            (function frame() {
+                g.clearRect(0, 0, canvas.width, canvas.height);
+                parts.forEach(function (p) {
+                    p.vy += 0.35;
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.r += p.vr;
+                    g.save();
+                    g.translate(p.x, p.y);
+                    g.rotate(p.r);
+                    g.fillStyle = p.c;
+                    g.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+                    g.restore();
+                });
+                t += 1;
+                if (t < 130) {
+                    window.requestAnimationFrame(frame);
+                } else {
+                    canvas.remove();
+                }
+            })();
+        }
+
+        function orbitHop() {
+            var o = document.getElementById('lp-orbit');
+            if (!o) {
+                return;
+            }
+            o.classList.remove('is-hop');
+            void o.offsetWidth;
+            o.classList.add('is-hop');
+        }
+
+        function showBadgeToasts(badges) {
+            if (!badges || !badges.length) {
+                return;
+            }
+            var label = 'Badge earned';
+            badges.forEach(function (badge, idx) {
+                window.setTimeout(function () {
+                    var el = document.createElement('div');
+                    el.className = 'lp-badge-toast';
+                    el.setAttribute('role', 'status');
+                    var icon = document.createElement('span');
+                    icon.className = 'lp-badge-toast-icon';
+                    icon.setAttribute('aria-hidden', 'true');
+                    var ic = document.createElement('iconify-icon');
+                    ic.setAttribute('icon', 'hugeicons:' + (badge.icon || 'award-01'));
+                    ic.setAttribute('width', '26');
+                    ic.setAttribute('height', '26');
+                    icon.appendChild(ic);
+                    var text = document.createElement('div');
+                    var small = document.createElement('small');
+                    small.textContent = label;
+                    var b = document.createElement('b');
+                    b.textContent = badge.name || '';
+                    text.appendChild(small);
+                    text.appendChild(b);
+                    el.appendChild(icon);
+                    el.appendChild(text);
+                    document.body.appendChild(el);
+                    confetti(60);
+                    orbitHop();
+                    window.setTimeout(function () {
+                        if (el.parentNode) {
+                            el.parentNode.removeChild(el);
+                        }
+                    }, 3600);
+                }, 400 + idx * 900);
+            });
+        }
+
+        var badgeDataEl = document.getElementById('lp-badge-unlock-data');
+        var badges = [];
+        if (badgeDataEl) {
+            try {
+                badges = JSON.parse(badgeDataEl.textContent || '[]') || [];
+            } catch (err) {
+                badges = [];
+            }
+        }
+
+        var scrim = document.querySelector('[data-lp-levelup-scrim]');
+        if (scrim) {
+            scrim.removeAttribute('hidden');
+            document.body.classList.add('lp-levelup-lock');
+            window.setTimeout(function () {
+                confetti(180);
+                orbitHop();
+            }, 150);
+
+            function closeLevelUp() {
+                scrim.setAttribute('hidden', 'hidden');
+                document.body.classList.remove('lp-levelup-lock');
+                showBadgeToasts(badges);
+            }
+
+            var dismiss = scrim.querySelector('[data-lp-levelup-dismiss]');
+            if (dismiss) {
+                dismiss.addEventListener('click', closeLevelUp);
+            }
+            scrim.addEventListener('click', function (e) {
+                if (e.target === scrim) {
+                    closeLevelUp();
+                }
+            });
+            document.addEventListener('keydown', function onEsc(e) {
+                if (e.key === 'Escape' && !scrim.hasAttribute('hidden')) {
+                    closeLevelUp();
+                    document.removeEventListener('keydown', onEsc);
+                }
+            });
+            return;
+        }
+
+        showBadgeToasts(badges);
+    })();
+
     // Dot Dot orbit (bottom-right companion).
     var orbit = document.getElementById('lp-orbit');
     var orbitHide = document.querySelector('[data-lp-orbit-hide]');

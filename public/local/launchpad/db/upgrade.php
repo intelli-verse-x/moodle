@@ -279,5 +279,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111741, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111742) {
+        // Fellow level-up modal + badge toast (achievement unlock celebrations).
+        upgrade_plugin_savepoint(true, 2026111742, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111743) {
+        // Fellow unlock celebrations (level-up modal + badge toast); no QA panel.
+        upgrade_plugin_savepoint(true, 2026111743, 'local', 'launchpad');
+    }
+
     return true;
 }

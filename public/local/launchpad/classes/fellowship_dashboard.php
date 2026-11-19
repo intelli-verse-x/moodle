@@ -43,6 +43,12 @@ final class fellowship_dashboard {
      */
     public const PREF_PORTFOLIO_CASE_PREFIX = 'local_launchpad_portfolio_case_';
 
+    /**
+     * Last-seen XP level index + earned badge ids (JSON) for level-up / badge popups.
+     * Shape: {"xp":int,"level":int,"badges":string[]}.
+     */
+    public const PREF_ACH_SNAPSHOT = 'local_launchpad_ach_snapshot';
+
     /** Max stored case study title length (chars). */
     public const PORTFOLIO_CASE_TITLE_MAX = 200;
 
@@ -2215,6 +2221,126 @@ final class fellowship_dashboard {
             }
         }
         return $index;
+    }
+
+    /**
+     * Diff live achievements against the fellow's last-seen snapshot.
+     * First visit seeds the snapshot with no celebration. Then persist the new snapshot.
+     *
+     * @param array $live {@see live_achievements()}
+     * @param array $ach {@see achievements_context_from_live()}
+     * @return array Celebration flags for fellowship_shell + JS
+     */
+    public static function consume_achievement_unlocks(int $userid, array $live, array $ach): array {
+        $xp = (int) ($live['xp_total'] ?? $ach['xp_total'] ?? 0);
+        $levelidx = self::level_index_for_xp($xp);
+        $earnedids = [];
+        $earnedmap = [];
+        foreach ($live['badges'] ?? [] as $badge) {
+            if (empty($badge['earned'])) {
+                continue;
+            }
+            $id = (string) ($badge['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $earnedids[] = $id;
+            $earnedmap[$id] = $badge;
+        }
+        $earnedids = array_values(array_unique($earnedids));
+        sort($earnedids);
+
+        $current = [
+            'xp' => $xp,
+            'level' => $levelidx,
+            'badges' => $earnedids,
+        ];
+
+        $empty = [
+            'has_celebration' => false,
+            'has_level_up' => false,
+            'level_up_name' => '',
+            'level_up_index' => 0,
+            'level_up_color' => '',
+            'level_up_title' => '',
+            'level_up_blurb' => '',
+            'level_up_eyebrow' => self::str('fellowship_levelup_eyebrow', null, 'Level up'),
+            'level_up_cta' => self::str('fellowship_levelup_cta', null, 'Keep going'),
+            'has_badge_unlocks' => false,
+            'badge_unlocks' => [],
+            'badge_unlocks_json' => '[]',
+            'xp_total' => $xp,
+            'xp_total_label' => number_format($xp),
+        ];
+
+        $raw = get_user_preferences(self::PREF_ACH_SNAPSHOT, '', $userid);
+        $prev = null;
+        if (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $prev = $decoded;
+            }
+        }
+
+        // First sight: remember state, do not celebrate historical unlocks.
+        if ($prev === null) {
+            set_user_preference(self::PREF_ACH_SNAPSHOT, json_encode($current), $userid);
+            return $empty;
+        }
+
+        $out = $empty;
+        $prevlevel = (int) ($prev['level'] ?? 0);
+        $prevbadges = [];
+        foreach ($prev['badges'] ?? [] as $bid) {
+            $prevbadges[] = (string) $bid;
+        }
+
+        if ($levelidx > $prevlevel) {
+            $levels = self::achievement_levels();
+            $level = $levels[$levelidx] ?? $levels[0];
+            $name = (string) ($level['name'] ?? '');
+            $out['has_level_up'] = true;
+            $out['level_up_name'] = $name;
+            $out['level_up_index'] = $levelidx + 1;
+            $out['level_up_color'] = (string) ($level['color'] ?? '#5B8DF6');
+            $out['level_up_title'] = self::str(
+                'fellowship_levelup_title',
+                $name,
+                'You’re now a {$a}'
+            );
+            $out['level_up_blurb'] = self::str(
+                'fellowship_levelup_blurb',
+                (object) ['xp' => number_format($xp)],
+                'Earned from work you actually did: {$a->xp} XP from saved lessons, quizzes and submissions.'
+            );
+            $out['has_celebration'] = true;
+        }
+
+        $newids = array_values(array_diff($earnedids, $prevbadges));
+        $badgeunlocks = [];
+        foreach ($newids as $id) {
+            $badge = $earnedmap[$id] ?? null;
+            if ($badge === null) {
+                continue;
+            }
+            $badgeunlocks[] = [
+                'id' => $id,
+                'name' => (string) ($badge['name'] ?? $id),
+                'icon' => (string) ($badge['icon'] ?? 'award-01'),
+            ];
+        }
+        if ($badgeunlocks !== []) {
+            $out['has_badge_unlocks'] = true;
+            $out['badge_unlocks'] = $badgeunlocks;
+            $out['badge_unlocks_json'] = json_encode(
+                $badgeunlocks,
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            );
+            $out['has_celebration'] = true;
+        }
+
+        set_user_preference(self::PREF_ACH_SNAPSHOT, json_encode($current), $userid);
+        return $out;
     }
 
     /**
