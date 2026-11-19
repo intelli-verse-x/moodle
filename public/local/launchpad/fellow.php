@@ -696,6 +696,7 @@ switch ($view) {
                 'lessonmissing' => get_string('fellowship_lesson_missing', 'local_launchpad'),
                 'lessonnext' => get_string('fellowship_lesson_next', 'local_launchpad'),
                 'lessonnextlabel' => get_string('fellowship_lesson_next_label', 'local_launchpad'),
+                'lessonnextlocked' => get_string('fellowship_lesson_next_locked', 'local_launchpad'),
                 'lessonprev' => get_string('fellowship_lesson_prev', 'local_launchpad'),
                 'lessonnav' => get_string('fellowship_lesson_nav', 'local_launchpad'),
                 'playlisttitle' => get_string('fellowship_playlist_title', 'local_launchpad'),

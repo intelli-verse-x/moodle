@@ -135,29 +135,13 @@ final class activity_portal {
             ? $cm->url->out(false)
             : (new \moodle_url('/mod/' . $modname . '/view.php', ['id' => $cm->id]))->out(false);
 
-        $completion = new \completion_info($course);
-        $completiontracked = $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE;
-        $completioncomplete = false;
-        if ($completiontracked) {
-            $data = $completion->get_data($cm, false, (int) $user->id);
-            $completioncomplete = ((int) $data->completionstate === COMPLETION_COMPLETE
-                || (int) $data->completionstate === COMPLETION_COMPLETE_PASS);
-        }
-        // Same fellow-facing labels as Home / My track (assign submit ≠ Moodle completion).
-        $rowstatus = fellowship_dashboard::activity_row_status(
-            $cm,
-            (int) $user->id,
-            $completiontracked,
-            $completioncomplete
-        );
-        $tracked = !empty($rowstatus['tracked']) || !empty($rowstatus['show_status']);
-        $complete = !empty($rowstatus['complete']);
-        $status = (string) ($rowstatus['status_label'] ?? '');
-        $statustone = self::status_chip_tone((string) ($rowstatus['status_chip'] ?? ''));
-        if ($status === '' && !empty($rowstatus['show_status'])) {
-            $status = get_string('fellowship_incomplete', 'local_launchpad');
-            $statustone = 'run';
-        }
+        // Fellow status is refreshed after view handlers (page/resource may mark complete).
+        $tracked = false;
+        $complete = false;
+        $accesscomplete = true;
+        $status = '';
+        $statustone = 'run';
+        $rowstatus = [];
 
         $typename = method_exists($cm, 'get_module_type_name')
             ? (string) $cm->get_module_type_name()
@@ -428,6 +412,31 @@ final class activity_portal {
             $sectionname = get_section_name($course, $sectionnum);
         }
 
+        // Status after view handlers so view-complete pages unlock Next honestly.
+        $completion = new \completion_info($course);
+        $completiontracked = $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE;
+        $completioncomplete = false;
+        if ($completiontracked) {
+            $data = $completion->get_data($cm, false, (int) $user->id);
+            $completioncomplete = ((int) $data->completionstate === COMPLETION_COMPLETE
+                || (int) $data->completionstate === COMPLETION_COMPLETE_PASS);
+        }
+        $rowstatus = fellowship_dashboard::activity_row_status(
+            $cm,
+            (int) $user->id,
+            $completiontracked,
+            $completioncomplete
+        );
+        $tracked = !empty($rowstatus['tracked']) || !empty($rowstatus['show_status']);
+        $complete = !empty($rowstatus['complete']);
+        $accesscomplete = fellowship_dashboard::activity_access_complete($rowstatus);
+        $status = (string) ($rowstatus['status_label'] ?? '');
+        $statustone = self::status_chip_tone((string) ($rowstatus['status_chip'] ?? ''));
+        if ($status === '' && !empty($rowstatus['show_status'])) {
+            $status = get_string('fellowship_incomplete', 'local_launchpad');
+            $statustone = 'run';
+        }
+
         $hasbody = trim(strip_tags($bodyhtml)) !== '';
         // Placeholder only when there is nothing to show.
         $isplaceholder = !$hasbody && !$hasfiles && !$hasexternal && !$hasembed && !$hasvideo;
@@ -440,6 +449,17 @@ final class activity_portal {
 
         // Slice 1: shared shell chrome — phase playlist + prev/next for all in-shell types.
         $shell = self::build_shell_nav($cm, $course, (int) $user->id, $courseurl, $sectionname);
+
+        // Next stays visible but locked until fellow-access-complete (or videowatch Done).
+        $navnextlocked = false;
+        if (!empty($shell['nav_has_next'])) {
+            if (!empty($videowatch['videowatch_enabled']) && empty($videowatch['videowatch_completed'])) {
+                $navnextlocked = true;
+            } else if ($tracked && !$accesscomplete) {
+                $navnextlocked = true;
+            }
+        }
+        $shell['nav_next_locked'] = $navnextlocked;
 
         // Keep E7 lesson next fields in sync with shared next when present.
         if ($islesson && !empty($shell['nav_has_next'])) {

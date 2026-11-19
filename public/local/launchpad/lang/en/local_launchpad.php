@@ -1459,6 +1459,7 @@ $string['fellowship_lesson_exercise'] = 'Exercise';
 $string['fellowship_lesson_missing'] = 'Not included in this lesson yet.';
 $string['fellowship_lesson_next'] = 'Next';
 $string['fellowship_lesson_next_label'] = 'Next activity';
+$string['fellowship_lesson_next_locked'] = 'Complete this lesson first';
 $string['fellowship_lesson_prev'] = 'Previous';
 $string['fellowship_lesson_nav'] = 'Lesson navigation';
 $string['fellowship_playlist_title'] = 'This phase';

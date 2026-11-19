@@ -146,7 +146,21 @@
             <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
           {{/needsengine}}
           {{#nav_has_next}}
-            <a class="lp-btn lp-btn-solid" href="{{nav_next_url}}">{{strings.lessonnext}}: {{nav_next_name}}</a>
+            {{#nav_next_locked}}
+              <span
+                class="lp-btn lp-btn-solid lp-lesson-nav-next is-locked"
+                data-lp-activity-next
+                data-lp-next-locked="1"
+                data-lp-next-url="{{nav_next_url}}"
+                tabindex="0"
+                role="link"
+                aria-disabled="true"
+                title="{{strings.lessonnextlocked}}"
+              >{{strings.lessonnext}}: {{nav_next_name}}</span>
+            {{/nav_next_locked}}
+            {{^nav_next_locked}}
+              <a class="lp-btn lp-btn-solid lp-lesson-nav-next" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
+            {{/nav_next_locked}}
           {{/nav_has_next}}
         </div>
 
@@ -273,8 +287,25 @@
                       var mark = current.querySelector('.lp-lesson-playlist-mark');
                       if (mark) { mark.textContent = '\u2713'; }
                     }
-                    var next = document.querySelector('[data-lp-activity-next]');
-                    if (next) { next.classList.add('is-watch-complete'); }
+                    // Unlock Next in place (hero + footer) once watch policy is met.
+                    document.querySelectorAll('[data-lp-activity-next]').forEach(function (next) {
+                      next.classList.add('is-watch-complete');
+                      if (next.getAttribute('data-lp-next-locked') !== '1') {
+                        next.classList.remove('is-locked');
+                        next.removeAttribute('aria-disabled');
+                        next.removeAttribute('title');
+                        return;
+                      }
+                      var url = next.getAttribute('data-lp-next-url') || '';
+                      if (!url) { return; }
+                      var a = document.createElement('a');
+                      a.className = next.className.replace(/\bis-locked\b/g, '').replace(/\s+/g, ' ').trim();
+                      a.href = url;
+                      a.setAttribute('data-lp-activity-next', '');
+                      a.textContent = next.textContent;
+                      a.classList.add('is-watch-complete');
+                      next.replaceWith(a);
+                    });
                     if (detail.justCompleted && toastText && toastHost) {
                       toastHost.textContent = toastText;
                       toastHost.hidden = false;
@@ -797,7 +828,21 @@
               <span class="lp-lesson-nav-spacer" aria-hidden="true"></span>
             {{/nav_has_prev}}
             {{#nav_has_next}}
-              <a class="lp-btn lp-btn-solid lp-lesson-nav-next" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
+              {{#nav_next_locked}}
+                <span
+                  class="lp-btn lp-btn-solid lp-lesson-nav-next is-locked"
+                  data-lp-activity-next
+                  data-lp-next-locked="1"
+                  data-lp-next-url="{{nav_next_url}}"
+                  tabindex="0"
+                  role="link"
+                  aria-disabled="true"
+                  title="{{strings.lessonnextlocked}}"
+                >{{strings.lessonnext}}: {{nav_next_name}}</span>
+              {{/nav_next_locked}}
+              {{^nav_next_locked}}
+                <a class="lp-btn lp-btn-solid lp-lesson-nav-next" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
+              {{/nav_next_locked}}
             {{/nav_has_next}}
           </nav>
         {{/nav_has_either}}

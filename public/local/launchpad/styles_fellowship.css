@@ -10276,6 +10276,23 @@ a.lp-lesson-playlist-link:hover {
   font-size: 14.5px;
   font-weight: 700;
 }
+.lp-lesson-nav-next.is-locked,
+.lp-btn.lp-lesson-nav-next.is-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.15);
+  pointer-events: auto; /* keep hover title/tooltip */
+  user-select: none;
+}
+.lp-lesson-nav-next.is-locked:hover,
+.lp-btn.lp-lesson-nav-next.is-locked:hover {
+  filter: grayscale(0.05);
+  opacity: 0.65;
+}
+[data-lp-activity-next].is-watch-complete:not(.is-locked) {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
 .lp-activity-badge.is-phase {
   background: #E3F5E8;
   color: #15803d;

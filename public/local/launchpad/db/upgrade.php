@@ -174,5 +174,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111716, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111717) {
+        // Next stays visible but locked until fellow-access-complete / videowatch Done.
+        upgrade_plugin_savepoint(true, 2026111717, 'local', 'launchpad');
+    }
+
     return true;
 }
