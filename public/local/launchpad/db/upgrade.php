@@ -189,5 +189,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111719, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111720) {
+        // Compact < > prev/next in activity topbar; remove long Next/Previous buttons.
+        upgrade_plugin_savepoint(true, 2026111720, 'local', 'launchpad');
+    }
+
     return true;
 }

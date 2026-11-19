@@ -10372,10 +10372,64 @@ a.lp-lesson-playlist-link:hover {
   align-items: flex-start;
   gap: 14px;
 }
+.lp-activity-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
 .lp-activity-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+}
+.lp-lesson-chevrons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.lp-lesson-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--lp-line, #e6eaf2);
+  background: #fff;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+a.lp-lesson-chevron:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1a4fb8;
+}
+.lp-lesson-chevron.is-locked,
+.lp-lesson-chevron.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: #64748b;
+  background: #f8fafc;
+}
+.lp-lesson-chevron.is-locked:hover {
+  opacity: 0.6;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+}
+[data-lp-activity-next].lp-lesson-chevron.is-watch-complete:not(.is-locked) {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.28);
+  color: #1a4fb8;
 }
 .lp-activity-badge {
   display: inline-flex;

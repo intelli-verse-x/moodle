@@ -113,14 +113,59 @@
 
     <article class="lp-activity-hero">
       <div class="lp-activity-hero-copy">
-        <div class="lp-activity-badges">
-          <span class="lp-activity-badge is-type">{{modname}}</span>
-          {{#status}}
-            <span class="lp-activity-badge is-status is-{{statustone}}">{{status}}</span>
-          {{/status}}
-          {{#shell_has_phase}}
-            <span class="lp-activity-badge is-phase">{{shell_phase_label}}</span>
-          {{/shell_has_phase}}
+        <div class="lp-activity-topbar">
+          <div class="lp-activity-badges">
+            <span class="lp-activity-badge is-type">{{modname}}</span>
+            {{#status}}
+              <span class="lp-activity-badge is-status is-{{statustone}}">{{status}}</span>
+            {{/status}}
+            {{#shell_has_phase}}
+              <span class="lp-activity-badge is-phase">{{shell_phase_label}}</span>
+            {{/shell_has_phase}}
+          </div>
+          {{#nav_has_either}}
+            <nav class="lp-lesson-chevrons" data-lp-activity-nav aria-label="{{strings.lessonnav}}">
+              {{#nav_has_prev}}
+                <a
+                  class="lp-lesson-chevron"
+                  href="{{nav_prev_url}}"
+                  data-lp-activity-prev
+                  title="{{strings.lessonprev}}: {{nav_prev_name}}"
+                  aria-label="{{strings.lessonprev}}: {{nav_prev_name}}"
+                >&lt;</a>
+              {{/nav_has_prev}}
+              {{^nav_has_prev}}
+                <span class="lp-lesson-chevron is-disabled" aria-disabled="true" title="{{strings.lessonprev}}">&lt;</span>
+              {{/nav_has_prev}}
+              {{#nav_has_next}}
+                {{#nav_next_locked}}
+                  <span
+                    class="lp-lesson-chevron is-locked"
+                    data-lp-activity-next
+                    data-lp-next-locked="1"
+                    data-lp-next-url="{{nav_next_url}}"
+                    tabindex="0"
+                    role="link"
+                    aria-disabled="true"
+                    title="{{strings.lessonnextlocked}}"
+                    aria-label="{{strings.lessonnext}}: {{nav_next_name}} — {{strings.lessonnextlocked}}"
+                  >&gt;</span>
+                {{/nav_next_locked}}
+                {{^nav_next_locked}}
+                  <a
+                    class="lp-lesson-chevron"
+                    href="{{nav_next_url}}"
+                    data-lp-activity-next
+                    title="{{strings.lessonnext}}: {{nav_next_name}}"
+                    aria-label="{{strings.lessonnext}}: {{nav_next_name}}"
+                  >&gt;</a>
+                {{/nav_next_locked}}
+              {{/nav_has_next}}
+              {{^nav_has_next}}
+                <span class="lp-lesson-chevron is-disabled" aria-disabled="true" title="{{strings.lessonnext}}">&gt;</span>
+              {{/nav_has_next}}
+            </nav>
+          {{/nav_has_either}}
         </div>
 
         <h2 class="lp-activity-title">{{title_main}}</h2>
@@ -145,23 +190,6 @@
           {{#needsengine}}
             <a class="lp-btn lp-btn-solid" href="{{moodleurl}}">{{strings.openactivity}}</a>
           {{/needsengine}}
-          {{#nav_has_next}}
-            {{#nav_next_locked}}
-              <span
-                class="lp-btn lp-btn-solid lp-lesson-nav-next is-locked"
-                data-lp-activity-next
-                data-lp-next-locked="1"
-                data-lp-next-url="{{nav_next_url}}"
-                tabindex="0"
-                role="link"
-                aria-disabled="true"
-                title="{{strings.lessonnextlocked}}"
-              >{{strings.lessonnext}}: {{nav_next_name}}</span>
-            {{/nav_next_locked}}
-            {{^nav_next_locked}}
-              <a class="lp-btn lp-btn-solid lp-lesson-nav-next" href="{{nav_next_url}}" data-lp-activity-next>{{strings.lessonnext}}: {{nav_next_name}}</a>
-            {{/nav_next_locked}}
-          {{/nav_has_next}}
         </div>
 
         {{#show_judging}}
@@ -287,13 +315,12 @@
                       var mark = current.querySelector('.lp-lesson-playlist-mark');
                       if (mark) { mark.textContent = '\u2713'; }
                     }
-                    // Unlock Next in place (hero + footer) once watch policy is met.
+                    // Unlock compact Next chevron once watch policy is met.
                     document.querySelectorAll('[data-lp-activity-next]').forEach(function (next) {
                       next.classList.add('is-watch-complete');
                       if (next.getAttribute('data-lp-next-locked') !== '1') {
                         next.classList.remove('is-locked');
                         next.removeAttribute('aria-disabled');
-                        next.removeAttribute('title');
                         return;
                       }
                       var url = next.getAttribute('data-lp-next-url') || '';
@@ -303,6 +330,12 @@
                       a.href = url;
                       a.setAttribute('data-lp-activity-next', '');
                       a.textContent = next.textContent;
+                      a.setAttribute('aria-label', next.getAttribute('aria-label') || next.getAttribute('title') || 'Next');
+                      var tip = next.getAttribute('aria-label') || '';
+                      if (tip.indexOf('—') !== -1) {
+                        tip = tip.split('—')[0].trim();
+                      }
+                      if (tip) { a.setAttribute('title', tip); }
                       a.classList.add('is-watch-complete');
                       next.replaceWith(a);
                     });
@@ -819,11 +852,6 @@
           {{/is_quiz}}
         {{/needsengine}}
 
-        {{#nav_has_prev}}
-          <nav class="lp-lesson-nav" data-lp-activity-nav aria-label="{{strings.lessonnav}}">
-            <a class="lp-btn lp-btn-light" href="{{nav_prev_url}}" data-lp-activity-prev>{{strings.lessonprev}}: {{nav_prev_name}}</a>
-          </nav>
-        {{/nav_has_prev}}
       </div>
     </article>
     </div>
