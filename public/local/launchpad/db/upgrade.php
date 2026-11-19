@@ -259,5 +259,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111737, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111738) {
+        // Video stage fill: absolute tech + object-fit cover (16:9 stage).
+        upgrade_plugin_savepoint(true, 2026111738, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111739) {
+        // Drop branded blue stage underlay; black boot → gone on play.
+        upgrade_plugin_savepoint(true, 2026111739, 'local', 'launchpad');
+    }
+
     return true;
 }
