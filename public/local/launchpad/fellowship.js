@@ -4027,7 +4027,7 @@
         });
     })();
 
-    /* Quiz attempt / summary: confirm finish + optional countdown */
+    /* Quiz attempt / summary: Stitch focus UI + confirm finish + countdown */
     (function () {
         var root = document.querySelector('[data-region="quiz-attempt"], [data-region="quiz-summary"]');
         if (!root) {
@@ -4044,7 +4044,150 @@
                     }
                 }
             });
+            /* Moodle multichoice uses div labels — whole row selects the radio. */
+            form.addEventListener('click', function (ev) {
+                var row = ev.target.closest('.que.multichoice .answer .r0, .que.multichoice .answer .r1');
+                if (!row || !form.contains(row)) {
+                    return;
+                }
+                if (ev.target.closest('a, button, textarea, select')) {
+                    return;
+                }
+                var radio = row.querySelector('input[type="radio"]');
+                if (!radio || radio.disabled) {
+                    return;
+                }
+                if (ev.target !== radio) {
+                    radio.checked = true;
+                    radio.dispatchEvent(new Event('input', { bubbles: true }));
+                    radio.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
         }
+
+        var blocks = Array.prototype.slice.call(root.querySelectorAll('.lp-quiz-question'));
+        var total = blocks.length;
+        var current = 1;
+        var answeredEl = root.querySelector('[data-lp-quiz-answered]');
+        var currentEl = root.querySelector('[data-lp-quiz-current]');
+        var fill = root.querySelector('[data-lp-quiz-fill]');
+        var pctEl = root.querySelector('[data-lp-quiz-pct]');
+        var prevBtn = root.querySelector('[data-lp-quiz-nav="prev"]');
+        var nextBtn = root.querySelector('[data-lp-quiz-nav="next"]');
+        var focusUi = root.classList.contains('is-focus-ui');
+
+        function blockAnswered(block) {
+            if (block.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked')) {
+                return true;
+            }
+            var text = block.querySelector('input[type="text"], textarea');
+            return !!(text && String(text.value || '').trim() !== '');
+        }
+
+        function refreshProgress() {
+            if (!total) {
+                return;
+            }
+            var answered = 0;
+            blocks.forEach(function (block) {
+                var ok = blockAnswered(block);
+                block.classList.toggle('is-answered', ok);
+                var tile = root.querySelector('[data-lp-quiz-jump="' + block.getAttribute('data-index') + '"]');
+                if (tile) {
+                    tile.classList.toggle('is-answered', ok);
+                    if (ok) {
+                        tile.classList.remove('is-todo');
+                    } else if (!tile.classList.contains('is-flagged')) {
+                        tile.classList.add('is-todo');
+                    }
+                }
+                if (ok) {
+                    answered += 1;
+                }
+            });
+            var pct = Math.round((answered / total) * 100);
+            if (answeredEl) {
+                answeredEl.textContent = answered + ' of ' + total + ' answered';
+            }
+            if (fill) {
+                fill.style.width = pct + '%';
+            }
+            if (pctEl) {
+                pctEl.textContent = pct + '%';
+            }
+        }
+
+        function setMode(mode) {
+            root.setAttribute('data-mode', mode);
+            root.classList.toggle('is-overview', mode === 'overview');
+            root.querySelectorAll('[data-lp-quiz-mode]').forEach(function (btn) {
+                var on = btn.getAttribute('data-lp-quiz-mode') === mode;
+                btn.classList.toggle('is-active', on);
+                btn.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            if (mode === 'overview') {
+                blocks.forEach(function (b) { b.hidden = false; b.classList.add('is-visible'); });
+            } else {
+                showQuestion(current);
+            }
+        }
+
+        function showQuestion(index) {
+            current = Math.min(Math.max(1, index), total || 1);
+            blocks.forEach(function (block) {
+                var i = parseInt(block.getAttribute('data-index') || '0', 10);
+                var on = i === current;
+                block.hidden = !on;
+                block.classList.toggle('is-visible', on);
+            });
+            root.querySelectorAll('[data-lp-quiz-jump]').forEach(function (tile) {
+                tile.classList.toggle('is-current', parseInt(tile.getAttribute('data-lp-quiz-jump'), 10) === current);
+            });
+            if (currentEl) {
+                currentEl.textContent = 'Question ' + current + ' of ' + total;
+            }
+            if (prevBtn) {
+                prevBtn.disabled = current <= 1;
+            }
+            if (nextBtn) {
+                nextBtn.disabled = current >= total;
+            }
+            var visible = root.querySelector('.lp-quiz-question.is-visible');
+            if (visible && root.getAttribute('data-mode') !== 'overview') {
+                visible.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        if (focusUi && total) {
+            root.querySelectorAll('[data-lp-quiz-mode]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    setMode(btn.getAttribute('data-lp-quiz-mode') || 'focus');
+                });
+            });
+            root.querySelectorAll('[data-lp-quiz-jump]').forEach(function (tile) {
+                tile.addEventListener('click', function () {
+                    if (root.getAttribute('data-mode') === 'overview') {
+                        setMode('focus');
+                    }
+                    showQuestion(parseInt(tile.getAttribute('data-lp-quiz-jump'), 10) || 1);
+                });
+            });
+            if (prevBtn) {
+                prevBtn.addEventListener('click', function () { showQuestion(current - 1); });
+            }
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function () { showQuestion(current + 1); });
+            }
+            setMode('focus');
+            showQuestion(1);
+        }
+
+        if (form && total) {
+            form.addEventListener('change', refreshProgress);
+            form.addEventListener('input', refreshProgress);
+            refreshProgress();
+        }
+
         var timerEl = root.querySelector('[data-lp-quiz-timer]');
         var timeupInput = root.querySelector('[data-lp-quiz-timeup]');
         var left = parseInt(root.getAttribute('data-timeleft') || '0', 10);

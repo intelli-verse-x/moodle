@@ -522,13 +522,90 @@
 
         {{#is_quiz}}
           {{#quiz_attempting}}
-            <div class="lp-quiz-attempt" data-region="quiz-attempt" data-timeleft="{{attempt_timeleft}}">
-              <div class="lp-quiz-attempt-bar">
-                <span class="lp-quiz-attempt-page">{{attempt_page_label}}</span>
-                {{#attempt_has_timer}}
-                  <span class="lp-quiz-attempt-timer" data-lp-quiz-timer>{{attempt_timeleft_label}}</span>
-                {{/attempt_has_timer}}
-              </div>
+            <div
+              class="lp-quiz-attempt{{#attempt_single_page}} is-single-page{{/attempt_single_page}}{{#attempt_focus_ui}} is-focus-ui{{/attempt_focus_ui}}"
+              data-region="quiz-attempt"
+              data-timeleft="{{attempt_timeleft}}"
+              data-qtotal="{{attempt_qtotal}}"
+              data-mode="focus"
+            >
+              {{#attempt_focus_ui}}
+                <section class="lp-quiz-head-card" data-purpose="quiz-overview">
+                  <div class="lp-quiz-head-top">
+                    <div class="lp-quiz-head-badges">
+                      <span class="lp-chip is-quiz">{{strings.quizchip}}</span>
+                      {{#shell_has_phase}}
+                        <span class="lp-chip is-phase">{{shell_phase_label}}</span>
+                      {{/shell_has_phase}}
+                    </div>
+                    {{#courseurl}}
+                      <a class="lp-btn lp-btn-light lp-btn-sm" href="{{courseurl}}">{{strings.backtotrack}}</a>
+                    {{/courseurl}}
+                  </div>
+                  <h2 class="lp-quiz-head-title">{{titlemain}}</h2>
+                  {{#shell_has_phase}}
+                    <p class="lp-quiz-head-sub">{{shell_phase_label}}</p>
+                  {{/shell_has_phase}}
+                  <div class="lp-quiz-mode-toggle" role="tablist" aria-label="{{strings.quizmodetoggle}}">
+                    <button type="button" class="is-active" data-lp-quiz-mode="focus" role="tab" aria-selected="true">{{strings.quizfocus}}</button>
+                    <button type="button" data-lp-quiz-mode="overview" role="tab" aria-selected="false">{{strings.quizoverview}}</button>
+                  </div>
+                  <div class="lp-quiz-head-progress">
+                    <div class="lp-quiz-head-progress-meta">
+                      <span class="lp-quiz-current" data-lp-quiz-current>{{attempt_current_of_label}}</span>
+                      <span class="lp-quiz-answered" data-lp-quiz-answered>{{attempt_answered_label}}</span>
+                      {{#attempt_has_timer}}
+                        <span class="lp-quiz-attempt-timer" data-lp-quiz-timer>{{attempt_timeleft_label}}</span>
+                      {{/attempt_has_timer}}
+                    </div>
+                    <div class="lp-quiz-progress" aria-hidden="true">
+                      <div class="lp-quiz-progress-track">
+                        <div class="lp-quiz-progress-fill" data-lp-quiz-fill style="width: {{attempt_progress_pct}}%;"></div>
+                      </div>
+                      <span class="lp-quiz-progress-pct" data-lp-quiz-pct>{{attempt_progress_pct}}%</span>
+                    </div>
+                  </div>
+                </section>
+
+                {{#attempt_has_palette}}
+                  <section class="lp-quiz-palette" data-purpose="question-palette" aria-label="{{strings.quizpalette}}">
+                    <div class="lp-quiz-palette-head">
+                      <span class="lp-quiz-palette-title">{{strings.quizpalette}}</span>
+                      <span class="lp-quiz-palette-hint">{{strings.quizpalettehint}}</span>
+                    </div>
+                    <div class="lp-quiz-palette-grid">
+                      {{#attempt_palette}}
+                        <button
+                          type="button"
+                          class="lp-quiz-palette-tile is-{{status_key}}{{#is_first}} is-current{{/is_first}}"
+                          data-lp-quiz-jump="{{index}}"
+                          data-slot="{{slot}}"
+                          aria-label="{{number_label}}"
+                        >
+                          <span>{{index_pad}}</span>
+                          <i class="lp-quiz-palette-dot" aria-hidden="true"></i>
+                        </button>
+                      {{/attempt_palette}}
+                    </div>
+                    <div class="lp-quiz-palette-legend" aria-hidden="true">
+                      <span><i class="is-current"></i>{{strings.quizlegcurrent}}</span>
+                      <span><i class="is-answered"></i>{{strings.quizleganswered}}</span>
+                      <span><i class="is-todo"></i>{{strings.quizlegtodo}}</span>
+                      <span><i class="is-flagged"></i>{{strings.quizlegflagged}}</span>
+                    </div>
+                  </section>
+                {{/attempt_has_palette}}
+              {{/attempt_focus_ui}}
+
+              {{^attempt_focus_ui}}
+                <div class="lp-quiz-attempt-bar">
+                  <span class="lp-quiz-attempt-page">{{attempt_page_label}}</span>
+                  {{#attempt_has_timer}}
+                    <span class="lp-quiz-attempt-timer" data-lp-quiz-timer>{{attempt_timeleft_label}}</span>
+                  {{/attempt_has_timer}}
+                </div>
+              {{/attempt_focus_ui}}
+
               <form method="post" action="{{attempt_form_action}}" class="lp-quiz-attempt-form" data-lp-quiz-form data-confirm-finish="{{strings.quizconfirmfinish}}">
                 <input type="hidden" name="sesskey" value="{{attempt_sesskey}}">
                 <input type="hidden" name="action" value="quiz_process">
@@ -537,19 +614,40 @@
                 <input type="hidden" name="thispage" value="{{attempt_page}}">
                 <input type="hidden" name="nextpage" value="{{attempt_nextpage}}">
                 <input type="hidden" name="timeup" value="0" data-lp-quiz-timeup>
-                {{#attempt_questions}}
-                  <div class="lp-quiz-question" data-slot="{{slot}}">{{{html}}}</div>
-                {{/attempt_questions}}
-                <div class="lp-quiz-attempt-actions">
-                  {{#attempt_has_prev}}
-                    <button type="submit" name="previous" value="1" class="lp-btn lp-btn-light">{{strings.quizprev}}</button>
-                  {{/attempt_has_prev}}
-                  {{^attempt_is_last}}
-                    <button type="submit" name="next" value="1" class="lp-btn lp-btn-solid">{{strings.quiznext}}</button>
-                  {{/attempt_is_last}}
-                  {{#attempt_is_last}}
-                    <button type="submit" name="opensummary" value="1" class="lp-btn lp-btn-solid">{{strings.quizopensummary}}</button>
-                  {{/attempt_is_last}}
+                <div class="lp-quiz-stage" data-lp-quiz-stage>
+                  {{#attempt_questions}}
+                    <article
+                      class="lp-quiz-question{{#answered}} is-answered{{/answered}}{{#flagged}} is-flagged{{/flagged}}"
+                      data-slot="{{slot}}"
+                      data-index="{{index}}"
+                      data-status="{{status_key}}"
+                    >
+                      {{{html}}}
+                    </article>
+                  {{/attempt_questions}}
+                </div>
+                <div class="lp-quiz-attempt-actions{{#attempt_focus_ui}} is-sticky-mobile{{/attempt_focus_ui}}">
+                  {{#attempt_focus_ui}}
+                    <button type="button" class="lp-btn lp-btn-light" data-lp-quiz-nav="prev" disabled>{{strings.quizprev}}</button>
+                    <button type="button" class="lp-btn lp-btn-light" data-lp-quiz-nav="next">{{strings.quiznextq}}</button>
+                    <button type="submit" name="finishattempt" value="1" class="lp-btn lp-btn-solid lp-quiz-submit" data-lp-quiz-finish>{{strings.quizsubmit}}</button>
+                  {{/attempt_focus_ui}}
+                  {{^attempt_focus_ui}}
+                    {{#attempt_has_prev}}
+                      <button type="submit" name="previous" value="1" class="lp-btn lp-btn-light">{{strings.quizprev}}</button>
+                    {{/attempt_has_prev}}
+                    {{^attempt_is_last}}
+                      <button type="submit" name="next" value="1" class="lp-btn lp-btn-solid">{{strings.quiznext}}</button>
+                    {{/attempt_is_last}}
+                    {{#attempt_is_last}}
+                      {{#attempt_single_page}}
+                        <button type="submit" name="finishattempt" value="1" class="lp-btn lp-btn-solid" data-lp-quiz-finish>{{strings.quizsubmit}}</button>
+                      {{/attempt_single_page}}
+                      {{^attempt_single_page}}
+                        <button type="submit" name="opensummary" value="1" class="lp-btn lp-btn-solid">{{strings.quizopensummary}}</button>
+                      {{/attempt_single_page}}
+                    {{/attempt_is_last}}
+                  {{/attempt_focus_ui}}
                 </div>
               </form>
               {{{end_code}}}
@@ -612,9 +710,19 @@
                   <div class="lp-quiz-question is-review" data-slot="{{slot}}">{{{html}}}</div>
                 {{/review_questions}}
               {{/review_has_questions}}
-              <div class="lp-activity-head-actions" style="margin-top:16px">
+              <div class="lp-quiz-attempt-actions" style="margin-top:16px">
                 <a class="lp-btn lp-btn-light" href="{{review_back_url}}">{{strings.quizbackbrief}}</a>
-                <a class="lp-btn lp-btn-solid" href="{{courseurl}}">{{strings.backtotrack}}</a>
+                {{#nav_has_next}}
+                  {{^nav_next_locked}}
+                    <a class="lp-btn lp-btn-solid" href="{{nav_next_url}}">{{strings.lessonnext}}: {{nav_next_name}}</a>
+                  {{/nav_next_locked}}
+                  {{#nav_next_locked}}
+                    <a class="lp-btn lp-btn-solid" href="{{courseurl}}">{{strings.backtotrack}}</a>
+                  {{/nav_next_locked}}
+                {{/nav_has_next}}
+                {{^nav_has_next}}
+                  <a class="lp-btn lp-btn-solid" href="{{courseurl}}">{{strings.backtotrack}}</a>
+                {{/nav_has_next}}
               </div>
               {{{end_code}}}
             </div>

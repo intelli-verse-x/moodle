@@ -294,5 +294,25 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111744, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111745) {
+        // Slice 5: quiz all-on-one-page defaults + calm single-page attempt / review next CTA.
+        upgrade_plugin_savepoint(true, 2026111745, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111746) {
+        // Quiz option rows clickable (Moodle div labels don't toggle radios without theme JS).
+        upgrade_plugin_savepoint(true, 2026111746, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111747) {
+        // Stitch quiz Focus Mode + Question Palette (desktop/mobile).
+        upgrade_plugin_savepoint(true, 2026111747, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111748) {
+        // Quiz: strip Moodle fieldset/info chrome; Stitch option cards + flag pill.
+        upgrade_plugin_savepoint(true, 2026111748, 'local', 'launchpad');
+    }
+
     return true;
 }

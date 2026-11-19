@@ -4926,15 +4926,19 @@ final class admin_dashboard {
                 $moduleinfo->grademethod = QUIZ_GRADEHIGHEST;
                 $moduleinfo->decimalpoints = 2;
                 $moduleinfo->questiondecimalpoints = -1;
-                $moduleinfo->reviewattempt = 0;
-                $moduleinfo->reviewcorrectness = 0;
-                $moduleinfo->reviewmaxmarks = 0;
-                $moduleinfo->reviewmarks = 0;
-                $moduleinfo->reviewspecificfeedback = 0;
-                $moduleinfo->reviewgeneralfeedback = 0;
-                $moduleinfo->reviewrightanswer = 0;
-                $moduleinfo->reviewoverallfeedback = 0;
-                $moduleinfo->questionsperpage = 1;
+                // Practice checks: all questions on one page (ToBa HTML / Slice 5).
+                $reviewafter = \mod_quiz\question\display_options::IMMEDIATELY_AFTER
+                    | \mod_quiz\question\display_options::LATER_WHILE_OPEN
+                    | \mod_quiz\question\display_options::AFTER_CLOSE;
+                $moduleinfo->reviewattempt = $reviewafter;
+                $moduleinfo->reviewcorrectness = $reviewafter;
+                $moduleinfo->reviewmaxmarks = $reviewafter;
+                $moduleinfo->reviewmarks = $reviewafter;
+                $moduleinfo->reviewspecificfeedback = $reviewafter;
+                $moduleinfo->reviewgeneralfeedback = $reviewafter;
+                $moduleinfo->reviewrightanswer = $reviewafter;
+                $moduleinfo->reviewoverallfeedback = $reviewafter;
+                $moduleinfo->questionsperpage = 0; // 0 = never paginate (all on one page).
                 $moduleinfo->navmethod = 'free';
                 $moduleinfo->shuffleanswers = 1;
                 $moduleinfo->sumgrades = 0;
