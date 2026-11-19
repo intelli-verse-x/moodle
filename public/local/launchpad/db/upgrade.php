@@ -254,5 +254,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111732, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111737) {
+        // Custom rate popover; stop videowatch forcing 1x; clip player corners.
+        upgrade_plugin_savepoint(true, 2026111737, 'local', 'launchpad');
+    }
+
     return true;
 }

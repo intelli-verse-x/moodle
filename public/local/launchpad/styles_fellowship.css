@@ -11165,16 +11165,11 @@ a.lp-lesson-chevron:hover {
 .lp-activity-player {
   width: 100%;
   border-radius: 16px;
-  overflow: hidden;
+  overflow: hidden; /* clip video to rounded corners */
   background: #203a7c;
   border: 1px solid #0f172a;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
   isolation: isolate;
-}
-/* Let 1x / quality menus open above the bar (overflow:hidden was clipping them). */
-.lp-activity-player:has(.vjs-lock-showing),
-.lp-activity-videojs:has(.vjs-lock-showing) {
-  overflow: visible;
 }
 .lp-activity-player video,
 .lp-activity-videojs .video-js,
@@ -11185,6 +11180,7 @@ a.lp-lesson-chevron:hover {
   max-height: min(72vh, 560px);
   background: #203a7c;
   vertical-align: middle;
+  border-radius: 0;
 }
 .lp-activity-videojs {
   position: relative;
@@ -11192,12 +11188,16 @@ a.lp-lesson-chevron:hover {
   background: #203a7c;
   aspect-ratio: 16 / 9;
   min-height: min(56vw, 420px);
+  overflow: hidden;
+  border-radius: inherit;
 }
 .lp-activity-videojs .mediaplugin,
 .lp-activity-videojs .mediaplugin > div {
   max-width: 100% !important;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
 }
 .lp-activity-videojs .video-js {
   width: 100% !important;
@@ -11206,6 +11206,13 @@ a.lp-lesson-chevron:hover {
   aspect-ratio: 16 / 9;
   min-height: inherit;
   background: #203a7c;
+  overflow: hidden !important; /* keep corners clipped; rate popover lives in control-bar */
+  border-radius: 0;
+}
+.lp-activity-videojs .video-js .vjs-tech,
+.lp-activity-videojs .video-js video {
+  object-fit: contain;
+  border-radius: 0;
 }
 /* Boot gate: hide native/VideoJS chrome until ready — avoids FOUC of default player. */
 .lp-activity-videojs.is-booting video,
@@ -11674,19 +11681,70 @@ a.lp-lesson-chevron:hover {
   font-weight: 700;
   letter-spacing: 0.06em;
 }
-/* Custom speed / quality popup — dark navy + white selected. */
+/* Native VideoJS rate menu is broken here (height:0 + clip). We use .lp-rate-popover. */
+.lp-activity-videojs .vjs-playback-rate > .vjs-menu {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.lp-activity-videojs .vjs-control-bar {
+  overflow: visible !important;
+}
+.lp-activity-videojs .lp-rate-popover {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 4.5rem;
+  padding: 0.35rem 0.3rem;
+  margin: 0;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #13284f 0%, #0b1b3a 100%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+.lp-activity-videojs .lp-rate-popover[hidden] {
+  display: none !important;
+}
+.lp-activity-videojs .lp-rate-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.lp-activity-videojs .lp-rate-option:hover,
+.lp-activity-videojs .lp-rate-option:focus {
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+.lp-activity-videojs .lp-rate-option.is-selected {
+  background: #fff;
+  color: #0b1b3a;
+  font-weight: 700;
+}
+/* Quality / other VideoJS popups — dark navy + white selected. */
 .lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu {
   width: 5.5rem;
   left: 50%;
   transform: translateX(-50%);
-  margin-bottom: 2.6rem;
+  margin-bottom: 0.35rem;
   height: auto;
-  bottom: 0;
-  z-index: 30;
+  bottom: 100%;
+  z-index: 40;
   pointer-events: auto;
-}
-.lp-activity-videojs .lp-vjs-skin .vjs-playback-rate .vjs-menu {
-  width: 4.5rem;
 }
 .lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
   background: #0b1b3a;

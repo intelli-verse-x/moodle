@@ -1,6 +1,6 @@
 // Playback guard for local_videowatch.
-// Skipping ahead is pulled back to the watched position. The server still
-// decides completion; this only stops the ordinary player controls.
+// Skipping ahead is pulled back to the watched position. Playback speed is
+// allowed (LaunchPad rate menu). The server still decides completion.
 // Progress responses also update optional LaunchPad UI hooks and fire
 // `local-videowatch:progress` for live Done / progress-bar feedback (Slice 2).
 (function () {
@@ -114,9 +114,7 @@
         if (snapping) {
             return;
         }
-        if (video.playbackRate !== 1) {
-            video.playbackRate = 1;
-        }
+        // Allow playback-rate changes (LaunchPad 1x menu). Still block skip-ahead.
         if (video.currentTime > cfg.frontier + 3) {
             snapping = true;
             video.currentTime = cfg.frontier;
@@ -152,13 +150,10 @@
             return;
         }
         video.dataset.videowatchArmed = '1';
-        video.controlsList = 'nodownload noplaybackrate';
+        video.controlsList = 'nodownload';
         video.disablePictureInPicture = true;
         video.addEventListener('contextmenu', function (event) {
             event.preventDefault();
-        });
-        video.addEventListener('ratechange', function () {
-            limit(video);
         });
         video.addEventListener('seeking', function () {
             limit(video);
@@ -192,12 +187,7 @@
                     return;
                 }
                 video.dataset.videowatchPlayer = '1';
-                player.playbackRate(1);
-                player.on('ratechange', function () {
-                    if (player.playbackRate() !== 1) {
-                        player.playbackRate(1);
-                    }
-                });
+                // Do not force 1x — LaunchPad speed menu owns playbackRate.
                 player.on('seeking', function () {
                     limit(video);
                 });

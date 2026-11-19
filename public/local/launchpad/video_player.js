@@ -56,6 +56,10 @@
             }
             btn.classList.remove('vjs-lock-showing', 'vjs-hover');
             btn.setAttribute('aria-expanded', 'false');
+            var menu = btn.querySelector('.vjs-menu');
+            if (menu) {
+                menu.classList.remove('vjs-lock-showing');
+            }
         });
     }
 
@@ -65,6 +69,11 @@
         if (!open) {
             btn.classList.add('vjs-lock-showing');
             btn.setAttribute('aria-expanded', 'true');
+            // VideoJS shows popup when .vjs-menu has lock-showing (not only the button).
+            var menu = btn.querySelector('.vjs-menu');
+            if (menu) {
+                menu.classList.add('vjs-lock-showing');
+            }
         }
     }
 
@@ -78,34 +87,201 @@
         return el.closest ? el.closest('.vjs-control.vjs-menu-button-popup') : el;
     }
 
-    function applyPlaybackRate(playerEl, item) {
-        var player = playerEl.__lpVjsPlayer;
-        if (!player || !item || typeof player.playbackRate !== 'function') {
-            return false;
-        }
-        // VideoJS rate items are usually "0.5x" / "1x" / "1.5x" text (sometimes data attrs).
-        var raw =
-            item.getAttribute('data-rate') ||
-            item.getAttribute('data-value') ||
-            (item.textContent || '');
-        var rate = parseFloat(String(raw).replace(/x/gi, '').trim());
-        if (isNaN(rate) || rate <= 0) {
-            return false;
-        }
+    var DEFAULT_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
+    function rateList(player) {
+        var rates = null;
         try {
-            player.playbackRate(rate);
-            return true;
+            rates = player && player.options_ && player.options_.playbackRates;
         } catch (err) {
+            rates = null;
+        }
+        if (!Array.isArray(rates) || !rates.length) {
+            rates = DEFAULT_RATES;
+        }
+        return rates.map(function (r) {
+            return Number(r);
+        }).filter(function (r) {
+            return r > 0;
+        });
+    }
+
+    function formatRateLabel(rate) {
+        var n = Number(rate) || 1;
+        if (Math.abs(n - Math.round(n)) < 0.001) {
+            return Math.round(n) + 'x';
+        }
+        return String(n).replace(/\.?0+$/, '') + 'x';
+    }
+
+    function currentVideoRate(playerEl) {
+        var video = playerEl.querySelector('video');
+        if (video && video.playbackRate) {
+            return Number(video.playbackRate) || 1;
+        }
+        var player = playerEl.__lpVjsPlayer;
+        try {
+            if (player && typeof player.playbackRate === 'function') {
+                return Number(player.playbackRate()) || 1;
+            }
+        } catch (err) {
+            // ignore
+        }
+        return 1;
+    }
+
+    /** Apply speed on the real <video> first — does not depend on VideoJS player handle. */
+    function setPlaybackRate(playerEl, rate) {
+        var n = Number(rate);
+        if (!(n > 0)) {
             return false;
         }
+        var video = playerEl.querySelector('video');
+        if (video) {
+            try {
+                video.playbackRate = n;
+            } catch (err) {
+                // ignore
+            }
+        }
+        var player = playerEl.__lpVjsPlayer;
+        if (player && typeof player.playbackRate === 'function') {
+            try {
+                player.playbackRate(n);
+            } catch (err2) {
+                // ignore
+            }
+        }
+        var label = playerEl.querySelector('.vjs-playback-rate .vjs-playback-rate-value');
+        if (label) {
+            label.textContent = formatRateLabel(n);
+        }
+        playerEl.querySelectorAll('.lp-rate-popover [data-lp-rate]').forEach(function (btn) {
+            var br = Number(btn.getAttribute('data-lp-rate'));
+            if (Math.abs(br - n) < 0.001) {
+                btn.classList.add('is-selected');
+                btn.setAttribute('aria-checked', 'true');
+            } else {
+                btn.classList.remove('is-selected');
+                btn.setAttribute('aria-checked', 'false');
+            }
+        });
+        return true;
+    }
+
+    function closeRatePopover(playerEl) {
+        var pop = playerEl.querySelector('.lp-rate-popover');
+        if (pop) {
+            pop.hidden = true;
+        }
+        var wrap = playerEl.querySelector('.vjs-playback-rate');
+        if (wrap) {
+            wrap.classList.remove('lp-rate-open');
+            wrap.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function positionRatePopover(playerEl, wrap, pop) {
+        var bar = playerEl.querySelector('.vjs-control-bar');
+        if (!bar || !wrap || !pop) {
+            return;
+        }
+        var barRect = bar.getBoundingClientRect();
+        var btnRect = wrap.getBoundingClientRect();
+        // Sit above the 1x control, inside the control bar stacking context.
+        var left = btnRect.left - barRect.left + (btnRect.width / 2) - 36;
+        left = Math.max(8, Math.min(left, barRect.width - 80));
+        pop.style.left = left + 'px';
+        pop.style.bottom = (barRect.height + 6) + 'px';
+        pop.style.right = 'auto';
+    }
+
+    /**
+     * Custom rate popup — VideoJS native menu uses height:0 + absolute content and
+     * is unreliable (desktop clip / mobile taps not applying). Own UI is intentional.
+     */
+    function ensureRatePopover(playerEl, player) {
+        var wrap = playerEl.querySelector('.vjs-playback-rate');
+        var bar = playerEl.querySelector('.vjs-control-bar');
+        if (!wrap || !bar) {
+            return null;
+        }
+
+        // Kill native VideoJS rate menu so it cannot intercept / confuse taps.
+        wrap.querySelectorAll('.vjs-menu').forEach(function (m) {
+            m.setAttribute('hidden', '');
+            m.style.display = 'none';
+            m.style.pointerEvents = 'none';
+        });
+
+        var pop = playerEl.querySelector('.lp-rate-popover');
+        if (!pop) {
+            pop = document.createElement('div');
+            pop.className = 'lp-rate-popover';
+            pop.setAttribute('role', 'menu');
+            pop.hidden = true;
+            bar.appendChild(pop);
+        }
+
+        var rates = rateList(player || playerEl.__lpVjsPlayer);
+        var cur = currentVideoRate(playerEl);
+        pop.innerHTML = '';
+        rates.forEach(function (rate) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'lp-rate-option';
+            btn.setAttribute('role', 'menuitemradio');
+            btn.setAttribute('data-lp-rate', String(rate));
+            btn.textContent = formatRateLabel(rate);
+            if (Math.abs(rate - cur) < 0.001) {
+                btn.classList.add('is-selected');
+                btn.setAttribute('aria-checked', 'true');
+            } else {
+                btn.setAttribute('aria-checked', 'false');
+            }
+            pop.appendChild(btn);
+        });
+        return pop;
+    }
+
+    function openRatePopover(playerEl) {
+        var wrap = playerEl.querySelector('.vjs-playback-rate');
+        var pop = ensureRatePopover(playerEl, playerEl.__lpVjsPlayer);
+        if (!wrap || !pop) {
+            return;
+        }
+        closeMenus(playerEl, null);
+        pop.hidden = false;
+        wrap.classList.add('lp-rate-open');
+        wrap.setAttribute('aria-expanded', 'true');
+        positionRatePopover(playerEl, wrap, pop);
     }
 
     function bindClickMenus(playerEl, player) {
         if (player) {
             playerEl.__lpVjsPlayer = player;
+            ensureRatePopover(playerEl, player);
         }
         playerEl.classList.remove('vjs-workinghover');
         playerEl.classList.add('lp-vjs-click-menus');
+
+        if (playerEl.getAttribute('data-lp-ratechange-bound') !== '1') {
+            playerEl.setAttribute('data-lp-ratechange-bound', '1');
+            // Prefer the real <video> rate — VideoJS label sync used to fight videowatch.
+            var syncLabel = function () {
+                var label = playerEl.querySelector('.vjs-playback-rate .vjs-playback-rate-value');
+                if (label) {
+                    label.textContent = formatRateLabel(currentVideoRate(playerEl));
+                }
+            };
+            var video = playerEl.querySelector('video');
+            if (video) {
+                video.addEventListener('ratechange', syncLabel);
+            }
+            if (player) {
+                player.on('ratechange', syncLabel);
+            }
+        }
 
         if (playerEl.getAttribute('data-lp-click-menu-bound') === '1') {
             return;
@@ -119,15 +295,47 @@
         });
         mo.observe(playerEl, { attributes: true, attributeFilter: ['class'] });
 
+        // pointerdown beats touch quirks; applies rate before click synthesizes elsewhere.
+        playerEl.addEventListener('pointerdown', function (e) {
+            var opt = e.target.closest && e.target.closest('.lp-rate-option');
+            if (!opt || !playerEl.contains(opt)) {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            var rate = Number(opt.getAttribute('data-lp-rate'));
+            setPlaybackRate(playerEl, rate);
+            closeRatePopover(playerEl);
+        }, true);
+
         playerEl.addEventListener('click', function (e) {
-            // Speed menu item — set rate ourselves (capture toggle was eating VideoJS handling).
-            var rateItem = e.target.closest && e.target.closest('.vjs-playback-rate .vjs-menu-item');
-            if (rateItem) {
+            // Custom rate option (fallback if pointerdown missed).
+            var opt = e.target.closest && e.target.closest('.lp-rate-option');
+            if (opt && playerEl.contains(opt)) {
                 e.preventDefault();
                 e.stopPropagation();
-                applyPlaybackRate(playerEl, rateItem);
-                closeMenus(playerEl, null);
+                var rate = Number(opt.getAttribute('data-lp-rate'));
+                setPlaybackRate(playerEl, rate);
+                closeRatePopover(playerEl);
                 return;
+            }
+
+            var rateWrap = e.target.closest && e.target.closest('.vjs-playback-rate');
+            if (rateWrap && playerEl.contains(rateWrap)) {
+                e.preventDefault();
+                e.stopPropagation();
+                var pop = playerEl.querySelector('.lp-rate-popover');
+                if (pop && !pop.hidden) {
+                    closeRatePopover(playerEl);
+                } else {
+                    openRatePopover(playerEl);
+                }
+                return;
+            }
+
+            // Tap elsewhere inside player closes rate popover.
+            if (!(e.target.closest && e.target.closest('.lp-rate-popover'))) {
+                closeRatePopover(playerEl);
             }
 
             var raw = e.target.closest && e.target.closest('.vjs-menu-button-popup');
@@ -135,6 +343,10 @@
                 return;
             }
             if (raw.classList.contains('lp-vjs-quality') || raw.closest('.lp-vjs-quality')) {
+                return;
+            }
+            // Ignore native playback-rate (we own it).
+            if (raw.classList.contains('vjs-playback-rate') || raw.closest('.vjs-playback-rate')) {
                 return;
             }
             if (e.target.closest && e.target.closest('.vjs-menu-item')) {
@@ -155,22 +367,48 @@
         document.addEventListener('click', function (e) {
             if (!playerEl.contains(e.target)) {
                 closeMenus(playerEl, null);
+                closeRatePopover(playerEl);
             }
         });
     }
 
     function withVideoJsPlayer(playerEl, cb) {
-        var id = playerEl.id || (playerEl.querySelector('video.video-js, .video-js') || {}).id;
-        if (!id || typeof window.require !== 'function') {
+        var candidates = [];
+        if (playerEl.id) {
+            candidates.push(playerEl.id);
+        }
+        var vid = playerEl.querySelector('video');
+        if (vid && vid.id) {
+            candidates.push(vid.id);
+        }
+        if (!candidates.length || typeof window.require !== 'function') {
             cb(null);
             return;
         }
         window.require(['media_videojs/video-lazy'], function (videojs) {
+            var found = null;
             try {
-                cb(videojs.getPlayer(id) || null);
+                for (var i = 0; i < candidates.length; i++) {
+                    found = videojs.getPlayer(candidates[i]);
+                    if (found) {
+                        break;
+                    }
+                }
+                if (!found && typeof videojs.getPlayers === 'function') {
+                    var all = videojs.getPlayers();
+                    Object.keys(all || {}).some(function (key) {
+                        var p = all[key];
+                        if (p && p.el_ && playerEl.contains(p.el_)) {
+                            found = p;
+                            return true;
+                        }
+                        return false;
+                    });
+                }
             } catch (err) {
-                cb(null);
+                found = null;
             }
+            cb(found);
         }, function () {
             cb(null);
         });

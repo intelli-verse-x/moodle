@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_videowatch';
-$plugin->version   = 2026111801;
+$plugin->version   = 2026111901;
 $plugin->requires  = 2025092600;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.1.1';
+$plugin->release   = '1.1.2';
