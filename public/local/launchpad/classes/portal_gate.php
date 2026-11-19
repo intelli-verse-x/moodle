@@ -123,9 +123,9 @@ final class portal_gate {
             return 'admin';
         }
         if (account_persona::is_mentor($userid)
-                || registration::is_portal_mentor($userid)
-                || registration::has_raw_mentor_portal_pref($userid)) {
-            // Raw mentor tag before fellowship — wrong-tab must not label mentors as Fellow.
+                || registration::is_portal_mentor($userid)) {
+            // is_portal_mentor already allows empty mentor shells and excludes
+            // employees/fellows with a poisoned toba_portal=mentor stamp.
             return 'mentor';
         }
         if (account_persona::is_employee($userid)) {

@@ -4529,10 +4529,10 @@ final class fellowship_dashboard {
             return false;
         }
         // Higher-priority personas use their own shells (portal_gate mismatch).
-        // Do not let a leftover / wrong-tab toba_portal open fellow.php for them.
+        // Use is_portal_mentor (not raw pref): a poisoned mentor stamp on an
+        // enrolled fellow/employee must not block their real shell.
         if (account_persona::is_admin($userid) || account_persona::is_mentor($userid)
                 || registration::is_portal_mentor($userid)
-                || registration::has_raw_mentor_portal_pref($userid)
                 || account_persona::is_employee($userid)) {
             return false;
         }

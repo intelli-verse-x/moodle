@@ -159,5 +159,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111713, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111714) {
+        // Cross-role: poisoned mentor tag must not override employee/fellow shells.
+        upgrade_plugin_savepoint(true, 2026111714, 'local', 'launchpad');
+    }
+
     return true;
 }
