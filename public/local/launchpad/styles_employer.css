@@ -63,6 +63,11 @@ body.local-launchpad-employer {
   outline-offset: 2px;
 }
 
+/* See styles_fellowship.css — VideoJS top_of_body injects Moodle skip without Boost CSS. */
+body.local-launchpad-employer a.visually-hidden-focusable[href="#maincontent"] {
+  display: none !important;
+}
+
 .lp-shell {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
