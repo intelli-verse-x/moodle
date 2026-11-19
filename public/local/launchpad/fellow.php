@@ -708,9 +708,16 @@ switch ($view) {
                 'playlistdone' => get_string('fellowship_playlist_done', 'local_launchpad'),
                 'playlistnow' => get_string('fellowship_playlist_now', 'local_launchpad'),
                 'playlistupnext' => get_string('fellowship_playlist_upnext', 'local_launchpad'),
+                'syllabussheet' => $lpstr('fellowship_syllabus_sheet', null, 'Phase syllabus'),
+                'syllabussheettoggle' => $lpstr(
+                    'fellowship_syllabus_sheet_toggle',
+                    null,
+                    'Open or close phase syllabus'
+                ),
                 'videowatchprogress' => get_string('fellowship_videowatch_progress', 'local_launchpad'),
                 'videowatchdone' => get_string('fellowship_videowatch_done', 'local_launchpad'),
                 'videoresources' => get_string('fellowship_video_resources', 'local_launchpad'),
+                'videostage' => get_string('fellowship_video_stage', 'local_launchpad'),
                 'videolength' => get_string('fellowship_video_length', 'local_launchpad'),
                 'assignbrief' => get_string('fellowship_assign_brief', 'local_launchpad'),
                 'assignbriefmissing' => get_string('fellowship_assign_brief_missing', 'local_launchpad'),

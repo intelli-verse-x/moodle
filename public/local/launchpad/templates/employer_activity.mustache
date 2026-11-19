@@ -92,14 +92,34 @@
                 ></div>
               {{/videowatch_enabled}}
               {{#hasvideoembed}}
-                <div class="lp-activity-videojs" data-lp-video-player data-lp-video-qualities='{{{videoqualities_json}}}'>
+                <div class="lp-activity-videojs is-booting" data-lp-video-player data-lp-video-qualities='{{{videoqualities_json}}}'>
+                  <div class="lp-vjs-boot" data-lp-vjs-boot>
+                    <div class="lp-vjs-boot-preview" data-lp-vjs-preview></div>
+                    <div class="lp-vjs-boot-loader" data-lp-vjs-loader aria-hidden="true"></div>
+                    <button type="button" class="lp-vjs-boot-play" data-lp-vjs-play hidden aria-label="Play video">
+                      <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+                        <polygon fill="currentColor" points="6,4 20,12 6,20"></polygon>
+                      </svg>
+                    </button>
+                  </div>
                   {{{videoembedhtml}}}
                 </div>
               {{/hasvideoembed}}
               {{^hasvideoembed}}
-                <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
-                  <source src="{{videourl}}" type="video/mp4">
-                </video>
+                <div class="lp-activity-videojs is-booting" data-lp-video-player>
+                  <div class="lp-vjs-boot" data-lp-vjs-boot>
+                    <div class="lp-vjs-boot-preview" data-lp-vjs-preview></div>
+                    <div class="lp-vjs-boot-loader" data-lp-vjs-loader aria-hidden="true"></div>
+                    <button type="button" class="lp-vjs-boot-play" data-lp-vjs-play hidden aria-label="Play video">
+                      <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+                        <polygon fill="currentColor" points="6,4 20,12 6,20"></polygon>
+                      </svg>
+                    </button>
+                  </div>
+                  <video playsinline preload="metadata" controlslist="nodownload" data-lp-video-el>
+                    <source src="{{videourl}}" type="video/mp4">
+                  </video>
+                </div>
               {{/hasvideoembed}}
               {{#videowatch_enabled}}
                 <script src="{{videowatch_guardscript}}"></script>

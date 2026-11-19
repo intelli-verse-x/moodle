@@ -209,5 +209,50 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111723, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111724) {
+        // Fellow mobile V2: phase playlist as bottom-sheet drawer (desktop rail unchanged).
+        upgrade_plugin_savepoint(true, 2026111724, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111725) {
+        // Mobile polish: chevrons, downloads separator, no syllabus dim, control-bar align, syllabus string.
+        upgrade_plugin_savepoint(true, 2026111725, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111726) {
+        // VideoJS bar: progress-on-top ref layout, hide LIVE, responsive control row.
+        upgrade_plugin_savepoint(true, 2026111726, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111727) {
+        // Stitch video player: boot poster/loader → center play; white scrubber; no FOUC.
+        upgrade_plugin_savepoint(true, 2026111727, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111728) {
+        // Control bar: remove PiP; strict play·volume·time | 1x·CC·gear·FS order.
+        upgrade_plugin_savepoint(true, 2026111728, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111729) {
+        // Mobile control bar: single nowrap row; progress absolute; volume icon-only.
+        upgrade_plugin_savepoint(true, 2026111729, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111730) {
+        // Mobile: tap video to re-show controls; idle bar pointer-events none.
+        upgrade_plugin_savepoint(true, 2026111730, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111731) {
+        // Mobile: full-width 16:9 only (no full-height); Stitch compact control chrome.
+        upgrade_plugin_savepoint(true, 2026111731, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111732) {
+        // Fix playback-rate menu: explicit rate apply + unclip overflow for popups.
+        upgrade_plugin_savepoint(true, 2026111732, 'local', 'launchpad');
+    }
+
     return true;
 }

@@ -1,5 +1,5 @@
 /**
- * LaunchPad VideoJS chrome: click-to-open menus, custom speed UI, quality gear.
+ * LaunchPad VideoJS chrome: Stitch control bar, boot poster/loader, quality gear.
  *
  * @module     local_launchpad
  * @copyright  2026 IntelliVerse-X
@@ -69,7 +69,6 @@
     }
 
     function menuRoot(el) {
-        // VideoJS nests a <button> inside the control div — lock class lives on the control.
         if (!el) {
             return null;
         }
@@ -79,8 +78,32 @@
         return el.closest ? el.closest('.vjs-control.vjs-menu-button-popup') : el;
     }
 
-    function bindClickMenus(playerEl) {
-        // Hover opens menus via .vjs-workinghover — force click-only (CSS + class).
+    function applyPlaybackRate(playerEl, item) {
+        var player = playerEl.__lpVjsPlayer;
+        if (!player || !item || typeof player.playbackRate !== 'function') {
+            return false;
+        }
+        // VideoJS rate items are usually "0.5x" / "1x" / "1.5x" text (sometimes data attrs).
+        var raw =
+            item.getAttribute('data-rate') ||
+            item.getAttribute('data-value') ||
+            (item.textContent || '');
+        var rate = parseFloat(String(raw).replace(/x/gi, '').trim());
+        if (isNaN(rate) || rate <= 0) {
+            return false;
+        }
+        try {
+            player.playbackRate(rate);
+            return true;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function bindClickMenus(playerEl, player) {
+        if (player) {
+            playerEl.__lpVjsPlayer = player;
+        }
         playerEl.classList.remove('vjs-workinghover');
         playerEl.classList.add('lp-vjs-click-menus');
 
@@ -97,15 +120,23 @@
         mo.observe(playerEl, { attributes: true, attributeFilter: ['class'] });
 
         playerEl.addEventListener('click', function (e) {
+            // Speed menu item — set rate ourselves (capture toggle was eating VideoJS handling).
+            var rateItem = e.target.closest && e.target.closest('.vjs-playback-rate .vjs-menu-item');
+            if (rateItem) {
+                e.preventDefault();
+                e.stopPropagation();
+                applyPlaybackRate(playerEl, rateItem);
+                closeMenus(playerEl, null);
+                return;
+            }
+
             var raw = e.target.closest && e.target.closest('.vjs-menu-button-popup');
             if (!raw || !playerEl.contains(raw)) {
                 return;
             }
-            // Quality has its own handler.
             if (raw.classList.contains('lp-vjs-quality') || raw.closest('.lp-vjs-quality')) {
                 return;
             }
-            // Ignore clicks on menu items (selecting a rate).
             if (e.target.closest && e.target.closest('.vjs-menu-item')) {
                 window.setTimeout(function () {
                     closeMenus(playerEl, null);
@@ -143,6 +174,172 @@
         }, function () {
             cb(null);
         });
+    }
+
+    function findVideoEl(host) {
+        return host.querySelector('video.video-js, .video-js video, video[data-lp-video-el], video');
+    }
+
+    function findPlayerRoot(host) {
+        return host.querySelector('.video-js') || findVideoEl(host);
+    }
+
+    function stripNativeChrome(host) {
+        host.querySelectorAll('video').forEach(function (v) {
+            v.removeAttribute('controls');
+            v.setAttribute('preload', 'metadata');
+            v.setAttribute('playsinline', '');
+            v.setAttribute('controlslist', 'nodownload');
+        });
+    }
+
+    function capturePreview(video, previewEl) {
+        if (!video || !previewEl || previewEl.getAttribute('data-ready') === '1') {
+            return;
+        }
+        if (!video.videoWidth || !video.videoHeight) {
+            return;
+        }
+        try {
+            var canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            previewEl.style.backgroundImage = 'url(' + canvas.toDataURL('image/jpeg', 0.72) + ')';
+            previewEl.setAttribute('data-ready', '1');
+        } catch (err) {
+            // Cross-origin or empty frame — keep navy fallback.
+        }
+    }
+
+    function hideBoot(host) {
+        host.classList.remove('is-booting', 'is-ready');
+        host.classList.add('is-playing');
+        var boot = host.querySelector('[data-lp-vjs-boot]');
+        if (boot) {
+            boot.setAttribute('hidden', '');
+        }
+    }
+
+    function showReady(host) {
+        host.classList.remove('is-booting');
+        host.classList.add('is-ready');
+        var loader = host.querySelector('[data-lp-vjs-loader]');
+        var playBtn = host.querySelector('[data-lp-vjs-play]');
+        if (loader) {
+            loader.setAttribute('hidden', '');
+        }
+        if (playBtn) {
+            playBtn.removeAttribute('hidden');
+        }
+    }
+
+    function bindBoot(host, playerEl, player) {
+        // Keep a live player handle — early boot runs before VideoJS upgrades.
+        host.__lpVjsPlayer = player || host.__lpVjsPlayer || null;
+
+        if (host.getAttribute('data-lp-boot-bound') === '1') {
+            if (player && host.getAttribute('data-lp-boot-player') !== '1') {
+                host.setAttribute('data-lp-boot-player', '1');
+                player.on('play', function () {
+                    hideBoot(host);
+                });
+                player.on('loadeddata', function () {
+                    var preview = host.querySelector('[data-lp-vjs-preview]');
+                    capturePreview(findVideoEl(host), preview);
+                    if (!host.classList.contains('is-playing')) {
+                        showReady(host);
+                    }
+                });
+                player.on('loadedmetadata', function () {
+                    if (!host.classList.contains('is-playing')) {
+                        showReady(host);
+                    }
+                });
+            }
+            return;
+        }
+        host.setAttribute('data-lp-boot-bound', '1');
+        host.classList.add('is-booting');
+
+        var preview = host.querySelector('[data-lp-vjs-preview]');
+        var playBtn = host.querySelector('[data-lp-vjs-play]');
+        var video = findVideoEl(host);
+
+        function tryReady() {
+            if (host.classList.contains('is-playing')) {
+                return;
+            }
+            if (video) {
+                capturePreview(video, preview);
+            }
+            // Prefer first frame; still unlock play once metadata exists.
+            if (!video || video.readyState >= 2 || video.videoWidth > 0) {
+                showReady(host);
+            }
+        }
+
+        if (video) {
+            ['loadeddata', 'loadedmetadata', 'canplay', 'seeked'].forEach(function (ev) {
+                video.addEventListener(ev, tryReady);
+            });
+            if (video.readyState >= 2) {
+                tryReady();
+            } else {
+                try {
+                    video.load();
+                } catch (err) {
+                    // ignore
+                }
+            }
+            // Fallback so loader never sticks forever.
+            window.setTimeout(function () {
+                if (!host.classList.contains('is-playing')) {
+                    showReady(host);
+                }
+            }, 4000);
+            video.addEventListener('play', function () {
+                hideBoot(host);
+            });
+        } else {
+            showReady(host);
+        }
+
+        function startPlayback(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            hideBoot(host);
+            var active = host.__lpVjsPlayer;
+            if (active && typeof active.play === 'function') {
+                var p = active.play();
+                if (p && typeof p.catch === 'function') {
+                    p.catch(function () {});
+                }
+                return;
+            }
+            var v = findVideoEl(host);
+            if (v) {
+                var p2 = v.play();
+                if (p2 && typeof p2.catch === 'function') {
+                    p2.catch(function () {});
+                }
+            }
+        }
+
+        if (playBtn) {
+            playBtn.addEventListener('click', startPlayback);
+        }
+
+        if (player) {
+            host.setAttribute('data-lp-boot-player', '1');
+            player.on('play', function () {
+                hideBoot(host);
+            });
+            player.on('loadeddata', tryReady);
+            player.on('loadedmetadata', tryReady);
+        }
     }
 
     function buildQualityButton(host, playerEl, player, qualities) {
@@ -216,7 +413,6 @@
                     }
                     return copy;
                 });
-                // Prefer height labels once metadata known for unlabeled singles.
                 if (items.length === 1 && !qualities[0].label) {
                     var hh = player && player.videoHeight ? player.videoHeight() : 0;
                     var dl = heightLabel(hh);
@@ -295,33 +491,207 @@
         renderList();
     }
 
-    function enhanceHost(host) {
-        if (host.getAttribute('data-lp-vjs-enhanced') === '1') {
+    function firstMatch(bar, selectors) {
+        for (var i = 0; i < selectors.length; i++) {
+            var el = bar.querySelector(selectors[i]);
+            if (el) {
+                return el;
+            }
+        }
+        return null;
+    }
+
+    function layoutControlBar(playerEl) {
+        var bar = playerEl.querySelector('.vjs-control-bar');
+        if (!bar) {
             return;
         }
-        var playerEl = host.querySelector('.video-js');
-        if (!playerEl || !playerEl.querySelector('.vjs-control-bar')) {
+
+        // Remove chrome we never want (PiP was landing left of Play after reorder).
+        bar.querySelectorAll([
+            '.vjs-picture-in-picture-control',
+            '.vjs-live-control',
+            '.vjs-seek-to-live-control',
+            '.vjs-live-display',
+            '.vjs-remaining-time',
+            '.vjs-chapters-button',
+            '.vjs-descriptions-button',
+            '.vjs-audio-button',
+            '.vjs-skip-backward-undefined',
+            '.vjs-skip-forward-undefined',
+        ].join(',')).forEach(function (el) {
+            el.remove();
+        });
+
+        // Exact Stitch order: progress | play · sound · time | 1x · CC · settings · fullscreen.
+        var progress = bar.querySelector('.vjs-progress-control');
+        var play = firstMatch(bar, ['.vjs-play-control']);
+        var volume = firstMatch(bar, ['.vjs-volume-panel', '.vjs-mute-control']);
+        var current = firstMatch(bar, ['.vjs-current-time']);
+        var divider = firstMatch(bar, ['.vjs-time-divider']);
+        var duration = firstMatch(bar, ['.vjs-duration']);
+        var rate = firstMatch(bar, ['.vjs-playback-rate']);
+        var caps = firstMatch(bar, ['.vjs-subs-caps-button', '.vjs-captions-button', '.vjs-subtitles-button']);
+        var quality = firstMatch(bar, ['.lp-vjs-quality']);
+        var fullscreen = firstMatch(bar, ['.vjs-fullscreen-control']);
+
+        var spacer = bar.querySelector('.lp-vjs-spacer');
+        if (!spacer) {
+            spacer = document.createElement('div');
+            spacer.className = 'vjs-control lp-vjs-spacer';
+            spacer.setAttribute('aria-hidden', 'true');
+        }
+
+        var ordered = [
+            progress,
+            play,
+            volume,
+            current,
+            divider,
+            duration,
+            spacer,
+            rate,
+            caps,
+            quality,
+            fullscreen,
+        ].filter(Boolean);
+
+        // Rebuild bar children strictly — leftovers previously stayed at the front (PiP).
+        ordered.forEach(function (el) {
+            bar.appendChild(el);
+        });
+        Array.from(bar.children).forEach(function (child) {
+            if (ordered.indexOf(child) === -1) {
+                child.remove();
+            }
+        });
+    }
+
+    function isTouchUi() {
+        try {
+            return !!(window.matchMedia &&
+                window.matchMedia('(hover: none), (pointer: coarse)').matches);
+        } catch (err) {
+            return 'ontouchstart' in window;
+        }
+    }
+
+    /**
+     * Mobile: tap the stage to show controls again after they auto-hide.
+     * Desktop mouse-move activity does not fire on phones.
+     */
+    function bindTapToShowControls(playerEl, player) {
+        if (!player || playerEl.getAttribute('data-lp-tap-controls') === '1') {
+            return;
+        }
+        playerEl.setAttribute('data-lp-tap-controls', '1');
+        playerEl.classList.add('lp-vjs-touch-controls');
+
+        // Keep chrome up longer on touch so 1x / CC / gear are tappable.
+        try {
+            if (typeof player.options === 'function') {
+                player.options({ inactivityTimeout: isTouchUi() ? 5000 : 3000 });
+            }
+        } catch (err) {
+            // ignore
+        }
+
+        function reveal() {
+            try {
+                player.userActive(true);
+            } catch (err) {
+                playerEl.classList.add('vjs-user-active');
+                playerEl.classList.remove('vjs-user-inactive');
+            }
+        }
+
+        player.on('play', reveal);
+        player.on('pause', reveal);
+
+        // Any touch on the player surface re-shows the bar.
+        playerEl.addEventListener('touchstart', function () {
+            reveal();
+        }, { passive: true });
+
+        // Tap tech (video) while playing → show controls (do not steal control-bar taps).
+        playerEl.addEventListener('click', function (e) {
+            if (!playerEl.classList.contains('vjs-has-started')) {
+                return;
+            }
+            if (e.target.closest && e.target.closest('.vjs-control-bar, .vjs-menu, .lp-vjs-boot')) {
+                reveal();
+                return;
+            }
+            // Stage tap: always reveal; second quick path lets VideoJS pause/play as usual.
+            reveal();
+        }, true);
+    }
+
+    function enhanceHost(host) {
+        stripNativeChrome(host);
+
+        var playerEl = findPlayerRoot(host);
+        if (!playerEl) {
             return false;
+        }
+
+        // Native-only path (no VideoJS upgrade).
+        if (!playerEl.classList.contains('video-js') && playerEl.tagName === 'VIDEO') {
+            if (host.getAttribute('data-lp-vjs-enhanced') === '1') {
+                return true;
+            }
+            host.setAttribute('data-lp-vjs-enhanced', '1');
+            bindBoot(host, playerEl, null);
+            return true;
+        }
+
+        if (!playerEl.querySelector('.vjs-control-bar')) {
+            // Still booting VideoJS — keep overlay, strip native controls early.
+            bindBoot(host, playerEl, null);
+            return false;
+        }
+
+        if (host.getAttribute('data-lp-vjs-enhanced') === '1') {
+            // VideoJS may re-inject PiP after first enhance — keep layout strict.
+            layoutControlBar(playerEl);
+            return true;
         }
         host.setAttribute('data-lp-vjs-enhanced', '1');
         playerEl.classList.add('lp-vjs-skin');
 
-        bindClickMenus(playerEl);
+        layoutControlBar(playerEl);
+        bindClickMenus(playerEl, null);
+        bindBoot(host, playerEl, null);
 
         var qualities = parseQualities(host);
         withVideoJsPlayer(playerEl, function (player) {
             buildQualityButton(host, playerEl, player, qualities);
-            // Re-bind after quality button inserted.
-            bindClickMenus(playerEl);
+            layoutControlBar(playerEl);
+            bindClickMenus(playerEl, player);
+            bindBoot(host, playerEl, player);
+            bindTapToShowControls(playerEl, player);
+            if (player) {
+                player.on('loadedmetadata', function () {
+                    layoutControlBar(playerEl);
+                });
+                player.on('play', function () {
+                    layoutControlBar(playerEl);
+                });
+                // Catch late-injected controls (PiP often appears after first paint).
+                window.setTimeout(function () {
+                    layoutControlBar(playerEl);
+                }, 300);
+                window.setTimeout(function () {
+                    layoutControlBar(playerEl);
+                }, 1200);
+            }
         });
         return true;
     }
 
     function scan() {
         document.querySelectorAll('[data-lp-video-player].lp-activity-videojs').forEach(function (host) {
-            if (!enhanceHost(host)) {
-                // Player still booting.
-            }
+            enhanceHost(host);
         });
     }
 
@@ -332,14 +702,18 @@
         var pending = document.querySelectorAll(
             '[data-lp-video-player].lp-activity-videojs:not([data-lp-vjs-enhanced="1"])'
         );
-        if (!pending.length || tries > 40) {
+        if (!pending.length || tries > 60) {
             window.clearInterval(timer);
         }
-    }, 250);
+    }, 200);
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', scan);
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-lp-video-player].lp-activity-videojs').forEach(stripNativeChrome);
+            scan();
+        });
     } else {
+        document.querySelectorAll('[data-lp-video-player].lp-activity-videojs').forEach(stripNativeChrome);
         scan();
     }
 })();

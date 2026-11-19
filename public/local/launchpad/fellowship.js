@@ -50,6 +50,58 @@
         }
     }
 
+    // Mobile V2: phase syllabus bottom sheet (Fellow activity).
+    (function syllabusSheet() {
+        var sheet = shell.querySelector('[data-lp-syllabus-sheet]');
+        if (!sheet) {
+            return;
+        }
+        var sheetScrim = sheet.querySelector('[data-lp-syllabus-close]');
+        var toggles = sheet.querySelectorAll('[data-lp-syllabus-toggle]');
+        var mq = window.matchMedia('(max-width: 900px)');
+
+        function setSheetOpen(open) {
+            if (!mq.matches) {
+                open = false;
+            }
+            sheet.classList.toggle('is-sheet-open', open);
+            document.body.classList.toggle('lp-syllabus-sheet-lock', open);
+            toggles.forEach(function (btn) {
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            if (sheetScrim) {
+                if (open) {
+                    sheetScrim.removeAttribute('hidden');
+                } else {
+                    sheetScrim.setAttribute('hidden', 'hidden');
+                }
+            }
+        }
+
+        toggles.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                setSheetOpen(!sheet.classList.contains('is-sheet-open'));
+            });
+        });
+        if (sheetScrim) {
+            sheetScrim.addEventListener('click', function () {
+                setSheetOpen(false);
+            });
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && sheet.classList.contains('is-sheet-open')) {
+                setSheetOpen(false);
+            }
+        });
+        if (typeof mq.addEventListener === 'function') {
+            mq.addEventListener('change', function () {
+                if (!mq.matches) {
+                    setSheetOpen(false);
+                }
+            });
+        }
+    })();
+
     if (toggle) {
         toggle.addEventListener('click', function () {
             setOpen(!shell.classList.contains('is-nav-open'));

@@ -252,11 +252,11 @@ final class activity_portal {
                 $mimetype = (string) $file->get_mimetype();
                 $isvideo = str_starts_with($mimetype, 'video/');
                 $streammoodleurl = \moodle_url::make_pluginfile_url(
-                    $context->id,
-                    'mod_resource',
-                    'content',
-                    $file->get_itemid(),
-                    $file->get_filepath(),
+                        $context->id,
+                        'mod_resource',
+                        'content',
+                        $file->get_itemid(),
+                        $file->get_filepath(),
                     $file->get_filename(),
                     false
                 );

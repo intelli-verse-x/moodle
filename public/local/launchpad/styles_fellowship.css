@@ -5965,19 +5965,7 @@ body.lp-cal-detail-lock { overflow: hidden; }
     gap: 8px;
   }
   .lp-ladder-step { flex: 0 0 96px; }
-  .lp-orbit {
-    width: 104px;
-    height: 78px;
-    right: 12px;
-    bottom: 14px;
-  }
-  .lp-orbit-bot { width: 104px; }
-  .lp-orbit-say {
-    right: 70px;
-    bottom: 56px;
-    width: min(240px, calc(100vw - 100px));
-  }
-  .lp-orbit-hide { right: 12px; bottom: 4px; }
+  /* Orbit mobile size is after base .lp-orbit rules below (cascade). */
 }
 @media (max-width: 640px) {
   .lp-greet-sub { display: none; }
@@ -6062,6 +6050,30 @@ body.lp-orbit-is-hidden .lp-orbit { display: none; }
   0% { transform: translateY(0) scale(1); }
   40% { transform: translateY(-18px) scale(1.04); }
   100% { transform: translateY(0) scale(1); }
+}
+
+/* Mobile: keep Dot Dot small so it does not cover lesson chrome. */
+@media (max-width: 900px) {
+  .lp-orbit {
+    width: 72px;
+    height: 56px;
+    right: 10px;
+    bottom: 14px;
+  }
+  .lp-orbit-bot {
+    width: 72px;
+  }
+  .lp-orbit-say {
+    right: 64px;
+    bottom: 42px;
+    width: min(200px, calc(100vw - 96px));
+    font-size: 12px;
+  }
+  .lp-orbit-hide {
+    right: 10px;
+    bottom: 2px;
+    font-size: 11px;
+  }
 }
 
 /* —— Achievements tools chrome (Employer badges patterns) —— */
@@ -10253,6 +10265,17 @@ body.lp-portal-mismatch-lock {
   position: sticky;
   top: 12px;
 }
+/* Mobile sheet chrome — hidden on desktop */
+.lp-syllabus-scrim,
+.lp-syllabus-peek {
+  display: none;
+}
+.lp-syllabus-sheet {
+  min-width: 0;
+}
+body.lp-syllabus-sheet-lock {
+  overflow: hidden;
+}
 .lp-lesson-playlist-panel {
   background: #fff;
   border: 1px solid var(--lp-line);
@@ -10523,18 +10546,213 @@ a.lp-lesson-playlist-link:hover {
   .lp-lesson-shell.has-playlist {
     grid-template-columns: 1fr;
   }
-  .lp-lesson-playlist {
-    order: 2;
-    position: static;
-  }
   .lp-lesson-shell.has-playlist > .lp-activity-hero {
     order: 1;
   }
+  /* V2 bottom sheet — Fellow activity playlist on mobile */
+  body.local-launchpad-fellowship .lp-activity-page.has-syllabus-sheet {
+    padding-bottom: 148px;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet] {
+    order: unset;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 55;
+    width: 100%;
+    max-width: none;
+    pointer-events: none;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet] .lp-syllabus-sheet {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: min(82vh, 720px);
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    border: 1px solid var(--lp-line, #e6eaf2);
+    border-bottom: 0;
+    box-shadow: 0 -10px 30px -4px rgba(15, 23, 42, 0.15), 0 -4px 12px -2px rgba(15, 23, 42, 0.08);
+    transform: translateY(calc(100% - 132px));
+    transition: transform 0.28s ease;
+    overflow: hidden;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet].is-sheet-open .lp-syllabus-sheet {
+    transform: translateY(0);
+  }
+  /* Transparent click-catcher only — no dim/fade over the lesson. */
+  body.local-launchpad-fellowship .lp-syllabus-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 54;
+    background: transparent;
+    pointer-events: none;
+    opacity: 0;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet].is-sheet-open .lp-syllabus-scrim {
+    pointer-events: auto;
+    opacity: 1;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-scrim[hidden] {
+    display: none !important;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-peek {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 10px 14px 12px;
+    background: rgba(255, 255, 255, 0.97);
+    border-bottom: 1px solid #eef2f7;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-handle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    margin: 0;
+    padding: 4px 0 2px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-handle-bar {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: #cbd5e1;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-peek-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-peek-ico {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    background: #eef4ff;
+    color: #1a4fb8;
+    flex: 0 0 auto;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-peek-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-peek-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-peek-pct {
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-peek-sub {
+    font-size: 11px;
+    font-weight: 500;
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-chevron {
+    flex: 0 0 auto;
+    color: #64748b;
+    transition: transform 0.28s ease;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet].is-sheet-open .lp-syllabus-chevron {
+    transform: rotate(180deg);
+  }
+  body.local-launchpad-fellowship .lp-syllabus-next {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-next.is-locked {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: auto;
+  }
+  body.local-launchpad-fellowship .lp-syllabus-panel {
+    display: none;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    background: #f8fafc;
+    -webkit-overflow-scrolling: touch;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet].is-sheet-open .lp-syllabus-panel {
+    display: block;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet] .lp-lesson-playlist-sum {
+    display: none;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet] .lp-lesson-playlist-panel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  body.local-launchpad-fellowship .lp-lesson-playlist[data-lp-syllabus-sheet] .lp-lesson-playlist-list {
+    max-height: none;
+    padding: 10px 12px 20px;
+  }
+  body.local-launchpad-fellowship:has([data-lp-syllabus-sheet]) .lp-orbit,
+  body.local-launchpad-fellowship:has([data-lp-syllabus-sheet]) .lp-orbit-hide {
+    bottom: 150px;
+    right: 10px;
+  }
+  body.local-launchpad-fellowship:has([data-lp-syllabus-sheet].is-sheet-open) .lp-orbit,
+  body.local-launchpad-fellowship:has([data-lp-syllabus-sheet].is-sheet-open) .lp-orbit-hide {
+    display: none;
+  }
+  /* Non-sheet / older mobile playlist fallback */
+  body:not(.local-launchpad-fellowship) .lp-lesson-playlist,
+  body.local-launchpad-fellowship .lp-lesson-playlist:not([data-lp-syllabus-sheet]) {
+    order: 2;
+    position: static;
+  }
+  body:not(.local-launchpad-fellowship) .lp-lesson-playlist-list,
+  body.local-launchpad-fellowship .lp-lesson-playlist:not([data-lp-syllabus-sheet]) .lp-lesson-playlist-list {
+    max-height: 280px;
+  }
   .lp-lesson-playlist-panel:not([open]) .lp-lesson-playlist-sum {
     border-bottom: 0;
-  }
-  .lp-lesson-playlist-list {
-    max-height: 280px;
   }
 }
 .lp-activity-hero {
@@ -10569,7 +10787,7 @@ a.lp-lesson-playlist-link:hover {
 .lp-lesson-chevrons {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -10577,39 +10795,51 @@ a.lp-lesson-playlist-link:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: 1px solid var(--lp-line, #e6eaf2);
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #fff;
   color: #0f172a;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
   text-decoration: none;
   box-sizing: border-box;
+  box-shadow: none;
+}
+.lp-lesson-chevron-glyph {
+  display: block;
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+.lp-lesson-chevron.is-prev {
+  color: #94a3b8;
+}
+.lp-lesson-chevron.is-next {
+  color: #0f172a;
 }
 a.lp-lesson-chevron:hover {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: #1a4fb8;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
 }
 .lp-lesson-chevron.is-locked,
 .lp-lesson-chevron.is-disabled {
-  opacity: 0.45;
+  opacity: 1;
   cursor: not-allowed;
-  color: #64748b;
-  background: #f8fafc;
+  color: #cbd5e1;
+  background: #fff;
+  border-color: #eef2f7;
 }
 .lp-lesson-chevron.is-locked:hover {
-  opacity: 0.6;
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #64748b;
+  border-color: #eef2f7;
+  background: #fff;
+  color: #cbd5e1;
 }
 [data-lp-activity-next].lp-lesson-chevron.is-watch-complete:not(.is-locked) {
   border-color: #93c5fd;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
   color: #1a4fb8;
 }
 .lp-activity-badge {
@@ -10919,13 +11149,32 @@ a.lp-lesson-chevron:hover {
   width: 100%;
   max-width: 720px;
 }
-.lp-activity-player {
+/* Clean video stage: player island + downloads as a separate card below. */
+.lp-video-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   width: 100%;
   max-width: min(960px, 100%);
-  border-radius: 12px;
+  margin: 6px 0 2px;
+}
+.lp-activity-intro + .lp-video-stage,
+.lp-activity-head-actions + .lp-video-stage {
+  margin-top: 4px;
+}
+.lp-activity-player {
+  width: 100%;
+  border-radius: 16px;
   overflow: hidden;
-  background: #0D1429;
-  border: 1px solid var(--lp-line);
+  background: #203a7c;
+  border: 1px solid #0f172a;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+  isolation: isolate;
+}
+/* Let 1x / quality menus open above the bar (overflow:hidden was clipping them). */
+.lp-activity-player:has(.vjs-lock-showing),
+.lp-activity-videojs:has(.vjs-lock-showing) {
+  overflow: visible;
 }
 .lp-activity-player video,
 .lp-activity-videojs .video-js,
@@ -10934,24 +11183,123 @@ a.lp-lesson-chevron:hover {
   width: 100%;
   height: auto;
   max-height: min(72vh, 560px);
-  background: #000;
+  background: #203a7c;
   vertical-align: middle;
 }
 .lp-activity-videojs {
+  position: relative;
   width: 100%;
-  background: #000;
+  background: #203a7c;
+  aspect-ratio: 16 / 9;
+  min-height: min(56vw, 420px);
 }
 .lp-activity-videojs .mediaplugin,
 .lp-activity-videojs .mediaplugin > div {
   max-width: 100% !important;
   width: 100%;
+  height: 100%;
 }
 .lp-activity-videojs .video-js {
   width: 100% !important;
   max-width: 100%;
+  height: 100% !important;
   aspect-ratio: 16 / 9;
-  min-height: min(56vw, 420px);
+  min-height: inherit;
+  background: #203a7c;
 }
+/* Boot gate: hide native/VideoJS chrome until ready — avoids FOUC of default player. */
+.lp-activity-videojs.is-booting video,
+.lp-activity-videojs.is-booting .video-js {
+  opacity: 0;
+  pointer-events: none;
+}
+.lp-activity-videojs.is-booting .vjs-control-bar,
+.lp-activity-videojs.is-booting .vjs-big-play-button,
+.lp-activity-videojs.is-ready .vjs-big-play-button,
+.lp-activity-videojs.is-booting .vjs-loading-spinner,
+.lp-activity-videojs.is-ready:not(.is-playing) .vjs-control-bar {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.lp-activity-videojs.is-booting video::-webkit-media-controls,
+.lp-activity-videojs.is-booting video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+.lp-activity-videojs.is-ready:not(.is-playing) .video-js,
+.lp-activity-videojs.is-ready:not(.is-playing) video {
+  opacity: 0;
+}
+.lp-activity-videojs.is-playing .video-js,
+.lp-activity-videojs.is-playing video {
+  opacity: 1;
+  pointer-events: auto;
+}
+.lp-vjs-boot {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #203a7c;
+  border-radius: inherit;
+}
+.lp-activity-videojs.is-playing .lp-vjs-boot,
+.lp-vjs-boot[hidden] {
+  display: none !important;
+}
+.lp-vjs-boot-preview {
+  position: absolute;
+  inset: 0;
+  background: #203a7c center / cover no-repeat;
+}
+.lp-vjs-boot-loader {
+  position: relative;
+  z-index: 1;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: lp-vjs-spin 0.75s linear infinite;
+}
+.lp-vjs-boot-loader[hidden] {
+  display: none !important;
+}
+@keyframes lp-vjs-spin {
+  to { transform: rotate(360deg); }
+}
+.lp-vjs-boot-play {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.4);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.lp-vjs-boot-play:hover {
+  background: #1d4ed8;
+}
+.lp-vjs-boot-play:active {
+  transform: scale(0.95);
+}
+.lp-vjs-boot-play[hidden] {
+  display: none !important;
+}
+.lp-vjs-boot-play svg {
+  margin-left: 2px;
+}
+/* Stitch: centered blue play once VideoJS owns chrome (post-start). */
 .lp-activity-videojs .video-js .vjs-big-play-button {
   left: 50%;
   top: 50%;
@@ -10962,13 +11310,199 @@ a.lp-lesson-chevron:hover {
   height: 4rem;
   margin: 0;
   line-height: 4rem;
-  background: rgba(37, 99, 235, 0.92);
+  background: #2563eb;
+  font-size: 2.25em;
 }
+.lp-activity-videojs .video-js:hover .vjs-big-play-button,
+.lp-activity-videojs .video-js .vjs-big-play-button:focus {
+  background: #1d4ed8;
+}
+/* Stitch layout: progress above a single nowrap control row. */
 .lp-activity-videojs .video-js .vjs-control-bar {
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
-  height: 3.25rem;
+  display: flex !important;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  position: absolute !important;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.45) 55%, transparent 100%);
+  height: auto !important;
+  min-height: 0;
   font-size: 13px;
-  padding: 0 0.35rem 0.15rem;
+  padding: 1.85rem 0.85rem 0.55rem;
+  box-sizing: border-box;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+/* Playing + idle: hide chrome AND let taps reach the video (show again on tap). */
+.lp-activity-videojs .video-js.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-control-bar {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+/* Tap / pause / ended → controls must be visible + tappable. */
+.lp-activity-videojs .video-js.vjs-user-active .vjs-control-bar,
+.lp-activity-videojs .video-js.vjs-paused .vjs-control-bar,
+.lp-activity-videojs .video-js.vjs-ended .vjs-control-bar {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+.lp-activity-videojs .video-js .vjs-tech {
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+/* Flex order belt-and-suspenders (DOM reorder + CSS). */
+.lp-activity-videojs .video-js .vjs-control-bar > * {
+  order: 50;
+  flex: 0 0 auto;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-play-control { order: 2; }
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel,
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-mute-control { order: 3; }
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-current-time { order: 4; }
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-time-divider { order: 5; }
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-duration { order: 6; }
+.lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-spacer { order: 10; }
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-playback-rate { order: 11; }
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-subs-caps-button,
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-captions-button,
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-subtitles-button { order: 12; }
+.lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-quality { order: 13; }
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-fullscreen-control { order: 14; }
+/* Progress sits above the icon row so buttons never wrap under it. */
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-progress-control {
+  order: 1;
+  position: absolute !important;
+  left: 0.85rem;
+  right: 0.85rem;
+  top: 0.55rem;
+  display: flex !important;
+  align-items: center;
+  width: auto !important;
+  max-width: none !important;
+  flex: none !important;
+  height: 1rem !important;
+  margin: 0;
+  float: none;
+  padding: 0;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-progress-holder {
+  margin: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-play-progress {
+  background: #fff;
+  border-radius: 999px;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-play-progress:before,
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-level:before {
+  color: #fff;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-control,
+.lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-quality {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 2.4em;
+  min-width: 0;
+  height: 2.35rem;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  float: none;
+  position: relative;
+  color: #fff;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-time-control {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  min-width: 0;
+  height: 2.35rem;
+  line-height: 1;
+  margin: 0;
+  float: none;
+  position: relative;
+  color: #fff;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-playback-rate {
+  width: auto;
+  min-width: 2.2em;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel {
+  display: inline-flex !important;
+  align-items: center;
+  width: auto;
+  min-width: 2.4em;
+  height: 2.35rem;
+  float: none;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-spacer {
+  flex: 1 1 auto !important;
+  width: auto;
+  min-width: 0.35rem;
+  max-width: none;
+  height: 2.35rem;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+  background: transparent;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-current-time,
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-time-divider,
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-duration {
+  display: inline-flex !important;
+  padding: 0 0.12rem;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.95);
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-time-divider {
+  min-width: 0;
+  padding: 0 0.1rem;
+}
+.lp-activity-videojs .video-js .vjs-control-bar .vjs-playback-rate .vjs-playback-rate-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.4rem;
+  line-height: 1;
+  padding: 0 0.35rem;
+  position: static;
+  top: auto;
+  left: auto;
+  width: auto;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* Kill PiP / LIVE / remaining-time chrome (VOD lessons only). */
+.lp-activity-videojs .vjs-picture-in-picture-control,
+.lp-activity-videojs .vjs-live-control,
+.lp-activity-videojs .vjs-seek-to-live-control,
+.lp-activity-videojs .vjs-live-display,
+.lp-activity-videojs .vjs-remaining-time,
+.lp-activity-videojs .vjs-chapters-button,
+.lp-activity-videojs .vjs-descriptions-button,
+.lp-activity-videojs .vjs-audio-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
 }
 /* Click-only menus (kill VideoJS hover-open). */
 .lp-activity-videojs .video-js.vjs-workinghover .vjs-menu-button-popup.vjs-hover .vjs-menu,
@@ -10979,23 +11513,168 @@ a.lp-lesson-chevron:hover {
 .lp-activity-videojs .video-js .vjs-menu-button-popup .vjs-menu.vjs-lock-showing {
   display: block !important;
 }
-/* Hide unused chrome — keep play / volume / time / progress / rate / quality / fullscreen. */
+/* Hide unused chrome — Stitch: no PiP / LIVE / skip stubs. */
 .lp-activity-videojs .lp-vjs-skin .vjs-picture-in-picture-control,
 .lp-activity-videojs .lp-vjs-skin .vjs-chapters-button,
 .lp-activity-videojs .lp-vjs-skin .vjs-descriptions-button,
 .lp-activity-videojs .lp-vjs-skin .vjs-audio-button,
 .lp-activity-videojs .lp-vjs-skin .vjs-remaining-time,
+.lp-activity-videojs .lp-vjs-skin .vjs-live-control,
+.lp-activity-videojs .lp-vjs-skin .vjs-seek-to-live-control,
+.lp-activity-videojs .lp-vjs-skin .vjs-live-display,
 .lp-activity-videojs .lp-vjs-skin .vjs-skip-backward-undefined,
 .lp-activity-videojs .lp-vjs-skin .vjs-skip-forward-undefined {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+@media (max-width: 900px) {
+  /* Full width only — never stretch to viewport height (Stitch compact 16:9 island). */
+  .lp-video-stage,
+  .lp-activity-player {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+  }
+  .lp-activity-player {
+    border-radius: 16px;
+  }
+  .lp-activity-videojs {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none;
+  }
+  .lp-activity-player video,
+  .lp-activity-videojs .video-js,
+  .lp-activity-videojs video {
+    max-height: none;
+  }
+  .lp-activity-videojs .mediaplugin,
+  .lp-activity-videojs .mediaplugin > div {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+  }
+  .lp-activity-videojs .video-js {
+    position: absolute !important;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding-top: 0 !important; /* kill VideoJS fluid padding that fights our box */
+    aspect-ratio: auto;
+  }
+  /* Stitch compact controls: play · vol · time | 1x · CC · gear · FS */
+  .lp-activity-videojs .video-js .vjs-control-bar {
+    padding: 2rem 1rem 0.75rem;
+    font-size: 12px;
+    gap: 0;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-progress-control {
+    left: 1rem;
+    right: 1rem;
+    top: 0.65rem;
+    height: 0.9rem !important;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-progress-holder {
+    height: 4px;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-control,
+  .lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-quality {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-play-control {
+    margin-right: 0.35rem;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel.vjs-volume-panel-horizontal {
+    width: 1.75rem !important;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    margin-right: 0.35rem;
+  }
+  /* Icon-only volume on mobile — expanding slider was blowing the row. */
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-control,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel:hover .vjs-volume-control,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel.vjs-hover .vjs-volume-control,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-volume-panel:focus-within .vjs-volume-control {
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-time-control,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-current-time,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-duration,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-time-divider {
+    width: auto !important;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0 0.05rem;
+    height: 1.75rem;
+    letter-spacing: -0.01em;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-playback-rate {
+    width: auto;
+    min-width: 1.5rem;
+    height: 1.75rem;
+    margin-left: 0.15rem;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-playback-rate .vjs-playback-rate-value {
+    height: 1.75rem;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 0.2rem;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-subs-caps-button,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-captions-button,
+  .lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-quality,
+  .lp-activity-videojs .video-js .vjs-control-bar .vjs-fullscreen-control {
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-left: 0.15rem;
+  }
+  .lp-activity-videojs .video-js .vjs-control-bar .lp-vjs-spacer {
+    flex: 1 1 auto !important;
+    min-width: 0.5rem;
+    height: 1.75rem;
+  }
+  .lp-activity-videojs .lp-vjs-quality .lp-vjs-gear-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .lp-vjs-boot-play {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+@media (min-width: 901px) {
+  .lp-vjs-boot-play {
+    width: 5rem;
+    height: 5rem;
+  }
+  .lp-vjs-boot-play svg {
+    width: 32px;
+    height: 32px;
+  }
 }
 .lp-activity-videojs .lp-vjs-skin .vjs-playback-rate .vjs-playback-rate-value {
-  font-size: 1em;
-  font-weight: 600;
-  line-height: 3.25rem;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
-/* Custom speed / quality popup — dark navy + white selected (ref). */
+/* Custom speed / quality popup — dark navy + white selected. */
 .lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu {
   width: 5.5rem;
   left: 50%;
@@ -11003,6 +11682,11 @@ a.lp-lesson-chevron:hover {
   margin-bottom: 2.6rem;
   height: auto;
   bottom: 0;
+  z-index: 30;
+  pointer-events: auto;
+}
+.lp-activity-videojs .lp-vjs-skin .vjs-playback-rate .vjs-menu {
+  width: 4.5rem;
 }
 .lp-activity-videojs .lp-vjs-skin .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
   background: #0b1b3a;
@@ -11057,10 +11741,10 @@ a.lp-lesson-chevron:hover {
 }
 .lp-activity-videojs .lp-vjs-quality .lp-vjs-gear-icon {
   display: block;
-  margin: 0 auto;
-  position: relative;
-  top: 50%;
-  transform: translateY(-50%);
+  margin: 0;
+  position: static;
+  top: auto;
+  transform: none;
   opacity: 0.95;
 }
 .lp-activity-videojs .lp-vjs-quality.vjs-lock-showing .lp-vjs-gear-icon {
@@ -11070,20 +11754,39 @@ a.lp-lesson-chevron:hover {
   width: 6.5rem;
 }
 .lp-activity-video-resources {
-  padding: 0.9rem 1rem 1rem;
-  background: #F8FAFC;
-  border-top: 1px solid var(--lp-line);
+  padding: 12px 2px 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--lp-line, #e6eaf2);
+  border-radius: 0;
+  box-shadow: none;
 }
 .lp-activity-video-resources-title {
-  margin: 0 0 0.65rem;
-  font-size: 12.5px;
+  margin: 0 0 10px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .05em;
   text-transform: uppercase;
-  color: #334155;
+  color: #64748b;
 }
 .lp-activity-video-resources .lp-activity-files {
   max-width: none;
+}
+.lp-video-stage {
+  gap: 0;
+}
+.lp-video-stage > .lp-activity-player {
+  margin-bottom: 0;
+}
+.lp-video-stage > .lp-activity-video-resources {
+  margin-top: 12px;
+  padding-top: 12px;
+}
+@media (max-width: 900px) {
+  .lp-video-stage {
+    max-width: none;
+  }
 }
 .lp-activity-video {
   position: relative;

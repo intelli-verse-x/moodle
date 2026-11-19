@@ -2581,17 +2581,84 @@ a.lp-bdg {
   background: #000;
 }
 .lp-activity-videojs {
+  position: relative;
   width: 100%;
-  background: #000;
+  background: #203a7c;
+  aspect-ratio: 16 / 9;
 }
 .lp-activity-videojs .video-js {
   width: 100% !important;
   max-width: 100%;
   aspect-ratio: 16 / 9;
+  background: #203a7c;
+}
+.lp-activity-videojs.is-booting video,
+.lp-activity-videojs.is-booting .video-js {
+  opacity: 0;
+  pointer-events: none;
+}
+.lp-activity-videojs.is-booting .vjs-control-bar,
+.lp-activity-videojs.is-booting .vjs-big-play-button,
+.lp-activity-videojs.is-ready .vjs-big-play-button {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+.lp-vjs-boot {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #203a7c;
+}
+.lp-activity-videojs.is-playing .lp-vjs-boot,
+.lp-vjs-boot[hidden] {
+  display: none !important;
+}
+.lp-vjs-boot-preview {
+  position: absolute;
+  inset: 0;
+  background: #203a7c center / cover no-repeat;
+}
+.lp-vjs-boot-loader {
+  position: relative;
+  z-index: 1;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: lp-vjs-spin 0.75s linear infinite;
+}
+.lp-vjs-boot-loader[hidden] {
+  display: none !important;
+}
+@keyframes lp-vjs-spin {
+  to { transform: rotate(360deg); }
+}
+.lp-vjs-boot-play {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+}
+.lp-vjs-boot-play[hidden] {
+  display: none !important;
 }
 .lp-activity-videojs .video-js .vjs-control-bar {
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
-  height: 3.25rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+  height: auto;
+  min-height: 3.25rem;
 }
 .lp-activity-videojs .video-js.vjs-workinghover .vjs-menu-button-popup.vjs-hover .vjs-menu {
   display: none !important;

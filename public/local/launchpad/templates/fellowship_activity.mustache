@@ -3,12 +3,13 @@
 
     Fellow activity consume — LaunchPad shell over Moodle CM (page/url/resource/quiz/assign in-shell).
     Slice 0: videowatch guard. Slice 1: playlist + prev/next. Slice 2: live Done/progress.
-    Slice 3: Moodle VideoJS stage + supporting downloads under player.
+    Slice 3: Moodle VideoJS stage; downloads sit in a separate card under the player.
     Stitch-aligned shell: stage left, phase playlist right — real progress only.
     Slice 4: text lesson article/E7 polish (no empty fake sections).
+    Mobile V2: phase playlist as bottom-sheet drawer (desktop keeps right rail).
 }}
 {{#activity}}
-  <div class="lp-activity-page" data-region="fellowship-activity">
+  <div class="lp-activity-page{{#has_playlist}} has-syllabus-sheet{{/has_playlist}}" data-region="fellowship-activity">
     <nav class="lp-crumbs" aria-label="Breadcrumb">
       <a href="{{home_url}}">{{strings.navhome}}</a>
       <span aria-hidden="true">/</span>
@@ -19,95 +20,166 @@
 
     <div class="lp-lesson-shell{{#has_playlist}} has-playlist{{/has_playlist}}">
       {{#has_playlist}}
-        <aside class="lp-lesson-playlist" data-region="phase-playlist" data-lp-playlist aria-label="{{strings.playlisttitle}}">
-          <details class="lp-lesson-playlist-panel" open>
-            <summary class="lp-lesson-playlist-sum">
-              <span class="lp-lesson-playlist-heading">{{strings.playlisttitle}}</span>
-              {{#shell_has_phase}}
-                <span class="lp-lesson-playlist-phase">{{shell_phase_label}}</span>
-              {{/shell_has_phase}}
-              {{#playlist_has_progress}}
-                <div class="lp-lesson-playlist-progress" data-lp-playlist-progress>
-                  <div class="lp-lesson-playlist-progress-meta">
-                    <span class="lp-lesson-playlist-progress-label">{{playlist_progress_label}}</span>
-                    <span class="lp-lesson-playlist-progress-pct">{{playlist_progress_pct}}%</span>
-                  </div>
-                  <div class="lp-lesson-playlist-progress-track" aria-hidden="true">
-                    <div class="lp-lesson-playlist-progress-fill" style="width: {{playlist_progress_pct}}%;"></div>
-                  </div>
-                </div>
-              {{/playlist_has_progress}}
-            </summary>
-            <ol class="lp-lesson-playlist-list">
-              {{#playlist}}
-                <li class="lp-lesson-playlist-item{{#current}} is-current{{/current}}{{#complete}} is-done{{/complete}}{{#is_up_next}} is-up-next{{/is_up_next}}"
-                    data-lp-playlist-item
-                    data-cmid="{{cmid}}"
-                    data-complete="{{#complete}}1{{/complete}}{{^complete}}0{{/complete}}"
-                    data-current="{{#current}}1{{/current}}{{^current}}0{{/current}}"
-                    {{#current}}data-lp-playlist-current{{/current}}>
-                  {{#current}}
-                    <span class="lp-lesson-playlist-link is-current" aria-current="page">
-                      <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}•{{/complete}}</span>
-                      <span class="lp-lesson-playlist-copy">
-                        {{#is_now}}
-                          <span class="lp-lesson-playlist-eyebrow">{{strings.playlistnow}}</span>
-                        {{/is_now}}
-                        <span class="lp-lesson-playlist-name">{{name}}</span>
-                        {{#has_status}}
-                          <span class="lp-lesson-playlist-status">{{status_label}}</span>
-                        {{/has_status}}
-                      </span>
-                    </span>
-                    {{#show_watch_bar}}
-                      <div
-                        class="lp-videowatch-bar lp-videowatch-bar-playlist{{#watch_completed}} is-complete{{/watch_completed}}"
-                        data-lp-videowatch-bar
-                        data-pct="{{watch_pct}}"
-                        role="group"
-                        aria-label="{{strings.videowatchprogress}}"
-                      >
-                        <div class="lp-videowatch-bar-track">
-                          <div
-                            class="lp-videowatch-bar-fill"
-                            data-lp-videowatch-bar-fill
-                            style="width: {{watch_pct}}%;"
-                            role="progressbar"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                            aria-valuenow="{{watch_pct}}"
-                          ></div>
-                        </div>
-                        <span class="lp-videowatch-bar-label" data-lp-videowatch-bar-label>{{watch_pct}}%</span>
+        <aside
+          class="lp-lesson-playlist"
+          data-region="phase-playlist"
+          data-lp-playlist
+          data-lp-syllabus-sheet
+          aria-label="{{strings.syllabussheet}}"
+        >
+          <div class="lp-syllabus-scrim" data-lp-syllabus-close hidden></div>
+          <div class="lp-syllabus-sheet">
+            <div class="lp-syllabus-peek">
+              <button
+                type="button"
+                class="lp-syllabus-handle"
+                data-lp-syllabus-toggle
+                aria-expanded="false"
+                aria-controls="lp-syllabus-panel"
+                aria-label="{{strings.syllabussheettoggle}}"
+              >
+                <span class="lp-syllabus-handle-bar" aria-hidden="true"></span>
+              </button>
+              <button
+                type="button"
+                class="lp-syllabus-peek-row"
+                data-lp-syllabus-toggle
+                aria-expanded="false"
+                aria-controls="lp-syllabus-panel"
+              >
+                <span class="lp-syllabus-peek-ico" aria-hidden="true">
+                  <iconify-icon icon="hugeicons:left-to-right-list-bullet" width="16" height="16"></iconify-icon>
+                </span>
+                <span class="lp-syllabus-peek-copy">
+                  <span class="lp-syllabus-peek-title">
+                    {{strings.syllabussheet}}
+                    {{#playlist_has_progress}}
+                      <span class="lp-syllabus-peek-pct">{{playlist_progress_pct}}%</span>
+                    {{/playlist_has_progress}}
+                  </span>
+                  <span class="lp-syllabus-peek-sub">
+                    {{#playlist_has_progress}}{{playlist_progress_label}}{{/playlist_has_progress}}
+                    {{#shell_has_phase}}
+                      {{#playlist_has_progress}} · {{/playlist_has_progress}}{{shell_phase_label}}
+                    {{/shell_has_phase}}
+                  </span>
+                </span>
+                <iconify-icon class="lp-syllabus-chevron" icon="hugeicons:arrow-up-01" width="18" height="18" aria-hidden="true"></iconify-icon>
+              </button>
+              {{#nav_has_next}}
+                {{#nav_next_locked}}
+                  <span
+                    class="lp-btn lp-btn-solid lp-syllabus-next is-locked"
+                    data-lp-activity-next
+                    data-lp-next-locked="1"
+                    data-lp-next-url="{{nav_next_url}}"
+                    tabindex="0"
+                    role="link"
+                    aria-disabled="true"
+                    title="{{strings.lessonnextlocked}}"
+                  >{{strings.lessonnext}}: {{nav_next_name}}</span>
+                {{/nav_next_locked}}
+                {{^nav_next_locked}}
+                  <a
+                    class="lp-btn lp-btn-solid lp-syllabus-next"
+                    href="{{nav_next_url}}"
+                    data-lp-activity-next
+                  >{{strings.lessonnext}}: {{nav_next_name}}</a>
+                {{/nav_next_locked}}
+              {{/nav_has_next}}
+            </div>
+
+            <div class="lp-syllabus-panel" id="lp-syllabus-panel">
+              <details class="lp-lesson-playlist-panel" open>
+                <summary class="lp-lesson-playlist-sum">
+                  <span class="lp-lesson-playlist-heading">{{strings.playlisttitle}}</span>
+                  {{#shell_has_phase}}
+                    <span class="lp-lesson-playlist-phase">{{shell_phase_label}}</span>
+                  {{/shell_has_phase}}
+                  {{#playlist_has_progress}}
+                    <div class="lp-lesson-playlist-progress" data-lp-playlist-progress>
+                      <div class="lp-lesson-playlist-progress-meta">
+                        <span class="lp-lesson-playlist-progress-label">{{playlist_progress_label}}</span>
+                        <span class="lp-lesson-playlist-progress-pct">{{playlist_progress_pct}}%</span>
                       </div>
-                      <p
-                        class="lp-videowatch-toast"
-                        data-lp-videowatch-toast
-                        data-done-label="{{strings.playlistdone}}"
-                        data-toast-text="{{strings.videowatchdone}}"
-                        hidden
-                        role="status"
-                      ></p>
-                    {{/show_watch_bar}}
-                  {{/current}}
-                  {{^current}}
-                    <a class="lp-lesson-playlist-link" href="{{url}}">
-                      <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}○{{/complete}}</span>
-                      <span class="lp-lesson-playlist-copy">
-                        {{#is_up_next}}
-                          <span class="lp-lesson-playlist-eyebrow is-up-next">{{strings.playlistupnext}}</span>
-                        {{/is_up_next}}
-                        <span class="lp-lesson-playlist-name">{{name}}</span>
-                        {{#has_status}}
-                          <span class="lp-lesson-playlist-status">{{status_label}}</span>
-                        {{/has_status}}
-                      </span>
-                    </a>
-                  {{/current}}
-                </li>
-              {{/playlist}}
-            </ol>
-          </details>
+                      <div class="lp-lesson-playlist-progress-track" aria-hidden="true">
+                        <div class="lp-lesson-playlist-progress-fill" style="width: {{playlist_progress_pct}}%;"></div>
+                      </div>
+                    </div>
+                  {{/playlist_has_progress}}
+                </summary>
+                <ol class="lp-lesson-playlist-list">
+                  {{#playlist}}
+                    <li class="lp-lesson-playlist-item{{#current}} is-current{{/current}}{{#complete}} is-done{{/complete}}{{#is_up_next}} is-up-next{{/is_up_next}}"
+                        data-lp-playlist-item
+                        data-cmid="{{cmid}}"
+                        data-complete="{{#complete}}1{{/complete}}{{^complete}}0{{/complete}}"
+                        data-current="{{#current}}1{{/current}}{{^current}}0{{/current}}"
+                        {{#current}}data-lp-playlist-current{{/current}}>
+                      {{#current}}
+                        <span class="lp-lesson-playlist-link is-current" aria-current="page">
+                          <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}•{{/complete}}</span>
+                          <span class="lp-lesson-playlist-copy">
+                            {{#is_now}}
+                              <span class="lp-lesson-playlist-eyebrow">{{strings.playlistnow}}</span>
+                            {{/is_now}}
+                            <span class="lp-lesson-playlist-name">{{name}}</span>
+                            {{#has_status}}
+                              <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                            {{/has_status}}
+                          </span>
+                        </span>
+                        {{#show_watch_bar}}
+                          <div
+                            class="lp-videowatch-bar lp-videowatch-bar-playlist{{#watch_completed}} is-complete{{/watch_completed}}"
+                            data-lp-videowatch-bar
+                            data-pct="{{watch_pct}}"
+                            role="group"
+                            aria-label="{{strings.videowatchprogress}}"
+                          >
+                            <div class="lp-videowatch-bar-track">
+                              <div
+                                class="lp-videowatch-bar-fill"
+                                data-lp-videowatch-bar-fill
+                                style="width: {{watch_pct}}%;"
+                                role="progressbar"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-valuenow="{{watch_pct}}"
+                              ></div>
+                            </div>
+                            <span class="lp-videowatch-bar-label" data-lp-videowatch-bar-label>{{watch_pct}}%</span>
+                          </div>
+                          <p
+                            class="lp-videowatch-toast"
+                            data-lp-videowatch-toast
+                            data-done-label="{{strings.playlistdone}}"
+                            data-toast-text="{{strings.videowatchdone}}"
+                            hidden
+                            role="status"
+                          ></p>
+                        {{/show_watch_bar}}
+                      {{/current}}
+                      {{^current}}
+                        <a class="lp-lesson-playlist-link" href="{{url}}">
+                          <span class="lp-lesson-playlist-mark" aria-hidden="true">{{#complete}}✓{{/complete}}{{^complete}}○{{/complete}}</span>
+                          <span class="lp-lesson-playlist-copy">
+                            {{#is_up_next}}
+                              <span class="lp-lesson-playlist-eyebrow is-up-next">{{strings.playlistupnext}}</span>
+                            {{/is_up_next}}
+                            <span class="lp-lesson-playlist-name">{{name}}</span>
+                            {{#has_status}}
+                              <span class="lp-lesson-playlist-status">{{status_label}}</span>
+                            {{/has_status}}
+                          </span>
+                        </a>
+                      {{/current}}
+                    </li>
+                  {{/playlist}}
+                </ol>
+              </details>
+            </div>
+          </div>
         </aside>
       {{/has_playlist}}
 
@@ -127,20 +199,20 @@
             <nav class="lp-lesson-chevrons" data-lp-activity-nav aria-label="{{strings.lessonnav}}">
               {{#nav_has_prev}}
                 <a
-                  class="lp-lesson-chevron"
+                  class="lp-lesson-chevron is-prev"
                   href="{{nav_prev_url}}"
                   data-lp-activity-prev
                   title="{{strings.lessonprev}}: {{nav_prev_name}}"
                   aria-label="{{strings.lessonprev}}: {{nav_prev_name}}"
-                >&lt;</a>
+                ><span class="lp-lesson-chevron-glyph" aria-hidden="true">‹</span></a>
               {{/nav_has_prev}}
               {{^nav_has_prev}}
-                <span class="lp-lesson-chevron is-disabled" aria-disabled="true" title="{{strings.lessonprev}}">&lt;</span>
+                <span class="lp-lesson-chevron is-prev is-disabled" aria-disabled="true" title="{{strings.lessonprev}}"><span class="lp-lesson-chevron-glyph" aria-hidden="true">‹</span></span>
               {{/nav_has_prev}}
               {{#nav_has_next}}
                 {{#nav_next_locked}}
                   <span
-                    class="lp-lesson-chevron is-locked"
+                    class="lp-lesson-chevron is-next is-locked"
                     data-lp-activity-next
                     data-lp-next-locked="1"
                     data-lp-next-url="{{nav_next_url}}"
@@ -149,20 +221,20 @@
                     aria-disabled="true"
                     title="{{strings.lessonnextlocked}}"
                     aria-label="{{strings.lessonnext}}: {{nav_next_name}} — {{strings.lessonnextlocked}}"
-                  >&gt;</span>
+                  ><span class="lp-lesson-chevron-glyph" aria-hidden="true">›</span></span>
                 {{/nav_next_locked}}
                 {{^nav_next_locked}}
                   <a
-                    class="lp-lesson-chevron"
+                    class="lp-lesson-chevron is-next"
                     href="{{nav_next_url}}"
                     data-lp-activity-next
                     title="{{strings.lessonnext}}: {{nav_next_name}}"
                     aria-label="{{strings.lessonnext}}: {{nav_next_name}}"
-                  >&gt;</a>
+                  ><span class="lp-lesson-chevron-glyph" aria-hidden="true">›</span></a>
                 {{/nav_next_locked}}
               {{/nav_has_next}}
               {{^nav_has_next}}
-                <span class="lp-lesson-chevron is-disabled" aria-disabled="true" title="{{strings.lessonnext}}">&gt;</span>
+                <span class="lp-lesson-chevron is-next is-disabled" aria-disabled="true" title="{{strings.lessonnext}}"><span class="lp-lesson-chevron-glyph" aria-hidden="true">›</span></span>
               {{/nav_has_next}}
             </nav>
           {{/nav_has_either}}
@@ -259,99 +331,121 @@
           {{/isplaceholder}}
 
           {{#hasvideo}}
-            <div class="lp-activity-player" data-lp-video-stage>
-              {{#videowatch_enabled}}
-                <div
-                  id="local-videowatch"
-                  class="local-videowatch"
-                  data-lp-videowatch-guard
-                  data-lp-videowatch-progress="{{videowatch_frontier}}"
-                  data-cmid="{{videowatch_cmid}}"
-                  data-sesskey="{{videowatch_sesskey}}"
-                  data-url="{{videowatch_url}}"
-                  data-frontier="{{videowatch_frontier}}"
-                  data-duration="{{videowatch_duration}}"
-                  data-required="{{videowatch_required}}"
-                  data-completed="{{#videowatch_completed}}1{{/videowatch_completed}}{{^videowatch_completed}}0{{/videowatch_completed}}"
-                  data-pct="{{videowatch_pct}}"
-                  hidden
-                ></div>
-              {{/videowatch_enabled}}
-              {{#hasvideoembed}}
-                <div class="lp-activity-videojs" data-lp-video-player data-lp-video-qualities='{{{videoqualities_json}}}'>
-                  {{{videoembedhtml}}}
-                </div>
-              {{/hasvideoembed}}
-              {{^hasvideoembed}}
-                <video controls playsinline preload="metadata" controlslist="nodownload" data-lp-video-player>
-                  <source src="{{videourl}}" type="video/mp4">
-                  Your browser does not support HTML5 video.
-                </video>
-              {{/hasvideoembed}}
-              {{#videowatch_enabled}}
-                <script src="{{videowatch_guardscript}}"></script>
-                <script>
-                (function () {
-                  if (window.__lpVideowatchLive) { return; }
-                  window.__lpVideowatchLive = true;
-                  var toastHost = document.querySelector('[data-lp-videowatch-toast]');
-                  var doneLabel = (toastHost && toastHost.getAttribute('data-done-label')) || 'Done';
-                  var toastText = (toastHost && toastHost.getAttribute('data-toast-text')) || '';
-                  document.addEventListener('local-videowatch:progress', function (ev) {
-                    var detail = (ev && ev.detail) || {};
-                    if (!detail.completed) { return; }
-                    var badge = document.querySelector('.lp-activity-badge.is-status');
-                    if (badge) {
-                      badge.textContent = doneLabel;
-                      badge.classList.remove('is-run', 'is-line', 'is-warn');
-                      badge.classList.add('is-ok');
-                    }
-                    var current = document.querySelector('[data-lp-playlist-current], [data-lp-playlist-item][data-current="1"]');
-                    if (current) {
-                      current.setAttribute('data-complete', '1');
-                      current.classList.add('is-done');
-                      var status = current.querySelector('.lp-lesson-playlist-status');
-                      if (status) { status.textContent = doneLabel; }
-                      var mark = current.querySelector('.lp-lesson-playlist-mark');
-                      if (mark) { mark.textContent = '\u2713'; }
-                    }
-                    // Unlock compact Next chevron once watch policy is met.
-                    document.querySelectorAll('[data-lp-activity-next]').forEach(function (next) {
-                      next.classList.add('is-watch-complete');
-                      if (next.getAttribute('data-lp-next-locked') !== '1') {
-                        next.classList.remove('is-locked');
-                        next.removeAttribute('aria-disabled');
-                        return;
+            <section class="lp-video-stage" data-lp-video-stage aria-label="{{strings.videostage}}">
+              <div class="lp-activity-player">
+                {{#videowatch_enabled}}
+                  <div
+                    id="local-videowatch"
+                    class="local-videowatch"
+                    data-lp-videowatch-guard
+                    data-lp-videowatch-progress="{{videowatch_frontier}}"
+                    data-cmid="{{videowatch_cmid}}"
+                    data-sesskey="{{videowatch_sesskey}}"
+                    data-url="{{videowatch_url}}"
+                    data-frontier="{{videowatch_frontier}}"
+                    data-duration="{{videowatch_duration}}"
+                    data-required="{{videowatch_required}}"
+                    data-completed="{{#videowatch_completed}}1{{/videowatch_completed}}{{^videowatch_completed}}0{{/videowatch_completed}}"
+                    data-pct="{{videowatch_pct}}"
+                    hidden
+                  ></div>
+                {{/videowatch_enabled}}
+                {{#hasvideoembed}}
+                  <div class="lp-activity-videojs is-booting" data-lp-video-player data-lp-video-qualities='{{{videoqualities_json}}}'>
+                    <div class="lp-vjs-boot" data-lp-vjs-boot>
+                      <div class="lp-vjs-boot-preview" data-lp-vjs-preview></div>
+                      <div class="lp-vjs-boot-loader" data-lp-vjs-loader aria-hidden="true"></div>
+                      <button type="button" class="lp-vjs-boot-play" data-lp-vjs-play hidden aria-label="Play video">
+                        <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+                          <polygon fill="currentColor" points="6,4 20,12 6,20"></polygon>
+                        </svg>
+                      </button>
+                    </div>
+                    {{{videoembedhtml}}}
+                  </div>
+                {{/hasvideoembed}}
+                {{^hasvideoembed}}
+                  <div class="lp-activity-videojs is-booting" data-lp-video-player>
+                    <div class="lp-vjs-boot" data-lp-vjs-boot>
+                      <div class="lp-vjs-boot-preview" data-lp-vjs-preview></div>
+                      <div class="lp-vjs-boot-loader" data-lp-vjs-loader aria-hidden="true"></div>
+                      <button type="button" class="lp-vjs-boot-play" data-lp-vjs-play hidden aria-label="Play video">
+                        <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false">
+                          <polygon fill="currentColor" points="6,4 20,12 6,20"></polygon>
+                        </svg>
+                      </button>
+                    </div>
+                    <video playsinline preload="metadata" controlslist="nodownload" data-lp-video-el>
+                      <source src="{{videourl}}" type="video/mp4">
+                      Your browser does not support HTML5 video.
+                    </video>
+                  </div>
+                {{/hasvideoembed}}
+                {{#videowatch_enabled}}
+                  <script src="{{videowatch_guardscript}}"></script>
+                  <script>
+                  (function () {
+                    if (window.__lpVideowatchLive) { return; }
+                    window.__lpVideowatchLive = true;
+                    var toastHost = document.querySelector('[data-lp-videowatch-toast]');
+                    var doneLabel = (toastHost && toastHost.getAttribute('data-done-label')) || 'Done';
+                    var toastText = (toastHost && toastHost.getAttribute('data-toast-text')) || '';
+                    document.addEventListener('local-videowatch:progress', function (ev) {
+                      var detail = (ev && ev.detail) || {};
+                      if (!detail.completed) { return; }
+                      var badge = document.querySelector('.lp-activity-badge.is-status');
+                      if (badge) {
+                        badge.textContent = doneLabel;
+                        badge.classList.remove('is-run', 'is-line', 'is-warn');
+                        badge.classList.add('is-ok');
                       }
-                      var url = next.getAttribute('data-lp-next-url') || '';
-                      if (!url) { return; }
-                      var a = document.createElement('a');
-                      a.className = next.className.replace(/\bis-locked\b/g, '').replace(/\s+/g, ' ').trim();
-                      a.href = url;
-                      a.setAttribute('data-lp-activity-next', '');
-                      a.textContent = next.textContent;
-                      a.setAttribute('aria-label', next.getAttribute('aria-label') || next.getAttribute('title') || 'Next');
-                      var tip = next.getAttribute('aria-label') || '';
-                      if (tip.indexOf('—') !== -1) {
-                        tip = tip.split('—')[0].trim();
+                      var current = document.querySelector('[data-lp-playlist-current], [data-lp-playlist-item][data-current="1"]');
+                      if (current) {
+                        current.setAttribute('data-complete', '1');
+                        current.classList.add('is-done');
+                        var status = current.querySelector('.lp-lesson-playlist-status');
+                        if (status) { status.textContent = doneLabel; }
+                        var mark = current.querySelector('.lp-lesson-playlist-mark');
+                        if (mark) { mark.textContent = '\u2713'; }
                       }
-                      if (tip) { a.setAttribute('title', tip); }
-                      a.classList.add('is-watch-complete');
-                      next.replaceWith(a);
+                      // Unlock compact Next chevron once watch policy is met.
+                      document.querySelectorAll('[data-lp-activity-next]').forEach(function (next) {
+                        next.classList.add('is-watch-complete');
+                        if (next.getAttribute('data-lp-next-locked') !== '1') {
+                          next.classList.remove('is-locked');
+                          next.removeAttribute('aria-disabled');
+                          return;
+                        }
+                        var url = next.getAttribute('data-lp-next-url') || '';
+                        if (!url) { return; }
+                        var a = document.createElement('a');
+                        a.className = next.className.replace(/\bis-locked\b/g, '').replace(/\s+/g, ' ').trim();
+                        a.href = url;
+                        a.setAttribute('data-lp-activity-next', '');
+                        a.textContent = next.textContent;
+                        a.setAttribute('aria-label', next.getAttribute('aria-label') || next.getAttribute('title') || 'Next');
+                        var tip = next.getAttribute('aria-label') || '';
+                        if (tip.indexOf('—') !== -1) {
+                          tip = tip.split('—')[0].trim();
+                        }
+                        if (tip) { a.setAttribute('title', tip); }
+                        a.classList.add('is-watch-complete');
+                        next.replaceWith(a);
+                      });
+                      if (detail.justCompleted && toastText && toastHost) {
+                        toastHost.textContent = toastText;
+                        toastHost.hidden = false;
+                        toastHost.classList.add('is-visible');
+                        window.setTimeout(function () {
+                          toastHost.classList.remove('is-visible');
+                          toastHost.hidden = true;
+                        }, 4500);
+                      }
                     });
-                    if (detail.justCompleted && toastText && toastHost) {
-                      toastHost.textContent = toastText;
-                      toastHost.hidden = false;
-                      toastHost.classList.add('is-visible');
-                      window.setTimeout(function () {
-                        toastHost.classList.remove('is-visible');
-                        toastHost.hidden = true;
-                      }, 4500);
-                    }
-                  });
-                })();
-                </script>
-              {{/videowatch_enabled}}
+                  })();
+                  </script>
+                {{/videowatch_enabled}}
+              </div>
               {{#has_video_resources}}
                 <div class="lp-activity-video-resources" data-lp-video-resources>
                   <h3 class="lp-activity-video-resources-title">{{strings.videoresources}}</h3>
@@ -378,7 +472,7 @@
                   </ul>
                 </div>
               {{/has_video_resources}}
-            </div>
+            </section>
           {{/hasvideo}}
 
           {{#hasembed}}
