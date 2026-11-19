@@ -450,7 +450,43 @@ final class employer_dashboard {
                 'body' => self::str('employer_empty_body', null, 'When your organisation enrols you, your courses will show here.'),
             ],
             'strings' => $strings,
-        ], $homesummary, $toolpage, messaging::notification_dropdown_context($userid, 'employer'));
+        ], self::mobile_topbar_context($workspacecourse, $coursephases, $view), $homesummary, $toolpage,
+            messaging::notification_dropdown_context($userid, 'employer'));
+    }
+
+    /**
+     * Mobile two-tier topbar: course name + current phase (real data only).
+     *
+     * @param array|null $workspacecourse
+     * @param array $coursephases
+     * @param string $view
+     * @return array<string, mixed>
+     */
+    private static function mobile_topbar_context(?array $workspacecourse, array $coursephases, string $view): array {
+        $track = '';
+        $trackurl = '';
+        $phase = '';
+        if ($workspacecourse !== null) {
+            $track = trim((string) ($workspacecourse['name'] ?? ''));
+            $trackurl = (string) ($workspacecourse['detail_url'] ?? '');
+            if ($view === 'course' || $view === 'home') {
+                foreach ($coursephases as $row) {
+                    if (!empty($row['is_current'])) {
+                        $phase = trim((string) ($row['name'] ?? ''));
+                        if ($phase !== '') {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return [
+            'has_mobile_context' => $track !== '',
+            'mobile_context_track' => $track,
+            'mobile_context_track_url' => $trackurl !== '' ? $trackurl : '#',
+            'has_mobile_context_phase' => $phase !== '',
+            'mobile_context_phase' => $phase,
+        ];
     }
 
     /**

@@ -10,29 +10,38 @@
 
   <div class="lp-main-wrap">
     <header class="lp-topbar">
-      <div class="lp-topbar-start">
-        <button type="button" class="lp-menu-btn" data-lp-nav-toggle aria-expanded="false" aria-controls="lp-side">
-          <iconify-icon icon="hugeicons:menu-01" width="18" height="18" aria-hidden="true"></iconify-icon>
-          {{strings.menu}}
-        </button>
-        <div class="lp-greet">
-          <h1 class="lp-page-title">{{#is_home}}{{greeting}}{{/is_home}}{{^is_home}}{{pagetitle}}{{/is_home}}</h1>
-          <p class="lp-greet-sub">{{portallabel}}</p>
+      <div class="lp-topbar-primary">
+        <div class="lp-topbar-start">
+          <button type="button" class="lp-menu-btn" data-lp-nav-toggle aria-expanded="false" aria-controls="lp-side" aria-label="{{strings.menu}}">
+            <iconify-icon icon="hugeicons:menu-01" width="20" height="20" aria-hidden="true"></iconify-icon>
+            <span class="lp-menu-btn-label">{{strings.menu}}</span>
+          </button>
+          <a class="lp-topbar-brand" href="{{urls.home}}" title="ToBa Learn">
+            <img class="lp-topbar-brand-img" src="{{assets}}/logo.webp" alt="ToBa Learn" width="120" height="32">
+          </a>
+          <div class="lp-greet">
+            <h1 class="lp-page-title">{{#is_home}}{{greeting}}{{/is_home}}{{^is_home}}{{pagetitle}}{{/is_home}}</h1>
+            <p class="lp-greet-sub">{{portallabel}}</p>
+          </div>
+        </div>
+        <div class="lp-topbar-actions">
+          {{#hascourses}}
+            <a class="lp-xp-chip" href="{{sidecard.url}}" title="{{sidecard.title}}">
+              <iconify-icon icon="hugeicons:chart-line-data-01" width="16" height="16" aria-hidden="true"></iconify-icon>
+              <b>{{sidecard.chip_value}}</b> <span>{{sidecard.chip_label}}</span>
+            </a>
+          {{/hascourses}}
+          {{> local_launchpad/notification_dropdown }}
+          {{> local_launchpad/profile_menu }}
         </div>
       </div>
-      <div class="lp-topbar-actions">
-        {{#hascourses}}
-          <a class="lp-xp-chip" href="{{sidecard.url}}" title="{{sidecard.title}}">
-            <iconify-icon icon="hugeicons:chart-line-data-01" width="16" height="16" aria-hidden="true"></iconify-icon>
-            <b>{{sidecard.chip_value}}</b> <span>{{sidecard.chip_label}}</span>
-          </a>
-        {{/hascourses}}
-        {{> local_launchpad/notification_dropdown }}
-        {{> local_launchpad/profile_menu }}
-      </div>
+      {{> local_launchpad/mobile_topbar_context }}
     </header>
 
     <main class="lp-main" id="lp-main" tabindex="-1">
+      <div class="lp-mobile-pagehead">
+        <h1 class="lp-mobile-page-title">{{#is_home}}{{greeting}}{{/is_home}}{{^is_home}}{{pagetitle}}{{/is_home}}</h1>
+      </div>
       <div class="lp-inner{{^hascourses}}{{#is_home}} lp-inner-empty{{/is_home}}{{/hascourses}}">
         {{#is_home}}
           {{#hascourses}}

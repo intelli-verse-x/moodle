@@ -269,5 +269,15 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111739, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111740) {
+        // Mobile two-tier topbar for employer / mentor / admin (role-specific context).
+        upgrade_plugin_savepoint(true, 2026111740, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111741) {
+        // Employer mobile Dot Dot: 72px (Fellow parity); fix cascade after base orbit.
+        upgrade_plugin_savepoint(true, 2026111741, 'local', 'launchpad');
+    }
+
     return true;
 }

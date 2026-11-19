@@ -5681,7 +5681,7 @@ body.lp-cal-detail-lock { overflow: hidden; }
 
 @media (max-width: 900px) {
   .lp-shell { grid-template-columns: 1fr; }
-  /* Fellow mobile: Stitch two-tier topbar (brand + track/phase). Other roles keep prior chrome. */
+  /* Portal mobile: Stitch two-tier topbar (Fellow / Mentor / Admin share fellowship CSS). */
   body.local-launchpad-fellowship .lp-topbar {
     margin: 0;
     padding: 0;
@@ -5708,7 +5708,11 @@ body.lp-cal-detail-lock { overflow: hidden; }
     gap: 8px;
     min-width: 0;
   }
-  body.local-launchpad-fellowship .lp-greet { display: none; }
+  body.local-launchpad-fellowship .lp-greet,
+  body.local-launchpad-fellowship .lp-page-title-wrap,
+  body.local-launchpad-fellowship .lp-topbar-primary .lp-page-title {
+    display: none;
+  }
   body.local-launchpad-fellowship .lp-topbar-brand {
     display: inline-flex;
     align-items: center;
@@ -5835,6 +5839,22 @@ body.lp-cal-detail-lock { overflow: hidden; }
     background: #22c55e;
     flex: 0 0 auto;
   }
+  /* Mentor: fellow/assign pill reads as identity, not “current phase”. */
+  body.local-launchpad-mentor .lp-topbar-context-phase {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  body.local-launchpad-mentor .lp-topbar-context-phase-dot {
+    background: #3b82f6;
+  }
+  /* Admin: track ops pill. */
+  body.local-launchpad-admin .lp-topbar-context-phase {
+    background: #ede9fe;
+    color: #5b21b6;
+  }
+  body.local-launchpad-admin .lp-topbar-context-phase-dot {
+    background: #8b5cf6;
+  }
   body.local-launchpad-fellowship .lp-mobile-pagehead {
     display: block;
     margin: 0 0 12px;
@@ -5848,16 +5868,6 @@ body.lp-cal-detail-lock { overflow: hidden; }
     line-height: 1.2;
     color: var(--lp-ink, #0d1429);
   }
-  /* Non-Fellow shells: keep previous sticky topbar behaviour */
-  body:not(.local-launchpad-fellowship) .lp-topbar {
-    padding: 14px 16px 0;
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background: rgba(246, 248, 252, .92);
-    backdrop-filter: blur(10px);
-  }
-  body:not(.local-launchpad-fellowship) .lp-menu-btn { display: inline-flex; }
   .lp-side {
     position: fixed;
     inset: 0 auto 0 0;

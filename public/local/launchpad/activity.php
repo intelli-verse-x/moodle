@@ -43,12 +43,21 @@ $needvideojs = !empty($activityctx['activity']['hasvideoembed']);
 
 // Shell chrome (nav, urls, strings) from Employer dashboard; content from activity.
 $shell = employer_dashboard::export_for_template($USER, 'course', $courseid);
+$act = is_array($activityctx['activity'] ?? null) ? $activityctx['activity'] : [];
+$shelltrack = trim((string) ($act['shell_track_label'] ?? $act['coursename'] ?? ''));
+$shellphase = trim((string) ($act['shell_phase_label'] ?? ''));
+$shellback = (string) ($act['shell_back_url'] ?? $act['courseurl'] ?? '');
 $templatecontext = array_merge($shell, $activityctx, [
     'is_home' => false,
     'is_courses' => false,
     'is_course' => false,
     'is_activity' => true,
     'pagetitle' => (string) ($activityctx['pagetitle'] ?? $shell['pagetitle']),
+    'has_mobile_context' => $shelltrack !== '',
+    'mobile_context_track' => $shelltrack,
+    'mobile_context_track_url' => $shellback !== '' ? $shellback : '#',
+    'has_mobile_context_phase' => $shellphase !== '',
+    'mobile_context_phase' => $shellphase,
 ]);
 
 $PAGE->set_context(context_system::instance());

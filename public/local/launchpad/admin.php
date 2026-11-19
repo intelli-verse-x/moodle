@@ -872,6 +872,34 @@ if ($view === 'home') {
     $pagesub = get_string('admin_overview_page_sub', 'local_launchpad');
 }
 
+// Mobile two-tier context: selected track (+ phase/activity) on builder ops views.
+$mobilecontexttrack = '';
+$mobilecontexttrackurl = '';
+$mobilecontextphase = '';
+if ($trackid > 0 && in_array($view, ['courseops', 'builder', 'manage', 'activity'], true)) {
+    $trackcourse = $DB->get_record('course', ['id' => $trackid], 'id, fullname', IGNORE_MISSING);
+    if ($trackcourse) {
+        $mobilecontexttrack = format_string($trackcourse->fullname);
+        $mobilecontexttrackurl = (new moodle_url(persona_home::ADMIN_PATH, [
+            'view' => 'courseops',
+            'trackid' => $trackid,
+        ]))->out(false);
+    }
+    if ($view === 'manage' && $sectionnum > 0) {
+        require_once($CFG->dirroot . '/course/lib.php');
+        $mobilecontextphase = trim((string) get_section_name($trackid, $sectionnum));
+    } else if ($view === 'activity' && $cmid > 0) {
+        try {
+            [$trackcmcourse, $trackcm] = get_course_and_cm_from_cmid($cmid);
+            if ((int) ($trackcmcourse->id ?? 0) === $trackid) {
+                $mobilecontextphase = trim((string) $trackcm->get_formatted_name());
+            }
+        } catch (\Throwable $unused) {
+            $mobilecontextphase = '';
+        }
+    }
+}
+
 $mismatch = portal_gate::consume_modal_context();
 $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merge([
     'data_region' => admin_dashboard::DATA_REGION,
@@ -885,7 +913,13 @@ $shell = $OUTPUT->render_from_template('local_launchpad/admin_shell', array_merg
     'home_url' => $homeurl,
     'logout_url' => $logouturl,
     'profile_url' => $profileurl,
+    'assets' => $pluginbase . '/assets/img',
     'logo_url' => $pluginbase . '/assets/img/logo-on-dark.png',
+    'has_mobile_context' => $mobilecontexttrack !== '',
+    'mobile_context_track' => $mobilecontexttrack,
+    'mobile_context_track_url' => $mobilecontexttrackurl !== '' ? $mobilecontexttrackurl : $homeurl,
+    'has_mobile_context_phase' => $mobilecontextphase !== '',
+    'mobile_context_phase' => $mobilecontextphase,
     'notifications_url' => $notificationsurl,
     'notifications_label' => $notificationslabel,
     'unread_notifications' => $unread,
