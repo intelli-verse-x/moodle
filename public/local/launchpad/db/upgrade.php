@@ -169,5 +169,10 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111715, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111716) {
+        // Fellow lesson UX Slice 4: readable text article stage; E7 only when real sections exist.
+        upgrade_plugin_savepoint(true, 2026111716, 'local', 'launchpad');
+    }
+
     return true;
 }

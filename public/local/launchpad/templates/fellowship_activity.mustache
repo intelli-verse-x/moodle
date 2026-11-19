@@ -5,6 +5,7 @@
     Slice 0: videowatch guard. Slice 1: playlist + prev/next. Slice 2: live Done/progress.
     Slice 3: Moodle VideoJS stage + supporting downloads under player.
     Stitch-aligned shell: stage left, phase playlist right — real progress only.
+    Slice 4: text lesson article/E7 polish (no empty fake sections).
 }}
 {{#activity}}
   <div class="lp-activity-page" data-region="fellowship-activity">
@@ -162,44 +163,44 @@
 
         {{#isinportal}}
           {{#is_lesson}}
-            <div class="lp-lesson-layout" data-region="lesson-layout">
-              <section class="lp-lesson-block">
-                <h3 class="lp-lesson-block-title">{{strings.lessonobjective}}</h3>
+            {{#lesson_use_article}}
+              <article class="lp-lesson-article" data-region="lesson-article">
+                {{#lesson_has_article_intro}}
+                  <div class="lp-lesson-article-intro">{{{lesson_article_intro_html}}}</div>
+                {{/lesson_has_article_intro}}
+                {{#lesson_has_article}}
+                  <div class="lp-lesson-article-body">{{{lesson_article_html}}}</div>
+                {{/lesson_has_article}}
+              </article>
+            {{/lesson_use_article}}
+            {{#lesson_use_e7}}
+              <div class="lp-lesson-layout" data-region="lesson-layout">
                 {{#lesson_has_objective}}
-                  <div class="lp-lesson-block-body">{{{lesson_objective_html}}}</div>
+                  <section class="lp-lesson-block">
+                    <h3 class="lp-lesson-block-title">{{strings.lessonobjective}}</h3>
+                    <div class="lp-lesson-block-body">{{{lesson_objective_html}}}</div>
+                  </section>
                 {{/lesson_has_objective}}
-                {{^lesson_has_objective}}
-                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
-                {{/lesson_has_objective}}
-              </section>
-              <section class="lp-lesson-block">
-                <h3 class="lp-lesson-block-title">{{strings.lessonexplain}}</h3>
                 {{#lesson_has_explain}}
-                  <div class="lp-lesson-block-body">{{{lesson_explain_html}}}</div>
+                  <section class="lp-lesson-block">
+                    <h3 class="lp-lesson-block-title">{{strings.lessonexplain}}</h3>
+                    <div class="lp-lesson-block-body">{{{lesson_explain_html}}}</div>
+                  </section>
                 {{/lesson_has_explain}}
-                {{^lesson_has_explain}}
-                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
-                {{/lesson_has_explain}}
-              </section>
-              <section class="lp-lesson-block">
-                <h3 class="lp-lesson-block-title">{{strings.lessonexample}}</h3>
                 {{#lesson_has_example}}
-                  <div class="lp-lesson-block-body">{{{lesson_example_html}}}</div>
+                  <section class="lp-lesson-block">
+                    <h3 class="lp-lesson-block-title">{{strings.lessonexample}}</h3>
+                    <div class="lp-lesson-block-body">{{{lesson_example_html}}}</div>
+                  </section>
                 {{/lesson_has_example}}
-                {{^lesson_has_example}}
-                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
-                {{/lesson_has_example}}
-              </section>
-              <section class="lp-lesson-block">
-                <h3 class="lp-lesson-block-title">{{strings.lessonexercise}}</h3>
                 {{#lesson_has_exercise}}
-                  <div class="lp-lesson-block-body">{{{lesson_exercise_html}}}</div>
+                  <section class="lp-lesson-block">
+                    <h3 class="lp-lesson-block-title">{{strings.lessonexercise}}</h3>
+                    <div class="lp-lesson-block-body">{{{lesson_exercise_html}}}</div>
+                  </section>
                 {{/lesson_has_exercise}}
-                {{^lesson_has_exercise}}
-                  <p class="lp-muted lp-sm">{{strings.lessonmissing}}</p>
-                {{/lesson_has_exercise}}
-              </section>
-            </div>
+              </div>
+            {{/lesson_use_e7}}
           {{/is_lesson}}
 
           {{#hasbody}}

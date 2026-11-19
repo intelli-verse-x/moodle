@@ -1160,6 +1160,12 @@ final class activity_portal {
     public static function empty_lesson_layout(): array {
         return [
             'lesson_structured' => false,
+            'lesson_use_e7' => false,
+            'lesson_use_article' => false,
+            'lesson_article_html' => '',
+            'lesson_has_article' => false,
+            'lesson_article_intro_html' => '',
+            'lesson_has_article_intro' => false,
             'lesson_objective_html' => '',
             'lesson_has_objective' => false,
             'lesson_explain_html' => '',
@@ -1196,28 +1202,35 @@ final class activity_portal {
         $exercise = $parsed['exercise_html'];
         $structured = $parsed['structured'];
 
-        // Unstructured pages: intro → objective, body → explanation (still show section chrome).
-        if (!$structured) {
-            if ($hasintro && trim(strip_tags($introhtml)) !== '') {
-                $objective = $introhtml;
-            }
-            if ($explain === '' && trim(strip_tags($bodyhtml)) !== '') {
-                $explain = $bodyhtml;
-            }
-        }
+        $hasarticle = trim(strip_tags($bodyhtml)) !== '';
+        $hasarticleintro = $hasintro && trim(strip_tags($introhtml)) !== '';
+        // Slice 4: unstructured pages use a readable article stage (no fake empty E7 buckets).
+        $usearticle = !$structured && ($hasarticle || $hasarticleintro);
+        $usee7 = $structured;
+
+        $nextobjective = $usee7 ? $objective : '';
+        $nextexplain = $usee7 ? $explain : '';
+        $nextexample = $usee7 ? $example : '';
+        $nextexercise = $usee7 ? $exercise : '';
 
         $next = self::next_activity_after($cm, $course, $userid);
 
         return [
             'lesson_structured' => $structured,
-            'lesson_objective_html' => $objective,
-            'lesson_has_objective' => trim(strip_tags($objective)) !== '',
-            'lesson_explain_html' => $explain,
-            'lesson_has_explain' => trim(strip_tags($explain)) !== '',
-            'lesson_example_html' => $example,
-            'lesson_has_example' => trim(strip_tags($example)) !== '',
-            'lesson_exercise_html' => $exercise,
-            'lesson_has_exercise' => trim(strip_tags($exercise)) !== '',
+            'lesson_use_e7' => $usee7,
+            'lesson_use_article' => $usearticle,
+            'lesson_article_html' => $usearticle ? $bodyhtml : '',
+            'lesson_has_article' => $usearticle && $hasarticle,
+            'lesson_article_intro_html' => $usearticle ? $introhtml : '',
+            'lesson_has_article_intro' => $usearticle && $hasarticleintro,
+            'lesson_objective_html' => $nextobjective,
+            'lesson_has_objective' => trim(strip_tags($nextobjective)) !== '',
+            'lesson_explain_html' => $nextexplain,
+            'lesson_has_explain' => trim(strip_tags($nextexplain)) !== '',
+            'lesson_example_html' => $nextexample,
+            'lesson_has_example' => trim(strip_tags($nextexample)) !== '',
+            'lesson_exercise_html' => $nextexercise,
+            'lesson_has_exercise' => trim(strip_tags($nextexercise)) !== '',
             'lesson_has_next' => $next !== null,
             'lesson_next_name' => $next['name'] ?? '',
             'lesson_next_url' => $next['url'] ?? '',
