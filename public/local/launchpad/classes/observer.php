@@ -76,10 +76,13 @@ class observer {
         if ($userid <= 0) {
             return;
         }
-        // Persist Fellowship/Mentor tab so empty shells survive wiping lp-* courses.
+        // Persist Fellowship/Mentor tab only when it matches the real persona
+        // (wrong-tab login must not poison toba_portal — see remember_login_portal).
         $rawportal = optional_param('portal', '', PARAM_ALPHANUMEXT);
         if ($rawportal !== '') {
             registration::remember_login_portal($userid, $rawportal);
+        } else {
+            registration::reconcile_portal_preference($userid);
         }
         // Login form portal field (employer/fellowship/mentor) must win over /my/ defaults.
         // Do not rewrite a pinned gate URL — wrong persona must hit employee/fellow/mentor.php

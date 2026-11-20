@@ -123,10 +123,18 @@ class registration {
      * (messaging / peers). This tag only unlocks shell home + fellow.php access
      * for empty post-confirm accounts.
      *
+     * Higher-priority personas (admin / mentor seat / employee) never count as
+     * self-registered fellows — a poisoned toba_portal must not open fellow.php.
+     *
      * @param int $userid
      */
     public static function is_self_registered_fellow(int $userid): bool {
         if ($userid <= 0) {
+            return false;
+        }
+        if (account_persona::is_admin($userid)
+                || account_persona::is_mentor($userid)
+                || account_persona::is_employee($userid)) {
             return false;
         }
         $portal = get_user_preferences(self::PREF_PORTAL, '', $userid);
@@ -138,8 +146,31 @@ class registration {
      *
      * Does not grant grading caps — mentor.php still shows empty queue until
      * the user is a teacher on an lp-* course. Used only for shell home/access.
+     *
+     * Employees and fellows never count as portal mentors (wrong login tab must
+     * not open mentor.php).
      */
     public static function is_portal_mentor(int $userid): bool {
+        if ($userid <= 0) {
+            return false;
+        }
+        if (account_persona::is_admin($userid)
+                || account_persona::is_employee($userid)
+                || account_persona::is_fellowship($userid)) {
+            return false;
+        }
+        // Raw fellowship tag (without enrolment) also blocks mentor shell access.
+        $portal = strtolower(trim((string) get_user_preferences(self::PREF_PORTAL, '', $userid)));
+        if (self::normalise_portal($portal) === self::PORTAL_FELLOWSHIP) {
+            return false;
+        }
+        return $portal === self::PORTAL_MENTOR || $portal === 'mentors';
+    }
+
+    /**
+     * Raw toba_portal is the mentor shell tag (not normalised fellowship).
+     */
+    public static function has_raw_mentor_portal_pref(int $userid): bool {
         if ($userid <= 0) {
             return false;
         }
@@ -148,20 +179,119 @@ class registration {
     }
 
     /**
+     * Whether this account may keep a Fellowship toba_portal stamp.
+     */
+    public static function may_remember_fellowship_portal(int $userid): bool {
+        if ($userid <= 0) {
+            return false;
+        }
+        // Wrong-tab login must not overwrite real mentor/employee/admin personas
+        // — including empty mentor shells that only have the mentor toba_portal tag.
+        if (account_persona::is_admin($userid)
+                || account_persona::is_mentor($userid)
+                || account_persona::is_employee($userid)
+                || self::has_raw_mentor_portal_pref($userid)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Whether this account may keep a Mentor toba_portal stamp.
+     */
+    public static function may_remember_mentor_portal(int $userid): bool {
+        if ($userid <= 0) {
+            return false;
+        }
+        if (account_persona::is_admin($userid)
+                || account_persona::is_employee($userid)
+                || account_persona::is_fellowship($userid)) {
+            return false;
+        }
+        // Enrolled fellows already blocked above. Real mentor seats may repair a
+        // poisoned fellowship stamp; empty self-reg fellows must not become mentors.
+        if (account_persona::is_mentor($userid)) {
+            return true;
+        }
+        $portal = strtolower(trim((string) get_user_preferences(self::PREF_PORTAL, '', $userid)));
+        if (self::normalise_portal($portal) === self::PORTAL_FELLOWSHIP) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Persist Fellowship/Mentor portal choice after a successful login tab pin.
      *
      * So empty-state shells still open after courses are removed (scratch wipe).
+     * Never stamps a portal that conflicts with the account's real persona —
+     * that was poisoning employee→mentor and fellow↔mentor cross-login.
      */
     public static function remember_login_portal(int $userid, string $portal): void {
         if ($userid <= 0) {
             return;
         }
         $portal = login_portal::normalise($portal);
-        if ($portal !== login_portal::FELLOWSHIP && $portal !== login_portal::MENTOR) {
+        if ($portal === login_portal::FELLOWSHIP) {
+            if (!self::may_remember_fellowship_portal($userid)) {
+                self::reconcile_portal_preference($userid);
+                return;
+            }
+        } else if ($portal === login_portal::MENTOR) {
+            if (!self::may_remember_mentor_portal($userid)) {
+                self::reconcile_portal_preference($userid);
+                return;
+            }
+        } else {
             return;
         }
         set_user_preference(self::PREF_PORTAL, $portal, $userid);
         persona_home::reset_home_cache();
+    }
+
+    /**
+     * Drop a poisoned toba_portal when it conflicts with the real persona.
+     *
+     * Employees/admins never need the tag. Mentors keep mentor (or clear fellowship).
+     * Fellows keep fellowship (or clear mentor).
+     */
+    public static function reconcile_portal_preference(int $userid): void {
+        if ($userid <= 0) {
+            return;
+        }
+        $current = strtolower(trim((string) get_user_preferences(self::PREF_PORTAL, '', $userid)));
+        if ($current === '') {
+            return;
+        }
+
+        if (account_persona::is_admin($userid) || account_persona::is_employee($userid)) {
+            unset_user_preference(self::PREF_PORTAL, $userid);
+            persona_home::reset_home_cache();
+            return;
+        }
+
+        if (account_persona::is_mentor($userid)) {
+            if (self::normalise_portal($current) === self::PORTAL_FELLOWSHIP
+                    || ($current !== self::PORTAL_MENTOR && $current !== 'mentors')) {
+                set_user_preference(self::PREF_PORTAL, self::PORTAL_MENTOR, $userid);
+                persona_home::reset_home_cache();
+            }
+            return;
+        }
+
+        // Enrolled fellows: repair a poisoned mentor stamp back to fellowship.
+        if (account_persona::is_fellowship($userid)) {
+            if (self::normalise_portal($current) !== self::PORTAL_FELLOWSHIP) {
+                set_user_preference(self::PREF_PORTAL, self::PORTAL_FELLOWSHIP, $userid);
+                persona_home::reset_home_cache();
+            }
+            return;
+        }
+
+        // Empty mentor shell tag — keep it (never flip to fellowship here).
+        if (self::has_raw_mentor_portal_pref($userid)) {
+            return;
+        }
     }
 
     /**

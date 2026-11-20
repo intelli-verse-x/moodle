@@ -1,0 +1,21 @@
+{{!
+    @template local_launchpad/mobile_topbar_context
+
+    Shared mobile context strip (track/course + optional phase/pill).
+    Visible only under mobile CSS — desktop keeps .lp-topbar-context { display: none }.
+}}
+{{#has_mobile_context}}
+  <div class="lp-topbar-context" data-region="mobile-topbar-context">
+    <a class="lp-topbar-context-track" href="{{mobile_context_track_url}}">
+      <iconify-icon icon="hugeicons:arrow-left-01" width="14" height="14" aria-hidden="true"></iconify-icon>
+      <span class="lp-topbar-context-track-name">{{mobile_context_track}}</span>
+    </a>
+    {{#has_mobile_context_phase}}
+      <span class="lp-topbar-context-sep" aria-hidden="true">/</span>
+      <span class="lp-topbar-context-phase">
+        <span class="lp-topbar-context-phase-dot" aria-hidden="true"></span>
+        {{mobile_context_phase}}
+      </span>
+    {{/has_mobile_context_phase}}
+  </div>
+{{/has_mobile_context}}

@@ -144,8 +144,11 @@ final class quiz_attempt_ui {
         }
 
         $timenow = time();
-        // Never finish from the last question page — save, then open summary.
-        $dofinish = $finishattempt && !$opensummary && (bool) $timeup;
+        // Single-page quizzes (ToBa HTML): Submit finishes in place with confirm.
+        // Multi-page: never finish from a question page — save, then open summary
+        // (timeup is the exception).
+        $singlepage = $attemptobj->get_num_pages() <= 1;
+        $dofinish = $finishattempt && !$opensummary && ((bool) $timeup || $singlepage);
         $state = $attemptobj->process_attempt($timenow, $dofinish, $timeup, $thispage);
 
         if ($state === quiz_attempt::FINISHED || $state === quiz_attempt::ABANDONED) {
@@ -224,15 +227,30 @@ final class quiz_attempt_ui {
 
         $slots = $attemptobj->get_slots($page);
         $questions = [];
+        $qindex = 0;
         foreach ($slots as $slot) {
+            if (!$attemptobj->is_real_question($slot)) {
+                continue;
+            }
+            $qindex++;
+            $state = $attemptobj->get_question_state($slot);
+            $answered = !($state == \question_state::$todo || $state == \question_state::$invalid);
+            $flagged = $attemptobj->is_question_flagged($slot);
             $html = $attemptobj->render_question($slot, false, $renderer);
             $questions[] = [
                 'slot' => (int) $slot,
+                'index' => $qindex,
+                'index_pad' => sprintf('%02d', $qindex),
+                'number_label' => get_string('fellowship_quiz_sum_q', 'local_launchpad', $qindex),
+                'answered' => $answered,
+                'flagged' => $flagged,
+                'status_key' => $flagged ? 'flagged' : ($answered ? 'answered' : 'todo'),
                 'html' => $html,
             ];
         }
 
         $numpages = $attemptobj->get_num_pages();
+        $singlepage = $numpages <= 1;
         $islast = $attemptobj->is_last_page($page);
         $nextpage = $islast ? -1 : ($page + 1);
         $quiz = $attemptobj->get_quiz();
@@ -244,6 +262,26 @@ final class quiz_attempt_ui {
             $hastimer = true;
             $timeleft = max(0, ($timestart + $timelimit) - time());
         }
+
+        $qtotal = count($questions);
+        $qanswered = 0;
+        $palette = [];
+        foreach ($questions as $qi => $qmeta) {
+            if (!empty($qmeta['answered'])) {
+                $qanswered++;
+            }
+            $palette[] = [
+                'slot' => $qmeta['slot'],
+                'index' => $qmeta['index'],
+                'index_pad' => $qmeta['index_pad'],
+                'number_label' => $qmeta['number_label'],
+                'answered' => !empty($qmeta['answered']),
+                'flagged' => !empty($qmeta['flagged']),
+                'status_key' => $qmeta['status_key'],
+                'is_first' => $qi === 0,
+            ];
+        }
+        $progresspct = $qtotal > 0 ? (int) round(($qanswered / $qtotal) * 100) : 0;
 
         $attemptobj->fire_attempt_viewed_event();
 
@@ -257,11 +295,32 @@ final class quiz_attempt_ui {
             'attempt_nextpage' => $nextpage,
             'attempt_is_last' => $islast,
             'attempt_has_prev' => $page > 0,
-            'attempt_page_label' => get_string(
-                'fellowship_quiz_page_of',
+            'attempt_single_page' => $singlepage,
+            'attempt_focus_ui' => $singlepage && $qtotal > 1,
+            'attempt_show_page_label' => !$singlepage,
+            'attempt_page_label' => $singlepage
+                ? get_string('fellowship_quiz_questions_n', 'local_launchpad', max(1, $qtotal))
+                : get_string(
+                    'fellowship_quiz_page_of',
+                    'local_launchpad',
+                    (object) ['page' => $page + 1, 'total' => max(1, $numpages)]
+                ),
+            'attempt_has_progress' => $qtotal > 0,
+            'attempt_answered_label' => get_string(
+                'fellowship_quiz_answered_of',
                 'local_launchpad',
-                (object) ['page' => $page + 1, 'total' => max(1, $numpages)]
+                (object) ['answered' => $qanswered, 'total' => $qtotal]
             ),
+            'attempt_current_of_label' => get_string(
+                'fellowship_quiz_current_of',
+                'local_launchpad',
+                (object) ['current' => 1, 'total' => max(1, $qtotal)]
+            ),
+            'attempt_progress_pct' => $progresspct,
+            'attempt_qtotal' => $qtotal,
+            'attempt_qanswered' => $qanswered,
+            'attempt_palette' => $palette,
+            'attempt_has_palette' => $palette !== [],
             'attempt_questions' => $questions,
             'attempt_has_questions' => $questions !== [],
             'attempt_form_action' => self::activity_url($cmid)->out(false),

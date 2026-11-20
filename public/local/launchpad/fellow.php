@@ -40,6 +40,7 @@ use local_launchpad\persona_home;
 use local_launchpad\portal_gate;
 use local_launchpad\assign_submit_ui;
 use local_launchpad\quiz_attempt_ui;
+use local_launchpad\track_certificate;
 
 /**
  * Resolve a Moodle lang key for Fellowship UI (never show [[missing]] markers).
@@ -557,6 +558,8 @@ if ($selected && $outline === null) {
 }
 
 $content = '';
+$needvideojs = false;
+$mobilecontextphase = '';
 $pagetitle = $lpstr('fellowship_area_heading', null, 'Fellowship');
 $nocourses = $lpstr(
     'fellowship_no_courses',
@@ -639,7 +642,13 @@ switch ($view) {
         $act = $activityctx['activity'] ?? [];
         $pagetitle = (string) ($activityctx['pagetitle'] ?? $pagetitle);
         $modtype = (string) ($act['modtype'] ?? '');
+        // Mobile topbar context row: real phase name only (no fake badges).
+        if (!empty($act['shell_has_phase']) && trim((string) ($act['shell_phase_label'] ?? '')) !== '') {
+            $mobilecontextphase = (string) $act['shell_phase_label'];
+        }
         $showjudging = in_array($modtype, ['assign', 'quiz'], true);
+        // Slice 3: custom shell must flush Moodle AMD so media_videojs/loader can upgrade the player.
+        $needvideojs = !empty($act['hasvideoembed']);
 
         $quizui = [];
         if ($modtype === 'quiz') {
@@ -692,6 +701,24 @@ switch ($view) {
                 'lessonmissing' => get_string('fellowship_lesson_missing', 'local_launchpad'),
                 'lessonnext' => get_string('fellowship_lesson_next', 'local_launchpad'),
                 'lessonnextlabel' => get_string('fellowship_lesson_next_label', 'local_launchpad'),
+                'lessonnextlocked' => get_string('fellowship_lesson_next_locked', 'local_launchpad'),
+                'lessonprev' => get_string('fellowship_lesson_prev', 'local_launchpad'),
+                'lessonnav' => get_string('fellowship_lesson_nav', 'local_launchpad'),
+                'playlisttitle' => get_string('fellowship_playlist_title', 'local_launchpad'),
+                'playlistdone' => get_string('fellowship_playlist_done', 'local_launchpad'),
+                'playlistnow' => get_string('fellowship_playlist_now', 'local_launchpad'),
+                'playlistupnext' => get_string('fellowship_playlist_upnext', 'local_launchpad'),
+                'syllabussheet' => $lpstr('fellowship_syllabus_sheet', null, 'Phase syllabus'),
+                'syllabussheettoggle' => $lpstr(
+                    'fellowship_syllabus_sheet_toggle',
+                    null,
+                    'Open or close phase syllabus'
+                ),
+                'videowatchprogress' => get_string('fellowship_videowatch_progress', 'local_launchpad'),
+                'videowatchdone' => get_string('fellowship_videowatch_done', 'local_launchpad'),
+                'videoresources' => get_string('fellowship_video_resources', 'local_launchpad'),
+                'videostage' => get_string('fellowship_video_stage', 'local_launchpad'),
+                'videolength' => get_string('fellowship_video_length', 'local_launchpad'),
                 'assignbrief' => get_string('fellowship_assign_brief', 'local_launchpad'),
                 'assignbriefmissing' => get_string('fellowship_assign_brief_missing', 'local_launchpad'),
                 'assigndeliverable' => get_string('fellowship_assign_deliverable', 'local_launchpad'),
@@ -710,6 +737,8 @@ switch ($view) {
                 'assignonlinetext' => get_string('fellowship_assign_onlinetext', 'local_launchpad'),
                 'assignfileupload' => get_string('fellowship_assign_fileupload', 'local_launchpad'),
                 'assignfilehint' => get_string('fellowship_assign_filehint', 'local_launchpad'),
+                'assignfilereplacehint' => get_string('fellowship_assign_filereplacehint', 'local_launchpad'),
+                'assignfiletypeclient' => get_string('fellowship_assign_filetype_client', 'local_launchpad'),
                 'assignsavedraft' => get_string('fellowship_assign_savedraft', 'local_launchpad'),
                 'assignsubmit' => get_string('fellowship_assign_submit', 'local_launchpad'),
                 'assignconfirmsubmit' => get_string('fellowship_assign_confirmsubmit', 'local_launchpad'),
@@ -737,6 +766,17 @@ switch ($view) {
                 'quizsubmit' => get_string('fellowship_quiz_submit', 'local_launchpad'),
                 'quiznext' => get_string('fellowship_quiz_next', 'local_launchpad'),
                 'quizprev' => get_string('fellowship_quiz_prev', 'local_launchpad'),
+                'quiznextq' => get_string('fellowship_quiz_next_q', 'local_launchpad'),
+                'quizfocus' => get_string('fellowship_quiz_focus', 'local_launchpad'),
+                'quizoverview' => get_string('fellowship_quiz_overview', 'local_launchpad'),
+                'quizmodetoggle' => get_string('fellowship_quiz_mode_toggle', 'local_launchpad'),
+                'quizpalette' => get_string('fellowship_quiz_palette', 'local_launchpad'),
+                'quizpalettehint' => get_string('fellowship_quiz_palette_hint', 'local_launchpad'),
+                'quizlegcurrent' => get_string('fellowship_quiz_leg_current', 'local_launchpad'),
+                'quizleganswered' => get_string('fellowship_quiz_leg_answered', 'local_launchpad'),
+                'quizlegtodo' => get_string('fellowship_quiz_leg_todo', 'local_launchpad'),
+                'quizlegflagged' => get_string('fellowship_quiz_leg_flagged', 'local_launchpad'),
+                'quizchip' => get_string('fellowship_quiz_chip', 'local_launchpad'),
                 'quizopensummary' => get_string('fellowship_quiz_open_summary', 'local_launchpad'),
                 'quizsummarylead' => get_string('fellowship_quiz_summary_lead', 'local_launchpad'),
                 'quizsummaryjump' => get_string('fellowship_quiz_summary_jump', 'local_launchpad'),
@@ -780,6 +820,22 @@ switch ($view) {
 
     case 'progress':
         $pagetitle = $lpstr('fellowship_nav_progress', null, 'Progress');
+        // Eligible Download: auto-issue + stream PDF (exits).
+        if (optional_param('downloadcert', 0, PARAM_BOOL) && confirm_sesskey()) {
+            global $SESSION;
+            $downloadcourseid = $selected !== null ? (int) $selected->id : 0;
+            try {
+                track_certificate::serve_pdf_download($userid, $downloadcourseid);
+            } catch (\Throwable $e) {
+                $SESSION->lp_fellow_flash = [
+                    'error' => get_string('fellowship_cert_err_not_eligible', 'local_launchpad'),
+                ];
+                redirect(new moodle_url(persona_home::FELLOW_PATH, [
+                    'view' => 'progress',
+                    'id' => $downloadcourseid,
+                ]));
+            }
+        }
         $progressdata = fellowship_dashboard::completion_for_user($userid, $courses, $selected);
         $progressswitch = [];
         $progressselectedid = $selected !== null ? (int) $selected->id : 0;
@@ -1177,6 +1233,8 @@ $ach = fellowship_dashboard::achievements_context_from_live($live, $view === 'ac
 $xptotal = (int) $ach['xp_total'];
 $badgesearned = (int) $ach['badges_earned'];
 $badgestotal = (int) $ach['badges_total'];
+// Level-up modal + badge toast when XP/badges newly unlock since last visit.
+$achunlocks = fellowship_dashboard::consume_achievement_unlocks($userid, $live, $ach);
 
 if ($view === 'home') {
     $homeoutline = $outline;
@@ -1517,6 +1575,17 @@ if (count($courses) > 1 && $selected !== null) {
     $activecourselabel = fellowship_dashboard::display_label(format_string($selected->fullname));
 }
 
+// Mobile two-tier topbar context (Stitch): track + optional phase — real data only.
+$mobilecontexttrack = '';
+$mobilecontexttrackurl = '';
+if ($selected !== null) {
+    $mobilecontexttrack = fellowship_dashboard::display_label(format_string($selected->fullname));
+    $mobilecontexttrackurl = (new moodle_url(persona_home::FELLOW_PATH, array_filter([
+        'view' => 'track',
+        'id' => (int) $selected->id,
+    ])))->out(false);
+}
+
 $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array_merge([
     'data_region' => fellowship_dashboard::DATA_REGION,
     'assets' => $pluginbase . '/assets/img',
@@ -1525,6 +1594,11 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     'greeting' => $greeting,
     'portallabel' => $lpstr('fellowship_portal_label', null, 'Fellowship portal'),
     'active_course_label' => $activecourselabel,
+    'has_mobile_context' => $mobilecontexttrack !== '',
+    'mobile_context_track' => $mobilecontexttrack,
+    'mobile_context_track_url' => $mobilecontexttrackurl,
+    'has_mobile_context_phase' => $mobilecontextphase !== '',
+    'mobile_context_phase' => $mobilecontextphase,
     'role_label' => $fellowrole,
     'is_home' => $view === 'home',
     'has_courses' => $courses !== [],
@@ -1564,7 +1638,7 @@ $shell = $OUTPUT->render_from_template('local_launchpad/fellowship_shell', array
     ],
     'bot_url' => $pluginbase . '/assets/img/bot.webp',
     'orbit_tip' => $orbittip,
-], messaging::notification_dropdown_context($userid, 'fellow'), $mismatch));
+], $achunlocks, messaging::notification_dropdown_context($userid, 'fellow'), $mismatch));
 
 header('Content-Type: text/html; charset=utf-8');
 echo '<!doctype html>' . "\n";
@@ -1577,6 +1651,11 @@ echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
+if (!empty($needvideojs)) {
+    // VideoJS CSS + Moodle AMD/RequireJS head (loader registered during activity_portal export).
+    echo '<link rel="stylesheet" href="' . s((new moodle_url('/media/player/videojs/styles.css'))->out(false)) . '">' . "\n";
+    echo $PAGE->requires->get_head_code($PAGE, $OUTPUT);
+}
 echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '</head>' . "\n";
 $bodyclass = 'local-launchpad-fellowship';
@@ -1584,7 +1663,16 @@ if (!empty($mismatch['show_portal_mismatch'])) {
     $bodyclass .= ' lp-portal-mismatch-lock';
 }
 echo '<body class="' . $bodyclass . '">' . "\n";
+if (!empty($needvideojs)) {
+    // javascript-static.js + jQuery/YUI live here — without this, media_videojs/loader dies on M.util.js_pending.
+    echo $PAGE->requires->get_top_of_body_code($OUTPUT);
+}
 echo $shell;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
+if (!empty($needvideojs)) {
+    echo $PAGE->requires->get_end_code();
+    // After AMD end_code so media_videojs/video-lazy is available for quality switching.
+    echo '<script src="' . s($pluginbase . '/video_player.js?v=' . rawurlencode($assetv)) . '" defer></script>' . "\n";
+}
 echo '</body>' . "\n";
 echo '</html>';

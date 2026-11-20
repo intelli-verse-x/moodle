@@ -19,9 +19,9 @@ namespace local_launchpad;
 /**
  * Persona post-login / My home routing.
  *
- * Priority: Admin → Mentor → Employee → Fellowship → Moodle /my/.
- * Employee (cohort lp-employee) wins over Fellowship so employer learners enrolled
- * on lp-* courses still get the Employer shell — not fellow.php.
+ * Priority: Admin → real Mentor seat → Employee → mentor tag → Fellowship → Moodle /my/.
+ * Employee (cohort lp-employee) wins over Fellowship and over a poisoned mentor
+ * toba_portal so employer learners still get the Employer shell — not mentor/fellow.php.
  * Deep course/mod wantsurl targets are never rewritten. Stale persona-shell
  * wantsurls (wrong shell for this user) are corrected on login.
  *
@@ -73,16 +73,19 @@ final class persona_home {
 
         $home = null;
         // is_admin() already covers is_siteadmin() — avoid a second native check.
+        // Priority: Admin → real mentor seat → Employee → mentor tag → Fellowship.
+        // Employee must beat a poisoned mentor toba_portal from the wrong login tab.
         if (account_persona::is_admin($userid)) {
             $home = new \moodle_url(self::ADMIN_PATH);
-        } else if (account_persona::is_mentor($userid)
-                || registration::is_portal_mentor($userid)) {
-            // Teacher on lp-* OR mentor portal tag (empty shell after course wipe).
+        } else if (account_persona::is_mentor($userid)) {
             $home = new \moodle_url(self::MENTOR_PATH);
         } else if (account_persona::is_employee($userid)) {
             // Employer cohort before Fellowship: lp-* student enrolments are normal
             // for employee upskilling and must not force the Fellowship shell.
             $home = new \moodle_url(self::EMPLOYEE_PATH);
+        } else if (registration::is_portal_mentor($userid)) {
+            // Mentor portal tag only (empty shell after course wipe) — never employees/fellows.
+            $home = new \moodle_url(self::MENTOR_PATH);
         } else if (account_persona::is_fellowship($userid)
                 || registration::is_self_registered_fellow($userid)) {
             // Enrolment OR Fellowship self-reg tag (toba_portal). Do not broaden

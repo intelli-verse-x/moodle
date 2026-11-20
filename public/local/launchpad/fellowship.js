@@ -50,6 +50,58 @@
         }
     }
 
+    // Mobile V2: phase syllabus bottom sheet (Fellow activity).
+    (function syllabusSheet() {
+        var sheet = shell.querySelector('[data-lp-syllabus-sheet]');
+        if (!sheet) {
+            return;
+        }
+        var sheetScrim = sheet.querySelector('[data-lp-syllabus-close]');
+        var toggles = sheet.querySelectorAll('[data-lp-syllabus-toggle]');
+        var mq = window.matchMedia('(max-width: 900px)');
+
+        function setSheetOpen(open) {
+            if (!mq.matches) {
+                open = false;
+            }
+            sheet.classList.toggle('is-sheet-open', open);
+            document.body.classList.toggle('lp-syllabus-sheet-lock', open);
+            toggles.forEach(function (btn) {
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            if (sheetScrim) {
+                if (open) {
+                    sheetScrim.removeAttribute('hidden');
+                } else {
+                    sheetScrim.setAttribute('hidden', 'hidden');
+                }
+            }
+        }
+
+        toggles.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                setSheetOpen(!sheet.classList.contains('is-sheet-open'));
+            });
+        });
+        if (sheetScrim) {
+            sheetScrim.addEventListener('click', function () {
+                setSheetOpen(false);
+            });
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && sheet.classList.contains('is-sheet-open')) {
+                setSheetOpen(false);
+            }
+        });
+        if (typeof mq.addEventListener === 'function') {
+            mq.addEventListener('change', function () {
+                if (!mq.matches) {
+                    setSheetOpen(false);
+                }
+            });
+        }
+    })();
+
     if (toggle) {
         toggle.addEventListener('click', function () {
             setOpen(!shell.classList.contains('is-nav-open'));
@@ -1807,6 +1859,164 @@
             });
         });
     }
+
+    // Achievement celebrations when a new level/badge unlocks (HTML LaunchPad parity).
+    (function initAchievementUnlocks() {
+        var reduceMotion = false;
+        try {
+            reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        } catch (e) {
+            reduceMotion = false;
+        }
+
+        function confetti(n) {
+            if (reduceMotion) {
+                return;
+            }
+            n = n || 140;
+            var canvas = document.createElement('canvas');
+            canvas.className = 'lp-confetti';
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            document.body.appendChild(canvas);
+            var g = canvas.getContext('2d');
+            if (!g) {
+                canvas.remove();
+                return;
+            }
+            var cols = ['#1A61F2', '#5B8DF6', '#FFBF33', '#4DCC66', '#FF5959', '#9CC0FF'];
+            var parts = [];
+            var i;
+            for (i = 0; i < n; i++) {
+                parts.push({
+                    x: canvas.width / 2 + (Math.random() - 0.5) * 200,
+                    y: canvas.height * 0.35,
+                    vx: (Math.random() - 0.5) * 14,
+                    vy: -Math.random() * 13 - 4,
+                    s: Math.random() * 8 + 4,
+                    r: Math.random() * 6,
+                    vr: (Math.random() - 0.5) * 0.3,
+                    c: cols[Math.floor(Math.random() * cols.length)]
+                });
+            }
+            var t = 0;
+            (function frame() {
+                g.clearRect(0, 0, canvas.width, canvas.height);
+                parts.forEach(function (p) {
+                    p.vy += 0.35;
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.r += p.vr;
+                    g.save();
+                    g.translate(p.x, p.y);
+                    g.rotate(p.r);
+                    g.fillStyle = p.c;
+                    g.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+                    g.restore();
+                });
+                t += 1;
+                if (t < 130) {
+                    window.requestAnimationFrame(frame);
+                } else {
+                    canvas.remove();
+                }
+            })();
+        }
+
+        function orbitHop() {
+            var o = document.getElementById('lp-orbit');
+            if (!o) {
+                return;
+            }
+            o.classList.remove('is-hop');
+            void o.offsetWidth;
+            o.classList.add('is-hop');
+        }
+
+        function showBadgeToasts(badges) {
+            if (!badges || !badges.length) {
+                return;
+            }
+            var label = 'Badge earned';
+            badges.forEach(function (badge, idx) {
+                window.setTimeout(function () {
+                    var el = document.createElement('div');
+                    el.className = 'lp-badge-toast';
+                    el.setAttribute('role', 'status');
+                    var icon = document.createElement('span');
+                    icon.className = 'lp-badge-toast-icon';
+                    icon.setAttribute('aria-hidden', 'true');
+                    var ic = document.createElement('iconify-icon');
+                    ic.setAttribute('icon', 'hugeicons:' + (badge.icon || 'award-01'));
+                    ic.setAttribute('width', '26');
+                    ic.setAttribute('height', '26');
+                    icon.appendChild(ic);
+                    var text = document.createElement('div');
+                    var small = document.createElement('small');
+                    small.textContent = label;
+                    var b = document.createElement('b');
+                    b.textContent = badge.name || '';
+                    text.appendChild(small);
+                    text.appendChild(b);
+                    el.appendChild(icon);
+                    el.appendChild(text);
+                    document.body.appendChild(el);
+                    confetti(60);
+                    orbitHop();
+                    window.setTimeout(function () {
+                        if (el.parentNode) {
+                            el.parentNode.removeChild(el);
+                        }
+                    }, 3600);
+                }, 400 + idx * 900);
+            });
+        }
+
+        var badgeDataEl = document.getElementById('lp-badge-unlock-data');
+        var badges = [];
+        if (badgeDataEl) {
+            try {
+                badges = JSON.parse(badgeDataEl.textContent || '[]') || [];
+            } catch (err) {
+                badges = [];
+            }
+        }
+
+        var scrim = document.querySelector('[data-lp-levelup-scrim]');
+        if (scrim) {
+            scrim.removeAttribute('hidden');
+            document.body.classList.add('lp-levelup-lock');
+            window.setTimeout(function () {
+                confetti(180);
+                orbitHop();
+            }, 150);
+
+            function closeLevelUp() {
+                scrim.setAttribute('hidden', 'hidden');
+                document.body.classList.remove('lp-levelup-lock');
+                showBadgeToasts(badges);
+            }
+
+            var dismiss = scrim.querySelector('[data-lp-levelup-dismiss]');
+            if (dismiss) {
+                dismiss.addEventListener('click', closeLevelUp);
+            }
+            scrim.addEventListener('click', function (e) {
+                if (e.target === scrim) {
+                    closeLevelUp();
+                }
+            });
+            document.addEventListener('keydown', function onEsc(e) {
+                if (e.key === 'Escape' && !scrim.hasAttribute('hidden')) {
+                    closeLevelUp();
+                    document.removeEventListener('keydown', onEsc);
+                }
+            });
+            return;
+        }
+
+        showBadgeToasts(badges);
+    })();
 
     // Dot Dot orbit (bottom-right companion).
     var orbit = document.getElementById('lp-orbit');
@@ -3779,6 +3989,33 @@
         if (!form) {
             return;
         }
+        var input = form.querySelector('input[name="assignfile"]');
+        var chosen = form.querySelector('[data-lp-assign-chosen]');
+        if (input && chosen) {
+            input.addEventListener('change', function () {
+                var file = input.files && input.files[0];
+                if (!file) {
+                    chosen.hidden = true;
+                    chosen.textContent = '';
+                    return;
+                }
+                var name = file.name || '';
+                var ext = name.indexOf('.') >= 0 ? name.split('.').pop().toLowerCase() : '';
+                var accept = (input.getAttribute('accept') || '').toLowerCase();
+                var allowed = accept.split(',').map(function (p) {
+                    return p.trim().replace(/^\./, '');
+                }).filter(Boolean);
+                if (allowed.length && allowed.indexOf(ext) === -1) {
+                    input.value = '';
+                    chosen.hidden = false;
+                    chosen.textContent = input.getAttribute('data-lp-assign-filetype-msg')
+                        || 'That file type is not allowed.';
+                    return;
+                }
+                chosen.hidden = false;
+                chosen.textContent = name;
+            });
+        }
         form.addEventListener('submit', function (ev) {
             var submitter = ev.submitter || document.activeElement;
             if (submitter && submitter.getAttribute('name') === 'assign_submit') {
@@ -3790,7 +4027,7 @@
         });
     })();
 
-    /* Quiz attempt / summary: confirm finish + optional countdown */
+    /* Quiz attempt / summary: Stitch focus UI + confirm finish + countdown */
     (function () {
         var root = document.querySelector('[data-region="quiz-attempt"], [data-region="quiz-summary"]');
         if (!root) {
@@ -3807,7 +4044,150 @@
                     }
                 }
             });
+            /* Moodle multichoice uses div labels — whole row selects the radio. */
+            form.addEventListener('click', function (ev) {
+                var row = ev.target.closest('.que.multichoice .answer .r0, .que.multichoice .answer .r1');
+                if (!row || !form.contains(row)) {
+                    return;
+                }
+                if (ev.target.closest('a, button, textarea, select')) {
+                    return;
+                }
+                var radio = row.querySelector('input[type="radio"]');
+                if (!radio || radio.disabled) {
+                    return;
+                }
+                if (ev.target !== radio) {
+                    radio.checked = true;
+                    radio.dispatchEvent(new Event('input', { bubbles: true }));
+                    radio.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
         }
+
+        var blocks = Array.prototype.slice.call(root.querySelectorAll('.lp-quiz-question'));
+        var total = blocks.length;
+        var current = 1;
+        var answeredEl = root.querySelector('[data-lp-quiz-answered]');
+        var currentEl = root.querySelector('[data-lp-quiz-current]');
+        var fill = root.querySelector('[data-lp-quiz-fill]');
+        var pctEl = root.querySelector('[data-lp-quiz-pct]');
+        var prevBtn = root.querySelector('[data-lp-quiz-nav="prev"]');
+        var nextBtn = root.querySelector('[data-lp-quiz-nav="next"]');
+        var focusUi = root.classList.contains('is-focus-ui');
+
+        function blockAnswered(block) {
+            if (block.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked')) {
+                return true;
+            }
+            var text = block.querySelector('input[type="text"], textarea');
+            return !!(text && String(text.value || '').trim() !== '');
+        }
+
+        function refreshProgress() {
+            if (!total) {
+                return;
+            }
+            var answered = 0;
+            blocks.forEach(function (block) {
+                var ok = blockAnswered(block);
+                block.classList.toggle('is-answered', ok);
+                var tile = root.querySelector('[data-lp-quiz-jump="' + block.getAttribute('data-index') + '"]');
+                if (tile) {
+                    tile.classList.toggle('is-answered', ok);
+                    if (ok) {
+                        tile.classList.remove('is-todo');
+                    } else if (!tile.classList.contains('is-flagged')) {
+                        tile.classList.add('is-todo');
+                    }
+                }
+                if (ok) {
+                    answered += 1;
+                }
+            });
+            var pct = Math.round((answered / total) * 100);
+            if (answeredEl) {
+                answeredEl.textContent = answered + ' of ' + total + ' answered';
+            }
+            if (fill) {
+                fill.style.width = pct + '%';
+            }
+            if (pctEl) {
+                pctEl.textContent = pct + '%';
+            }
+        }
+
+        function setMode(mode) {
+            root.setAttribute('data-mode', mode);
+            root.classList.toggle('is-overview', mode === 'overview');
+            root.querySelectorAll('[data-lp-quiz-mode]').forEach(function (btn) {
+                var on = btn.getAttribute('data-lp-quiz-mode') === mode;
+                btn.classList.toggle('is-active', on);
+                btn.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            if (mode === 'overview') {
+                blocks.forEach(function (b) { b.hidden = false; b.classList.add('is-visible'); });
+            } else {
+                showQuestion(current);
+            }
+        }
+
+        function showQuestion(index) {
+            current = Math.min(Math.max(1, index), total || 1);
+            blocks.forEach(function (block) {
+                var i = parseInt(block.getAttribute('data-index') || '0', 10);
+                var on = i === current;
+                block.hidden = !on;
+                block.classList.toggle('is-visible', on);
+            });
+            root.querySelectorAll('[data-lp-quiz-jump]').forEach(function (tile) {
+                tile.classList.toggle('is-current', parseInt(tile.getAttribute('data-lp-quiz-jump'), 10) === current);
+            });
+            if (currentEl) {
+                currentEl.textContent = 'Question ' + current + ' of ' + total;
+            }
+            if (prevBtn) {
+                prevBtn.disabled = current <= 1;
+            }
+            if (nextBtn) {
+                nextBtn.disabled = current >= total;
+            }
+            var visible = root.querySelector('.lp-quiz-question.is-visible');
+            if (visible && root.getAttribute('data-mode') !== 'overview') {
+                visible.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        if (focusUi && total) {
+            root.querySelectorAll('[data-lp-quiz-mode]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    setMode(btn.getAttribute('data-lp-quiz-mode') || 'focus');
+                });
+            });
+            root.querySelectorAll('[data-lp-quiz-jump]').forEach(function (tile) {
+                tile.addEventListener('click', function () {
+                    if (root.getAttribute('data-mode') === 'overview') {
+                        setMode('focus');
+                    }
+                    showQuestion(parseInt(tile.getAttribute('data-lp-quiz-jump'), 10) || 1);
+                });
+            });
+            if (prevBtn) {
+                prevBtn.addEventListener('click', function () { showQuestion(current - 1); });
+            }
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function () { showQuestion(current + 1); });
+            }
+            setMode('focus');
+            showQuestion(1);
+        }
+
+        if (form && total) {
+            form.addEventListener('change', refreshProgress);
+            form.addEventListener('input', refreshProgress);
+            refreshProgress();
+        }
+
         var timerEl = root.querySelector('[data-lp-quiz-timer]');
         var timeupInput = root.querySelector('[data-lp-quiz-timeup]');
         var left = parseInt(root.getAttribute('data-timeleft') || '0', 10);

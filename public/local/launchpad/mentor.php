@@ -353,6 +353,8 @@ $nav = [
 
 $content = '';
 $pagetitle = get_string('mentor_area_heading', 'local_launchpad');
+$detaildata = null;
+$reviewdata = null;
 
 switch ($view) {
     case 'queue':
@@ -573,6 +575,37 @@ unset($group, $item);
 
 $notificationslabel = messaging::notifications_label($unread);
 
+// Mobile two-tier context: course + fellow/assign on deep views; single course when only one.
+$mobilecontexttrack = '';
+$mobilecontexttrackurl = '';
+$mobilecontextphase = '';
+if ($view === 'fellow' && !empty($detaildata) && is_array($detaildata)) {
+    $mobilecontexttrack = trim((string) ($detaildata['course_name'] ?? ''));
+    $mobilecontexttrackurl = $fellowsurl;
+    $mobilecontextphase = trim((string) ($detaildata['fellow_name'] ?? ''));
+} else if ($view === 'review' && !empty($reviewdata) && is_array($reviewdata)) {
+    $mobilecontexttrack = trim((string) ($reviewdata['course_name'] ?? ''));
+    $reviewcourseid = (int) ($reviewdata['course_id'] ?? 0);
+    $reviewfellowid = (int) ($reviewdata['fellow_id'] ?? $fellowid);
+    if ($reviewcourseid > 0 && $reviewfellowid > 0) {
+        $mobilecontexttrackurl = (new moodle_url(persona_home::MENTOR_PATH, [
+            'view' => 'fellow',
+            'userid' => $reviewfellowid,
+            'course' => $reviewcourseid,
+        ]))->out(false);
+    } else {
+        $mobilecontexttrackurl = $queueurl;
+    }
+    $assignname = trim((string) ($reviewdata['assign_name'] ?? ''));
+    $mobilecontextphase = $assignname !== ''
+        ? $assignname
+        : trim((string) ($reviewdata['fellow_name'] ?? ''));
+} else if (count($courses) === 1) {
+    $only = reset($courses);
+    $mobilecontexttrack = format_string((string) ($only->fullname ?? ''));
+    $mobilecontexttrackurl = $homeurl;
+}
+
 $mismatch = portal_gate::consume_modal_context();
 $mentorinitials = fellowship_dashboard::initials($USER);
 $mentoremail = trim((string) ($USER->email ?? ''));
@@ -586,6 +619,11 @@ $shell = $OUTPUT->render_from_template('local_launchpad/mentor_shell', array_mer
     'pagetitle' => $pagetitle,
     'home_url' => $homeurl,
     'assets' => $pluginbase . '/assets/img',
+    'has_mobile_context' => $mobilecontexttrack !== '',
+    'mobile_context_track' => $mobilecontexttrack,
+    'mobile_context_track_url' => $mobilecontexttrackurl !== '' ? $mobilecontexttrackurl : $homeurl,
+    'has_mobile_context_phase' => $mobilecontextphase !== '',
+    'mobile_context_phase' => $mobilecontextphase,
     'logout_url' => $logouturl,
     'profile_url' => $profileurl,
     'notifications_url' => $notificationsurl,

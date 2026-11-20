@@ -122,7 +122,10 @@ final class portal_gate {
         if (account_persona::is_admin($userid)) {
             return 'admin';
         }
-        if (account_persona::is_mentor($userid) || registration::is_portal_mentor($userid)) {
+        if (account_persona::is_mentor($userid)
+                || registration::is_portal_mentor($userid)) {
+            // is_portal_mentor already allows empty mentor shells and excludes
+            // employees/fellows with a poisoned toba_portal=mentor stamp.
             return 'mentor';
         }
         if (account_persona::is_employee($userid)) {

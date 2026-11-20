@@ -42,6 +42,10 @@ final class mentor_dashboard {
 
     /**
      * Whether this user may open the mentor shell.
+     *
+     * Real lp-* teacher seat, or a clean mentor portal tag for empty shells.
+     * Employees / fellows / admins are never allowed — wrong login tab must hit
+     * portal_gate mismatch, not the mentor UI.
      */
     public static function can_access(int $userid): bool {
         if ($userid <= 0) {
@@ -49,6 +53,11 @@ final class mentor_dashboard {
         }
         // Site admins use admin.php — do not linger on the Mentor shell.
         if (account_persona::is_admin($userid)) {
+            return false;
+        }
+        if (account_persona::is_employee($userid)
+                || account_persona::is_fellowship($userid)
+                || registration::is_self_registered_fellow($userid)) {
             return false;
         }
         // Teacher on lp-* OR mentor portal tag (empty queue OK until courses exist).

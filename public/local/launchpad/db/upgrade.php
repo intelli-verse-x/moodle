@@ -84,5 +84,235 @@ function xmldb_local_launchpad_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111608, 'local', 'launchpad');
     }
 
+    if ($oldversion < 2026111609) {
+        // Interim tip used briefly on wip/fellow-lesson-ux before cert tips were restored.
+        upgrade_plugin_savepoint(true, 2026111609, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111700) {
+        // Landing Sign-in handoff: clear is-leaving overlay on bfcache Back/Forward.
+        upgrade_plugin_savepoint(true, 2026111700, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111701) {
+        // Employer login/Access portal: restore pin in hook; skip testsession steal; persona Access portal.
+        upgrade_plugin_savepoint(true, 2026111701, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111702) {
+        // Cross-role portal: wrong login tab must not stamp/open another shell.
+        upgrade_plugin_savepoint(true, 2026111702, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111703) {
+        // Mentor tag must not be overwritten by fellow login / labelled as Fellow.
+        upgrade_plugin_savepoint(true, 2026111703, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111704) {
+        // Course ops Certificate panel: attach once / edit design / issue-safe detach.
+        upgrade_plugin_savepoint(true, 2026111704, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111705) {
+        // Cert Step 3: criteria gate, customcert URL → Progress, Download auto-issue PDF.
+        upgrade_plugin_savepoint(true, 2026111705, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111706) {
+        // Fellow lesson UX Slice 0–1: videowatch in LaunchPad shell + phase playlist / prev-next.
+        upgrade_plugin_savepoint(true, 2026111706, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111707) {
+        // Playlist/hero use Home fellow status labels; activity crumbs show track name.
+        upgrade_plugin_savepoint(true, 2026111707, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111708) {
+        // Fellow lesson UX Slice 2: live watch progress bar + Done without reload.
+        upgrade_plugin_savepoint(true, 2026111708, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111709) {
+        // Slice 2 tweak: stepped watch % in phase playlist; drop under-video notice.
+        upgrade_plugin_savepoint(true, 2026111709, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111710) {
+        // Fellow lesson UX Slice 3: Moodle VideoJS stage + downloads under player.
+        upgrade_plugin_savepoint(true, 2026111710, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111711) {
+        // Slice 3 fix: flush VideoJS AMD/CSS in custom Fellow/Employer shells.
+        upgrade_plugin_savepoint(true, 2026111711, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111712) {
+        // Slice 3 fix: also flush top-of-body JS (javascript-static / M.util.js_pending) so VideoJS boots.
+        upgrade_plugin_savepoint(true, 2026111712, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111713) {
+        // Slice 3: click-open speed menu, custom speed UI, quality gear for Moodle-stored videos.
+        upgrade_plugin_savepoint(true, 2026111713, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111714) {
+        // Cross-role: poisoned mentor tag must not override employee/fellow shells.
+        upgrade_plugin_savepoint(true, 2026111714, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111715) {
+        // Stitch-aligned Fellow lesson shell: playlist right, real phase progress, download cards.
+        upgrade_plugin_savepoint(true, 2026111715, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111716) {
+        // Fellow lesson UX Slice 4: readable text article stage; E7 only when real sections exist.
+        upgrade_plugin_savepoint(true, 2026111716, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111717) {
+        // Next stays visible but locked until fellow-access-complete / videowatch Done.
+        upgrade_plugin_savepoint(true, 2026111717, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111718) {
+        // Fix video length meta when lang cache is stale; drop duplicate bottom Next.
+        upgrade_plugin_savepoint(true, 2026111718, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111719) {
+        // Drop native VideoJS title tooltip over the player (title already in hero).
+        upgrade_plugin_savepoint(true, 2026111719, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111720) {
+        // Compact < > prev/next in activity topbar; remove long Next/Previous buttons.
+        upgrade_plugin_savepoint(true, 2026111720, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111721) {
+        // Assign file dropzone: PDF/DOCX only, 1 file, Moodle file plugin + size/type checks.
+        upgrade_plugin_savepoint(true, 2026111721, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111722) {
+        // Draft Remove file; honour assignsubmission_file max files/size/types; submitted stays locked.
+        upgrade_plugin_savepoint(true, 2026111722, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111723) {
+        // Fellow mobile topbar: Stitch two-tier brand + track/phase context (portal only).
+        upgrade_plugin_savepoint(true, 2026111723, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111724) {
+        // Fellow mobile V2: phase playlist as bottom-sheet drawer (desktop rail unchanged).
+        upgrade_plugin_savepoint(true, 2026111724, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111725) {
+        // Mobile polish: chevrons, downloads separator, no syllabus dim, control-bar align, syllabus string.
+        upgrade_plugin_savepoint(true, 2026111725, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111726) {
+        // VideoJS bar: progress-on-top ref layout, hide LIVE, responsive control row.
+        upgrade_plugin_savepoint(true, 2026111726, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111727) {
+        // Stitch video player: boot poster/loader → center play; white scrubber; no FOUC.
+        upgrade_plugin_savepoint(true, 2026111727, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111728) {
+        // Control bar: remove PiP; strict play·volume·time | 1x·CC·gear·FS order.
+        upgrade_plugin_savepoint(true, 2026111728, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111729) {
+        // Mobile control bar: single nowrap row; progress absolute; volume icon-only.
+        upgrade_plugin_savepoint(true, 2026111729, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111730) {
+        // Mobile: tap video to re-show controls; idle bar pointer-events none.
+        upgrade_plugin_savepoint(true, 2026111730, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111731) {
+        // Mobile: full-width 16:9 only (no full-height); Stitch compact control chrome.
+        upgrade_plugin_savepoint(true, 2026111731, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111732) {
+        // Fix playback-rate menu: explicit rate apply + unclip overflow for popups.
+        upgrade_plugin_savepoint(true, 2026111732, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111737) {
+        // Custom rate popover; stop videowatch forcing 1x; clip player corners.
+        upgrade_plugin_savepoint(true, 2026111737, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111738) {
+        // Video stage fill: absolute tech + object-fit cover (16:9 stage).
+        upgrade_plugin_savepoint(true, 2026111738, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111739) {
+        // Drop branded blue stage underlay; black boot → gone on play.
+        upgrade_plugin_savepoint(true, 2026111739, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111740) {
+        // Mobile two-tier topbar for employer / mentor / admin (role-specific context).
+        upgrade_plugin_savepoint(true, 2026111740, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111741) {
+        // Employer mobile Dot Dot: 72px (Fellow parity); fix cascade after base orbit.
+        upgrade_plugin_savepoint(true, 2026111741, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111742) {
+        // Fellow level-up modal + badge toast (achievement unlock celebrations).
+        upgrade_plugin_savepoint(true, 2026111742, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111743) {
+        // Fellow unlock celebrations (level-up modal + badge toast); no QA panel.
+        upgrade_plugin_savepoint(true, 2026111743, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111744) {
+        // Mobile video full-bleed in lesson card (Stitch expanded layout); roomier controls.
+        upgrade_plugin_savepoint(true, 2026111744, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111745) {
+        // Slice 5: quiz all-on-one-page defaults + calm single-page attempt / review next CTA.
+        upgrade_plugin_savepoint(true, 2026111745, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111746) {
+        // Quiz option rows clickable (Moodle div labels don't toggle radios without theme JS).
+        upgrade_plugin_savepoint(true, 2026111746, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111747) {
+        // Stitch quiz Focus Mode + Question Palette (desktop/mobile).
+        upgrade_plugin_savepoint(true, 2026111747, 'local', 'launchpad');
+    }
+
+    if ($oldversion < 2026111748) {
+        // Quiz: strip Moodle fieldset/info chrome; Stitch option cards + flag pill.
+        upgrade_plugin_savepoint(true, 2026111748, 'local', 'launchpad');
+    }
+
     return true;
 }

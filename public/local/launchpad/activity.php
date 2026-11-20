@@ -39,15 +39,25 @@ if (!account_persona::is_employee((int) $USER->id) && !is_siteadmin()) {
 
 $activityctx = activity_portal::export($USER, $cmid);
 $courseid = (int) ($activityctx['activity']['courseid'] ?? 0);
+$needvideojs = !empty($activityctx['activity']['hasvideoembed']);
 
 // Shell chrome (nav, urls, strings) from Employer dashboard; content from activity.
 $shell = employer_dashboard::export_for_template($USER, 'course', $courseid);
+$act = is_array($activityctx['activity'] ?? null) ? $activityctx['activity'] : [];
+$shelltrack = trim((string) ($act['shell_track_label'] ?? $act['coursename'] ?? ''));
+$shellphase = trim((string) ($act['shell_phase_label'] ?? ''));
+$shellback = (string) ($act['shell_back_url'] ?? $act['courseurl'] ?? '');
 $templatecontext = array_merge($shell, $activityctx, [
     'is_home' => false,
     'is_courses' => false,
     'is_course' => false,
     'is_activity' => true,
     'pagetitle' => (string) ($activityctx['pagetitle'] ?? $shell['pagetitle']),
+    'has_mobile_context' => $shelltrack !== '',
+    'mobile_context_track' => $shelltrack,
+    'mobile_context_track_url' => $shellback !== '' ? $shellback : '#',
+    'has_mobile_context_phase' => $shellphase !== '',
+    'mobile_context_phase' => $shellphase,
 ]);
 
 $PAGE->set_context(context_system::instance());
@@ -76,10 +86,22 @@ echo '<link rel="preconnect" href="https://fonts.googleapis.com">' . "\n";
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
 echo '<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">' . "\n";
 echo '<link rel="stylesheet" href="' . s($cssurl) . '">' . "\n";
+if (!empty($needvideojs)) {
+    echo '<link rel="stylesheet" href="' . s((new moodle_url('/media/player/videojs/styles.css'))->out(false)) . '">' . "\n";
+    echo $PAGE->requires->get_head_code($PAGE, $OUTPUT);
+}
 echo '<script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>' . "\n";
 echo '</head>' . "\n";
 echo '<body class="local-launchpad-employer">' . "\n";
+if (!empty($needvideojs)) {
+    // javascript-static.js + jQuery/YUI — required before media_videojs/loader AMD boots.
+    echo $PAGE->requires->get_top_of_body_code($OUTPUT);
+}
 echo $body;
 echo '<script src="' . s($jsurl) . '" defer></script>' . "\n";
+if (!empty($needvideojs)) {
+    echo $PAGE->requires->get_end_code();
+    echo '<script src="' . s($pluginbase . '/video_player.js?v=' . rawurlencode($assetv)) . '" defer></script>' . "\n";
+}
 echo '</body>' . "\n";
 echo '</html>';

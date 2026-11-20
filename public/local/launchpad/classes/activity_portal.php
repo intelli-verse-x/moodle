@@ -135,15 +135,13 @@ final class activity_portal {
             ? $cm->url->out(false)
             : (new \moodle_url('/mod/' . $modname . '/view.php', ['id' => $cm->id]))->out(false);
 
-        $completion = new \completion_info($course);
+        // Fellow status is refreshed after view handlers (page/resource may mark complete).
         $tracked = false;
         $complete = false;
-        if ($completion->is_enabled($cm) != COMPLETION_TRACKING_NONE) {
-            $tracked = true;
-            $data = $completion->get_data($cm, false, (int) $user->id);
-            $complete = ((int) $data->completionstate === COMPLETION_COMPLETE
-                || (int) $data->completionstate === COMPLETION_COMPLETE_PASS);
-        }
+        $accesscomplete = true;
+        $status = '';
+        $statustone = 'run';
+        $rowstatus = [];
 
         $typename = method_exists($cm, 'get_module_type_name')
             ? (string) $cm->get_module_type_name()
@@ -168,8 +166,16 @@ final class activity_portal {
         $hasembed = false;
         $videourl = '';
         $hasvideo = false;
+        $videoembedhtml = '';
+        $hasvideoembed = false;
+        $videoqualities = [];
+        /** @var \moodle_url|null */
+        $videoembedurl = null;
         $files = [];
         $hasfiles = false;
+        $videoresources = [];
+        $hasvideoresources = false;
+        $videowatch = self::empty_videowatch();
         $isinportal = self::is_portal_renderable($modname);
         $needsengine = !$isinportal;
         $callouttext = '';
@@ -245,15 +251,16 @@ final class activity_portal {
                 }
                 $mimetype = (string) $file->get_mimetype();
                 $isvideo = str_starts_with($mimetype, 'video/');
-                $streamurl = \moodle_url::make_pluginfile_url(
-                    $context->id,
-                    'mod_resource',
-                    'content',
-                    $file->get_itemid(),
-                    $file->get_filepath(),
+                $streammoodleurl = \moodle_url::make_pluginfile_url(
+                        $context->id,
+                        'mod_resource',
+                        'content',
+                        $file->get_itemid(),
+                        $file->get_filepath(),
                     $file->get_filename(),
                     false
-                )->out(false);
+                );
+                $streamurl = $streammoodleurl->out(false);
                 $downloadurl = \moodle_url::make_pluginfile_url(
                         $context->id,
                         'mod_resource',
@@ -263,10 +270,11 @@ final class activity_portal {
                     $file->get_filename(),
                     true
                 )->out(false);
-                // First video file plays in-shell (Udemy-style showcase player).
+                // First video file plays in-shell (Slice 3: Moodle VideoJS when possible).
                 if ($isvideo && !$hasvideo) {
                     $hasvideo = true;
                     $videourl = $streamurl;
+                    $videoembedurl = $streammoodleurl;
                 }
                 $card = self::describe_resource_file($file, $context);
                 $files[] = array_merge($card, [
@@ -276,6 +284,108 @@ final class activity_portal {
                 ]);
             }
             $hasfiles = $files !== [];
+            // Supporting downloads under the player (non-video files on the same resource).
+            if ($hasvideo) {
+                foreach ($files as $card) {
+                    if (empty($card['isvideo'])) {
+                        $videoresources[] = $card;
+                    }
+                }
+                $hasvideoresources = $videoresources !== [];
+            }
+            // Slice 3: Moodle core_media_manager → VideoJS (same path as mod_resource).
+            // Stock resource embed uses resource->revision as the pluginfile itemid (cache-bust).
+            if ($hasvideo && $videoembedurl instanceof \moodle_url) {
+                global $PAGE;
+                $videofile = null;
+                foreach ($stored as $candidate) {
+                    if ($candidate->is_directory()) {
+                        continue;
+                    }
+                    if (str_starts_with((string) $candidate->get_mimetype(), 'video/')) {
+                        $videofile = $candidate;
+                        break;
+                    }
+                }
+                if ($videofile instanceof \stored_file) {
+                    $videoembedurl = \moodle_url::make_pluginfile_url(
+                        $context->id,
+                        'mod_resource',
+                        'content',
+                        (int) ($resource->revision ?? 0),
+                        $videofile->get_filepath(),
+                        $videofile->get_filename(),
+                        false
+                    );
+                    $videourl = $videoembedurl->out(false);
+                }
+                // Quality variants: every video file in this resource (Moodle pluginfile).
+                // Filename hints like "1080p" / "720p" become labels; otherwise JS uses height.
+                $videoqualities = [];
+                foreach ($stored as $candidate) {
+                    if ($candidate->is_directory()) {
+                        continue;
+                    }
+                    if (!str_starts_with((string) $candidate->get_mimetype(), 'video/')) {
+                        continue;
+                    }
+                    $qurl = \moodle_url::make_pluginfile_url(
+                        $context->id,
+                        'mod_resource',
+                        'content',
+                        (int) ($resource->revision ?? 0),
+                        $candidate->get_filepath(),
+                        $candidate->get_filename(),
+                        false
+                    );
+                    $videoqualities[] = [
+                        'src' => $qurl->out(false),
+                        'type' => (string) $candidate->get_mimetype(),
+                        'label' => self::video_quality_label_from_filename($candidate->get_filename()),
+                        'filename' => $candidate->get_filename(),
+                        'filesize' => (int) $candidate->get_filesize(),
+                    ];
+                }
+                usort($videoqualities, static function (array $a, array $b): int {
+                    $ha = self::video_quality_sort_height($a['label']);
+                    $hb = self::video_quality_sort_height($b['label']);
+                    if ($ha !== $hb) {
+                        return $hb <=> $ha;
+                    }
+                    return ($b['filesize'] ?? 0) <=> ($a['filesize'] ?? 0);
+                });
+                $mediamanager = \core_media_manager::instance($PAGE);
+                // Omit OPTION_BLOCK — LaunchPad already wraps the stage (.lp-activity-player).
+                $embedoptions = [
+                    \core_media_manager::OPTION_TRUSTED => true,
+                ];
+                if ($mediamanager->can_embed_url($videoembedurl, $embedoptions)) {
+                    // Trust core embed HTML as-is. Do not format_text/filter — mediaplugin
+                    // would nest a second VideoJS wrapper and LaunchPad shells flush JS separately.
+                    // Pass empty name — LaunchPad already shows the lesson title in the hero.
+                    // Moodle VideoJS still stamps a title (filename fallback); strip it so the
+                    // browser does not show a native tooltip over the player on hover.
+                    $videoembedhtml = $mediamanager->embed_url(
+                        $videoembedurl,
+                        '',
+                        0,
+                        0,
+                        $embedoptions
+                    );
+                    if (trim($videoembedhtml) !== '') {
+                        $videoembedhtml = preg_replace('/\s+title=(["\']).*?\1/i', '', $videoembedhtml) ?? $videoembedhtml;
+                        $hasvideoembed = true;
+                    }
+                }
+            }
+            // Slice 0: mount local_videowatch guard when this file is a deferred video.
+            if ($hasvideo && class_exists(\local_videowatch\policy::class)
+                    && method_exists(\local_videowatch\policy::class, 'export_mount')) {
+                $vw = \local_videowatch\policy::export_mount($cm, $context, (int) $user->id);
+                if ($vw !== null) {
+                    $videowatch = $vw;
+                }
+            }
         } else if ($modname === 'assign') {
             // Assignment brief + submit/status/feedback run inside LaunchPad.
             require_capability('mod/assign:view', $context);
@@ -302,21 +412,35 @@ final class activity_portal {
             $isinportal = false;
         }
 
-        if ($tracked && $complete) {
-            $status = get_string('employer_activity_complete', 'local_launchpad');
-            $statustone = 'ok';
-        } else if ($tracked) {
-            $status = get_string('employer_activity_incomplete', 'local_launchpad');
-            $statustone = 'run';
-        } else {
-            $status = get_string('employer_activity_not_tracked', 'local_launchpad');
-            $statustone = 'line';
-        }
-
         $sectionname = '';
         $sectionnum = (int) $cm->sectionnum;
         if ($sectionnum > 0) {
             $sectionname = get_section_name($course, $sectionnum);
+        }
+
+        // Status after view handlers so view-complete pages unlock Next honestly.
+        $completion = new \completion_info($course);
+        $completiontracked = $completion->is_enabled($cm) != COMPLETION_TRACKING_NONE;
+        $completioncomplete = false;
+        if ($completiontracked) {
+            $data = $completion->get_data($cm, false, (int) $user->id);
+            $completioncomplete = ((int) $data->completionstate === COMPLETION_COMPLETE
+                || (int) $data->completionstate === COMPLETION_COMPLETE_PASS);
+        }
+        $rowstatus = fellowship_dashboard::activity_row_status(
+            $cm,
+            (int) $user->id,
+            $completiontracked,
+            $completioncomplete
+        );
+        $tracked = !empty($rowstatus['tracked']) || !empty($rowstatus['show_status']);
+        $complete = !empty($rowstatus['complete']);
+        $accesscomplete = fellowship_dashboard::activity_access_complete($rowstatus);
+        $status = (string) ($rowstatus['status_label'] ?? '');
+        $statustone = self::status_chip_tone((string) ($rowstatus['status_chip'] ?? ''));
+        if ($status === '' && !empty($rowstatus['show_status'])) {
+            $status = get_string('fellowship_incomplete', 'local_launchpad');
+            $statustone = 'run';
         }
 
         $hasbody = trim(strip_tags($bodyhtml)) !== '';
@@ -328,6 +452,46 @@ final class activity_portal {
         $lesson = $islesson
             ? self::build_lesson_layout($bodyhtml, $introhtml, $hasintro, $course, $cm, (int) $user->id, $courseurl)
             : self::empty_lesson_layout();
+
+        // Slice 1: shared shell chrome — phase playlist + prev/next for all in-shell types.
+        $shell = self::build_shell_nav($cm, $course, (int) $user->id, $courseurl, $sectionname);
+
+        // Next stays visible but locked until fellow-access-complete (or videowatch Done).
+        $navnextlocked = false;
+        if (!empty($shell['nav_has_next'])) {
+            if (!empty($videowatch['videowatch_enabled']) && empty($videowatch['videowatch_completed'])) {
+                $navnextlocked = true;
+            } else if ($tracked && !$accesscomplete) {
+                $navnextlocked = true;
+            }
+        }
+        $shell['nav_next_locked'] = $navnextlocked;
+
+        // Keep E7 lesson next fields in sync with shared next when present.
+        if ($islesson && !empty($shell['nav_has_next'])) {
+            $lesson['lesson_has_next'] = true;
+            $lesson['lesson_next_name'] = $shell['nav_next_name'];
+            $lesson['lesson_next_url'] = $shell['nav_next_url'];
+            $lesson['lesson_next_mod'] = $shell['nav_next_mod'];
+        }
+        if ($islesson) {
+            $lesson['lesson_track_label'] = $shell['shell_track_label'];
+            $lesson['lesson_phase_label'] = $shell['shell_phase_label'];
+            $lesson['lesson_back_url'] = $courseurl;
+        }
+
+        // Slice 2: stepped watch bar on the current playlist row (This phase), not under the video.
+        if (!empty($videowatch['videowatch_enabled']) && !empty($shell['playlist']) && is_array($shell['playlist'])) {
+            foreach ($shell['playlist'] as $idx => $item) {
+                if (!empty($item['current'])) {
+                    $shell['playlist'][$idx]['show_watch_bar'] = true;
+                    $shell['playlist'][$idx]['watch_pct'] = (int) ($videowatch['videowatch_pct'] ?? 0);
+                    $shell['playlist'][$idx]['watch_completed'] = !empty($videowatch['videowatch_completed']);
+                } else {
+                    $shell['playlist'][$idx]['show_watch_bar'] = false;
+                }
+            }
+        }
 
         return [
             'is_activity' => true,
@@ -370,13 +534,266 @@ final class activity_portal {
                 'hasembed' => $hasembed,
                 'videourl' => $videourl,
                 'hasvideo' => $hasvideo,
+                'videoembedhtml' => $videoembedhtml,
+                'hasvideoembed' => $hasvideoembed,
+                'videoqualities_json' => json_encode(
+                    array_values($videoqualities),
+                    JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS
+                ),
+                'video_resources' => $videoresources,
+                'has_video_resources' => $hasvideoresources,
+                // Length only when videowatch already measured a real duration.
+                'has_video_length' => !empty($videowatch['videowatch_enabled'])
+                    && (int) ($videowatch['videowatch_duration'] ?? 0) > 0,
+                'video_length_meta' => self::format_video_length_meta(
+                    (int) ($videowatch['videowatch_duration'] ?? 0)
+                ),
                 'files' => $files,
-                'hasfiles' => $hasfiles && !$hasvideo, // When playing video, don't duplicate as a file list.
+                // Non-video resource lists; video case uses video_resources under the player.
+                'hasfiles' => $hasfiles && !$hasvideo,
                 'isinportal' => $isinportal,
                 'needsengine' => $needsengine,
                 'is_lesson' => $islesson,
-            ], $lesson, $assignbrief, $quizbrief),
+            ], $videowatch, $shell, $lesson, $assignbrief, $quizbrief),
         ];
+    }
+
+    /**
+     * Short length label from a real videowatch duration (seconds). Empty if unknown.
+     * Falls back to plain English when lang cache is stale so UI never shows [[keys]].
+     */
+    public static function format_video_length_label(int $seconds): string {
+        if ($seconds <= 0) {
+            return '';
+        }
+        $sm = get_string_manager();
+        if ($seconds < 60) {
+            if ($sm->string_exists('fellowship_video_length_sec', 'local_launchpad')) {
+                return get_string('fellowship_video_length_sec', 'local_launchpad', $seconds);
+            }
+            return '~' . $seconds . ' sec';
+        }
+        $mins = (int) floor($seconds / 60);
+        $rem = $seconds % 60;
+        if ($rem === 0) {
+            if ($sm->string_exists('fellowship_video_length_min', 'local_launchpad')) {
+                return get_string('fellowship_video_length_min', 'local_launchpad', $mins);
+            }
+            return '~' . $mins . ' min';
+        }
+        if ($sm->string_exists('fellowship_video_length_minsec', 'local_launchpad')) {
+            return get_string('fellowship_video_length_minsec', 'local_launchpad', (object) [
+                'min' => $mins,
+                'sec' => $rem,
+            ]);
+        }
+        return '~' . $mins . ' min ' . $rem . 's';
+    }
+
+    /**
+     * Meta line for video length, e.g. "Length: ~24 sec". Empty when duration unknown.
+     */
+    public static function format_video_length_meta(int $seconds): string {
+        $value = self::format_video_length_label($seconds);
+        if ($value === '') {
+            return '';
+        }
+        $sm = get_string_manager();
+        if ($sm->string_exists('fellowship_video_length', 'local_launchpad')) {
+            return get_string('fellowship_video_length', 'local_launchpad') . ': ' . $value;
+        }
+        return 'Length: ' . $value;
+    }
+
+    /**
+     * Empty videowatch mount context (non-video / policy off).
+     *
+     * @return array<string,mixed>
+     */
+    public static function empty_videowatch(): array {
+        return [
+            'videowatch_enabled' => false,
+            'videowatch_cmid' => 0,
+            'videowatch_sesskey' => '',
+            'videowatch_url' => '',
+            'videowatch_frontier' => 0,
+            'videowatch_duration' => 0,
+            'videowatch_required' => 0,
+            'videowatch_pct' => 0,
+            'videowatch_completed' => false,
+            'videowatch_guardscript' => '',
+            'videowatch_notice' => '',
+        ];
+    }
+
+    /**
+     * Shared Fellow shell chrome: phase label, playlist, prev/next.
+     *
+     * @return array<string,mixed>
+     */
+    public static function build_shell_nav(
+        \cm_info $cm,
+        \stdClass $course,
+        int $userid,
+        string $courseurl,
+        string $sectionname
+    ): array {
+        $prev = self::previous_activity_before($cm, $course, $userid);
+        $next = self::next_activity_after($cm, $course, $userid);
+        $playlist = self::phase_playlist($cm, $course, $userid);
+
+        $phaselabel = $sectionname !== ''
+            ? format_string($sectionname)
+            : format_string(get_section_name($course, (int) $cm->sectionnum));
+
+        // Real phase progress from Moodle completion on playlist rows (no cosmetics).
+        $playlistdone = 0;
+        $playlisttotal = count($playlist);
+        $foundcurrent = false;
+        $markedupnext = false;
+        foreach ($playlist as $idx => $item) {
+            if (!empty($item['complete'])) {
+                $playlistdone++;
+            }
+            $playlist[$idx]['is_now'] = !empty($item['current']);
+            $playlist[$idx]['is_up_next'] = false;
+            if (!empty($item['current'])) {
+                $foundcurrent = true;
+                continue;
+            }
+            // First item after the current row = Up next (real neighbour).
+            if ($foundcurrent && !$markedupnext) {
+                $playlist[$idx]['is_up_next'] = true;
+                $markedupnext = true;
+            }
+        }
+        $playlistpct = $playlisttotal > 0
+            ? (int) round(($playlistdone / $playlisttotal) * 100)
+            : 0;
+
+        return [
+            'shell_track_label' => format_string($course->fullname),
+            'shell_phase_label' => $phaselabel,
+            'shell_has_phase' => trim($phaselabel) !== '',
+            'shell_back_url' => $courseurl,
+            'nav_has_prev' => $prev !== null,
+            'nav_prev_name' => $prev['name'] ?? '',
+            'nav_prev_url' => $prev['url'] ?? '',
+            'nav_prev_mod' => $prev['modname'] ?? '',
+            'nav_has_next' => $next !== null,
+            'nav_next_name' => $next['name'] ?? '',
+            'nav_next_url' => $next['url'] ?? '',
+            'nav_next_mod' => $next['modname'] ?? '',
+            'nav_has_either' => $prev !== null || $next !== null,
+            'playlist' => $playlist,
+            'has_playlist' => $playlist !== [],
+            'playlist_count' => $playlisttotal,
+            'playlist_done' => $playlistdone,
+            'playlist_progress_pct' => $playlistpct,
+            'playlist_has_progress' => $playlisttotal > 0,
+            'playlist_progress_label' => $playlisttotal > 0
+                ? get_string('fellowship_playlist_progress', 'local_launchpad', (object) [
+                    'done' => $playlistdone,
+                    'total' => $playlisttotal,
+                ])
+                : '',
+        ];
+    }
+
+    /**
+     * Visible CMs in the current section/phase with completion flags.
+     *
+     * @return list<array{
+     *   cmid:int,
+     *   name:string,
+     *   url:string,
+     *   modname:string,
+     *   complete:bool,
+     *   tracked:bool,
+     *   current:bool,
+     *   status_label:string
+     * }>
+     */
+    public static function phase_playlist(\cm_info $cm, \stdClass $course, int $userid): array {
+        global $CFG;
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $modinfo = get_fast_modinfo($course, $userid);
+        $sectionnum = (int) $cm->sectionnum;
+        $sectioncms = $modinfo->get_sections()[$sectionnum] ?? [];
+        if ($sectioncms === []) {
+            return [];
+        }
+
+        $completion = new \completion_info($course);
+        $completionenabled = $completion->is_enabled();
+        $cms = $modinfo->get_cms();
+        $items = [];
+
+        foreach ($sectioncms as $otherid) {
+            if (!isset($cms[$otherid])) {
+                continue;
+            }
+            $other = $cms[$otherid];
+            if (!$other->uservisible || $other->deletioninprogress) {
+                continue;
+            }
+            if ($other->modname === 'label') {
+                continue;
+            }
+
+            $completiontracked = false;
+            $completioncomplete = false;
+            if ($completionenabled && $completion->is_enabled($other) != COMPLETION_TRACKING_NONE) {
+                $completiontracked = true;
+                $data = $completion->get_data($other, false, $userid);
+                $state = (int) $data->completionstate;
+                $completioncomplete = ($state === COMPLETION_COMPLETE || $state === COMPLETION_COMPLETE_PASS);
+            }
+
+            $rowstatus = fellowship_dashboard::activity_row_status(
+                $other,
+                $userid,
+                $completiontracked,
+                $completioncomplete
+            );
+            $iscomplete = !empty($rowstatus['complete']);
+            $tracked = !empty($rowstatus['tracked']) || !empty($rowstatus['show_status']);
+            $statuslabel = (string) ($rowstatus['status_label'] ?? '');
+            // Prefer Home labels; fall back to short playlist copy only when still empty + tracked.
+            if ($statuslabel === '' && $tracked) {
+                $statuslabel = $iscomplete
+                    ? get_string('fellowship_playlist_done', 'local_launchpad')
+                    : get_string('fellowship_playlist_todo', 'local_launchpad');
+            }
+
+            $items[] = [
+                'cmid' => (int) $other->id,
+                'name' => fellowship_dashboard::display_label($other->get_formatted_name()),
+                'url' => self::fellow_url((int) $other->id),
+                'modname' => (string) $other->modname,
+                'complete' => $iscomplete,
+                'tracked' => $tracked,
+                'current' => ((int) $other->id === (int) $cm->id),
+                'status_label' => $statuslabel,
+                'has_status' => $statuslabel !== '',
+                'status_chip' => (string) ($rowstatus['status_chip'] ?? ''),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Map Home/My-track status_chip → activity badge tone class.
+     */
+    public static function status_chip_tone(string $chip): string {
+        return match ($chip) {
+            'ok' => 'ok',
+            'warn' => 'warn',
+            'line' => 'line',
+            default => 'run',
+        };
     }
 
     /**
@@ -795,6 +1212,12 @@ final class activity_portal {
     public static function empty_lesson_layout(): array {
         return [
             'lesson_structured' => false,
+            'lesson_use_e7' => false,
+            'lesson_use_article' => false,
+            'lesson_article_html' => '',
+            'lesson_has_article' => false,
+            'lesson_article_intro_html' => '',
+            'lesson_has_article_intro' => false,
             'lesson_objective_html' => '',
             'lesson_has_objective' => false,
             'lesson_explain_html' => '',
@@ -831,28 +1254,35 @@ final class activity_portal {
         $exercise = $parsed['exercise_html'];
         $structured = $parsed['structured'];
 
-        // Unstructured pages: intro → objective, body → explanation (still show section chrome).
-        if (!$structured) {
-            if ($hasintro && trim(strip_tags($introhtml)) !== '') {
-                $objective = $introhtml;
-            }
-            if ($explain === '' && trim(strip_tags($bodyhtml)) !== '') {
-                $explain = $bodyhtml;
-            }
-        }
+        $hasarticle = trim(strip_tags($bodyhtml)) !== '';
+        $hasarticleintro = $hasintro && trim(strip_tags($introhtml)) !== '';
+        // Slice 4: unstructured pages use a readable article stage (no fake empty E7 buckets).
+        $usearticle = !$structured && ($hasarticle || $hasarticleintro);
+        $usee7 = $structured;
+
+        $nextobjective = $usee7 ? $objective : '';
+        $nextexplain = $usee7 ? $explain : '';
+        $nextexample = $usee7 ? $example : '';
+        $nextexercise = $usee7 ? $exercise : '';
 
         $next = self::next_activity_after($cm, $course, $userid);
 
         return [
             'lesson_structured' => $structured,
-            'lesson_objective_html' => $objective,
-            'lesson_has_objective' => trim(strip_tags($objective)) !== '',
-            'lesson_explain_html' => $explain,
-            'lesson_has_explain' => trim(strip_tags($explain)) !== '',
-            'lesson_example_html' => $example,
-            'lesson_has_example' => trim(strip_tags($example)) !== '',
-            'lesson_exercise_html' => $exercise,
-            'lesson_has_exercise' => trim(strip_tags($exercise)) !== '',
+            'lesson_use_e7' => $usee7,
+            'lesson_use_article' => $usearticle,
+            'lesson_article_html' => $usearticle ? $bodyhtml : '',
+            'lesson_has_article' => $usearticle && $hasarticle,
+            'lesson_article_intro_html' => $usearticle ? $introhtml : '',
+            'lesson_has_article_intro' => $usearticle && $hasarticleintro,
+            'lesson_objective_html' => $nextobjective,
+            'lesson_has_objective' => trim(strip_tags($nextobjective)) !== '',
+            'lesson_explain_html' => $nextexplain,
+            'lesson_has_explain' => trim(strip_tags($nextexplain)) !== '',
+            'lesson_example_html' => $nextexample,
+            'lesson_has_example' => trim(strip_tags($nextexample)) !== '',
+            'lesson_exercise_html' => $nextexercise,
+            'lesson_has_exercise' => trim(strip_tags($nextexercise)) !== '',
             'lesson_has_next' => $next !== null,
             'lesson_next_name' => $next['name'] ?? '',
             'lesson_next_url' => $next['url'] ?? '',
@@ -994,8 +1424,32 @@ final class activity_portal {
      * @return array{cmid:int,name:string,url:string,modname:string}|null
      */
     public static function next_activity_after(\cm_info $cm, \stdClass $course, int $userid): ?array {
+        return self::adjacent_activity($cm, $course, $userid, 'next');
+    }
+
+    /**
+     * Previous visible activity before this CM on the course (fellow shell URL).
+     *
+     * @return array{cmid:int,name:string,url:string,modname:string}|null
+     */
+    public static function previous_activity_before(\cm_info $cm, \stdClass $course, int $userid): ?array {
+        return self::adjacent_activity($cm, $course, $userid, 'prev');
+    }
+
+    /**
+     * Walk visible course CMs in modinfo order and return the neighbour.
+     *
+     * @param 'next'|'prev' $direction
+     * @return array{cmid:int,name:string,url:string,modname:string}|null
+     */
+    private static function adjacent_activity(
+        \cm_info $cm,
+        \stdClass $course,
+        int $userid,
+        string $direction
+    ): ?array {
         $modinfo = get_fast_modinfo($course, $userid);
-        $found = false;
+        $list = [];
         foreach ($modinfo->get_cms() as $other) {
             if (!$other->uservisible || $other->deletioninprogress) {
                 continue;
@@ -1004,19 +1458,56 @@ final class activity_portal {
             if ($other->modname === 'label') {
                 continue;
             }
-            if ($found) {
-                return [
-                    'cmid' => (int) $other->id,
-                    'name' => fellowship_dashboard::display_label($other->get_formatted_name()),
-                    'url' => self::fellow_url((int) $other->id),
-                    'modname' => (string) $other->modname,
-                ];
-            }
+            $list[] = $other;
+        }
+
+        $idx = null;
+        foreach ($list as $i => $other) {
             if ((int) $other->id === (int) $cm->id) {
-                $found = true;
+                $idx = $i;
+                break;
             }
         }
-        return null;
+        if ($idx === null) {
+            return null;
+        }
+
+        $target = null;
+        if ($direction === 'next' && isset($list[$idx + 1])) {
+            $target = $list[$idx + 1];
+        } else if ($direction === 'prev' && $idx > 0) {
+            $target = $list[$idx - 1];
+        }
+        if ($target === null) {
+            return null;
+        }
+
+        return [
+            'cmid' => (int) $target->id,
+            'name' => fellowship_dashboard::display_label($target->get_formatted_name()),
+            'url' => self::fellow_url((int) $target->id),
+            'modname' => (string) $target->modname,
+        ];
+    }
+
+    /**
+     * Quality label from filename hints (e.g. lesson-1080p.mp4 → 1080p).
+     */
+    private static function video_quality_label_from_filename(string $filename): string {
+        if (preg_match('/\b(2160|1440|1080|720|480|360|240)p\b/i', $filename, $m)) {
+            return $m[1] . 'p';
+        }
+        return '';
+    }
+
+    /**
+     * Sort key for quality labels (higher first). Unknown labels sort last.
+     */
+    private static function video_quality_sort_height(string $label): int {
+        if (preg_match('/^(\d+)p$/i', trim($label), $m)) {
+            return (int) $m[1];
+        }
+        return 0;
     }
 
     /**
